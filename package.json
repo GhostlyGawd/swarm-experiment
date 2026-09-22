@@ -4,9 +4,22 @@
   "description": "Project Aether — a unified, agent-native programming fabric and runtime substrate.",
   "type": "module",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GhostlyGawd/swarm-experiment.git"
+  },
+  "homepage": "https://github.com/GhostlyGawd/swarm-experiment#readme",
+  "bugs": {
+    "url": "https://github.com/GhostlyGawd/swarm-experiment/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22.6.0"

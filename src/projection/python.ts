@@ -1,5 +1,6 @@
 import type { Term, Ty } from '../tier1/ast.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
+import { unsupportedProjectionKinds } from './coverage.ts';
 
 export class PythonProjector {
   private readonly symbols: SymbolSpace;
@@ -46,4 +47,8 @@ export class PythonProjector {
   }
 }
 
-export const projectPython = (term: Term, symbols: SymbolSpace): string => new PythonProjector(symbols).project(term);
+export const projectPython = (term: Term, symbols: SymbolSpace): string => {
+  const unsupported = unsupportedProjectionKinds(term, 'python');
+  const warning = unsupported.length ? `# Placeholder projection for: ${unsupported.join(', ')}\n` : '';
+  return warning + new PythonProjector(symbols).project(term);
+};

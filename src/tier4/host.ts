@@ -3,7 +3,7 @@ import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
 import { CapabilitySealer, type CapabilityToken } from '../tier2/ocap.ts';
 import { ProductionRuntime, type CompileOptions } from '../tier3/compile.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
-import type { Ref, Value } from '../tier3/values.ts';
+import { isRef, type Ref, type Value } from '../tier3/values.ts';
 import type { EdgeTelemetry, FunctionTelemetry, Telemetry, TopologyPlan, Unit } from './topology.ts';
 
 export interface WireRequest {
@@ -76,7 +76,9 @@ export interface TopologyHostOptions extends CompileOptions {
 /** Executable host for a topology plan, including boundary and migration semantics. */
 export class TopologyHost {
   private planValue: TopologyPlan;
-  private readonly runtime: ProductionRuntime;
+  private readonly unitRuntimes = new Map<string, ProductionRuntime>();
+  private readonly module: Term;
+  private readonly compileOptions: TopologyHostOptions;
   private readonly units = new Map<SymbolId, string>();
   private readonly declarations = new Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>();
   private readonly partitioned = new Set<string>();
@@ -84,22 +86,41 @@ export class TopologyHost {
   private readonly sealer: CapabilitySealer;
   private readonly telemetry: TelemetryCollector;
   private readonly clock: () => number;
+  private readonly recordOwners = new Map<number, string>();
 
   constructor(module: Term, plan: TopologyPlan, opts: TopologyHostOptions) {
     this.planValue = plan;
-    this.runtime = ProductionRuntime.compile(module, opts);
+    this.module = module;
+    this.compileOptions = opts;
     this.sealer = opts.sealer ?? new CapabilitySealer();
     this.telemetry = opts.telemetry ?? new TelemetryCollector();
     this.clock = opts.clock ?? (() => Date.now());
     for (const unit of plan.units) for (const symbol of unit.members) this.units.set(symbol, unit.id);
     const members = module.kind === 'Module' ? module.members : [module];
     for (const member of members) if (member.kind === 'FunctionDecl') this.declarations.set(member.symbol, member);
+    for (const unit of plan.units) this.rebuildUnit(unit.id);
   }
 
   get plan(): TopologyPlan { return this.planValue; }
+  get unitRuntimeCount(): number { return this.unitRuntimes.size; }
   unitFor(symbol: SymbolId): string | null { return this.units.get(symbol) ?? null; }
-  allocateRecord(ty: Ty, fields: Record<string, Value>): Ref { return this.runtime.allocateRecord(ty, fields); }
-  readRecord(ref: Ref): ReadonlyMap<string, Value> { return this.runtime.readRecord(ref); }
+  allocateRecord(ty: Ty, fields: Record<string, Value>): Ref {
+    let allocated: Ref | null = null;
+    for (const [unit, runtime] of this.unitRuntimes) {
+      const ref = runtime.allocateRecord(ty, fields);
+      if (allocated && allocated.addr !== ref.addr) throw new Error('unit heaps lost deterministic allocation alignment');
+      allocated = ref;
+      if (!this.recordOwners.has(ref.addr)) this.recordOwners.set(ref.addr, unit);
+    }
+    if (!allocated) throw new Error('topology has no runtime units');
+    return allocated;
+  }
+  readRecord(ref: Ref): ReadonlyMap<string, Value> {
+    const owner = this.recordOwners.get(ref.addr);
+    const runtime = owner ? this.unitRuntimes.get(owner) : this.unitRuntimes.values().next().value;
+    if (!runtime) throw new RangeError(`no unit owns @${ref.addr}`);
+    return runtime.readRecord(ref);
+  }
   setPartition(unit: string, partitioned: boolean): void {
     if (partitioned) this.partitioned.add(unit); else this.partitioned.delete(unit);
   }
@@ -108,7 +129,18 @@ export class TopologyHost {
     const started = this.clock();
     this.active.set(symbol, (this.active.get(symbol) ?? 0) + 1);
     try {
-      return this.runtime.call(symbol, args);
+      const unit = this.unitFor(symbol);
+      const runtime = unit ? this.unitRuntimes.get(unit) : undefined;
+      if (!runtime) {
+        return {
+          ok: false,
+          fault: { kind: 'unbound', message: `${symbol} is not assigned to a runtime`, label: null, step: 0, bindings: {} },
+          steps: 0,
+        };
+      }
+      const result = runtime.call(symbol, args);
+      if (unit) for (const value of args) if (isRef(value)) this.recordOwners.set(value.addr, unit);
+      return result;
     } finally {
       this.active.set(symbol, (this.active.get(symbol) ?? 1) - 1);
       this.telemetry.record(from, symbol, this.clock() - started, estimatePayload(args));
@@ -156,11 +188,24 @@ export class TopologyHost {
       .filter((unit) => unit.members.length > 0);
     this.units.set(symbol, targetUnit);
     this.planValue = { ...this.planValue, units };
+    this.rebuildUnit(source);
+    this.rebuildUnit(targetUnit);
     return this.planValue;
   }
 
   collectTelemetry(windowSeconds: number): Telemetry {
     return this.telemetry.snapshot(windowSeconds, this.planValue.units);
+  }
+
+  private rebuildUnit(unitId: string): void {
+    const unit = this.planValue.units.find((candidate) => candidate.id === unitId);
+    if (!unit) { this.unitRuntimes.delete(unitId); return; }
+    const options: CompileOptions = {
+      ...this.compileOptions,
+      includeSymbols: unit.members,
+      callHandler: (callee, args, caller) => this.call(callee, args, caller),
+    };
+    this.unitRuntimes.set(unitId, ProductionRuntime.compile(this.module, options));
   }
 }
 

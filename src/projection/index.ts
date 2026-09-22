@@ -4,4 +4,5 @@ export { TypeNames } from './names.ts';
 export { PythonProjector, projectPython } from './python.ts';
 export { RustProjector, projectRust } from './rust.ts';
 export { projectDiff, structuralDiff, type ProjectionDiffEntry } from './diff.ts';
-export { ProjectionLanguageServer, type JsonRpcRequest, type JsonRpcResponse, type ProjectionDocument } from './lsp.ts';
+export { LspStreamDecoder, ProjectionLanguageServer, encodeLspMessage, type JsonRpcRequest, type JsonRpcResponse, type ProjectionDiagnostic, type ProjectionDocument } from './lsp.ts';
+export { PROJECTION_COVERAGE, unsupportedProjectionKinds, type ProjectionSupport, type ProjectionTarget } from './coverage.ts';

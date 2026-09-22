@@ -55,7 +55,8 @@ export { TypeNames } from './projection/names.ts';
 export { PythonProjector, projectPython } from './projection/python.ts';
 export { RustProjector, projectRust } from './projection/rust.ts';
 export { projectDiff, structuralDiff, type ProjectionDiffEntry } from './projection/diff.ts';
-export { ProjectionLanguageServer, type JsonRpcRequest, type JsonRpcResponse, type ProjectionDocument } from './projection/lsp.ts';
+export { LspStreamDecoder, ProjectionLanguageServer, encodeLspMessage, type JsonRpcRequest, type JsonRpcResponse, type ProjectionDiagnostic, type ProjectionDocument } from './projection/lsp.ts';
+export { PROJECTION_COVERAGE, unsupportedProjectionKinds, type ProjectionSupport, type ProjectionTarget } from './projection/coverage.ts';
 
 // --- Synthesis ---------------------------------------------------------------
 export { DEFAULT_MAX_ITERATIONS, formatOutcome, purgeBody, synthesize, type Attempt, type Feedback, type SynthesisOutcome, type Synthesizer } from './synthesis/loop.ts';

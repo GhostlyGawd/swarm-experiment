@@ -142,6 +142,14 @@ export interface CompileOptions {
   readonly entryPoints?: readonly SymbolId[];
   readonly scope?: string;
   readonly sampling?: ProductionSampling;
+  /** Compile only these entry bodies; all declarations remain visible for checks. */
+  readonly includeSymbols?: readonly SymbolId[];
+  /** Boundary call used when a visible callee lives in another artifact. */
+  readonly callHandler?: (
+    callee: SymbolId,
+    args: readonly Value[],
+    caller: SymbolId,
+  ) => ExecutionResult;
 }
 
 export interface TelemetrySample {
@@ -196,7 +204,8 @@ export class ProductionRuntime {
       if (t.kind === 'Module') for (const m of t.members) collect(m);
     };
     collect(module);
-    for (const decl of declarations) rt.compileFunction(decl);
+    const include = opts.includeSymbols ? new Set(opts.includeSymbols) : null;
+    for (const decl of declarations) if (!include || include.has(decl.symbol)) rt.compileFunction(decl);
     return rt;
   }
 
@@ -352,6 +361,7 @@ export class ProductionRuntime {
       olds,
       envelope: CapabilityEnvelope.of(...decl.capabilities),
       functionName: this.name(decl.symbol),
+      functionSymbol: decl.symbol,
       keptAssertions: this.keptClauses(decl, 'assertion'),
     };
 
@@ -819,8 +829,12 @@ export class ProductionRuntime {
         let target: CompiledFunction | undefined;
         return (f) => {
           target ??= this.compiled.get(callee);
-          if (!target) throw new ProductionFault('unbound', `${this.name(callee)} is not compiled`);
-          return this.enter(target, args.map((a) => a(f)));
+          const values = args.map((a) => a(f));
+          if (target) return this.enter(target, values);
+          const remote = this.opts.callHandler?.(callee, values, ctx.functionSymbol);
+          if (!remote) throw new ProductionFault('unbound', `${this.name(callee)} is not compiled`);
+          if (!remote.ok) throw new ProductionFault(remote.fault.kind, remote.fault.message, remote.fault.label);
+          return remote.value;
         };
       }
       case 'Invoke': {
@@ -1056,6 +1070,7 @@ interface Ctx {
   readonly olds: ExprFn[];
   readonly envelope: CapabilityEnvelope;
   readonly functionName: string;
+  readonly functionSymbol: SymbolId;
   readonly keptAssertions: Set<string>;
 }
 

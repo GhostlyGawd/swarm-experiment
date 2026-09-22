@@ -1,11 +1,12 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as b from '../../src/tier1/build.ts';
 import { AetherRepository } from '../../src/tier1/repository.ts';
 import { AgentSession, FrameDecoder, LeaseManager, encodeFrame } from '../../src/agent/protocol.ts';
+import { withFileLock } from '../../src/tier1/persistence.ts';
 
 const directories: string[] = [];
 after(() => directories.forEach((directory) => rmSync(directory, { recursive: true, force: true })));
@@ -40,4 +41,14 @@ test('G2: durable leases exclude competing agents and expire', () => {
   now = 11;
   const second = leases.acquire(root, 'agent-b', 10);
   assert.notEqual(second.token, first.token);
+});
+
+test('J3: abandoned filesystem locks are recovered after the stale threshold', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-stale-lock-'));
+  directories.push(directory);
+  const path = join(directory, 'resource.lock');
+  writeFileSync(path, 'abandoned');
+  utimesSync(path, new Date(0), new Date(0));
+  const value = withFileLock(path, () => 42, 100, 10);
+  assert.equal(value, 42);
 });

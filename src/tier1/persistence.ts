@@ -1,6 +1,6 @@
 import {
   closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync,
-  renameSync, unlinkSync, writeFileSync,
+  renameSync, statSync, unlinkSync, writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -55,7 +55,12 @@ export function atomicWriteOnce(path: string, contents: string): void {
   });
 }
 
-export function withFileLock<T>(lockPath: string, operation: () => T, timeoutMs = 5_000): T {
+export function withFileLock<T>(
+  lockPath: string,
+  operation: () => T,
+  timeoutMs = 5_000,
+  staleLockMs = 30_000,
+): T {
   mkdirSync(dirname(lockPath), { recursive: true });
   const deadline = Date.now() + timeoutMs;
   let fd: number | null = null;
@@ -65,6 +70,14 @@ export function withFileLock<T>(lockPath: string, operation: () => T, timeoutMs 
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== 'EEXIST' || Date.now() >= deadline) throw error;
+      try {
+        if (Date.now() - statSync(lockPath).mtimeMs > staleLockMs) {
+          unlinkSync(lockPath);
+          continue;
+        }
+      } catch (inspectionError) {
+        if ((inspectionError as NodeJS.ErrnoException).code !== 'ENOENT') throw inspectionError;
+      }
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
     }
   }

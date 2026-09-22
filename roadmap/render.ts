@@ -9,7 +9,7 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { renderGraphSection, renderOrderingSection } from './graph.ts';
+import { renderCompletionSection, renderGraphSection, renderOrderingSection } from './graph.ts';
 
 interface Section {
   readonly name: string;
@@ -17,6 +17,7 @@ interface Section {
 }
 
 const SECTIONS: readonly Section[] = [
+  { name: 'completion', render: renderCompletionSection },
   { name: 'graph', render: renderGraphSection },
   { name: 'ordering', render: renderOrderingSection },
 ];

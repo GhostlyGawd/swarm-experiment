@@ -291,6 +291,25 @@ export function renderGraphSection(): string {
   return lines.join('\n');
 }
 
+export function renderCompletionSection(): string {
+  const complete = FEATURES.filter((feature) => feature.status === 'complete');
+  const open = FEATURES.filter((feature) => feature.status !== 'complete');
+  const lines = [
+    `**${complete.length} of ${FEATURES.length} items complete.**`,
+    '',
+    '| Epic | Complete | Total |',
+    '|---|---:|---:|',
+  ];
+  for (const epic of EPICS) {
+    const members = FEATURES.filter((feature) => feature.epic === epic.id);
+    lines.push(`| ${epic.id}. ${epic.title} | ${members.filter((feature) => feature.status === 'complete').length} | ${members.length} |`);
+  }
+  lines.push('', open.length
+    ? `Open in dependency order: ${open.map((feature) => `\`${feature.id}\``).join(', ')}.`
+    : 'No open roadmap items remain.', '');
+  return lines.join('\n');
+}
+
 /**
  * The ordering section: the recommended path with every step classified, and
  * the first slice with its closure property stated.

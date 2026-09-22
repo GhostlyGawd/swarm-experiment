@@ -8,9 +8,11 @@ import { AetherRepository } from '../../src/tier1/repository.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import { buildLedgerExample } from '../../src/examples/ledger.ts';
 import { projectDiff } from '../../src/projection/diff.ts';
-import { ProjectionLanguageServer } from '../../src/projection/lsp.ts';
+import { LspStreamDecoder, ProjectionLanguageServer, encodeLspMessage } from '../../src/projection/lsp.ts';
 import { projectPython } from '../../src/projection/python.ts';
 import { projectRust } from '../../src/projection/rust.ts';
+import { PROJECTION_COVERAGE, unsupportedProjectionKinds } from '../../src/projection/coverage.ts';
+import { LINK_SCHEMA } from '../../src/tier1/ast.ts';
 
 const directories: string[] = [];
 after(() => directories.forEach((directory) => rmSync(directory, { recursive: true, force: true })));
@@ -53,4 +55,31 @@ test('H3: projection language server applies a text edit through a branch CAS', 
   assert.match(applied.text, /return gross \/ 50n;/);
   const initialized = server.handle({ jsonrpc: '2.0', id: 1, method: 'initialize' });
   assert.ok('result' in initialized);
+});
+
+test('J5: every AST kind has explicit projection support metadata', () => {
+  assert.deepEqual(Object.keys(PROJECTION_COVERAGE).sort(), Object.keys(LINK_SCHEMA).sort());
+  const ex = buildLedgerExample('projection-coverage');
+  const unsupported = unsupportedProjectionKinds(ex.module, 'rust');
+  assert.ok(unsupported.includes('Assign'));
+  assert.match(projectRust(ex.module, ex.syms), /^\/\/ Placeholder projection for:/);
+  assert.match(projectPython(ex.module, ex.syms), /^# Placeholder projection for:/);
+});
+
+test('J6: standard LSP frames decode incrementally and syntax errors become diagnostics', () => {
+  const request = { jsonrpc: '2.0' as const, id: 1, method: 'initialize' };
+  const frame = encodeLspMessage(request);
+  const decoder = new LspStreamDecoder();
+  assert.deepEqual(decoder.push(frame.slice(0, 8)), []);
+  assert.deepEqual(decoder.push(frame.slice(8)), [request]);
+
+  const directory = mkdtempSync(join(tmpdir(), 'aether-lsp-diagnostics-'));
+  directories.push(directory);
+  const ex = buildLedgerExample('lsp-diagnostics');
+  const repository = new AetherRepository(directory);
+  repository.commit('main', repository.store.intern(ex.module), { timestamp: 1 });
+  const server = new ProjectionLanguageServer(repository, ex.syms);
+  const diagnostics = server.validate('main', 'function broken(');
+  assert.equal(diagnostics.length, 1);
+  assert.equal(diagnostics[0].severity, 1);
 });

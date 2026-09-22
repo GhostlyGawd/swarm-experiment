@@ -25,6 +25,9 @@ import { buildLedgerExample, ACCOUNT, CAP_LEDGER_APPEND } from '../src/examples/
 import type { Value } from '../src/tier3/values.ts';
 import type { Term } from '../src/tier1/ast.ts';
 import type { NodeRef, SymbolId } from '../src/tier1/ids.ts';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const now = () => Number(process.hrtime.bigint()) / 1e6;
 
@@ -98,6 +101,35 @@ console.log('\nAether — non-functional requirements\n');
       'same, but materialising it needs multi-GB heap and the honest thing is to say ' +
       'which number was actually taken.',
   });
+}
+
+// --- J2 durable object resolution -------------------------------------------
+{
+  const directory = mkdtempSync(join(tmpdir(), 'aether-durable-bench-'));
+  try {
+    const writer = new GraphStore({ directory });
+    const refs: NodeRef[] = [];
+    for (let i = 0; i < 5_000; i++) refs.push(writer.intern(b.add(b.int(i), b.int(i + 1))));
+    const reader = new GraphStore({ directory });
+    const random = rng('durable-lookup');
+    const samples: number[] = [];
+    for (let i = 0; i < 2_000; i++) {
+      const ref = refs[random.int(0, refs.length - 1)];
+      const started = now();
+      reader.get(ref);
+      samples.push(now() - started);
+    }
+    const p999 = percentile(samples, 0.999);
+    record({
+      id: 'J2',
+      requirement: 'Durable object resolution',
+      bound: '< 5 ms @ 5k roots',
+      measured: `p99.9 ${p999.toFixed(4)} ms from disk/cache`,
+      verdict: p999 < 5 ? 'met' : 'missed',
+    });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 // --- 6.3 Deduplication over history -----------------------------------------

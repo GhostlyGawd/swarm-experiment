@@ -9,6 +9,31 @@ graph in §2 is generated from `roadmap/features.ts` and machine-checked by
 so neither can drift from the other. Completed items remain in the graph with
 positive source evidence, preserving the history of what the roadmap closed.
 
+The inventory tables preserve the reason each gap was opened. Current status is
+generated below from `roadmap/features.ts`; the original rationale is historical
+context rather than a claim that completed work is still absent.
+
+<!-- generated:completion -->
+
+**62 of 62 items complete.**
+
+| Epic | Complete | Total |
+|---|---:|---:|
+| A. Durability — make it a repository | 8 | 8 |
+| B. Language surface — make real programs expressible | 7 | 7 |
+| C. Verification reach | 9 | 9 |
+| D. Real distribution | 5 | 5 |
+| E. Concurrency | 4 | 4 |
+| F. Governance — the last Phase 3 deliverable | 5 | 5 |
+| G. Agent ergonomics | 4 | 4 |
+| H. Projection | 4 | 4 |
+| I. Correctness and release integrity | 9 | 9 |
+| J. Post-completion hardening | 7 | 7 |
+
+No open roadmap items remain.
+
+<!-- /generated:completion -->
+
 ---
 
 ## 1. Inventory
@@ -120,6 +145,18 @@ their guarantees.
 | I8 | Ship a consumable scoped npm package with valid tier exports | Make clean package artifacts executable | Complete | S |
 | I9 | Honor the containers topology target for every unit | Keep explicit deployment targets exact | Complete | S |
 
+### J. Post-completion hardening
+
+| # | Feature | Why | Size |
+|---|---|---|---|
+| J1 | Reconcile PRD and roadmap prose with completed implementation state | Remove stale phase and open-question claims | S |
+| J2 | Benchmark durable repository operations on disk | Measure the persistence path rather than only compatibility mode | M |
+| J3 | Recover stale filesystem locks after process failure | Prevent abandoned lock files from blocking writers indefinitely | S |
+| J4 | Run topology units in isolated runtime heaps | Make process boundaries behavioral rather than routing metadata | L |
+| J5 | Make projection coverage explicit for every AST node kind | Prevent silent comment fallbacks from being mistaken for support | M |
+| J6 | Add standard LSP Content-Length stream framing and diagnostics | Allow ordinary editors to speak to the projection server | M |
+| J7 | Add release license, CI gates, and package provenance metadata | Produce automated evidence for published artifacts | S |
+
 ---
 
 ## 2. Dependency graph
@@ -205,6 +242,15 @@ graph LR
     I8[✓ I8: Ship a consumable scoped npm package wit…]
     I9[✓ I9: Honor the containers topology target for…]
   end
+  subgraph J["Post-completion hardening"]
+    J1[✓ J1: Reconcile PRD and roadmap prose with com…]
+    J2[✓ J2: Benchmark durable repository operations …]
+    J3[✓ J3: Recover stale filesystem locks after pro…]
+    J4[✓ J4: Run topology units in isolated runtime h…]
+    J5[✓ J5: Make projection coverage explicit for ev…]
+    J6[✓ J6: Add standard LSP Content-Length stream f…]
+    J7[✓ J7: Add release license, CI gates, and packa…]
+  end
   A1 --> A2
   A1 --> A3
   A1 --> A4
@@ -243,6 +289,15 @@ graph LR
   G1 --> G2
   A8 --> G2
   A2 --> H3
+  A8 --> J2
+  A8 --> J3
+  G2 --> J3
+  D1 --> J4
+  D2 --> J4
+  H1 --> J5
+  H2 --> J5
+  H3 --> J6
+  I8 --> J7
 ```
 
 ### Waves
@@ -250,7 +305,7 @@ graph LR
 Wave *n* is everything whose deepest blocker sits in wave *n − 1*. Items in the
 same wave have no dependency on each other and can proceed in parallel.
 
-**Wave 0** — 27 feature(s), weight 132
+**Wave 0** — 28 feature(s), weight 133
 
 - `A1` Object store: write-once blobs keyed by node address, read-through cache — **M** ✓ complete
 - `B1` Sum types + constructors + a `Match` node — **L** ✓ complete
@@ -279,8 +334,9 @@ same wave have no dependency on each other and can proceed in parallel.
 - `I7` Bind fence discharge proofs to the replacement node — **S** ✓ complete
 - `I8` Ship a consumable scoped npm package with valid tier exports — **S** ✓ complete
 - `I9` Honor the containers topology target for every unit — **S** ✓ complete
+- `J1` Reconcile PRD and roadmap prose with completed implementation state — **S** ✓ complete
 
-**Wave 1** — 10 feature(s), weight 35
+**Wave 1** — 12 feature(s), weight 39
 
 - `A2` Named roots (branches/tags) + a commit object binding root × provenance × time — **S** ✓ complete ← A1
 - `A3` Durable provenance ledger and `InvalidatedSpec` flags — **M** ✓ complete ← A1
@@ -292,6 +348,8 @@ same wave have no dependency on each other and can proceed in parallel.
 - `E2` Systematic schedule exploration in micro-worlds — **L** ✓ complete ← E1
 - `E3` Transactions / atomicity — **L** ✓ complete ← E1
 - `F5` Incremental structural-key index — **M** ✓ complete ← A1
+- `J5` Make projection coverage explicit for every AST node kind — **M** ✓ complete ← H1, H2
+- `J7` Add release license, CI gates, and package provenance metadata — **S** ✓ complete ← I8
 
 **Wave 2** — 12 feature(s), weight 66
 
@@ -308,17 +366,21 @@ same wave have no dependency on each other and can proceed in parallel.
 - `G1` Wire protocol for the agent↔fabric session — **L** ✓ complete ← A1, A2
 - `H3` LSP / projectional editor so the virtual-filesystem story is real — **XL** ✓ complete ← A2
 
-**Wave 3** — 4 feature(s), weight 17
+**Wave 3** — 6 feature(s), weight 23
 
 - `D2` Wire protocol with unforgeable capability tokens — **L** ✓ complete ← D1
 - `D5` Telemetry collection — **M** ✓ complete ← D1
 - `F4` Approval workflow for fence discharges — **M** ✓ complete ← A3, F1
 - `G2` Subtree leases/claims — **M** ✓ complete ← G1, A8
+- `J2` Benchmark durable repository operations on disk — **M** ✓ complete ← A8
+- `J6` Add standard LSP Content-Length stream framing and diagnostics — **M** ✓ complete ← H3
 
-**Wave 4** — 2 feature(s), weight 28
+**Wave 4** — 4 feature(s), weight 37
 
 - `D3` Distributed fault semantics — what a contract means across a partition — **L** ✓ complete ← D2
 - `D4` Hot reconfiguration: move a function between units live — **XL** ✓ complete ← D1, D2
+- `J3` Recover stale filesystem locks after process failure — **S** ✓ complete ← A8, G2
+- `J4` Run topology units in isolated runtime heaps — **L** ✓ complete ← D1, D2
 
 ### Weight by epic
 
@@ -333,6 +395,7 @@ same wave have no dependency on each other and can proceed in parallel.
 | G. Agent ergonomics | 4 | 15 | A |
 | H. Projection | 4 | 29 | A |
 | I. Correctness and release integrity | 9 | 18 | — |
+| J. Post-completion hardening | 7 | 20 | A, D, G, H, I |
 
 ### Startable today
 

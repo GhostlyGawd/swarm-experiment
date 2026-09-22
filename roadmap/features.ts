@@ -57,6 +57,7 @@ export const EPICS: readonly Epic[] = [
   { id: 'G', title: 'Agent ergonomics' },
   { id: 'H', title: 'Projection' },
   { id: 'I', title: 'Correctness and release integrity' },
+  { id: 'J', title: 'Post-completion hardening' },
 ];
 
 const STORE = 'src/tier1/store.ts';
@@ -464,6 +465,57 @@ export const FEATURES: readonly Feature[] = [
     why: 'A requested container plan must not silently place pure functions at the edge',
     size: 'S', status: 'complete', deps: [],
     evidence: { kind: 'present', pattern: "shape === 'containers'", files: ['src/tier4/topology.ts'] },
+  },
+
+  // --- J. Post-completion hardening ---------------------------------------
+  {
+    id: 'J1', epic: 'J',
+    title: 'Reconcile PRD and roadmap prose with completed implementation state',
+    why: 'Phase status, open questions, and original gap rationales still describe completed work as outstanding',
+    size: 'S', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: 'generated:completion', files: ['docs/ROADMAP.md'] },
+  },
+  {
+    id: 'J2', epic: 'J',
+    title: 'Benchmark durable repository operations on disk',
+    why: 'The existing storage measurements still exercise the in-memory compatibility path',
+    size: 'M', status: 'complete', deps: ['A8'],
+    evidence: { kind: 'present', pattern: 'Durable object resolution', files: ['bench/nfr.bench.ts'] },
+  },
+  {
+    id: 'J3', epic: 'J',
+    title: 'Recover stale filesystem locks after process failure',
+    why: 'A crashed writer can currently leave a lock file that blocks progress until manual cleanup',
+    size: 'S', status: 'complete', deps: ['A8', 'G2'],
+    evidence: { kind: 'present', pattern: 'staleLockMs', files: ['src/tier1/persistence.ts'] },
+  },
+  {
+    id: 'J4', epic: 'J',
+    title: 'Run topology units in isolated runtime heaps',
+    why: 'The host routes by unit but currently executes every function in one shared production runtime',
+    size: 'L', status: 'complete', deps: ['D1', 'D2'],
+    evidence: { kind: 'present', pattern: 'unitRuntimes', files: ['src/tier4/host.ts'] },
+  },
+  {
+    id: 'J5', epic: 'J',
+    title: 'Make projection coverage explicit for every AST node kind',
+    why: 'Rust and Python projections currently fall back to comments for unsupported expressions',
+    size: 'M', status: 'complete', deps: ['H1', 'H2'],
+    evidence: { kind: 'present', pattern: 'PROJECTION_COVERAGE', files: ['src/projection/index.ts'] },
+  },
+  {
+    id: 'J6', epic: 'J',
+    title: 'Add standard LSP Content-Length stream framing and diagnostics',
+    why: 'The language-server request handler exists, but editors need the standard byte-stream transport',
+    size: 'M', status: 'complete', deps: ['H3'],
+    evidence: { kind: 'present', pattern: 'LspStreamDecoder', files: ['src/projection/lsp.ts'] },
+  },
+  {
+    id: 'J7', epic: 'J',
+    title: 'Add release license, CI gates, and package provenance metadata',
+    why: 'The package is consumable locally but the repository lacks automated release evidence',
+    size: 'S', status: 'complete', deps: ['I8'],
+    evidence: { kind: 'present', pattern: 'provenance', files: ['package.json'] },
   },
 ];
 

@@ -825,8 +825,8 @@ compilation cycle; Agent-IR specification and memory-hook protocol.
 **Phase 3 — Dynamic topology and autonomous optimization (months 13–18).**
 Fluid topology engine; differentiable optimization surfaces and continuous
 tuning agents; enterprise provenance and audit tooling.
-*Reference implementation: topology slicer, tuner and production runtime
-stripping complete; enterprise audit tooling outstanding.*
+*Reference implementation: complete, including the topology host, durable
+telemetry, signed audit export, revocation console, and approval workflow.*
 
 ---
 
@@ -861,19 +861,13 @@ stripping complete; enterprise audit tooling outstanding.*
 | Synthesis loop and stall gate | `src/synthesis/{loop,enumerative}.ts` |
 | §6 measurements | `bench/nfr.bench.ts` |
 
-### Open questions for review
+### Resolved implementation decisions
 
-1. **Elision and observability (R2).** The production artifact is 12.7× faster
-   and drops every already-proved clause, but a production fault now carries no
-   binding snapshot. Is the clause label and fault kind enough for an on-call
-   engineer, or does production need a narrow, sampled telemetry mode that sits
-   between the two runtimes?
-2. **Structural keys at repository scale.** Alpha-normalization is O(subtree),
-   so a repository-wide alpha-equivalence index is O(n · depth). Is that a
-   background job, or does the index need an incremental formulation?
-3. **Aliasing in the general case.** The current model reports the assumption.
-   Should the type system carry separation information instead, so non-aliasing
-   becomes checkable rather than assumed?
-4. **Advisory concurrency findings.** `concurrent_schedule` is advisory because
-   the topology decides. Should the Tier-4 slicer consume these findings as a
-   *constraint* — refusing a placement that makes a reported race reachable?
+1. **Elision and observability (R2).** Production supports opt-in sampled
+   telemetry; disabled sampling has no callback or timing cost.
+2. **Structural keys at repository scale.** Durable stores may maintain the
+   structural-key index incrementally as nodes arrive.
+3. **Aliasing in the general case.** `Owned<T>` parameters carry separation
+   into the type system and aliasing calls are rejected.
+4. **Advisory concurrency findings.** The slicer consumes findings as
+   single-writer placement constraints.

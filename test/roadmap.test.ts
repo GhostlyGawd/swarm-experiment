@@ -21,7 +21,7 @@ function tableRows(): Array<{ id: string; title: string; size: string }> {
     const cells = line.split('|').slice(1, -1).map((c) => c.trim());
     if (cells.length < 3) continue;
     const id = cells[0].replace(/\*/g, '');
-    if (!/^[A-I]\d+$/.test(id)) continue;
+    if (!/^[A-J]\d+$/.test(id)) continue;
     out.push({
       id,
       title: cells[1].replace(/\*\*/g, ''),
@@ -44,7 +44,7 @@ test('the dependency graph is acyclic', () => {
 test('feature ids are unique and well formed', () => {
   const seen = new Set<string>();
   for (const feature of FEATURES) {
-    assert.match(feature.id, /^[A-I]\d+$/, feature.id);
+    assert.match(feature.id, /^[A-J]\d+$/, feature.id);
     assert.equal(feature.id[0], feature.epic, `${feature.id} is filed under ${feature.epic}`);
     assert.equal(seen.has(feature.id), false, `duplicate id ${feature.id}`);
     seen.add(feature.id);
