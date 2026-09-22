@@ -463,6 +463,25 @@ export class DurableGraphStore {
   }
   importArchive(bytes: Uint8Array, options: { leaseId: string }): readonly NodeRef[] {
     key(options.leaseId);
+    const { roots, staged } = this.parseArchive(bytes);
+    return this.run(() => {
+      const state = this.state(); this.addLease(state, options.leaseId, roots); this.boundState(state);
+      this.install([...staged.values()]);
+      this.advance(state); return roots;
+    });
+  }
+  /** Verify an archive's complete schema, addresses, closure and bounds without
+   * installing objects, acquiring mutation tickets, changing roots or leases. */
+  validateArchive(bytes: Uint8Array, options: { canonical?: boolean } = {}): readonly NodeRef[] {
+    const { roots, staged } = this.parseArchive(bytes);
+    if (options.canonical) {
+      const body = { format: 'aether.ast-archive/1', hash: 'aether.ast-grouped-v1.blake3', roots: [...roots].sort(), objects: [...staged].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([ref, node]) => ({ ref, node: packValue(node) })) };
+      const canonical = this.encode({ ...body, checksum: digest(this.encode(body, true)) }, true);
+      if (!Buffer.from(canonical).equals(Buffer.from(bytes))) throw new TypeError('noncanonical AST archive');
+    }
+    return roots;
+  }
+  private parseArchive(bytes: Uint8Array): { roots: NodeRef[]; staged: Map<NodeRef, FlatNode> } {
     const archive = exactObject(this.decode(bytes, true), ['format', 'hash', 'roots', 'objects', 'checksum']);
     const { checksum, ...body } = archive;
     if (archive.format !== 'aether.ast-archive/1' || archive.hash !== 'aether.ast-grouped-v1.blake3') throw new TypeError('unsupported AST archive profile');
@@ -477,11 +496,7 @@ export class DurableGraphStore {
     }
     const reachable = this.closure(roots, root => { const node = staged.get(root); if (!node) throw new ReferenceError('missing AST archive child'); return node; });
     if (reachable.size !== staged.size) throw new TypeError('unreachable AST archive object');
-    return this.run(() => {
-      const state = this.state(); this.addLease(state, options.leaseId, roots); this.boundState(state);
-      this.install([...staged.values()]);
-      this.advance(state); return roots;
-    });
+    return { roots, staged };
   }
   /** Explicit migration from a quiescent legacy v1 store; hashes stay identical.
    * The legacy source must not run its uncoordinated GC during this copy. */

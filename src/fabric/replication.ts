@@ -53,7 +53,18 @@ export interface ReplicaOptions {
   maxJournalBytes?: number;
   /** Bounded retained local admission tickets; reclamation needs quiescent migration. */
   maxAdmissionTickets?: number;
+  /** Checkpoint clock fence, persisted for this epoch. Existing journals default to zero. */
+  lamportFloor?: string;
   fault?: (point: ReplicationFaultPoint) => void;
+}
+export interface MutationAuthorIdentity {
+  readonly operationId: Digest;
+  readonly repositoryId: string;
+  readonly membershipEpoch: string;
+  readonly replicaId: string;
+  readonly sequence: string;
+  readonly lamport: string;
+  readonly causalFrontier: readonly (readonly [string, string])[];
 }
 
 function publicKeyBytes(value: string): Buffer {
@@ -176,6 +187,7 @@ function publish(directory: string, name: string, bytes: Uint8Array): boolean {
 export class DurableReplica {
   readonly replicaId: string;
   readonly membership: MembershipV1;
+  readonly lamportFloor: string;
   private readonly limits: EncodingLimits;
   private readonly maxStoredOperations: number;
   private readonly maxJournalBytes: number;
@@ -189,6 +201,7 @@ export class DurableReplica {
 
   constructor(options: ReplicaOptions) {
     this.limits = encodingLimits(options.limits); validateMembership(options.membership, this.limits); identifier(options.replicaId);
+    this.lamportFloor = options.lamportFloor ?? '0'; decimal(this.lamportFloor, this.limits);
     const membership = decodeCanonical(encodeCanonical(options.membership, this.limits), this.limits) as unknown as MembershipV1;
     membership.replicas.forEach(Object.freeze); Object.freeze(membership.replicas);
     this.membership = Object.freeze(membership);
@@ -214,6 +227,10 @@ export class DurableReplica {
     this.admissionLock = new JournalLock({ directory: join(options.directory, 'admission-tickets'), limits: this.limits, maxTickets: options.maxAdmissionTickets });
     this.ingressDirectory = join(options.directory, 'operations'); this.authorDirectory = join(options.directory, 'authored');
     mkdirSync(this.ingressDirectory, { recursive: true }); mkdirSync(this.authorDirectory, { recursive: true }); syncDirectory(options.directory);
+    const clockPath = join(options.directory, 'clock-profile.json');
+    if (!existsSync(clockPath) && this.lamportFloor !== '0' && [this.ingressDirectory, this.authorDirectory].some(directory => readdirSync(directory).some(name => !name.startsWith('.tmp-')))) throw new Error('nonzero Lamport floor requires a new epoch journal');
+    const clockProfile = encodeCanonical({ format: 'aether.replica-clock/1', lamportFloor: this.lamportFloor }, this.limits);
+    if (!publish(options.directory, 'clock-profile.json', clockProfile) && !Buffer.from(this.readBounded(clockPath)).equals(Buffer.from(clockProfile))) throw new Error('replica Lamport floor changed; explicit epoch migration required');
     this.refresh();
   }
   /** Serializes only local resource admission; independent replica journals remain independent. */
@@ -233,6 +250,7 @@ export class DurableReplica {
         totalBytes += statSync(join(directory, file)).size;
         if (totalBytes > this.maxJournalBytes) throw new RangeError('journal byte capacity exceeded');
         const envelope = decodeMutation(this.readBounded(join(directory, file)), this.membership, this.limits);
+        if (BigInt(envelope.lamport) <= BigInt(this.lamportFloor)) throw new Error('mutation precedes epoch Lamport floor');
         const digest = envelopeDigest(envelope, this.limits);
         const expected = directory === this.ingressDirectory ? hashName(digest) : hashName(envelope.sequence);
         if (file !== `${expected}.json` || (directory === this.authorDirectory && envelope.replicaId !== this.replicaId)) throw new TypeError('journal filename/author binding mismatch');
@@ -245,6 +263,7 @@ export class DurableReplica {
   }
   ingest(bytes: Uint8Array): { operationId: Digest; disposition: CandidateOperation['disposition'] | 'duplicate' } {
     const envelope = decodeMutation(bytes, this.membership, this.limits);
+    if (BigInt(envelope.lamport) <= BigInt(this.lamportFloor)) throw new Error('mutation precedes epoch Lamport floor');
     // Immutable exact duplicates need no allocation and remain readable when
     // the bounded admission-ticket supply has been exhausted.
     this.refresh();
@@ -266,13 +285,19 @@ export class DurableReplica {
   author(occurrenceId: string, operation: MutationOperation, payload: MutationPayloadV1): Uint8Array {
     if (!this.privateKey) throw new Error('replica is read-only');
     identifier(occurrenceId); validateMutationPayload(operation, payload);
+    return this.authorMutation(() => ({ occurrenceId, operation, payload }));
+  }
+  /** The builder runs after allocating the logical identity under local admission
+   * but before publishing any bytes. A failed builder consumes no sequence. */
+  authorMutation(build: (identity: MutationAuthorIdentity) => { occurrenceId: string; operation: MutationOperation; payload: MutationPayloadV1 }): Uint8Array {
+    if (!this.privateKey) throw new Error('replica is read-only');
     return this.admit(() => {
       for (;;) {
         this.refresh();
         if (this.frames.size >= this.maxStoredOperations) throw new RangeError('journal capacity exceeded');
         const rows = this.classify();
         if (rows.some(row => row.envelope.replicaId === this.replicaId && row.disposition !== 'accepted')) throw new Error('own predecessor is pending or quarantined');
-        const frontier = new Map<string, bigint>(); let lamport = 0n;
+        const frontier = new Map<string, bigint>(); let lamport = BigInt(this.lamportFloor);
         for (const row of rows) {
           if (row.disposition !== 'accepted') continue;
           const e = row.envelope;
@@ -280,10 +305,14 @@ export class DurableReplica {
           if (BigInt(e.lamport) > lamport) lamport = BigInt(e.lamport);
         }
         const sequence = String((frontier.get(this.replicaId) ?? 0n) + 1n);
+        const causalFrontier = [...frontier].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([id, n]) => Object.freeze([id, String(n)] as const));
+        const identity = Object.freeze({ repositoryId: this.membership.repositoryId, membershipEpoch: this.membership.membershipEpoch, replicaId: this.replicaId, sequence, lamport: String(lamport + 1n), causalFrontier: Object.freeze(causalFrontier), operationId: operationId({ repositoryId: this.membership.repositoryId, membershipEpoch: this.membership.membershipEpoch, replicaId: this.replicaId, sequence }) });
+        const { occurrenceId, operation, payload } = build(identity);
+        identifier(occurrenceId); if (!['insert', 'delete', 'move', 'replace'].includes(operation)) throw new TypeError('unknown mutation operation'); validateMutationPayload(operation, payload);
         const envelope: MutationEnvelopeV1 = {
           format: 'aether.mutation/1', repositoryId: this.membership.repositoryId, membershipEpoch: this.membership.membershipEpoch,
           replicaId: this.replicaId, sequence, lamport: String(lamport + 1n),
-          causalFrontier: [...frontier].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([id, n]) => [id, String(n)]),
+          causalFrontier,
           occurrenceId, operation, payloadDigest: domainDigest('aether.mutation-payload/1', payload, this.limits), payload,
           signature: '',
         };
@@ -299,9 +328,21 @@ export class DurableReplica {
       }
     });
   }
-  private classify(): CandidateOperation[] {
+  /** Authenticate and classify an exact checkpoint cut without mutating live
+   * ingestion or letting later local variants alter that cut's replay. */
+  classifyFrames(bytes: readonly Uint8Array[]): CandidateOperation[] {
+    if (bytes.length > this.maxStoredOperations || bytes.reduce((sum, frame) => sum + frame.byteLength, 0) > this.maxJournalBytes) throw new RangeError('checkpoint operation cut capacity exceeded');
+    const frames = new Map<Digest, MutationEnvelopeV1>();
+    for (const frame of bytes) {
+      const envelope = decodeMutation(frame, this.membership, this.limits);
+      if (BigInt(envelope.lamport) <= BigInt(this.lamportFloor)) throw new Error('mutation precedes epoch Lamport floor');
+      frames.set(envelopeDigest(envelope, this.limits), envelope);
+    }
+    return this.classify(frames);
+  }
+  private classify(frames: ReadonlyMap<Digest, MutationEnvelopeV1> = this.frames): CandidateOperation[] {
     const grouped = new Map<Digest, MutationEnvelopeV1[]>();
-    for (const envelope of this.frames.values()) {
+    for (const envelope of frames.values()) {
       const id = operationId(envelope); const group = grouped.get(id) ?? []; group.push(envelope); grouped.set(id, group);
     }
     const states = new Map<Digest, { disposition: CandidateOperation['disposition']; reason: string }>();

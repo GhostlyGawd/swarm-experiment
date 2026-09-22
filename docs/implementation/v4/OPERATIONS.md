@@ -54,6 +54,16 @@ Local journal admission serializes quota checks and immutable publication so com
 
 `ReplicationHarness` is a deterministic test transport for duplication, reordering, drops, partitions, disconnection and restart. It provides no actual network throughput or 1,000-agent convergence claim. These journals also have no production-root update API. The selected production tree/quorum algorithms are described separately in [D04](decisions/D04-replication-quorum.md).
 
+## Durable occurrence-tree candidates
+
+`DurableTreeWorkspace` combines authenticated replica operations with durable AST prototypes. Use occurrence IDs for edits: identical immutable content may appear in independently editable locations. `seed`, `insert`, `move`, `replace`, `delete` and `ingest` preserve signed operation history. Fractional sibling positions and Lamport/operation ordering determine the same candidate after reordered or duplicated delivery.
+
+`materialize({ leaseId })` produces a candidate under a caller-owned lease. Structural or unresolved replication diagnostics return `root: null`; partial addresses are confined to diagnostic occurrence mappings. A complete but ill-typed AST remains a candidate with failing typecheck. `productionAuthorized` is always false: signed lineage, proof and governor admission remain required.
+
+Checkpoint collection first obtains a durable signed inventory fence from every enrolled member, then binds the exact union, projection, reindex map, complete AST archive and next epoch to unanimous acknowledgments. Missing members or conflicting extra frames block a new checkpoint. Existing certified decisions remain immutable and recover idempotently after termination. Old-epoch operations cannot resurrect collected occurrences.
+
+Concurrent capacity overflow is explicit and deterministically represented. It cannot yield an apparently complete truncated root. Delete/inspect/checkpoint maintenance stays available; certified repair records the bounded result while retaining all prior signed frames and prototypes for audit. No timeout-based member retirement, Byzantine quorum or 1,000-agent performance claim is provided by this protocol. See [workspace protocol](decisions/D04-tree-workspace.md) for exact bounds and recovery details.
+
 ## Proof evidence and compilation
 
 Construct an `EvidenceContext` from the actual module, specification, compiler/semantics/target identity, capability policy and registry. The host must obtain expected identity from its own current build and authorization configuration; echoing an untrusted sender's asserted context does not establish authenticity.

@@ -1,6 +1,6 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -380,4 +380,26 @@ test('interrupted initialization refuses checksummed nonempty root metadata inst
   assert.deepEqual(readFileSync(path), Buffer.from(changed));
   assert.equal(existsSync(join(directory, 'ast-initialized-v1.json')), false);
   assert.equal(existsSync(join(directory, 'ast-initializing-v1.json')), true);
+});
+
+test('read-only archive validation shares complete import checks without changing objects, roots or leases', () => {
+  const source = new DurableGraphStore({ directory: temporary() }), root = source.intern(b.add(b.int(1), b.int(2)), { leaseId: 'archive-source' });
+  const archive = source.exportArchive([root]);
+  const directory = temporary(), target = new DurableGraphStore({ directory });
+  const beforeRoots = readFileSync(join(directory, 'ast-roots-v1.json')), beforeRefs = target.listRefs();
+  const inventory = (path: string): unknown[] => readdirSync(path, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name)).map(entry => [entry.name, entry.isDirectory() ? inventory(join(path, entry.name)) : readFileSync(join(path, entry.name))]);
+  const beforeInventory = inventory(directory);
+  assert.deepEqual(target.validateArchive(archive, { canonical: true }), [root]);
+  const parsed = JSON.parse(Buffer.from(archive).toString('utf8'));
+  const { checksum: _checksum, ...body } = parsed; body.objects = [];
+  const malformed = encodeCanonical({ ...body, checksum: bytesToHexRef(blake3(encodeCanonical(body)), 'store:b3:') });
+  assert.throws(() => target.validateArchive(malformed), /missing AST archive child/);
+  assert.throws(() => target.validateArchive(Buffer.from(' ' + Buffer.from(archive).toString()), { canonical: true }), /noncanonical/);
+  // Legacy import acceptance remains unchanged; only callers explicitly asking
+  // for canonical validation reject transport whitespace.
+  assert.deepEqual(target.validateArchive(Buffer.from(' ' + Buffer.from(archive).toString())), [root]);
+  assert.deepEqual(inventory(directory), beforeInventory, 'validation must not consume mutation tickets or publish any file');
+  assert.deepEqual(readFileSync(join(directory, 'ast-roots-v1.json')), beforeRoots);
+  assert.deepEqual(target.listRefs(), beforeRefs);
+  assert.equal(Object.keys(target.roots().leases).length, 0);
 });

@@ -258,7 +258,7 @@ test('V4-F05: deterministic harness exercises reorder, duplicate, drop, partitio
     network.send('a', 'b', Buffer.from('{}')); network.deliver();
     assert.equal(b.candidateDigest(), rootBefore);
     assert.equal(network.report().failures.length, 1);
-    assert.deepEqual(readdirSync(join(f.directory, 'b')).sort(), ['admission-tickets', 'authored', 'capacity.json', 'identity.json', 'operations']);
+    assert.deepEqual(readdirSync(join(f.directory, 'b')).sort(), ['admission-tickets', 'authored', 'capacity.json', 'clock-profile.json', 'identity.json', 'operations']);
   } finally { f.cleanup(); }
 });
 
@@ -308,4 +308,54 @@ test('V4-F05: exact duplicate delivery needs no extra ticket after admission quo
     receiver.ingest(frame); assert.equal(receiver.ingest(frame).disposition,'duplicate');
     assert.equal(new DurableReplica(f.options('b','ticket-limit',{maxAdmissionTickets:1})).ingest(frame).disposition,'duplicate');
   } finally {f.cleanup();}
+});
+
+test('T1-06 author identity builder fails before sequence publication and preserves its checkpoint clock floor on restart', () => {
+  const f = setup();
+  try {
+    const options = f.options('a', 'builder', { lamportFloor: '90' });
+    const replica = new DurableReplica(options);
+    assert.throws(() => replica.authorMutation(() => { throw new Error('allocation interval exhausted'); }), /interval exhausted/);
+    assert.equal(replica.operations().length, 0);
+    const first = replica.authorMutation(identity => {
+      assert.equal(identity.sequence, '1'); assert.equal(identity.lamport, '91');
+      assert.throws(() => { (identity as { sequence: string }).sequence = '100'; });
+      return { occurrenceId: identity.operationId, operation: 'insert', payload: insert };
+    });
+    const envelope = decodeMutation(first, f.membership);
+    assert.equal(envelope.occurrenceId, operationId(envelope));
+    const reopened = new DurableReplica(options);
+    const next = decodeMutation(reopened.authorMutation(identity => ({ occurrenceId: identity.operationId, operation: 'insert', payload: insert })), f.membership);
+    assert.equal(next.sequence, '2'); assert.equal(next.lamport, '92');
+    assert.throws(() => new DurableReplica(f.options('a', 'builder')), /Lamport floor changed/);
+    const oldClock = new DurableReplica(f.options('a', 'old-clock')).author('old', 'insert', insert);
+    assert.throws(() => new DurableReplica(f.options('b', 'bounded', { lamportFloor: '90' })).ingest(oldClock), /Lamport floor/);
+  } finally { f.cleanup(); }
+});
+
+test('T1-06 author identity builders in concurrent processes receive distinct durable operation IDs', async () => {
+  const f = setup();
+  try {
+    const keyPath = join(f.directory, 'key.pem'), membershipPath = join(f.directory, 'membership.json');
+    writeFileSync(keyPath, f.keys.a.privateKey.export({ format: 'pem', type: 'pkcs8' }), { mode: 0o600 });
+    writeFileSync(membershipPath, JSON.stringify(f.membership));
+    const script = `
+      import { readFileSync } from 'node:fs';
+      import { DurableReplica } from ${JSON.stringify(new URL('../../src/fabric/replication.ts', import.meta.url).href)};
+      const replica = new DurableReplica({directory:process.env.REPLICA_DIRECTORY,membership:JSON.parse(readFileSync(process.env.MEMBERSHIP_PATH,'utf8')),replicaId:'a',privateKey:readFileSync(process.env.SIGNING_KEY_PATH,'utf8'),lamportFloor:'90'});
+      replica.authorMutation(identity=>({occurrenceId:identity.operationId,operation:'insert',payload:${JSON.stringify(insert)}}));
+    `;
+    const run = () => new Promise<void>((resolve, reject) => {
+      const child = spawn(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', script], { env: { ...process.env, REPLICA_DIRECTORY: join(f.directory, 'builder-race'), MEMBERSHIP_PATH: membershipPath, SIGNING_KEY_PATH: keyPath } });
+      let error = ''; child.stderr.on('data', chunk => { error += String(chunk); }); child.stdout.resume();
+      child.on('error', reject); child.on('close', code => code === 0 ? resolve() : reject(new Error(error)));
+    });
+    await Promise.all([run(), run(), run()]);
+    const replica = new DurableReplica(f.options('a', 'builder-race', { lamportFloor: '90' }));
+    const operations = replica.operations();
+    assert.deepEqual(operations.map(row => row.envelope.sequence).sort(), ['1', '2', '3']);
+    assert.deepEqual(operations.map(row => row.envelope.lamport).sort(), ['91', '92', '93']);
+    assert.equal(new Set(operations.map(row => row.envelope.occurrenceId)).size, 3);
+    assert.ok(operations.every(row => row.envelope.occurrenceId === operationId(row.envelope)));
+  } finally { f.cleanup(); }
 });
