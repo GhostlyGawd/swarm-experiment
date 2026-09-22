@@ -337,6 +337,40 @@ export class Parser {
         this.expect(')');
         return b.invoke(capToken.value as CapabilityName, ...args);
       }
+      case 'ok':
+      case 'err': {
+        const variant = t.value;
+        this.pos++;
+        this.expect('<');
+        const ty = this.parseType();
+        this.expect('>');
+        this.expect('(');
+        const value = this.parseExpression();
+        this.expect(')');
+        if (ty.t !== 'Result') throw new ParseError(`${variant} requires a Result type`, t);
+        return variant === 'ok' ? b.ok(ty, value) : b.err(ty, value);
+      }
+      case 'matchResult': {
+        this.pos++;
+        this.expect('(');
+        const value = this.parseExpression();
+        this.expect(',');
+        const okName = this.expectIdent();
+        this.expect('=>');
+        this.pushScope();
+        const okSymbol = this.bind(okName);
+        const ok = this.parseExpression();
+        this.popScope();
+        this.expect(',');
+        const errName = this.expectIdent();
+        this.expect('=>');
+        this.pushScope();
+        const errSymbol = this.bind(errName);
+        const err = this.parseExpression();
+        this.popScope();
+        this.expect(')');
+        return b.matchResult(value, okSymbol, ok, errSymbol, err);
+      }
       default: break;
     }
 

@@ -30,7 +30,7 @@ export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec
 
 // --- Tier 3: execution and simulation ---------------------------------------
 export { AetherFault, Runtime, type Checkpoint, type ExecutionResult, type Fault, type FaultKind, type TraceEvent } from './tier3/runtime.ts';
-export { formatValue, isRef, type Ref, type Value } from './tier3/values.ts';
+export { formatValue, isRef, isResultValue, type Ref, type ResultValue, type Value } from './tier3/values.ts';
 export { ProductionRuntime, formatCompilation, type ClauseDecision, type CompilationReport, type CompileOptions, type ElisionPolicy } from './tier3/compile.ts';
 export { MicroWorld, formatMicroWorld, simulateModule, type Counterexample, type MicroWorldReport, type PropertyName } from './tier3/microworld.ts';
 export { generateCase, materialise, shrinkPlain, type Plain } from './tier3/generate.ts';

@@ -15,16 +15,25 @@ export interface Ref {
   readonly addr: number;
 }
 
-export type Value = bigint | boolean | string | null | Ref;
+export interface ResultValue {
+  readonly variant: 'ok' | 'err';
+  readonly value: Value;
+}
+
+export type Value = bigint | boolean | string | null | Ref | ResultValue;
 
 export const isRef = (v: Value): v is Ref =>
   typeof v === 'object' && v !== null && 'addr' in v;
+
+export const isResultValue = (v: Value): v is ResultValue =>
+  typeof v === 'object' && v !== null && 'variant' in v && 'value' in v;
 
 export function formatValue(v: Value, heap?: ReadonlyMap<number, Map<string, Value>>): string {
   if (v === null) return '()';
   if (typeof v === 'bigint') return `${v}`;
   if (typeof v === 'boolean') return String(v);
   if (typeof v === 'string') return JSON.stringify(v);
+  if (isResultValue(v)) return `${v.variant}(${formatValue(v.value, heap)})`;
   const record = heap?.get(v.addr);
   if (!record) return `@${v.addr}`;
   const fields = [...record.entries()].map(([k, fv]) => `${k}: ${formatValue(fv, heap)}`);

@@ -308,6 +308,13 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
         pools.ty.intern(encodeTy(t.ty, internName));
         for (const [n] of t.fields) internName(n);
         break;
+      case 'ResultValue':
+        pools.ty.intern(encodeTy(t.ty, internName));
+        break;
+      case 'MatchResult':
+        pools.sym.intern(t.okSymbol);
+        pools.sym.intern(t.errSymbol);
+        break;
       case 'Invoke': pools.cap.intern(t.capability); break;
       case 'Place':
         pools.sym.intern(t.symbol);
@@ -391,6 +398,12 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
       case 'Field': out.push(`F${nm(t.field)}`); return;
       case 'RecordLit':
         out.push(`R${ty(t.ty)}${f(t.fields.length)}${t.fields.map(([n]) => nm(n)).join('')}`);
+        return;
+      case 'ResultValue':
+        out.push(`O${t.variant === 'ok' ? 0 : 1}${ty(t.ty)}`);
+        return;
+      case 'MatchResult':
+        out.push(`J${sym(t.okSymbol)}${sym(t.errSymbol)}`);
         return;
       case 'Old': out.push('@'); return;
       case 'ResultRef': out.push('$'); return;
@@ -646,6 +659,21 @@ export function decode(ir: string, ctx?: IrContext): Term {
           ty: t,
           fields: names.map((nm2, idx) => [nm2, values[idx]] as const),
         });
+        continue;
+      }
+      case 'O': {
+        const variant = r.digit() === '0' ? 'ok' : 'err';
+        const t = tyAt(r.field());
+        if (t.t !== 'Result') throw new SyntaxError('ResultValue requires a Result type');
+        const [value] = popN(1);
+        stack.push({ kind: 'ResultValue', variant, ty: t, value });
+        continue;
+      }
+      case 'J': {
+        const okSymbol = symAt(r.field());
+        const errSymbol = symAt(r.field());
+        const [value, ok, err] = popN(3);
+        stack.push({ kind: 'MatchResult', value, okSymbol, ok, errSymbol, err });
         continue;
       }
       case 'P': {

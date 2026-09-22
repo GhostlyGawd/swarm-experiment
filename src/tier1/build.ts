@@ -59,6 +59,17 @@ export const record = (ty: Ty, fields: Record<string, Term>): Term => ({
   // Sorted so that two literals differing only in authoring order share an address.
   fields: Object.entries(fields).sort((a, b) => (a[0] < b[0] ? -1 : 1)),
 });
+export const ok = (ty: Extract<Ty, { t: 'Result' }>, value: Term): Term =>
+  ({ kind: 'ResultValue', variant: 'ok', ty, value });
+export const err = (ty: Extract<Ty, { t: 'Result' }>, value: Term): Term =>
+  ({ kind: 'ResultValue', variant: 'err', ty, value });
+export const matchResult = (
+  value: Term,
+  okSymbol: SymbolId,
+  okBody: Term,
+  errSymbol: SymbolId,
+  errBody: Term,
+): Term => ({ kind: 'MatchResult', value, okSymbol, ok: okBody, errSymbol, err: errBody });
 export const old = (expr: Term): Term => ({ kind: 'Old', expr });
 export const result = (): Term => ({ kind: 'ResultRef' });
 export const invoke = (capability: CapabilityName, ...args: Term[]): Term => ({

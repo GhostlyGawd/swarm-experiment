@@ -66,6 +66,14 @@ export type Term =
   | { kind: 'Call'; callee: SymbolId; args: readonly Term[] }
   | { kind: 'Field'; object: Term; field: string }
   | { kind: 'RecordLit'; ty: Ty; fields: ReadonlyArray<readonly [string, Term]> }
+  /** Value-level constructors for the built-in binary sum type. */
+  | { kind: 'ResultValue'; variant: 'ok' | 'err'; ty: Extract<Ty, { t: 'Result' }>; value: Term }
+  /** Exhaustive elimination of a Result value. */
+  | {
+      kind: 'MatchResult'; value: Term;
+      okSymbol: SymbolId; ok: Term;
+      errSymbol: SymbolId; err: Term;
+    }
   /** `old(e)` — the pre-state value of `e`. Legal only inside `ensures`. */
   | { kind: 'Old'; expr: Term }
   /** `result` — the value being returned. Legal only inside `ensures`. */
@@ -170,6 +178,8 @@ export const LINK_SCHEMA: Readonly<Record<NodeKind, readonly LinkField[]>> = {
   Call: [many('args')],
   Field: [one('object')],
   RecordLit: [{ field: 'fields', arity: 'pairs' }],
+  ResultValue: [one('value')],
+  MatchResult: [one('value'), one('ok'), one('err')],
   Old: [one('expr')],
   Invoke: [many('args')],
   Let: [one('init')],
@@ -187,7 +197,8 @@ export const LINK_SCHEMA: Readonly<Record<NodeKind, readonly LinkField[]>> = {
 };
 
 const EXPRESSION_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>([
-  'Lit', 'Var', 'Bin', 'Un', 'Cond', 'Call', 'Field', 'RecordLit', 'Old', 'ResultRef', 'Invoke',
+  'Lit', 'Var', 'Bin', 'Un', 'Cond', 'Call', 'Field', 'RecordLit', 'ResultValue', 'MatchResult',
+  'Old', 'ResultRef', 'Invoke',
 ]);
 
 const STATEMENT_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>([

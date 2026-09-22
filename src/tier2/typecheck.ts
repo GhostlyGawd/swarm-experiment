@@ -418,6 +418,25 @@ export class TypeChecker {
         }
         return term.ty;
       }
+      case 'ResultValue': {
+        const expected = term.variant === 'ok' ? term.ty.ok : term.ty.err;
+        const actual = this.typeOf(term.value, scope, env, [...path, 'value'], ctx);
+        this.expect(expected, actual, [...path, 'value'], `${term.variant} payload`);
+        return term.ty;
+      }
+      case 'MatchResult': {
+        const value = this.typeOf(term.value, scope, env, [...path, 'value'], ctx);
+        if (value.t !== 'Result') {
+          this.error('type_mismatch', `match expects Result, got ${tyToString(value)}`, [...path, 'value']);
+          return { t: 'Unit' };
+        }
+        const okScope: Scope = { vars: new Map([[term.okSymbol, value.ok]]), parent: scope };
+        const errScope: Scope = { vars: new Map([[term.errSymbol, value.err]]), parent: scope };
+        const ok = this.typeOf(term.ok, okScope, env, [...path, 'ok'], ctx);
+        const err = this.typeOf(term.err, errScope, env, [...path, 'err'], ctx);
+        this.expect(ok, err, [...path, 'err'], 'match branches');
+        return ok;
+      }
       case 'Old':
         if (ctx !== 'ensures') {
           this.error('contract_only_expression', 'old(…) is only meaningful in an ensures clause', path,

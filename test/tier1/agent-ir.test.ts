@@ -18,6 +18,8 @@ test('every node kind survives an Agent-IR round trip', () => {
   const rec = { t: 'Record' as const, name: typeName('type:x:pair'), fields: [['l', b.Int], ['r', b.Str]] as const };
   const nominal = { t: 'Nominal' as const, name: typeName('type:x:id'), repr: b.Str };
   const res = { t: 'Result' as const, ok: b.Int, err: b.Str };
+  const okValue = syms.define('okValue');
+  const errValue = syms.define('errValue');
 
   const term = b.module_({
     symbol: syms.define('m'),
@@ -49,6 +51,8 @@ test('every node kind survives an Agent-IR round trip', () => {
           }),
           b.exprStmt(b.cond(b.bool(true), b.concat(b.str('a'), b.str('b')), b.str('c'))),
           b.exprStmt(b.call(g, b.v(a))),
+          b.exprStmt(b.matchResult(b.ok(res, b.int(3)), okValue, b.v(okValue), errValue, b.int(0))),
+          b.exprStmt(b.err(res, b.str('failed'))),
           b.assign(b.place(a, 'left'), b.v(a)),
           b.exprStmt(b.field(b.v(a), 'balance')),
           b.exprStmt(b.mod(b.div(b.mul(b.sub(b.add(b.int(1), b.int(2)), b.int(3)), b.int(4)), b.int(5)), b.int(6))),
@@ -64,7 +68,7 @@ test('every node kind survives an Agent-IR round trip', () => {
 
   // The fixture is meant to be exhaustive; fail loudly if a kind is missing.
   const covered = new Set([...walk(term)].map((n) => n.kind));
-  for (const kind of ['Lit','Var','Bin','Un','Cond','Call','Field','RecordLit','Old','ResultRef',
+  for (const kind of ['Lit','Var','Bin','Un','Cond','Call','Field','RecordLit','ResultValue','MatchResult','Old','ResultRef',
     'Invoke','Place','Let','Assign','If','While','Return','Assert','ExprStmt','Block','Clause',
     'Contract','FunctionDecl','TypeDecl','Surface','SymbolTable','Module']) {
     assert.ok(covered.has(kind as never), `round-trip fixture does not cover ${kind}`);

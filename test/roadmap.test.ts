@@ -196,16 +196,11 @@ test('every feature has evidence matching its completion status', () => {
   }
 });
 
-test('the two confirmed language holes are still holes', () => {
-  // These are the two the brainstorm called out specifically; if either is
-  // fixed, the roadmap entry that depends on the claim must be revisited.
+test('the two confirmed language holes agree with roadmap status', () => {
   const ast = readFileSync(`${ROOT}src/tier1/ast.ts`, 'utf8');
   assert.ok(ast.includes("t: 'Result'"), 'Result is still declared as a type');
-  assert.equal(
-    readFileSync(`${ROOT}src/tier1/build.ts`, 'utf8').includes('ok('),
-    false,
-    'Result gained a value-level constructor; B1 needs rewording',
-  );
+  assert.equal(byId.get('B1')!.status, 'complete');
+  assert.ok(ast.includes("kind: 'MatchResult'"), 'B1 is complete but MatchResult is absent');
   assert.equal(ast.includes("kind: 'Import'"), false, 'a module still cannot reference another');
 });
 

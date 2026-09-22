@@ -143,7 +143,7 @@ graph LR
     A8[✓ A8: Cross-process write safety]
   end
   subgraph B["Language surface — make real programs expressible"]
-    B1[B1: Sum types + constructors + a Match node]
+    B1[✓ B1: Sum types + constructors + a Match node]
     B2[B2: Immutable sequences]
     B3[B3: Function values / closures]
     B4[B4: Parametric types]
@@ -253,7 +253,7 @@ same wave have no dependency on each other and can proceed in parallel.
 **Wave 0** — 27 feature(s), weight 132
 
 - `A1` Object store: write-once blobs keyed by node address, read-through cache — **M** ✓ complete
-- `B1` Sum types + constructors + a `Match` node — **L**
+- `B1` Sum types + constructors + a `Match` node — **L** ✓ complete
 - `B2` Immutable sequences (index, length, map/fold) — **L** *(degraded until B4, C2)*
 - `B3` Function values / closures — **XL**
 - `B4` Parametric types — **L**
@@ -336,7 +336,7 @@ same wave have no dependency on each other and can proceed in parallel.
 
 ### Startable today
 
-27 open features have all blockers complete: `B1`, `B2`, `B3`, `B4`, `B5`, `B6`, `B7`, `C6`, `C1`, `C4`, `C7`, `C8`, `C9`, `D1`, `E1`, `E4`, `F1`, `F2`, `F3`, `F5`, `G1`, `G3`, `G4`, `H1`, `H2`, `H3`, `H4`.
+26 open features have all blockers complete: `B2`, `B3`, `B4`, `B5`, `B6`, `B7`, `C6`, `C1`, `C4`, `C7`, `C8`, `C9`, `D1`, `E1`, `E4`, `F1`, `F2`, `F3`, `F5`, `G1`, `G3`, `G4`, `H1`, `H2`, `H3`, `H4`.
 
 <!-- /generated:graph -->
 

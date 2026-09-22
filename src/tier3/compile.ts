@@ -49,7 +49,7 @@ import { CapabilityEnvelope, type CapabilityRegistry, type RevocationList } from
 import { underlying } from '../tier2/typecheck.ts';
 import type { VerificationReport } from '../tier2/verify.ts';
 import type { ExecutionResult, Fault, FaultKind } from './runtime.ts';
-import { formatValue, isRef, type Ref, type Value } from './values.ts';
+import { formatValue, isRef, isResultValue, type Ref, type Value } from './values.ts';
 
 // ---------------------------------------------------------------------------
 // compiled representation
@@ -311,6 +311,10 @@ export class ProductionRuntime {
     // register-allocation problem this compiler does not need to solve.
     const allocate = (t: Term): void => {
       if (t.kind === 'Let') slots.set(t.symbol, slots.size);
+      if (t.kind === 'MatchResult') {
+        slots.set(t.okSymbol, slots.size);
+        slots.set(t.errSymbol, slots.size);
+      }
       for (const child of childTerms(t)) allocate(child);
     };
     if (decl.body) allocate(decl.body);
@@ -580,6 +584,28 @@ export class ProductionRuntime {
           const values: Record<string, Value> = {};
           for (const [n, fn] of fields) values[n] = fn(f);
           return this.allocateRecord(ty, values);
+        };
+      }
+      case 'ResultValue': {
+        const value = this.expr(term.value, ctx);
+        const variant = term.variant;
+        return (f) => ({ variant, value: value(f) });
+      }
+      case 'MatchResult': {
+        const value = this.expr(term.value, ctx);
+        const ok = this.expr(term.ok, ctx);
+        const err = this.expr(term.err, ctx);
+        const okSlot = this.slotOf(term.okSymbol, ctx);
+        const errSlot = this.slotOf(term.errSymbol, ctx);
+        return (f) => {
+          const matched = value(f);
+          if (!isResultValue(matched)) throw new ProductionFault('type_error', 'match expects a Result value');
+          if (matched.variant === 'ok') {
+            f.s[okSlot] = matched.value;
+            return ok(f);
+          }
+          f.s[errSlot] = matched.value;
+          return err(f);
         };
       }
       case 'Call': {

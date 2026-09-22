@@ -121,6 +121,11 @@ export class TypeScriptProjector {
         const body = t.fields.map(([n, v]) => `${n}: ${this.expr(v)}`).join(', ');
         return `({ ${body} } satisfies ${this.ty(t.ty)})`;
       }
+      case 'ResultValue':
+        return `${t.variant}<${this.ty(t.ty)}>(${this.expr(t.value)})`;
+      case 'MatchResult':
+        return `matchResult(${this.expr(t.value)}, ${this.name(t.okSymbol)} => ${this.expr(t.ok)}, ` +
+          `${this.name(t.errSymbol)} => ${this.expr(t.err)})`;
       case 'Old': return `old(${this.expr(t.expr)})`;
       case 'ResultRef': return 'result';
       case 'Invoke':

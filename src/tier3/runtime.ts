@@ -26,7 +26,7 @@ import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
 import { CapabilityEnvelope, type CapabilityRegistry, type RevocationList } from '../tier2/ocap.ts';
 import { underlying } from '../tier2/typecheck.ts';
-import { formatValue, isRef, type Ref, type Value } from './values.ts';
+import { formatValue, isRef, isResultValue, type Ref, type Value } from './values.ts';
 
 // ---------------------------------------------------------------------------
 // journal
@@ -617,6 +617,22 @@ export class Runtime {
         const ref = this.allocate(fields);
         this.emit('alloc', 'RecordLit', `@${ref.addr}`);
         return ref;
+      }
+      case 'ResultValue':
+        return { variant: expr.variant, value: this.eval(expr.value, frame, result, old) };
+      case 'MatchResult': {
+        const matched = this.eval(expr.value, frame, result, old);
+        if (!isResultValue(matched)) {
+          throw new AetherFault(this.fault('type_error', 'match expects a Result value', null));
+        }
+        const scope: Scope = new Map();
+        scope.set(matched.variant === 'ok' ? expr.okSymbol : expr.errSymbol, matched.value);
+        frame.scopes.push(scope);
+        try {
+          return this.eval(matched.variant === 'ok' ? expr.ok : expr.err, frame, result, old);
+        } finally {
+          frame.scopes.pop();
+        }
       }
       case 'Call': {
         const callee = this.functions.get(expr.callee);

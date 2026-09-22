@@ -126,8 +126,8 @@ export const FEATURES: readonly Feature[] = [
     id: 'B1', epic: 'B',
     title: 'Sum types + constructors + a `Match` node',
     why: 'This is what makes `Result` real. Error handling is currently unexpressible',
-    size: 'L', deps: [],
-    evidence: { kind: 'absent', pattern: "kind: 'Match'", files: [AST] },
+    size: 'L', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: "kind: 'MatchResult'", files: [AST] },
   },
   {
     id: 'B2', epic: 'B',

@@ -268,6 +268,8 @@ class VcBuilder {
       case 'Call': return this.call(expr, path, old);
       case 'Invoke': return this.freshVar('invoke'); // effects have no value here
       case 'RecordLit': return this.freshVar('record');
+      case 'ResultValue': return this.freshVar(`result_${expr.variant}`);
+      case 'MatchResult': return this.freshVar('match_result');
       default: return this.freshVar('opaque');
     }
   }
