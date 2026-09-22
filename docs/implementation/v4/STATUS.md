@@ -25,7 +25,7 @@ Branch: `aether/v4-implementation`. Planning checkpoint: `9f23a7b`. First implem
 - **V4-T1-03 verified:** default strict production admission now requires signed causal intent, exact evidence and current spec/policy fences. [Evidence](evidence/lineage-2cc2d27/REVIEW.md) records clean `2cc2d27`, 457 passing tests, explicit legacy profile migration and actual crash/recovery/repair without duplicate effects.
 - **V4-T3-01 active:** an explicit resumable runtime is being built with serialized nonempty frames, closure/task captures, heap identity and durable event/checkpoint state. A discovered reference-runtime Atomic return rollback bug was fixed and covered by a shared reference/production regression.
 - **V4-T1-04 active:** a versioned structural/vector index and actual pinned local embedding-model campaign are being implemented, with labeled recall and full query-cost accounting.
-- **V4-T1-06 active:** durable occurrence-tree replication and candidate materialization are being implemented with fractional indexing, deterministic moves and signed epoch/checkpoint stabilization.
+- **V4-T1-06 verified:** durable occurrence-tree candidates, exact fractional positions and signed unanimous stabilization. [Evidence](evidence/tree-8020327/REVIEW.md) binds clean `8020327`, 477 passing tests, actual crash recovery and the independently reproduced/repaired capacity-overflow case. Incomplete materializations expose no normal candidate root.
 - **Native profile follow-up:** campaign 01 retained a 2.535 ms miss; campaign 02 refused to run after its source pin changed. Campaign 03 explicitly initialized an empty VM/vCPU before READY, then ran 1,000 fresh guests: max 167.375 µs, guest resident memory 65,536 bytes. This bounded scalar prototype passes the selected scope; full runtime/driver qualification remains open. A [clean source repeat](evidence/native-5bb4f1c/REVIEW.md) at `5bb4f1c` also passed all 1,000 guests: max 159.542 µs and 65,536 bytes, with every raw sample retained.
 
 Exact-commit evidence is in [foundations-4a9b077](evidence/foundations-4a9b077/REVIEW.md). A detached verification checkout passed 242 tests, typechecking and both roadmap checks. Clean pinned-dependency benchmark measurement exited 0; release enforcement correctly exited 1 with 17 unsatisfied required rows.
@@ -51,8 +51,8 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 
 ## Next executable actions
 
-1. Checkpoint and verify Tree-CRDT implementation after its capacity-overflow repair; incomplete materialization must expose no normal root.
-2. Complete and review resumable execution, including failure-atomic mutations, replay identity and actual checkpoint/task/effect restart coverage.
-3. Build and measure native structural/vector retrieval with pinned real embeddings; continue remaining eligible v2 tasks.
+1. Finish resumable-runtime review fixes and production factory integration, then verify exact source with real frame/task/effect restart cases.
+2. Independently review structural/vector retrieval and preserve actual MiniLM campaign evidence, including exact-versus-LSH quality and complete text-query cost.
+3. Continue remaining eligible v2 tasks and preserve all later functional, performance and governance requirements.
 
-Goal-turn classification: progress — the baseline, durable AST persistence, portable scalar certificates and strict signed lineage are verified. Tree-CRDT, resumable execution and semantic retrieval are progressing; full v4 remains open. No global blocker has been established.
+Goal-turn classification: progress — the baseline, durable AST persistence, portable scalar certificates, strict signed lineage and Tree-CRDT are verified. Resumable execution and semantic retrieval are progressing; full v4 remains open. No global blocker has been established.

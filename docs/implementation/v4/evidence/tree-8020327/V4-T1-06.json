@@ -1,0 +1,20 @@
+{
+  "task": "V4-T1-06",
+  "specVersion": "0.1.0",
+  "subjectCommit": "80203274b6b686f89d0ff037ba20e644e2de5fd2",
+  "recordedAt": "2026-09-22T23:37:02.825824+00:00",
+  "checks": [
+    {
+      "gate": "V4-T1-06/G1",
+      "result": "pass",
+      "method": "Clean source:477 tests, build, typechecking and both roadmap checks; actual durable replicas/CAS, signed checkpoint protocol and crash recovery. See REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/tree-8020327/REVIEW.md"
+    },
+    {
+      "gate": "V4-T1-06/G2",
+      "result": "pass",
+      "method": "Clean source:477 tests, build, typechecking and both roadmap checks; actual durable replicas/CAS, signed checkpoint protocol and crash recovery. See REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/tree-8020327/REVIEW.md"
+    }
+  ]
+}
