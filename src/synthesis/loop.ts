@@ -273,7 +273,10 @@ export function synthesize(
       proof: opts.invariant
         ? dischargeProof(verification, opts.invariant, ('ast:b3:' + '0'.repeat(64)) as NodeRef)
         : null,
-      provenFormally: true,
+      // Reaching this line does not imply a proof: with `preferProved` off the
+      // loop accepts the first candidate that passes its micro-worlds, whatever
+      // the solver managed.
+      provenFormally: proven,
       elapsedMs: Date.now() - started,
     };
   }
