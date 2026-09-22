@@ -23,7 +23,7 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-R01](#v4-r01), [V4-R02](#v4-r02), [V4-R03](#v4-r03), [V4-R04](#v4-r04), [V4-T1-01](#v4-t1-01).
+**Ready now:** [V4-R04](#v4-r04), [V4-T1-01](#v4-t1-01).
 
 ## Milestones
 
@@ -46,9 +46,9 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-F06](#v4-f06) | Validate proof evidence against exact execution subjects | verification | baseline | in_progress | [V4-F03](#v4-f03) |
 | [V4-F07](#v4-f07) | Make state handoff durable across actual processes | distribution | baseline | planned | [V4-F01](#v4-f01), [V4-F04](#v4-f04) |
 | [V4-F08](#v4-f08) | Integrate exact-root admission and baseline recovery slice | governance | baseline | planned | [V4-F02](#v4-f02), [V4-F05](#v4-f05), [V4-F06](#v4-f06), [V4-F07](#v4-f07) |
-| [V4-R01](#v4-r01) | Select and model replication and quorum algorithms | distribution | baseline | planned | [V4-F03](#v4-f03) |
-| [V4-R02](#v4-r02) | Measure native target feasibility | compiler | baseline | planned | — |
-| [V4-R03](#v4-r03) | Select certificate calculus and private attestation statement | verification | baseline | planned | [V4-F03](#v4-f03) |
+| [V4-R01](#v4-r01) | Select and model replication and quorum algorithms | distribution | baseline | in_progress | [V4-F03](#v4-f03) |
+| [V4-R02](#v4-r02) | Measure native target feasibility | compiler | baseline | in_progress | — |
+| [V4-R03](#v4-r03) | Select certificate calculus and private attestation statement | verification | baseline | in_progress | [V4-F03](#v4-f03) |
 | [V4-R04](#v4-r04) | Define numerical and learning experiment contracts | synthesis | baseline | planned | — |
 | [V4-T1-01](#v4-t1-01) | Content-addressed AST persistence | substrate | v2 | planned | [V4-F03](#v4-f03) |
 | [V4-T1-02](#v4-t1-02) | Agent-IR and bidirectional projections | language | v2 | planned | [V4-F02](#v4-f02), [V4-T1-01](#v4-t1-01) |
@@ -356,7 +356,7 @@ Evidence: not yet produced.
 
 ### V4-R01
 
-**Select and model replication and quorum algorithms** · research · baseline · owner: distribution · **planned**
+**Select and model replication and quorum algorithms** · research · baseline · owner: distribution · **in_progress**
 
 Prerequisites: [V4-F03](#v4-f03).
 
@@ -370,7 +370,7 @@ Evidence: not yet produced.
 
 ### V4-R02
 
-**Measure native target feasibility** · research · baseline · owner: compiler · **planned**
+**Measure native target feasibility** · research · baseline · owner: compiler · **in_progress**
 
 Prerequisites: none.
 
@@ -384,7 +384,7 @@ Evidence: not yet produced.
 
 ### V4-R03
 
-**Select certificate calculus and private attestation statement** · research · baseline · owner: verification · **planned**
+**Select certificate calculus and private attestation statement** · research · baseline · owner: verification · **in_progress**
 
 Prerequisites: [V4-F03](#v4-f03).
 

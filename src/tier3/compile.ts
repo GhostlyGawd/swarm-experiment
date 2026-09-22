@@ -51,6 +51,9 @@ import type { VerificationReport } from '../tier2/verify.ts';
 import type { ExecutionResult, Fault, FaultKind } from './runtime.ts';
 import { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
 import { copyHeap, snapshotHeap, restoreHeap, type HeapRecord, type ProductionSnapshot } from './heap-state.ts';
+import { EffectInvocationError, type RuntimeEffectRouter } from './effects.ts';
+import { validateVettedEvidence, type VettedEvidence } from '../fabric/evidence.ts';
+import type { ExecutionManifestV1 } from '../fabric/identity.ts';
 
 // ---------------------------------------------------------------------------
 // compiled representation
@@ -77,11 +80,13 @@ type StmtFn = (f: Frame) => Value | typeof FALLTHROUGH;
 class ProductionFault extends Error {
   readonly kind: FaultKind;
   readonly label: string | null;
-  constructor(kind: FaultKind, message: string, label: string | null = null) {
+  readonly recoveryId?: string;
+  constructor(kind: FaultKind, message: string, label: string | null = null, recoveryId?: string) {
     super(message);
     this.name = 'ProductionFault';
     this.kind = kind;
     this.label = label;
+    this.recoveryId = recoveryId;
   }
 }
 
@@ -131,8 +136,11 @@ export interface CompileOptions {
   readonly symbols?: SymbolSpace;
   readonly revocations?: RevocationList;
   readonly effects?: ReadonlyMap<CapabilityName, (args: readonly Value[]) => Value>;
+  readonly effectRouter?: RuntimeEffectRouter;
   /** Verification results, keyed by function symbol. Required for elision. */
   readonly verification?: ReadonlyMap<SymbolId, VerificationReport>;
+  /** v4 admission: expectedManifest must come from the host's current build/policy context. */
+  readonly evidence?: { readonly vetted: VettedEvidence; readonly expectedManifest: ExecutionManifestV1 };
   readonly policy?: ElisionPolicy;
   /**
    * Functions reachable from outside this artifact. Anything *not* listed can
@@ -194,8 +202,21 @@ export class ProductionRuntime {
    * otherwise decide which checks happen by declaration order.
    */
   static compile(module: Term, opts: CompileOptions): ProductionRuntime {
+    const moduleRef = new GraphStore().intern(module);
+    if (opts.evidence) {
+      const { vetted, expectedManifest } = opts.evidence;
+      validateVettedEvidence(vetted, expectedManifest);
+      if (expectedManifest.astRoot !== moduleRef) throw new TypeError('evidence does not match compiled module');
+      if (opts.verification) throw new TypeError('v4 evidence cannot be combined with untrusted legacy reports');
+      if (opts.policy === 'elide') throw new TypeError('v4 evidence cannot authorize unconditional elision');
+      const members = module.kind === 'Module' ? module.members : [module];
+      opts = { ...opts, verification: new Map(vetted.reports),
+        entryPoints: members.filter((term): term is Extract<Term, { kind: 'FunctionDecl' }> => term.kind === 'FunctionDecl').map(term => term.symbol),
+      };
+    }
     const rt = new ProductionRuntime(opts);
-    rt.moduleRef = new GraphStore().intern(module);
+    rt.moduleRef = moduleRef;
+    opts.effectRouter?.bind(rt.moduleRef);
     const declarations: Array<Extract<Term, { kind: 'FunctionDecl' }>> = [];
     const collect = (t: Term): void => {
       if (t.kind === 'FunctionDecl') {
@@ -328,7 +349,7 @@ export class ProductionRuntime {
       outcome = { ok: true, value: this.enter(fn, args), steps: 0 };
     } catch (e) {
       if (e instanceof ProductionFault) {
-        outcome = { ok: false, fault: this.fault(e.kind, e.message, e.label), steps: 0 };
+        outcome = { ok: false, fault: { ...this.fault(e.kind, e.message, e.label), ...(e.recoveryId ? { recoveryId: e.recoveryId } : {}) }, steps: 0 };
       } else {
         throw e;
       }
@@ -885,7 +906,7 @@ export class ProductionRuntime {
           if (target) return this.enter(target, values);
           const remote = this.opts.callHandler?.(callee, values, ctx.functionSymbol);
           if (!remote) throw new ProductionFault('unbound', `${this.name(callee)} is not compiled`);
-          if (!remote.ok) throw new ProductionFault(remote.fault.kind, remote.fault.message, remote.fault.label);
+          if (!remote.ok) throw new ProductionFault(remote.fault.kind, remote.fault.message, remote.fault.label, remote.fault.recoveryId);
           return remote.value;
         };
       }
@@ -914,11 +935,14 @@ export class ProductionRuntime {
             );
           }
           const values = args.map((a) => a(f));
-          if (!handler) return null;
+          if (!handler && !this.opts.effectRouter) return null;
           try {
-            return handler(values);
+            return this.opts.effectRouter ? this.opts.effectRouter.invoke(capability, values) : handler!(values);
           } catch (e) {
             if (e instanceof ProductionFault) throw e;
+            if (e instanceof EffectInvocationError && e.outcome.state === 'indeterminate') {
+              throw new ProductionFault('effect_indeterminate', e.message, capability, e.outcome.recoveryId);
+            }
             throw new ProductionFault(
               'effect_failed',
               `${capability} failed: ${e instanceof Error ? e.message : String(e)}`,
@@ -951,7 +975,7 @@ export class ProductionRuntime {
       if (target) return this.enter(target, args);
       const remote = this.opts.callHandler?.(symbol, args, ctx.functionSymbol);
       if (!remote) throw new ProductionFault('unbound', `${this.name(symbol)} is not compiled`);
-      if (!remote.ok) throw new ProductionFault(remote.fault.kind, remote.fault.message, remote.fault.label);
+      if (!remote.ok) throw new ProductionFault(remote.fault.kind, remote.fault.message, remote.fault.label, remote.fault.recoveryId);
       return remote.value;
     };
   }

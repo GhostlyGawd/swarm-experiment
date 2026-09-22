@@ -74,3 +74,4 @@ export { buildLedgerExample, ledgerCapabilities, ledgerTelemetry, ACCOUNT, CENTS
 
 // Versioned execution envelopes; kept namespaced to preserve the v1 API.
 export * as fabric from './fabric/index.ts';
+export { BrokerEffectRouter, EffectInvocationError, type RuntimeEffectRouter, type RuntimeEffectRouterOptions } from './tier3/effects.ts';

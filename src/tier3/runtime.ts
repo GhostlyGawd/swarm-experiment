@@ -24,9 +24,11 @@
 import type { BinOp, Term, Ty } from '../tier1/ast.ts';
 import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
+import { GraphStore } from '../tier1/store.ts';
 import { CapabilityEnvelope, type CapabilityRegistry, type RevocationList } from '../tier2/ocap.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
+import { EffectInvocationError, type RuntimeEffectRouter } from './effects.ts';
 
 // ---------------------------------------------------------------------------
 // journal
@@ -69,7 +71,8 @@ export type FaultKind =
   | 'unbound'
   | 'type_error'
   /** An effect handler refused. Injected by micro-worlds to model an outage. */
-  | 'effect_failed';
+  | 'effect_failed'
+  | 'effect_indeterminate';
 
 export interface Fault {
   readonly kind: FaultKind;
@@ -79,6 +82,8 @@ export interface Fault {
   readonly step: number;
   /** Variable bindings in scope at the fault, for the repair agent. */
   readonly bindings: Readonly<Record<string, string>>;
+  /** Durable effect recovery identity; never treat this outcome as safely aborted. */
+  readonly recoveryId?: string;
 }
 
 export class AetherFault extends Error {
@@ -111,6 +116,7 @@ export interface RuntimeOptions {
   readonly revocations?: RevocationList;
   /** Implementations of the capabilities in scope. */
   readonly effects?: ReadonlyMap<CapabilityName, (args: readonly Value[]) => Value>;
+  readonly effectRouter?: RuntimeEffectRouter;
   /**
    * Bound on a single top-level call, not on the runtime's lifetime. A
    * cumulative bound would make a long-lived development runtime quietly stop
@@ -166,8 +172,12 @@ export class Runtime {
 
   /** Make a module's functions callable. */
   load(term: Term): this {
-    if (term.kind === 'FunctionDecl') this.functions.set(term.symbol, term);
-    if (term.kind === 'Module') for (const m of term.members) this.load(m);
+    this.opts.effectRouter?.bind(new GraphStore().intern(term));
+    const collect = (node: Term): void => {
+      if (node.kind === 'FunctionDecl') this.functions.set(node.symbol, node);
+      if (node.kind === 'Module') for (const member of node.members) collect(member);
+    };
+    collect(term);
     return this;
   }
 
@@ -277,7 +287,7 @@ export class Runtime {
    * history is deliberately *not* copied: a fork explores forwards.
    */
   fork(): Runtime {
-    const child = new Runtime(this.opts);
+    const child = new Runtime({ ...this.opts, effectRouter: this.opts.effectRouter?.fork() });
     for (const [symbol, decl] of this.functions) child.functions.set(symbol, decl);
     child.heap = new Map();
     for (const [addr, record] of this.heap) child.heap.set(addr, new Map(record));
@@ -881,11 +891,14 @@ export class Runtime {
     this.effectLog.push({ step: this.stepCount, capability: expr.capability, args });
     this.emit('invoke', 'Invoke', `${expr.capability}(${args.map((a) => formatValue(a, this.heap)).join(', ')})`);
     const handler = this.opts.effects?.get(expr.capability);
-    if (!handler) return null;
+    if (!handler && !this.opts.effectRouter) return null;
     try {
-      return handler(args);
+      return this.opts.effectRouter ? this.opts.effectRouter.invoke(expr.capability, args) : handler!(args);
     } catch (e) {
       if (e instanceof AetherFault) throw e;
+      if (e instanceof EffectInvocationError && e.outcome.state === 'indeterminate') {
+        throw new AetherFault({ ...this.fault('effect_indeterminate', e.message, expr.capability), recoveryId: e.outcome.recoveryId });
+      }
       throw new AetherFault(this.fault(
         'effect_failed',
         `${expr.capability} failed: ${e instanceof Error ? e.message : String(e)}`,

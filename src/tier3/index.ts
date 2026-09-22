@@ -4,3 +4,4 @@ export { ProductionRuntime, formatCompilation, type ClauseDecision, type Compila
 export { MicroWorld, exploreSchedules, formatMicroWorld, materializeCounterexample, simulateModule, type Counterexample, type MicroWorldReport, type PersistedCounterexample, type PropertyName, type ScheduleOutcome, type ScheduleStep } from './microworld.ts';
 export { generateCase, materialise, shrinkPlain, type Plain } from './generate.ts';
 export type { ProductionSnapshot } from './heap-state.ts';
+export { BrokerEffectRouter, EffectInvocationError, type RuntimeEffectRouter, type RuntimeEffectRouterOptions } from './effects.ts';

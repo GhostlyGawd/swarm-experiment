@@ -15,12 +15,13 @@ export interface WireRequest {
   readonly timeoutMs?: number;
 }
 
-export type DistributedFaultKind = 'partition' | 'timeout' | 'authority' | 'remote_fault';
+export type DistributedFaultKind = 'partition' | 'timeout' | 'authority' | 'remote_fault' | 'indeterminate';
 export interface DistributedFault {
   readonly kind: DistributedFaultKind;
   readonly message: string;
   readonly retryable: boolean;
-  readonly committed: boolean;
+  readonly committed: boolean | null;
+  readonly recoveryId?: string;
 }
 export type DistributedResult =
   | { readonly ok: true; readonly execution: ExecutionResult; readonly unit: string }
@@ -161,6 +162,12 @@ export class TopologyHost {
     }
     const started = this.clock();
     const execution = this.call(request.to, request.args, request.from);
+    if (!execution.ok && execution.fault.kind === 'effect_indeterminate') {
+      return { ok: false, unit, fault: {
+        kind: 'indeterminate', message: execution.fault.message,
+        retryable: false, committed: null, recoveryId: execution.fault.recoveryId,
+      } };
+    }
     if (request.timeoutMs !== undefined && this.clock() - started > request.timeoutMs) {
       return { ok: false, unit, fault: fault('timeout', `request ${request.id} exceeded its deadline`, true, execution.ok) };
     }
