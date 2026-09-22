@@ -12,6 +12,7 @@ export * from './tier1/ids.ts';
 export { canonicalBytes, canonicalText, type Canonical } from './tier1/canonical.ts';
 export { Blake3, blake3, blake3Hex, bytesToHex } from './tier1/blake3.ts';
 export { GraphStore, alphaNormalize, hashNode, structuralKeyOf, type Step, type StoreStats } from './tier1/store.ts';
+export { DurableGraphStore, type DurableGraphStoreOptions, type DurableStoreLimits, type DurableRootHead, type DurableRootState, type PendingAstPromotion, type DurableStoreFault, type DurableCollectionResult } from './tier1/durable-store.ts';
 export { AetherRepository, type CommitOptions, type CommitRecord, type FsckIssue, type GarbageCollectionResult, type Packfile } from './tier1/repository.ts';
 export { ModuleResolver, type ResolvedModule } from './tier1/modules.ts';
 export { merge3, type MergeConflict, type MergeResult } from './tier1/merge.ts';

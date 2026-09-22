@@ -2,6 +2,18 @@
 
 Use [TRACKER.md](TRACKER.md) for verified task status and [STATUS.md](STATUS.md) for current work. These interfaces implement the early foundations; full v4 deployment, scale and assurance gates remain open.
 
+## Durable AST storage
+
+`DurableGraphStore` is an explicit versioned storage profile, exported by the root package and tier1. Existing `GraphStore`/`AetherRepository` data stays readable through its original APIs. Use `importLegacy` to copy a quiescent legacy graph into the new store with unchanged v1 grouped-child hashes.
+
+Open the store with a private directory and a fixed capacity profile. Intern an AST under a unique lease ID, commit its root with the expected named head (or `null` for a new head), then release the lease. Root compare-and-swap, object publication and garbage collection share one process-death-recoverable lock. Published roots follow durable object writes. Collection retains committed history, active leases and both sides of pending promotions.
+
+Leases do not expire by elapsed time. Released lease IDs and finalized promotion IDs cannot be reused, so a delayed retry cannot remove a newer candidate's protection. `stagePromotion` pins its source and candidate; `finishPromotion` records the terminal decision and performs a committed head change atomically. Use a new logical ID for new work.
+
+`exportArchive` and `importArchive` validate version, bounds, complete reachable closure and content hashes. Imported data remains protected by its caller-selected lease. Corrupt or incomplete archives fail before root publication. The store also bounds hydration expansion so a compact shared DAG cannot cause unlimited tree expansion during import or access.
+
+The default profile allows 100,000 nodes/tickets and 10,000 roots/retired IDs, with 1 MiB object/root records and 64 MiB archives. These are implemented capacity limits, not the v4 100M-node qualification. Retained history/tickets require coordinated maintenance or a new versioned store once capacity is reached; do not delete protection records manually.
+
 ## State-preserving local movement
 
 `TopologyHost.move(symbol, targetUnit, expectedGeneration?)` prepares replacement runtimes and imports validated snapshots before publishing a new local generation. Use `host.generation` as the expected generation when coordinating edits. A same-unit move is a no-op. Invalid placement, active calls, retained live closures/tasks and preparation failures leave the old state usable.
