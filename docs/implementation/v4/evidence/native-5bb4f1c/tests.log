@@ -1,0 +1,12 @@
+✔ fresh guest qualification uses maximum of all preregistered guests and excludes controller RSS from guest scope (1.147333ms)
+✔ fresh guest qualification rejects first-guest omission, repeats, malformed timing, invalid responses and incomplete cleanup (0.351917ms)
+✔ fresh guest profile keeps approved numeric bounds and prohibits guest warmups/reuse (0.154125ms)
+✔ initialized hypervisor campaign requires a destroyed empty VM/vCPU context and zero executed guest warmups (0.484833ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 100.63575

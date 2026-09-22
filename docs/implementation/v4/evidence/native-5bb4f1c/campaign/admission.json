@@ -1,0 +1,81 @@
+{
+  "format": "aether.fresh-guest-admission/1",
+  "completedAt": "2026-09-22T22:19:50.459Z",
+  "registrationDigest": "sha256:0ef1e398dab13f505e2d02d326106445cab61f9cf54160a4eb0b5610c6b30ec3",
+  "conformanceCases": 1345,
+  "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /Library/Developer/CommandLineTools/usr/bin",
+  "linkerVersion": "LLD 22.1.6 (https://github.com/rust-lang/llvm-project.git dcc3606807c989700e0ac1cac18c31741bcd40d9) (compatible with GNU linkers)",
+  "abi": "aether.native-i64/1",
+  "astRoots": {
+    "fee": "ast:b3:39a16f7116e65378eac11b430ebacbdc6da807dc87764ba779c7124249504e7f",
+    "arithmetic": [
+      "ast:b3:229c27fb14c8b58e3317cf911ffc63ec84969fdb46d8c7eaebad9617a450f757",
+      "ast:b3:03203970b7575a0ad3e406738db62348e9c276e486bc7fda073bf53c833e2d7a",
+      "ast:b3:2e5aca408e1e96542a98113593398d4c422aca54ec7b2db6d0ced34ef068a11e",
+      "ast:b3:2888b9e00be4c9c586de955930d0179d60e6cb20a050485798d531196a6e6551",
+      "ast:b3:bb4503cc760946b8bfb4a15f762bfe066385b964ce4f0499939d1b2a4de448ee"
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "conformance.json",
+      "bytes": 303380,
+      "digest": "sha256:20bded944b9dee4ca118da181436e9cbf7269887225d10165643a398bd3ac2ba"
+    },
+    {
+      "path": "generated.h",
+      "bytes": 1956,
+      "digest": "sha256:3340a326b381b767f239dd255dcb1e9ff43911f7fa0332c76ecc3a6553f4b173"
+    },
+    {
+      "path": "initialized-guest-campaign",
+      "bytes": 53824,
+      "digest": "sha256:bb98095de85fb969f6e1bc4bcd50a1455b878d93020c0afd97730592e5557896"
+    },
+    {
+      "path": "initialized-guest-campaign.s",
+      "bytes": 42318,
+      "digest": "sha256:efd076a9a9e673484d4195ff0da62b4d2af02f1afe84950299080a08a1157113"
+    },
+    {
+      "path": "kernel.bin",
+      "bytes": 60,
+      "digest": "sha256:81c8b3d987c5b108b9720946f825ad8a770c1de9be23d61b3bf64b3ed62c307e"
+    },
+    {
+      "path": "kernel.c",
+      "bytes": 717,
+      "digest": "sha256:a16f33cece201eca37eb3ca6794720edd515f4df1cb3ed52c16d5ab6ac708fff"
+    },
+    {
+      "path": "kernel.elf",
+      "bytes": 66136,
+      "digest": "sha256:45790b15b5ab00b1c9507b629bc3ae3c2c2cfddb74a06fb4113efd5b288fed3d"
+    },
+    {
+      "path": "kernel.o",
+      "bytes": 824,
+      "digest": "sha256:a159809f71d5623612c0afc67a077417da0dc0f9da97fd2c907a8d8288f728f6"
+    },
+    {
+      "path": "native-boot",
+      "bytes": 53824,
+      "digest": "sha256:28ac5725e0b08597ab3fb1e2858131eedee58cf9e68c94f44fc01af132ee66f1"
+    },
+    {
+      "path": "native-driver",
+      "bytes": 50672,
+      "digest": "sha256:023239dd75bd2969208cc644bfbd70ed64917751ec657adbbf00b0c35b29162d"
+    },
+    {
+      "path": "native-driver.s",
+      "bytes": 22231,
+      "digest": "sha256:f88c84670ac281171ca4d0d89b0e3463f3ef81961753ed579dc0d31ba8a8d019"
+    },
+    {
+      "path": "start.o",
+      "bytes": 648,
+      "digest": "sha256:cb048bb87239ce8d5fa506884f65768c762fb16c27b63e652f086403d88eda07"
+    }
+  ]
+}

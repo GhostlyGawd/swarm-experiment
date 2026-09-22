@@ -1,0 +1,134 @@
+{
+  "format": "aether.native-clean-campaign/1",
+  "subjectCommit": "5bb4f1cfa0478ea4afb940e268400e17bf102434",
+  "workingTreeDirty": false,
+  "specVersion": "0.1.0",
+  "recordedAt": "2026-09-22T22:22:58.149776+00:00",
+  "commands": [
+    {
+      "command": "node --test --experimental-strip-types test/research/fresh-guest-campaign.test.ts",
+      "exitCode": 0
+    },
+    {
+      "command": "initialized-guest-campaign.ts register <new output>",
+      "exitCode": 0
+    },
+    {
+      "command": "initialized-guest-campaign.ts run <new output>",
+      "exitCode": 0
+    }
+  ],
+  "scope": "Additional bounded prototype evidence under the approved boundary. Does not close full unikernel/driver/runtime qualification.",
+  "artifacts": [
+    {
+      "path": "campaign/admission.json",
+      "digest": "sha256:2488cc8972df99e0f7727042b33d4574b365b587bf14b9bc94fb66e0886311d8",
+      "bytes": 3011
+    },
+    {
+      "path": "campaign/attempt.json",
+      "digest": "sha256:9233e3ed1c2f0dd613b7ccba05bcff1345346e1d65308c7faecdbf7f4c96516f",
+      "bytes": 368
+    },
+    {
+      "path": "campaign/conformance.json",
+      "digest": "sha256:20bded944b9dee4ca118da181436e9cbf7269887225d10165643a398bd3ac2ba",
+      "bytes": 303380
+    },
+    {
+      "path": "campaign/execution.json",
+      "digest": "sha256:377234d3212316b403f31c0ab0b57db1786536b0874032851f49aa09295938bb",
+      "bytes": 849993
+    },
+    {
+      "path": "campaign/generated.h",
+      "digest": "sha256:3340a326b381b767f239dd255dcb1e9ff43911f7fa0332c76ecc3a6553f4b173",
+      "bytes": 1956
+    },
+    {
+      "path": "campaign/initialized-guest-campaign",
+      "digest": "sha256:bb98095de85fb969f6e1bc4bcd50a1455b878d93020c0afd97730592e5557896",
+      "bytes": 53824
+    },
+    {
+      "path": "campaign/initialized-guest-campaign.s",
+      "digest": "sha256:efd076a9a9e673484d4195ff0da62b4d2af02f1afe84950299080a08a1157113",
+      "bytes": 42318
+    },
+    {
+      "path": "campaign/kernel.bin",
+      "digest": "sha256:81c8b3d987c5b108b9720946f825ad8a770c1de9be23d61b3bf64b3ed62c307e",
+      "bytes": 60
+    },
+    {
+      "path": "campaign/kernel.c",
+      "digest": "sha256:a16f33cece201eca37eb3ca6794720edd515f4df1cb3ed52c16d5ab6ac708fff",
+      "bytes": 717
+    },
+    {
+      "path": "campaign/kernel.elf",
+      "digest": "sha256:45790b15b5ab00b1c9507b629bc3ae3c2c2cfddb74a06fb4113efd5b288fed3d",
+      "bytes": 66136
+    },
+    {
+      "path": "campaign/kernel.o",
+      "digest": "sha256:a159809f71d5623612c0afc67a077417da0dc0f9da97fd2c907a8d8288f728f6",
+      "bytes": 824
+    },
+    {
+      "path": "campaign/native-boot",
+      "digest": "sha256:28ac5725e0b08597ab3fb1e2858131eedee58cf9e68c94f44fc01af132ee66f1",
+      "bytes": 53824
+    },
+    {
+      "path": "campaign/native-driver",
+      "digest": "sha256:023239dd75bd2969208cc644bfbd70ed64917751ec657adbbf00b0c35b29162d",
+      "bytes": 50672
+    },
+    {
+      "path": "campaign/native-driver.s",
+      "digest": "sha256:f88c84670ac281171ca4d0d89b0e3463f3ef81961753ed579dc0d31ba8a8d019",
+      "bytes": 22231
+    },
+    {
+      "path": "campaign/preregistration.json",
+      "digest": "sha256:0ef1e398dab13f505e2d02d326106445cab61f9cf54160a4eb0b5610c6b30ec3",
+      "bytes": 11917
+    },
+    {
+      "path": "campaign/raw.jsonl",
+      "digest": "sha256:f61866eabb80014b94ce7d523a5dec8b0c442c9c09aad804fe46d14ba49dc9e9",
+      "bytes": 632816
+    },
+    {
+      "path": "campaign/report.json",
+      "digest": "sha256:efd4c0eed950e9b366f8166103a958fb40616195b0c28fe5c3c76350b64ced2b",
+      "bytes": 2866
+    },
+    {
+      "path": "campaign/start.o",
+      "digest": "sha256:cb048bb87239ce8d5fa506884f65768c762fb16c27b63e652f086403d88eda07",
+      "bytes": 648
+    },
+    {
+      "path": "campaign/stderr.txt",
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "register.log",
+      "digest": "sha256:6446f2f493e4f36b4091ed0e99ceb00ac044f851a0f1ced7ee67c00f9259b91f",
+      "bytes": 141
+    },
+    {
+      "path": "run.log",
+      "digest": "sha256:126db07f8cc3317a95775157db87950bfb684b8308a6fbd4e7438b12e01c5d93",
+      "bytes": 2867
+    },
+    {
+      "path": "tests.log",
+      "digest": "sha256:ffc6b3fa29558ede580b2d334fe8eebf9d6bd9b9989253a98dc4da986e182f30",
+      "bytes": 609
+    }
+  ]
+}

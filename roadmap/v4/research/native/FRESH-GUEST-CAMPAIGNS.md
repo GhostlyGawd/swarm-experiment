@@ -12,6 +12,11 @@ fixture: **1,000 fresh guests, maximum 167.375 µs, peak guest-resident memory
 65,536 bytes**. This is bounded workload evidence. It does not complete the
 native runtime, drivers, compiler or full unikernel requirements.
 
+A subsequent [clean-commit repeat](../../../../docs/implementation/v4/evidence/native-5bb4f1c/REVIEW.md)
+at `5bb4f1c` also passed all 1,000 guests: maximum **159.542 µs**, median
+26.917 µs, and **65,536 bytes** guest resident memory. Its source/artifact
+hashes and every raw sample are retained separately.
+
 ## Preserved history
 
 | Record | Preregistered protocol | Executed guests | Maximum boot | Guest memory | Result |

@@ -1,0 +1,11 @@
+{
+  "format": "aether.fresh-guest-attempt/1",
+  "startedAt": "2026-09-22T22:20:01.940Z",
+  "registrationDigest": "sha256:0ef1e398dab13f505e2d02d326106445cab61f9cf54160a4eb0b5610c6b30ec3",
+  "admissionDigest": "sha256:2488cc8972df99e0f7727042b33d4574b365b587bf14b9bc94fb66e0886311d8",
+  "loadAverageBefore": [
+    2.57568359375,
+    3.279296875,
+    3.7939453125
+  ]
+}
