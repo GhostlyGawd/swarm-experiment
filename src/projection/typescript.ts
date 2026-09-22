@@ -99,8 +99,15 @@ export class TypeScriptProjector {
         // Same-precedence right operands need parens: a - (b - c) ≠ a - b - c.
         return wrap(`${this.expr(t.left, p)} ${BIN_TEXT[t.op]} ${this.expr(t.right, p + 1)}`, p);
       }
-      case 'Un':
-        return wrap(`${UN_TEXT[t.op]}${this.expr(t.operand, UNARY_PRECEDENCE)}`, UNARY_PRECEDENCE);
+      case 'Un': {
+        // `-5n` is a negative literal; `-(5n)` is negation applied to a
+        // positive one. They evaluate alike but are different nodes, so the
+        // projection has to keep them apart or the round trip is lossy.
+        const operand = t.op === 'neg' && t.operand.kind === 'Lit'
+          ? `(${this.expr(t.operand)})`
+          : this.expr(t.operand, UNARY_PRECEDENCE);
+        return wrap(`${UN_TEXT[t.op]}${operand}`, UNARY_PRECEDENCE);
+      }
       case 'Cond':
         return wrap(
           `${this.expr(t.cond, COND_PRECEDENCE + 1)} ? ${this.expr(t.then, COND_PRECEDENCE)}` +

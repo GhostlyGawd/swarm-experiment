@@ -10,6 +10,7 @@ import { SymbolSpace } from '../tier1/symbols.ts';
 import { ProvenanceLedger } from '../tier1/provenance.ts';
 import { capability, typeName, type InvariantId, type SymbolId } from '../tier1/ids.ts';
 import type { Term, Ty } from '../tier1/ast.ts';
+import { CapabilityRegistry } from '../tier2/ocap.ts';
 
 export const CENTS: Ty = {
   t: 'Nominal',
@@ -32,9 +33,24 @@ export const CAP_NETWORK_FETCH = capability('cap:network:fetch');
 export const INV_CONSERVATION = 'inv:b3:' + 'c0'.repeat(32) as InvariantId;
 export const INV_NON_NEGATIVE = 'inv:b3:' + 'a1'.repeat(32) as InvariantId;
 
+/** The capabilities this example's code is allowed to name. */
+export function ledgerCapabilities(): CapabilityRegistry {
+  const registry = new CapabilityRegistry();
+  registry.declare('cap:db:ledger_append', {
+    arity: 3,
+    description: 'Append a (from, to, amount) entry to the immutable ledger.',
+  });
+  registry.declare('cap:network:fetch', {
+    arity: 1,
+    description: 'Issue an outbound request to a named endpoint.',
+  });
+  return registry;
+}
+
 export interface LedgerExample {
   readonly syms: SymbolSpace;
   readonly ledger: ProvenanceLedger;
+  readonly capabilities: CapabilityRegistry;
   readonly module: Term;
   readonly transfer: Term;
   readonly symbols: Readonly<Record<string, SymbolId>>;
@@ -101,6 +117,13 @@ export function buildLedgerExample(seed = 'ledger-example'): LedgerExample {
       requires: [
         b.clause(b.ge(senderBalance, b.v(amount)), 'sufficient_funds'),
         b.clause(b.gt(b.v(amount), b.typed(CENTS, 0n)), 'positive_amount'),
+        // Without this, `transfer(a, a, n)` aliases the two balances and the
+        // debit/credit postconditions genuinely do not hold. The verifier
+        // reports the assumption when it is missing rather than assuming it.
+        b.clause(
+          b.ne(b.field(b.v(sender), 'id'), b.field(b.v(receiver), 'id')),
+          'distinct_accounts',
+        ),
       ],
       ensures: [
         b.clause(b.eq(senderBalance, b.sub(b.old(senderBalance), b.v(amount))), 'debit_exact'),
@@ -198,6 +221,7 @@ export function buildLedgerExample(seed = 'ledger-example'): LedgerExample {
   return {
     syms,
     ledger,
+    capabilities: ledgerCapabilities(),
     module: moduleTerm,
     transfer: transferDecl,
     symbols: {
