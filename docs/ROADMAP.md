@@ -189,10 +189,10 @@ graph LR
     G4[✓ G4: Sampled production telemetry mode]
   end
   subgraph H["Projection"]
-    H1[H1: Rust projection]
-    H2[H2: Python projection]
-    H3[H3: LSP / projectional editor so the virtual…]
-    H4[H4: Diff projection]
+    H1[✓ H1: Rust projection]
+    H2[✓ H2: Python projection]
+    H3[✓ H3: LSP / projectional editor so the virtual…]
+    H4[✓ H4: Diff projection]
   end
   subgraph I["Correctness and release integrity"]
     I1[✓ I1: Sound modular verification for mutating …]
@@ -267,9 +267,9 @@ same wave have no dependency on each other and can proceed in parallel.
 - `E4` Feed concurrency findings to the slicer as placement constraints — **S** ✓ complete
 - `G3` Real tokenizer binding — **S** ✓ complete
 - `G4` Sampled production telemetry mode — **M** ✓ complete
-- `H1` Rust projection (read-only) — **M**
-- `H2` Python projection — **M**
-- `H4` Diff projection — render the change between two roots as readable text — **M**
+- `H1` Rust projection (read-only) — **M** ✓ complete
+- `H2` Python projection — **M** ✓ complete
+- `H4` Diff projection — render the change between two roots as readable text — **M** ✓ complete
 - `I1` Sound modular verification for mutating callees — **L** ✓ complete
 - `I2` Bind proof elision to exact content and admissible evidence — **M** ✓ complete
 - `I3` Downgrade truncated path exploration to unproven — **S** ✓ complete
@@ -306,7 +306,7 @@ same wave have no dependency on each other and can proceed in parallel.
 - `F2` Signed append-only audit export — **M** ✓ complete ← A3
 - `F3` Operator revocation console with a durable trail — **S** ✓ complete ← A3
 - `G1` Wire protocol for the agent↔fabric session — **L** ✓ complete ← A1, A2
-- `H3` LSP / projectional editor so the virtual-filesystem story is real — **XL** ← A2
+- `H3` LSP / projectional editor so the virtual-filesystem story is real — **XL** ✓ complete ← A2
 
 **Wave 3** — 4 feature(s), weight 17
 
@@ -336,7 +336,7 @@ same wave have no dependency on each other and can proceed in parallel.
 
 ### Startable today
 
-4 open features have all blockers complete: `H1`, `H2`, `H3`, `H4`.
+0 open features have all blockers complete: .
 
 <!-- /generated:graph -->
 

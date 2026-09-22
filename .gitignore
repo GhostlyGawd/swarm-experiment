@@ -2,3 +2,4 @@ node_modules/
 dist/
 *.tsbuildinfo
 .aether-store/
+.DS_Store

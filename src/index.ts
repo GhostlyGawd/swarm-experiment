@@ -52,6 +52,10 @@ export { TelemetryCollector, TopologyHost, type DistributedFault, type Distribut
 export { TypeScriptProjector, projectTypeScript, type ProjectOptions } from './projection/typescript.ts';
 export { ParseError, Parser, parseExpression, parseTypeScript, type ParseOptions } from './projection/parse.ts';
 export { TypeNames } from './projection/names.ts';
+export { PythonProjector, projectPython } from './projection/python.ts';
+export { RustProjector, projectRust } from './projection/rust.ts';
+export { projectDiff, structuralDiff, type ProjectionDiffEntry } from './projection/diff.ts';
+export { ProjectionLanguageServer, type JsonRpcRequest, type JsonRpcResponse, type ProjectionDocument } from './projection/lsp.ts';
 
 // --- Synthesis ---------------------------------------------------------------
 export { DEFAULT_MAX_ITERATIONS, formatOutcome, purgeBody, synthesize, type Attempt, type Feedback, type SynthesisOutcome, type Synthesizer } from './synthesis/loop.ts';
