@@ -182,6 +182,11 @@ export function buildLedgerExample(seed = 'ledger-example'): LedgerExample {
       requires: [
         b.clause(b.ge(b.v(principal), b.typed(CENTS, 0n)), 'non_negative_principal'),
         b.clause(b.ge(b.v(periods), b.int(0)), 'non_negative_periods'),
+        // A loop bounded only by an unbounded parameter is a liveness hazard,
+        // not a correctness one, so the solver will not catch it. The
+        // micro-world does: without this bound it reports a step-budget
+        // exhaustion for large `periods`. 1200 is a century of monthly periods.
+        b.clause(b.le(b.v(periods), b.int(1200)), 'bounded_periods'),
       ],
       ensures: [b.clause(b.ge(b.result(), b.v(principal)), 'never_shrinks', 'property')],
     }),
