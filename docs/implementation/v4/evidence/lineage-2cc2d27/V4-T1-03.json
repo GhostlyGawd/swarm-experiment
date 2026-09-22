@@ -1,0 +1,20 @@
+{
+  "task": "V4-T1-03",
+  "specVersion": "0.1.0",
+  "subjectCommit": "2cc2d27b38ff4c74d96be3e0d11144dff264a4e0",
+  "recordedAt": "2026-09-22T23:19:48.752298+00:00",
+  "checks": [
+    {
+      "gate": "V4-T1-03/G1",
+      "result": "pass",
+      "method": "Clean source:457 tests, build, typechecking and both roadmap checks. Real strict-process deployment, signed lineage, invalidation and recovery cases; analysis in REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/lineage-2cc2d27/REVIEW.md"
+    },
+    {
+      "gate": "V4-T1-03/G2",
+      "result": "pass",
+      "method": "Clean source:457 tests, build, typechecking and both roadmap checks. Real strict-process deployment, signed lineage, invalidation and recovery cases; analysis in REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/lineage-2cc2d27/REVIEW.md"
+    }
+  ]
+}

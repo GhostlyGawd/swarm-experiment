@@ -22,8 +22,9 @@ Branch: `aether/v4-implementation`. Planning checkpoint: `9f23a7b`. First implem
 - **R04 result:** actual adapter train/save/reload and held-out gradient fixtures pass. Fresh boundary throughput 0.448–0.466M/sec misses 2M/sec. No full synthesis/efficiency claim.
 - **V4-T1-01 verified:** versioned durable AST storage, root compare-and-swap, leases, pending-promotion pins, bounded archives and coordinated collection. [Evidence](evidence/ast-3dfabca/REVIEW.md) binds clean commit `3dfabca`, 395 passing tests and initialization recovery at eight actual termination points.
 - **V4-T2-10 verified:** independent scalar Hoare derivation, exact integer/propositional certificates and closed-artifact compiler admission. [Evidence](evidence/proof-e10d6cd/REVIEW.md) binds clean commit `e10d6cd`, 429 tests, isolated consumers without solver/producer files and the retained 98,200-valuation review. Unsupported theories and proof-latency qualification remain open.
-- **V4-T1-03 active:** signed causal intent, shared-node lineage, exact invariant fences and spec/policy invalidation are being integrated with strict production admission.
+- **V4-T1-03 verified:** default strict production admission now requires signed causal intent, exact evidence and current spec/policy fences. [Evidence](evidence/lineage-2cc2d27/REVIEW.md) records clean `2cc2d27`, 457 passing tests, explicit legacy profile migration and actual crash/recovery/repair without duplicate effects.
 - **V4-T3-01 active:** an explicit resumable runtime is being built with serialized nonempty frames, closure/task captures, heap identity and durable event/checkpoint state. A discovered reference-runtime Atomic return rollback bug was fixed and covered by a shared reference/production regression.
+- **V4-T1-04 active:** a versioned structural/vector index and actual pinned local embedding-model campaign are being implemented, with labeled recall and full query-cost accounting.
 - **V4-T1-06 active:** durable occurrence-tree replication and candidate materialization are being implemented with fractional indexing, deterministic moves and signed epoch/checkpoint stabilization.
 - **Native profile follow-up:** campaign 01 retained a 2.535 ms miss; campaign 02 refused to run after its source pin changed. Campaign 03 explicitly initialized an empty VM/vCPU before READY, then ran 1,000 fresh guests: max 167.375 µs, guest resident memory 65,536 bytes. This bounded scalar prototype passes the selected scope; full runtime/driver qualification remains open. A [clean source repeat](evidence/native-5bb4f1c/REVIEW.md) at `5bb4f1c` also passed all 1,000 guests: max 159.542 µs and 65,536 bytes, with every raw sample retained.
 
@@ -50,8 +51,8 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 
 ## Next executable actions
 
-1. Complete strict lineage admission integration and independent review; verify current-policy/spec behavior, recovery and shared causes.
-2. Complete durable Tree-CRDT candidate projection and signed checkpoint stabilization, preserving all historical root/epoch protections.
-3. Implement and verify resumable execution with real frame/task checkpoints and broker-backed effects; continue remaining eligible v2 tasks.
+1. Checkpoint and verify Tree-CRDT implementation after its capacity-overflow repair; incomplete materialization must expose no normal root.
+2. Complete and review resumable execution, including failure-atomic mutations, replay identity and actual checkpoint/task/effect restart coverage.
+3. Build and measure native structural/vector retrieval with pinned real embeddings; continue remaining eligible v2 tasks.
 
-Goal-turn classification: progress — the baseline, durable AST persistence and portable scalar certificates are verified. Strict lineage, Tree-CRDT and resumable execution are progressing; full v4 remains open. No global blocker has been established.
+Goal-turn classification: progress — the baseline, durable AST persistence, portable scalar certificates and strict signed lineage are verified. Tree-CRDT, resumable execution and semantic retrieval are progressing; full v4 remains open. No global blocker has been established.

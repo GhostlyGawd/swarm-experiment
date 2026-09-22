@@ -1,9 +1,8 @@
 /**
  * Project Aether — a unified, agent-native programming fabric.
  *
- * The public surface is organized by tier. Tier N depends only on the tiers
- * below it, which is what lets the topology engine move code between processes
- * without the semantics tier noticing.
+ * The public surface is organized by tier. Shared fabric and admission services
+ * bind code, state, evidence and authority across those tiers.
  */
 
 // --- Tier 1: storage and representation -------------------------------------

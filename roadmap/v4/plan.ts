@@ -328,6 +328,8 @@ export const PLAN: Plan = {
               ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/ast-3dfabca/V4-T1-01.json' }
               : task.id === 'V4-T2-10'
                 ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/proof-e10d6cd/V4-T2-10.json' }
-                : ['V4-T1-03', 'V4-T1-06', 'V4-T3-01'].includes(task.id) ? { ...task, status: 'in_progress' as const } : task),
+                : task.id === 'V4-T1-03'
+                  ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/lineage-2cc2d27/V4-T1-03.json' }
+                  : ['V4-T1-04', 'V4-T1-06', 'V4-T3-01'].includes(task.id) ? { ...task, status: 'in_progress' as const } : task),
   firstSlice: ['V4-F01', 'V4-F02', 'V4-F03', 'V4-F04', 'V4-F05', 'V4-F06', 'V4-F07', 'V4-F08'],
 };

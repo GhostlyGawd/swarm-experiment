@@ -6,7 +6,7 @@ Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) f
 
 > This is implementation status. Publishing the specification does not complete runtime work. A verified task needs evidence for every gate; functional delivery does not imply that the release NFR/KPI gates passed.
 
-**15/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
+**16/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
 
 ## First implementation slice
 
@@ -23,14 +23,14 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-T1-02](#v4-t1-02), [V4-T1-04](#v4-t1-04), [V4-T2-04](#v4-t2-04).
+**Ready now:** [V4-T1-02](#v4-t1-02), [V4-T1-05](#v4-t1-05), [V4-T1-09](#v4-t1-09), [V4-T2-04](#v4-t2-04).
 
 ## Milestones
 
 | Milestone | Verified | Total | Release gate |
 |---|---:|---:|---|
 | baseline | 13 | 13 | [V4-M0](#v4-m0) |
-| v2 | 2 | 20 | [V4-M2](#v4-m2) |
+| v2 | 3 | 20 | [V4-M2](#v4-m2) |
 | v3 | 0 | 14 | [V4-M3](#v4-m3) |
 | v4 | 0 | 15 | [V4-M4](#v4-m4) |
 
@@ -52,8 +52,8 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-R04](#v4-r04) | Define numerical and learning experiment contracts | synthesis | baseline | verified | — |
 | [V4-T1-01](#v4-t1-01) | Content-addressed AST persistence | substrate | v2 | verified | [V4-F03](#v4-f03) |
 | [V4-T1-02](#v4-t1-02) | Agent-IR and bidirectional projections | language | v2 | planned | [V4-F02](#v4-f02), [V4-T1-01](#v4-t1-01) |
-| [V4-T1-03](#v4-t1-03) | Causal lineage and invariant fences | governance | v2 | in_progress | [V4-T1-01](#v4-t1-01), [V4-F06](#v4-f06) |
-| [V4-T1-04](#v4-t1-04) | Structural and semantic index | retrieval | v2 | planned | [V4-T1-01](#v4-t1-01) |
+| [V4-T1-03](#v4-t1-03) | Causal lineage and invariant fences | governance | v2 | verified | [V4-T1-01](#v4-t1-01), [V4-F06](#v4-f06) |
+| [V4-T1-04](#v4-t1-04) | Structural and semantic index | retrieval | v2 | in_progress | [V4-T1-01](#v4-t1-01) |
 | [V4-T1-05](#v4-t1-05) | Continuous semantic garbage collection | synthesis | v3 | planned | [V4-T1-03](#v4-t1-03), [V4-T2-10](#v4-t2-10), [V4-F08](#v4-f08) |
 | [V4-T1-06](#v4-t1-06) | Tree-CRDT concurrency | distribution | v2 | in_progress | [V4-F05](#v4-f05), [V4-R01](#v4-r01), [V4-T1-01](#v4-t1-01) |
 | [V4-T1-07](#v4-t1-07) | Module LoRA training and loading | synthesis | v3 | planned | [V4-R04](#v4-r04), [V4-T1-09](#v4-t1-09), [V4-T2-05](#v4-t2-05), [V4-F08](#v4-f08) |
@@ -443,7 +443,7 @@ Evidence: not yet produced.
 
 ### V4-T1-03
 
-**Causal lineage and invariant fences** · implementation · v2 · owner: governance · **in_progress**
+**Causal lineage and invariant fences** · implementation · v2 · owner: governance · **verified**
 
 Prerequisites: [V4-T1-01](#v4-t1-01), [V4-F06](#v4-f06).
 
@@ -454,11 +454,11 @@ Acceptance gates:
 - **V4-T1-03/G1** — Every production artifact resolves to signed intent and evidence; shared nodes preserve all causal links.
 - **V4-T1-03/G2** — Spec edits invalidate all relevant evidence and prevent stale fence discharge.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/lineage-2cc2d27/V4-T1-03.json).
 
 ### V4-T1-04
 
-**Structural and semantic index** · implementation · v2 · owner: retrieval · **planned**
+**Structural and semantic index** · implementation · v2 · owner: retrieval · **in_progress**
 
 Prerequisites: [V4-T1-01](#v4-t1-01).
 

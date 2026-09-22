@@ -1,0 +1,56 @@
+{
+  "format": "aether.lineage-verification/1",
+  "subjectCommit": "2cc2d27b38ff4c74d96be3e0d11144dff264a4e0",
+  "workingTreeDirty": false,
+  "specVersion": "0.1.0",
+  "recordedAt": "2026-09-22T23:19:48.752298+00:00",
+  "checks": [
+    {
+      "command": "npm test (includes build)",
+      "exitCode": 0,
+      "artifact": "tests.log"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "artifact": "typecheck.log"
+    },
+    {
+      "command": "npm run roadmap:check",
+      "exitCode": 0,
+      "artifact": "roadmap.log"
+    },
+    {
+      "command": "npm run roadmap:v4:check",
+      "exitCode": 0,
+      "artifact": "roadmap-v4.log"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "V4-T1-03.json",
+      "sha256": "3c02fa60e47fdebfbfd40f505040f5f3f2ad65906abdc2054b6c88822f2fdf0f",
+      "bytes": 856
+    },
+    {
+      "path": "roadmap-v4.log",
+      "sha256": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+      "bytes": 182
+    },
+    {
+      "path": "roadmap.log",
+      "sha256": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+      "bytes": 135
+    },
+    {
+      "path": "tests.log",
+      "sha256": "ff496acf50852753a63a1cab06fead0f29eac980a08de19c87938d641e4b688b",
+      "bytes": 43470
+    },
+    {
+      "path": "typecheck.log",
+      "sha256": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a",
+      "bytes": 69
+    }
+  ]
+}
