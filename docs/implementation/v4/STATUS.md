@@ -9,14 +9,19 @@ Branch: `aether/v4-implementation`. Planning checkpoint: `9f23a7b`. First implem
 - **V4-F01 verified:** state-preserving local migration, authoritative call-boundary synchronization, allocator continuity, closure/task owner dispatch and map/fold callback movement. Eleven migration regressions and independent adversarial review support its three gates.
 - **V4-F02 verified:** real token/corpus accounting, pinned tokenizer, benchmark manifests and separate measure/enforce commands. Actual ≥4× and unmeasured release targets remain failed/open. Measurement implementation is complete; performance success is not.
 - **V4-F03 verified:** bounded canonical encoding, exact execution identities, dependency closure and sidecars with v1 compatibility checks. Public fabric exports are built and usable.
-- **V4-F04 awaiting exact-commit verification:** durable broker, replay/branch isolation, budget hooks, idempotency/reconciliation and both runtime bridges implemented. Structured indeterminate outcomes propagate through host dispatch. Independent review repaired malformed replay histories, inconsistent recovery markers and orphanable locks; real process tests cover crashes and concurrent writers.
-- **V4-F05 awaiting exact-commit verification:** signed envelopes, durable causal ingestion, equivocation quarantine and fault-delivery harness implemented. Independent review found and repaired concurrent quota oversubscription using the shared immutable ticket mutex. Full Tree-CRDT projection remains a later task.
-- **V4-F06 awaiting exact-commit verification:** exact-subject evidence validation and compiler admission integrated. Actual ledger records and formal loops are verified; concrete nested-alias and other unsupported models fail closed. Serialized peer claims are reverified; branded local evidence is required for the v4 compiler path.
-- **V4-R01 awaiting evidence:** selected occurrence-tree/HotStuff/FROST approach, documented primary sources and nine bounded executable-model tests. No production consensus or scale claim.
-- **V4-R02 active research:** local M4 Pro Hypervisor.framework access confirmed; native code and actual freestanding guest timing prototypes underway.
-- **V4-R03 active research:** independent integer certificate prototype and real local Groth16 private bounded-artifact proof demonstrated. Early JS proof verification exceeds 5 ms; the source performance target remains unmet.
+- **V4-F04 verified:** durable broker, replay/branch isolation, budget hooks, idempotency/reconciliation and runtime bridges. Real process crashes, concurrent writers and all independent-review fixes are evidenced at `3dce2d6`.
+- **V4-F05 verified:** signed causal journals, equivocation quarantine and delivery harness; concurrent quota admission is protected by the shared ticket mutex. This is not full Tree-CRDT projection or 1,000-agent qualification.
+- **V4-F06 verified:** exact-subject proof admission and compiler integration, peer reverification, preserved entry/property checks and explicit rejection of demonstrated model gaps. Portable certificates remain separate.
+- **V4-F07 active:** real authenticated process-channel transport and nested call/effect tests implemented. Root added guarded heap-transfer boundaries and asynchronous journal ownership. Durable ProcessHost coordinator is being implemented and reviewed; no completion claim yet.
+- **V4-F08 core work underway:** promotion journal/signature/driver protocol implementation can proceed while F07 is built. Tracker remains planned until its dependency is verified; full closure requires the actual process driver.
+- **V4-R01 awaiting corrected evidence:** D04 v0.2.0 restores the PRD's required fractional indexing after detecting an incompatible RGA substitution. Exact rational position model and ten tests pass; checkpoint evidence pending.
+- **V4-R02 research artifacts ready:** actual 60-byte freestanding guest boots under Hypervisor.framework; 1,345 checked native/reference cases pass. Cold-process launch and VMM RSS miss the chosen strict timing/footprint profiles; 50 ns bound is inconclusive at available timer resolution. No hardware-access blocker.
+- **V4-R03 research artifacts ready:** independent certificate kernel plus actual Groth16 bounded private-artifact proof and independent public verifier. Three verification samples exceed 5 ms; production setup/full-module attestation remains open.
+- **V4-R04 research artifacts ready:** actual public SmolLM2-135M LoRA adapter trained/saved/reloaded; held-out gradient fixtures pass. Boundary throughput around 0.49M/sec misses the preregistered 2M target. No full synthesis/efficiency claim.
 
 Exact-commit evidence is in [foundations-4a9b077](evidence/foundations-4a9b077/REVIEW.md). A detached verification checkout passed 242 tests, typechecking and both roadmap checks. Clean pinned-dependency benchmark measurement exited 0; release enforcement correctly exited 1 with 17 unsatisfied required rows.
+
+The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **299 tests**, typechecking and both roadmap checks. [Contract evidence](evidence/contracts-3dce2d6/REVIEW.md) closes F04/F05/F06 and rechecks prior foundation regressions. Its old R01 ordering model is explicitly not accepted as completed research.
 
 ## Decisions and findings
 
@@ -41,4 +46,4 @@ Exact-commit evidence is in [foundations-4a9b077](evidence/foundations-4a9b077/R
 3. Verify these contracts at an exact implementation checkpoint, then begin durable process migration and exact-root promotion.
 4. Start the four research decision tasks as independent work becomes available; retain all full v4 scope.
 
-Goal-turn classification: progress — three foundation tasks implemented, independently tested and evidenced; the next three are active. No global blocker has been established.
+Goal-turn classification: progress — six foundation tasks implemented and evidenced; real process coordination, promotion and four research gates are progressing. No global blocker has been established.

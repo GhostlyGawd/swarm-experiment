@@ -1,0 +1,26 @@
+{
+  "task": "V4-F05",
+  "specVersion": "0.1.0",
+  "subjectCommit": "3dce2d61686129cff45a76d256d3e2681c897fcc",
+  "recordedAt": "2026-09-22T20:25:23.829200+00:00",
+  "checks": [
+    {
+      "gate": "V4-F05/G1",
+      "result": "pass",
+      "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+      "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+    },
+    {
+      "gate": "V4-F05/G2",
+      "result": "pass",
+      "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+      "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+    },
+    {
+      "gate": "V4-F05/G3",
+      "result": "pass",
+      "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+      "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+    }
+  ]
+}

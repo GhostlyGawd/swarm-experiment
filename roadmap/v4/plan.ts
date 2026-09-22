@@ -316,6 +316,8 @@ export const PLAN: Plan = {
   version: SPEC_VERSION, requirements,
   tasks: tasks.map(task => ['V4-F01', 'V4-F02', 'V4-F03'].includes(task.id)
     ? { ...task, status: 'verified' as const, evidence: `docs/implementation/v4/evidence/foundations-4a9b077/${task.id}.json` }
-    : ['V4-F04', 'V4-F05', 'V4-F06', 'V4-R01', 'V4-R02', 'V4-R03'].includes(task.id) ? { ...task, status: 'in_progress' as const } : task),
+    : ['V4-F04', 'V4-F05', 'V4-F06'].includes(task.id)
+      ? { ...task, status: 'verified' as const, evidence: `docs/implementation/v4/evidence/contracts-3dce2d6/${task.id}.json` }
+      : ['V4-F07', 'V4-R01', 'V4-R02', 'V4-R03', 'V4-R04'].includes(task.id) ? { ...task, status: 'in_progress' as const } : task),
   firstSlice: ['V4-F01', 'V4-F02', 'V4-F03', 'V4-F04', 'V4-F05', 'V4-F06', 'V4-F07', 'V4-F08'],
 };
