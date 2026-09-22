@@ -1,0 +1,160 @@
+/**
+ * Term constructors.
+ *
+ * Agents mutate the graph through the store; these helpers exist so that
+ * *tests, examples and the projection parser* can write trees without hand-
+ * assembling object literals. They perform no checking — the type checker
+ * (Tier 2) and the verifier are what decide whether a tree is admissible.
+ */
+
+import type {
+  BinOp, Objective, Param, Purity, Rigor, SurfaceDomain, Term, Ty, UnOp,
+} from './ast.ts';
+import { Bool, Int, Str, Unit } from './ast.ts';
+import type { CapabilityName, ProvenanceId, SymbolId, TypeName } from './ids.ts';
+
+export const int = (value: bigint | number): Term => ({
+  kind: 'Lit',
+  ty: Int,
+  value: typeof value === 'bigint' ? value : BigInt(value),
+});
+export const bool = (value: boolean): Term => ({ kind: 'Lit', ty: Bool, value });
+export const str = (value: string): Term => ({ kind: 'Lit', ty: Str, value });
+export const unit = (): Term => ({ kind: 'Lit', ty: Unit, value: null });
+/** A literal carrying a nominal type, e.g. 250 cents rather than 250. */
+export const typed = (ty: Ty, value: bigint | boolean | string | null): Term => ({
+  kind: 'Lit', ty, value,
+});
+
+export const v = (symbol: SymbolId): Term => ({ kind: 'Var', symbol });
+
+export const bin = (op: BinOp, left: Term, right: Term): Term => ({ kind: 'Bin', op, left, right });
+export const un = (op: UnOp, operand: Term): Term => ({ kind: 'Un', op, operand });
+
+export const add = (l: Term, r: Term) => bin('add', l, r);
+export const sub = (l: Term, r: Term) => bin('sub', l, r);
+export const mul = (l: Term, r: Term) => bin('mul', l, r);
+export const div = (l: Term, r: Term) => bin('div', l, r);
+export const mod = (l: Term, r: Term) => bin('mod', l, r);
+export const eq = (l: Term, r: Term) => bin('eq', l, r);
+export const ne = (l: Term, r: Term) => bin('ne', l, r);
+export const lt = (l: Term, r: Term) => bin('lt', l, r);
+export const le = (l: Term, r: Term) => bin('le', l, r);
+export const gt = (l: Term, r: Term) => bin('gt', l, r);
+export const ge = (l: Term, r: Term) => bin('ge', l, r);
+export const and = (l: Term, r: Term) => bin('and', l, r);
+export const or = (l: Term, r: Term) => bin('or', l, r);
+export const concat = (l: Term, r: Term) => bin('concat', l, r);
+export const not = (e: Term) => un('not', e);
+export const neg = (e: Term) => un('neg', e);
+
+export const cond = (c: Term, then: Term, otherwise: Term): Term => ({
+  kind: 'Cond', cond: c, then, otherwise,
+});
+export const call = (callee: SymbolId, ...args: Term[]): Term => ({ kind: 'Call', callee, args });
+export const field = (object: Term, name: string): Term => ({ kind: 'Field', object, field: name });
+export const record = (ty: Ty, fields: Record<string, Term>): Term => ({
+  kind: 'RecordLit',
+  ty,
+  // Sorted so that two literals differing only in authoring order share an address.
+  fields: Object.entries(fields).sort((a, b) => (a[0] < b[0] ? -1 : 1)),
+});
+export const old = (expr: Term): Term => ({ kind: 'Old', expr });
+export const result = (): Term => ({ kind: 'ResultRef' });
+export const invoke = (capability: CapabilityName, ...args: Term[]): Term => ({
+  kind: 'Invoke', capability, args,
+});
+
+export const place = (symbol: SymbolId, ...path: string[]): Term => ({ kind: 'Place', symbol, path });
+export const let_ = (symbol: SymbolId, ty: Ty, init: Term): Term => ({ kind: 'Let', symbol, ty, init });
+export const assign = (target: Term, value: Term): Term => ({ kind: 'Assign', target, value });
+export const if_ = (c: Term, then: Term, otherwise: Term | null = null): Term => ({
+  kind: 'If', cond: c, then, otherwise,
+});
+export const while_ = (
+  c: Term,
+  body: Term,
+  opts: { invariants?: readonly Term[]; variant?: Term | null } = {},
+): Term => ({
+  kind: 'While',
+  cond: c,
+  invariants: opts.invariants ?? [],
+  variant: opts.variant ?? null,
+  body,
+});
+export const ret = (value: Term): Term => ({ kind: 'Return', value });
+export const assert_ = (expr: Term, label: string): Term => ({ kind: 'Assert', expr, label });
+export const exprStmt = (expr: Term): Term => ({ kind: 'ExprStmt', expr });
+export const block = (...stmts: Term[]): Term => ({ kind: 'Block', stmts });
+
+export const clause = (expr: Term, label: string, rigor: Rigor = 'formal'): Term => ({
+  kind: 'Clause', expr, label, rigor,
+});
+
+export const contract = (spec: {
+  requires?: readonly Term[];
+  ensures?: readonly Term[];
+  modifies?: readonly Term[];
+}): Term => ({
+  kind: 'Contract',
+  requires: spec.requires ?? [],
+  ensures: spec.ensures ?? [],
+  modifies: spec.modifies ?? [],
+});
+
+export const fn = (spec: {
+  symbol: SymbolId;
+  params?: readonly Param[];
+  returns: Ty;
+  capabilities?: readonly CapabilityName[];
+  purity?: Purity;
+  contract?: Term | null;
+  body?: Term | null;
+  surfaces?: readonly Term[];
+  provenance?: ProvenanceId | null;
+}): Term => ({
+  kind: 'FunctionDecl',
+  symbol: spec.symbol,
+  params: spec.params ?? [],
+  returns: spec.returns,
+  capabilities: spec.capabilities ?? [],
+  purity: spec.purity ?? (spec.capabilities?.length ? 'effectful' : 'pure'),
+  contract: spec.contract ?? null,
+  body: spec.body ?? null,
+  surfaces: spec.surfaces ?? [],
+  provenance: spec.provenance ?? null,
+});
+
+export const typeDecl = (name: TypeName, ty: Ty, provenance: ProvenanceId | null = null): Term => ({
+  kind: 'TypeDecl', name, ty, provenance,
+});
+
+export const surface = (spec: {
+  symbol: SymbolId;
+  domain: SurfaceDomain;
+  current: string | bigint;
+  objective?: Objective;
+}): Term => ({
+  kind: 'Surface',
+  symbol: spec.symbol,
+  domain: spec.domain,
+  current: spec.current,
+  objective: spec.objective ?? 'minimize_latency',
+});
+
+export const module_ = (spec: {
+  symbol: SymbolId;
+  members: readonly Term[];
+  symbolTable: Term;
+  provenance?: ProvenanceId | null;
+}): Term => ({
+  kind: 'Module',
+  symbol: spec.symbol,
+  members: spec.members,
+  symbolTable: spec.symbolTable,
+  provenance: spec.provenance ?? null,
+});
+
+export const param = (symbol: SymbolId, ty: Ty): Param => ({ symbol, ty });
+
+export { Bool, Int, Str, Unit };
