@@ -1,0 +1,23 @@
+{
+  "format": "aether.native-qualification-profile/1",
+  "version": "1.0.0",
+  "requirement": "V4-NFR-06",
+  "source": "PRD FR-4.5 and section 7; user clarification 2026-09-22",
+  "authorization": "User selected: Fresh guest on an already-running hypervisor; guest resident memory.",
+  "boot": {
+    "maximumMilliseconds": 1,
+    "start": "Begin creating a fresh guest instance on an already-running hypervisor/controller.",
+    "stop": "First validated useful response from that fresh guest.",
+    "include": ["guest allocation", "image loading into the guest", "VM/vCPU creation and setup", "guest execution through the first validated response"],
+    "exclude": ["initial controller-process launch", "starting the hypervisor service", "artifact compilation and prior admission"],
+    "reuseExistingGuest": false,
+    "aggregate": "maximum observed over the preregistered campaign, with all raw samples retained"
+  },
+  "memory": {
+    "maximumBytes": 2000000,
+    "scope": "Peak guest resident memory, including guest code, data, stacks, heaps and guest drivers.",
+    "exclude": ["controller-process RSS", "host hypervisor memory"],
+    "requiredDiagnostics": ["guest image bytes", "guest mapped/resident bytes", "controller-process RSS", "host/hypervisor overhead where measurable"]
+  },
+  "qualification": "This profile fixes measurement scope; it does not establish that the target passes or that the full native/unikernel implementation exists."
+}

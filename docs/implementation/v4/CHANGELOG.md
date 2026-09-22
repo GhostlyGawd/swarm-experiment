@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Target-profile decision — 2026-09-22
+
+- The user selected fresh guest startup on an already-running hypervisor and guest resident memory for the unchanged 1 ms / 2 MB limits.
+- Added `decisions/D07-native-qualification-profile.json` version 1.0.0. Historical measurements remain intact; controller startup and RSS are diagnostics. The current guest-startup maximum still misses 1 ms.
+- This fills a previously open target-profile parameter; functional contracts and specification version 0.1.0 remain unchanged.
+
 ## 0.1.0 — 2026-09-22
 
 - Established the implementation specification against code commit `3c3c8ebe63078f104f1ab7d8182b088124e9b1c6` and the preserved v4.0 PRD.

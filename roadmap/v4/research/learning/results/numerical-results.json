@@ -1,0 +1,314 @@
+{
+  "format": "aether.learning-research-run/1",
+  "profileSHA256": "4261cafc8dfdb0075756415247cffb744155805757c0f48ae337df99dd772984",
+  "scriptSHA256": "fe35478381eef43c0f278cd0d04ffd956803d2ae1af0c599f65745113fed1e9e",
+  "environment": {
+    "platform": "macOS-26.7-arm64-arm-64bit-Mach-O",
+    "python": "3.14.7",
+    "device": {
+      "device_name": "Apple M4 Pro",
+      "max_recommended_working_set_size": 19069665280,
+      "memory_size": 25769803776,
+      "architecture": "applegpu_g16s",
+      "max_buffer_length": 14302248960,
+      "resource_limit": 499000
+    },
+    "packages": {
+      "mlx": "0.32.1",
+      "mlx-lm": "0.31.3",
+      "numpy": "2.5.3",
+      "transformers": "5.17.0",
+      "tokenizers": "0.23.2",
+      "huggingface-hub": "1.32.0"
+    }
+  },
+  "gradients": {
+    "finiteDifferenceMaximumError": 9.751319885253906e-05,
+    "relaxationTrace": [
+      {
+        "step": 1,
+        "loss": 2.5651962757110596,
+        "gradientNorm": 1.6645044088363647
+      },
+      {
+        "step": 2,
+        "loss": 0.0004111789749003947,
+        "gradientNorm": 0.001624861266463995
+      },
+      {
+        "step": 3,
+        "loss": 1.6497286558151245,
+        "gradientNorm": 1.5182404518127441
+      },
+      {
+        "step": 4,
+        "loss": 0.08929967135190964,
+        "gradientNorm": 0.2566678524017334
+      },
+      {
+        "step": 5,
+        "loss": 0.9286126494407654,
+        "gradientNorm": 0.8256127834320068
+      },
+      {
+        "step": 6,
+        "loss": 0.002658309182152152,
+        "gradientNorm": 0.009293871931731701
+      },
+      {
+        "step": 7,
+        "loss": 0.021232930943369865,
+        "gradientNorm": 0.0687403455376625
+      },
+      {
+        "step": 8,
+        "loss": 3.5270068645477295,
+        "gradientNorm": 0.8163734674453735
+      },
+      {
+        "step": 9,
+        "loss": 0.5295858383178711,
+        "gradientNorm": 0.8959850668907166
+      },
+      {
+        "step": 10,
+        "loss": 1.0938397645950317,
+        "gradientNorm": 0.6718230843544006
+      },
+      {
+        "step": 11,
+        "loss": 3.461327314376831,
+        "gradientNorm": 0.9596691727638245
+      },
+      {
+        "step": 12,
+        "loss": 2.7658421993255615,
+        "gradientNorm": 1.426385760307312
+      },
+      {
+        "step": 13,
+        "loss": 0.830589771270752,
+        "gradientNorm": 0.32097360491752625
+      },
+      {
+        "step": 14,
+        "loss": 0.04491927847266197,
+        "gradientNorm": 0.1385924518108368
+      },
+      {
+        "step": 15,
+        "loss": 0.07384546846151352,
+        "gradientNorm": 0.20892532169818878
+      },
+      {
+        "step": 16,
+        "loss": 0.10426091402769089,
+        "gradientNorm": 0.2689647674560547
+      },
+      {
+        "step": 17,
+        "loss": 0.6528279781341553,
+        "gradientNorm": 0.5241146087646484
+      },
+      {
+        "step": 18,
+        "loss": 0.7286439538002014,
+        "gradientNorm": 0.5060194730758667
+      },
+      {
+        "step": 19,
+        "loss": 0.16011813282966614,
+        "gradientNorm": 0.3759880065917969
+      },
+      {
+        "step": 20,
+        "loss": 0.19908158481121063,
+        "gradientNorm": 0.432624876499176
+      },
+      {
+        "step": 21,
+        "loss": 0.21688222885131836,
+        "gradientNorm": 0.45857861638069153
+      },
+      {
+        "step": 22,
+        "loss": 0.31478023529052734,
+        "gradientNorm": 0.5579068064689636
+      },
+      {
+        "step": 23,
+        "loss": 0.00033423095010221004,
+        "gradientNorm": 0.0012931637465953827
+      },
+      {
+        "step": 24,
+        "loss": 2.4363052943954244e-06,
+        "gradientNorm": 8.516894922649954e-06
+      },
+      {
+        "step": 25,
+        "loss": 2.806508564390242e-05,
+        "gradientNorm": 0.00010342801397200674
+      },
+      {
+        "step": 26,
+        "loss": 0.9258304834365845,
+        "gradientNorm": 0.150958850979805
+      },
+      {
+        "step": 27,
+        "loss": 1.0804084539413452,
+        "gradientNorm": 1.1479798555374146
+      },
+      {
+        "step": 28,
+        "loss": 0.08215230703353882,
+        "gradientNorm": 0.2796745300292969
+      },
+      {
+        "step": 29,
+        "loss": 0.2607634663581848,
+        "gradientNorm": 0.5131393671035767
+      },
+      {
+        "step": 30,
+        "loss": 0.0195163544267416,
+        "gradientNorm": 0.06203947961330414
+      },
+      {
+        "step": 31,
+        "loss": 0.0006787215243093669,
+        "gradientNorm": 0.0024531991221010685
+      },
+      {
+        "step": 32,
+        "loss": 0.03834250569343567,
+        "gradientNorm": 0.1147458404302597
+      },
+      {
+        "step": 33,
+        "loss": 0.0015566685469821095,
+        "gradientNorm": 0.005807591136544943
+      },
+      {
+        "step": 34,
+        "loss": 0.0255139023065567,
+        "gradientNorm": 0.08529012650251389
+      },
+      {
+        "step": 35,
+        "loss": 0.03607214242219925,
+        "gradientNorm": 0.11612553149461746
+      },
+      {
+        "step": 36,
+        "loss": 0.012725869193673134,
+        "gradientNorm": 0.04077340289950371
+      },
+      {
+        "step": 37,
+        "loss": 0.0016694412333890796,
+        "gradientNorm": 0.006345735862851143
+      },
+      {
+        "step": 38,
+        "loss": 0.0007071886211633682,
+        "gradientNorm": 0.0024513956159353256
+      },
+      {
+        "step": 39,
+        "loss": 0.3378065526485443,
+        "gradientNorm": 0.5711238384246826
+      },
+      {
+        "step": 40,
+        "loss": 0.005296324845403433,
+        "gradientNorm": 0.018214799463748932
+      }
+    ],
+    "selectedCandidate": "x+1",
+    "heldoutDiscreteCorrect": true,
+    "fuzzing": [
+      {
+        "split": "development",
+        "target": 3,
+        "iterations": 3,
+        "concreteProbes": 4,
+        "success": true
+      },
+      {
+        "split": "development",
+        "target": 11,
+        "iterations": 11,
+        "concreteProbes": 12,
+        "success": true
+      },
+      {
+        "split": "development",
+        "target": 29,
+        "iterations": 29,
+        "concreteProbes": 30,
+        "success": true
+      },
+      {
+        "split": "heldout",
+        "target": 41,
+        "iterations": 41,
+        "concreteProbes": 42,
+        "success": true
+      },
+      {
+        "split": "heldout",
+        "target": 67,
+        "iterations": 67,
+        "concreteProbes": 68,
+        "success": true
+      },
+      {
+        "split": "heldout",
+        "target": 89,
+        "iterations": 89,
+        "concreteProbes": 90,
+        "success": true
+      }
+    ],
+    "heldoutFuzzingVerdict": "pass"
+  },
+  "boundaryRate": {
+    "samples": [
+      {
+        "seconds": 0.04090912500032573,
+        "inputs": 20000,
+        "inputsPerSecond": 488888.4814779283,
+        "verdict": "fail"
+      },
+      {
+        "seconds": 0.040532667000661604,
+        "inputs": 20000,
+        "inputsPerSecond": 493429.16417697223,
+        "verdict": "fail"
+      },
+      {
+        "seconds": 0.04119229199932306,
+        "inputs": 20000,
+        "inputsPerSecond": 485527.72932199726,
+        "verdict": "fail"
+      },
+      {
+        "seconds": 0.040889416999561945,
+        "inputs": 20000,
+        "inputsPerSecond": 489124.11737771326,
+        "verdict": "fail"
+      },
+      {
+        "seconds": 0.04085504199974821,
+        "inputs": 20000,
+        "inputsPerSecond": 489535.6612318073,
+        "verdict": "fail"
+      }
+    ],
+    "checksum": 153204,
+    "verdict": "fail",
+    "qualification": "local JSON event fixture only; full distributed micro-world is not measured"
+  }
+}

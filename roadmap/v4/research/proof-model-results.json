@@ -1,0 +1,264 @@
+{
+  "format": "aether.r03-certificate-prototype/1",
+  "generatedAt": "2026-09-22T20:13:16.301Z",
+  "sourceSha256": "859c4536bd75ea88050fe20c1ec1b21b733ade439c7d907c2f919c28eb1397bd",
+  "runnerSha256": "65286fd07e4b3ce548030dcafcd7bb109fd69e1f3dd7edb1ba0e0d7976e08c16",
+  "environment": {
+    "node": "v26.7.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M4 Pro"
+  },
+  "claim": {
+    "format": "aether.linear-claim/1",
+    "executionManifest": "aether.execution/1:b3:fbf9055cdcf5e541eec598952e04f8bdff5bf18903b9b15b05235dc22cd1a590",
+    "variables": [
+      "x",
+      "y"
+    ],
+    "assumptions": [
+      {
+        "coefficients": [
+          "1",
+          "1"
+        ],
+        "bound": "10"
+      },
+      {
+        "coefficients": [
+          "-1",
+          "0"
+        ],
+        "bound": "-4"
+      },
+      {
+        "coefficients": [
+          "0",
+          "-1"
+        ],
+        "bound": "-3"
+      }
+    ],
+    "goal": {
+      "coefficients": [
+        "1",
+        "0"
+      ],
+      "bound": "7"
+    }
+  },
+  "certificate": {
+    "format": "aether.linear-certificate/1",
+    "executionManifest": "aether.execution/1:b3:fbf9055cdcf5e541eec598952e04f8bdff5bf18903b9b15b05235dc22cd1a590",
+    "claimDigest": "aether.linear-claim/1:b3:c7a3d32d10b205233e283f53b51ec0098389b8fbe434a7596fa1db2dc547b6ea",
+    "multipliers": [
+      "1",
+      "0",
+      "1",
+      "1"
+    ]
+  },
+  "certificateBytes": 287,
+  "samples": [
+    {
+      "generationMs": 0.9839170000000053,
+      "checkingMs": 0.1687079999999952
+    },
+    {
+      "generationMs": 0.2714999999999961,
+      "checkingMs": 0.1274580000000043
+    },
+    {
+      "generationMs": 0.2551250000000067,
+      "checkingMs": 0.10491599999999579
+    },
+    {
+      "generationMs": 0.20425000000000182,
+      "checkingMs": 0.10125000000000028
+    },
+    {
+      "generationMs": 0.2894159999999957,
+      "checkingMs": 0.0829170000000019
+    },
+    {
+      "generationMs": 0.1561670000000035,
+      "checkingMs": 0.06537499999999596
+    },
+    {
+      "generationMs": 0.13137499999999847,
+      "checkingMs": 0.06829199999999958
+    },
+    {
+      "generationMs": 0.1581249999999983,
+      "checkingMs": 0.07191600000000165
+    },
+    {
+      "generationMs": 0.1577919999999935,
+      "checkingMs": 0.08454200000000611
+    },
+    {
+      "generationMs": 0.1349169999999944,
+      "checkingMs": 0.0727499999999992
+    },
+    {
+      "generationMs": 0.18241599999999636,
+      "checkingMs": 0.05300000000000438
+    },
+    {
+      "generationMs": 0.12370899999999807,
+      "checkingMs": 0.05983299999999758
+    },
+    {
+      "generationMs": 0.121417000000001,
+      "checkingMs": 0.059291999999999234
+    },
+    {
+      "generationMs": 0.12862499999999955,
+      "checkingMs": 0.061666999999999916
+    },
+    {
+      "generationMs": 0.14191600000000193,
+      "checkingMs": 0.05829199999999446
+    },
+    {
+      "generationMs": 0.10766599999999471,
+      "checkingMs": 0.05483400000000671
+    },
+    {
+      "generationMs": 0.19320900000000307,
+      "checkingMs": 0.0905830000000023
+    },
+    {
+      "generationMs": 0.12441700000000111,
+      "checkingMs": 0.060166000000002384
+    },
+    {
+      "generationMs": 0.10708300000000293,
+      "checkingMs": 0.052666999999999575
+    },
+    {
+      "generationMs": 0.11116700000000179,
+      "checkingMs": 0.04862500000000125
+    },
+    {
+      "generationMs": 0.0953750000000042,
+      "checkingMs": 0.047125000000001194
+    },
+    {
+      "generationMs": 0.09483399999999875,
+      "checkingMs": 0.05749999999999744
+    },
+    {
+      "generationMs": 0.09774999999999778,
+      "checkingMs": 0.1807500000000033
+    },
+    {
+      "generationMs": 0.14158299999999713,
+      "checkingMs": 0.058917000000000996
+    },
+    {
+      "generationMs": 0.11875000000000568,
+      "checkingMs": 0.05687499999999801
+    },
+    {
+      "generationMs": 0.12324999999999875,
+      "checkingMs": 0.06337500000000063
+    },
+    {
+      "generationMs": 0.12762500000000188,
+      "checkingMs": 0.046582999999998265
+    },
+    {
+      "generationMs": 0.11837500000000034,
+      "checkingMs": 0.045541000000000054
+    },
+    {
+      "generationMs": 0.09095800000000054,
+      "checkingMs": 0.09670899999999705
+    },
+    {
+      "generationMs": 0.09216700000000344,
+      "checkingMs": 0.045000000000001705
+    },
+    {
+      "generationMs": 0.09379200000000054,
+      "checkingMs": 0.05024999999999835
+    },
+    {
+      "generationMs": 0.10637499999999989,
+      "checkingMs": 0.056165999999997496
+    },
+    {
+      "generationMs": 0.09891700000000014,
+      "checkingMs": 0.04454199999999986
+    },
+    {
+      "generationMs": 0.0885420000000039,
+      "checkingMs": 0.04999999999999716
+    },
+    {
+      "generationMs": 0.09858400000000245,
+      "checkingMs": 0.10395799999999866
+    },
+    {
+      "generationMs": 0.09074999999999989,
+      "checkingMs": 0.052541999999995426
+    },
+    {
+      "generationMs": 0.09012500000000045,
+      "checkingMs": 0.04962499999999892
+    },
+    {
+      "generationMs": 0.11350000000000193,
+      "checkingMs": 0.04983399999999705
+    },
+    {
+      "generationMs": 0.098791999999996,
+      "checkingMs": 0.049083000000003096
+    },
+    {
+      "generationMs": 0.09566600000000136,
+      "checkingMs": 0.05629199999999912
+    },
+    {
+      "generationMs": 0.10154200000000202,
+      "checkingMs": 0.05129199999999656
+    },
+    {
+      "generationMs": 0.19666700000000503,
+      "checkingMs": 0.04787499999999767
+    },
+    {
+      "generationMs": 0.10766600000000182,
+      "checkingMs": 0.055416999999998495
+    },
+    {
+      "generationMs": 0.10387500000000216,
+      "checkingMs": 0.046125000000003524
+    },
+    {
+      "generationMs": 0.09433299999999889,
+      "checkingMs": 0.058124999999996874
+    },
+    {
+      "generationMs": 0.09341599999999772,
+      "checkingMs": 0.043874999999999886
+    },
+    {
+      "generationMs": 0.1196249999999992,
+      "checkingMs": 0.050457999999999004
+    },
+    {
+      "generationMs": 0.15062500000000512,
+      "checkingMs": 0.04945799999999423
+    },
+    {
+      "generationMs": 0.08529100000000511,
+      "checkingMs": 0.04241700000000037
+    },
+    {
+      "generationMs": 0.08420900000000131,
+      "checkingMs": 0.04204099999999755
+    }
+  ]
+}

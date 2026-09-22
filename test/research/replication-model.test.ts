@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { activateMembership, assertTreeInvariant, HotStuffModel, joinOperations, permutations, projectTree, runReplicationModel, subsets, validQC, type Block, type Committee, type QC, type TreeOp } from '../../roadmap/v4/research/replication-model.ts';
+import { activateMembership, allocateFractionalPosition, compareFractionalPositions, parseFractionalPosition, assertTreeInvariant, HotStuffModel, joinOperations, permutations, projectTree, runReplicationModel, subsets, validQC, type Block, type Committee, type QC, type TreeOp } from '../../roadmap/v4/research/replication-model.ts';
 
 const committee: Committee = { epoch: 1, f: 1, members: ['0','1','2','3'].map(id => ({ id, family: `family:${id}` })) };
 const signers = ['0','1','2'];
-const create = (id: string, occurrence: string, content = occurrence): TreeOp => ({ id, clock: 1, dependencies: [], kind: 'insert', occurrence, parent: 'root', anchor: null, content });
+const create = (id: string, occurrence: string, content = occurrence): TreeOp => ({ id, clock: 1, dependencies: [], kind: 'insert', occurrence, parent: 'root', position: 'fi1:1/1', content });
 const a = create('A:1','a'), b = create('B:1','b');
-const move = (id: string, occurrence: string, parent: string): TreeOp => ({ id, clock: 2, dependencies: [a.id,b.id], kind: 'move', occurrence, parent, anchor: null, content: '' });
+const move = (id: string, occurrence: string, parent: string): TreeOp => ({ id, clock: 2, dependencies: [a.id,b.id], kind: 'move', occurrence, parent, position: 'fi1:1/1', content: '' });
 function certify(model: HotStuffModel, block: string, high = model.genesis, voters = signers): QC {
   const view = model.nodes.get(voters[0])!.view;
   for (const id of voters) assert(model.vote(id,'prepare',block,high));
@@ -47,13 +47,44 @@ test('R01 trash deletion, concurrent replacement and restoration have explicit d
   assert.equal(child.parents.a,'b'); assert.equal(child.visible.length,0); assertTreeInvariant(child);
 });
 
-test('R01 immutable RGA placement anchors survive moves and concurrent insertion positions', () => {
-  const second: TreeOp = { ...b, clock:2, dependencies:[a.id], anchor:a.id };
-  const third: TreeOp = { ...create('C:1','c'), clock:2, dependencies:[a.id], anchor:a.id };
-  const moved: TreeOp = { ...move('A:3','a','trash'), clock:3, dependencies:[a.id,second.id,third.id], kind:'delete' };
-  const tree = projectTree([a,second,third,moved]); assertTreeInvariant(tree);
-  assert.deepEqual(tree.childOrder.root,['c','b']); assert.deepEqual(tree.childOrder.trash,['a']);
-  for (const order of permutations([a,second,third,moved])) assert.deepEqual(projectTree(order),tree);
+test('R01 exact fractional positions preserve order under concurrent allocation, moves and Lamport ties', () => {
+  const first = {...a, position: 'fi1:1/1'};
+  const last = {...b, position: 'fi1:2/1'};
+  const pos1 = allocateFractionalPosition(first.position, last.position, 'C:1');
+  const pos2 = allocateFractionalPosition(first.position, last.position, 'D:1');
+  assert.notEqual(pos1,pos2);
+  for (const position of [pos1,pos2]) { assert(compareFractionalPositions(first.position,position)<0); assert(compareFractionalPositions(position,last.position)<0); }
+  const middle: TreeOp = {...create('C:1','c'),clock:2,dependencies:[a.id,b.id],position:pos1};
+  const other: TreeOp = {...create('D:1','d'),clock:2,dependencies:[a.id,b.id],position:pos2};
+  const expected = projectTree([first,last,middle,other]); assertTreeInvariant(expected);
+  assert.equal(expected.childOrder.root[0],'a'); assert.equal(expected.childOrder.root.at(-1),'b');
+  for (const delivery of permutations([first,last,middle,other])) assert.deepEqual(projectTree(delivery),expected);
+  const ties=projectTree([first,{...last,position:first.position}]); assert.deepEqual(ties.childOrder.root,['a','b']);
+  const moved=projectTree([first,last,middle,{...move('A:3','a','root'),clock:3,position:'fi1:3/1'}]);
+  assert.equal(moved.childOrder.root.at(-1),'a'); assertTreeInvariant(moved);
+});
+
+test('R01 fractional keys reject noncanonical and oversized values before projection mutation',()=>{
+  for(const position of ['fi1:2/4','fi1:0/1','fi1:01/1','fi1:1/0','fi1:-1/1','fi2:1/1',`fi1:${'9'.repeat(129)}/1`,`fi1:${Array(9).fill('1/1').join(';')}`]) assert.throws(()=>parseFractionalPosition(position));
+  const lo='fi1:1/1'; const hi='fi1:1/1;1/1';
+  const inside=allocateFractionalPosition(lo,hi,'prefix-case');
+  assert(compareFractionalPositions(lo,inside)<0 && compareFractionalPositions(inside,hi)<0);
+  assert.throws(()=>allocateFractionalPosition(lo,lo,'duplicate-bound'),/equal/);
+  assert.throws(()=>allocateFractionalPosition(hi,lo,'reversed'),/reversed/);
+  const deep=`fi1:${Array(8).fill('1/1').join(';')}`;
+  assert.throws(()=>allocateFractionalPosition(deep,deep+';1/1','too-deep'),/limit/);
+  const large=`fi1:${Array(4).fill(`${'9'.repeat(100)}/1`).join(';')}`;
+  parseFractionalPosition(large); parseFractionalPosition(large+';1/1');
+  assert.throws(()=>allocateFractionalPosition(large,large+';1/1','allocation-overflow'),/byte limit/);
+  let upper='fi1:2/1';
+  const allocated=new Set<string>();
+  for(let i=0;i<100;i++) {
+    const next=allocateFractionalPosition('fi1:1/1',upper,`repeated-insert:${i}`);
+    assert(compareFractionalPositions('fi1:1/1',next)<0 && compareFractionalPositions(next,upper)<0);
+    assert(!allocated.has(next)); allocated.add(next); upper=next;
+  }
+  const invalid=projectTree([a,b,{...move('A:2','a','b'),position:'fi1:2/4'}]);
+  assert.equal(invalid.parents.a,'root'); assert.deepEqual(invalid.suppressed,['A:2:invalid-position']);
 });
 
 test('R01 same-ID equivocation is retained and quarantines dependents independently of first arrival', () => {

@@ -1,6 +1,50 @@
 /** R01 finite research model. No sockets, production votes, cryptography or timing claims. */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+
+type Fraction = readonly [bigint, bigint];
+const gcd = (a: bigint, b: bigint): bigint => { while (b !== 0n) [a,b] = [b,a%b]; return a; };
+/** Positive reduced rationals in a bounded lexicographic path. All comparison
+ * is exact bigint arithmetic; this is fractional indexing, never float LWW. */
+export function parseFractionalPosition(value: string): Fraction[] {
+  if (value.length > 512 || !value.startsWith('fi1:')) throw new Error('fractional position version/byte limit');
+  const parts = value.slice(4).split(';');
+  if (parts.length > 8) throw new Error('fractional position depth limit');
+  return parts.map(part => {
+    if (!/^[1-9][0-9]{0,127}\/[1-9][0-9]{0,127}$/.test(part)) throw new Error('invalid fractional component or digit limit');
+    const [n,d] = part.split('/').map(BigInt);
+    if (gcd(n,d) !== 1n) throw new Error('noncanonical fractional component');
+    return [n,d] as const;
+  });
+}
+const compareFraction = ([a,b]: Fraction,[c,d]: Fraction): number => a*d < c*b ? -1 : a*d > c*b ? 1 : 0;
+export function compareFractionalPositions(left: string, right: string): number {
+  const a = parseFractionalPosition(left), b = parseFractionalPosition(right);
+  for (let i=0;i<Math.min(a.length,b.length);i++) { const order=compareFraction(a[i],b[i]); if(order) return order; }
+  return a.length-b.length;
+}
+/** Mediant allocation plus an operation-specific fractional suffix prevents
+ * concurrent identical-interval allocations from sharing a generated key.
+ * The suffix is itself a fraction; Lamport/ID order still resolves supplied ties. */
+export function allocateFractionalPosition(left: string | null, right: string | null, operationId: string): string {
+  const a=left===null?[]:parseFractionalPosition(left), b=right===null?[]:parseFractionalPosition(right);
+  const reduce = (n: bigint,d: bigint): Fraction => { const g=gcd(n,d); return [n/g,d/g]; };
+  let prefix: Fraction[];
+  if(left===null) prefix=b.length?[reduce(b[0][0],b[0][1]*2n)]:[[1n,1n]];
+  else if(right===null) prefix=[reduce(a[0][0]+a[0][1],a[0][1])];
+  else {
+    const comparison=compareFractionalPositions(left,right);
+    if(comparison>=0) throw new Error(comparison===0?'equal fractional bounds require explicit reindex':'reversed fractional bounds');
+    let i=0; while(i<a.length && i<b.length && compareFraction(a[i],b[i])===0)i++;
+    prefix=a.slice(0,i);
+    prefix.push(i===a.length?reduce(b[i][0],b[i][1]*2n):reduce(a[i][0]+b[i][0],a[i][1]+b[i][1]));
+  }
+  const hash=BigInt(`0x${createHash('sha256').update(`aether.fractional-position/1:${operationId}`).digest('hex')}`);
+  prefix.push(reduce(hash+1n,(1n<<256n)+1n));
+  const key=`fi1:${prefix.map(([n,d])=>`${n}/${d}`).join(';')}`;
+  parseFractionalPosition(key); return key;
+}
 
 export interface TreeOp {
   readonly id: string;
@@ -9,12 +53,12 @@ export interface TreeOp {
   readonly kind: 'insert' | 'move' | 'delete' | 'replace';
   readonly occurrence: string;
   readonly parent: string;
-  readonly anchor: string | null;
+  readonly position: string;
   readonly content: string;
 }
 const lexical = (a: string, b: string): number => a < b ? -1 : a > b ? 1 : 0;
 const order = (a: TreeOp, b: TreeOp): number => a.clock - b.clock || lexical(a.id, b.id);
-const body = (op: TreeOp): string => JSON.stringify([op.id, op.clock, [...op.dependencies].sort(), op.kind, op.occurrence, op.parent, op.anchor, op.content]);
+const body = (op: TreeOp): string => JSON.stringify([op.id, op.clock, [...op.dependencies].sort(), op.kind, op.occurrence, op.parent, op.position, op.content]);
 export function joinOperations(...sets: readonly (readonly TreeOp[])[]): TreeOp[] {
   const variants = new Map<string, TreeOp>();
   for (const set of sets) for (const op of set) variants.set(body(op), op);
@@ -54,30 +98,21 @@ export function projectTree(operations: readonly TreeOp[]): TreeProjection {
     if (op.kind !== 'insert' && !Object.hasOwn(contents, op.occurrence)) { suppressed.push(`${op.id}:missing-occurrence`); continue; }
     const parent = op.kind === 'delete' ? 'trash' : op.parent;
     if (!['root', 'trash'].includes(parent) && !Object.hasOwn(contents, parent)) { suppressed.push(`${op.id}:missing-parent`); continue; }
-    if (op.kind !== 'delete' && op.anchor !== null) {
-      const anchor = placements.get(op.anchor);
-      if (!anchor || anchor.parent !== parent || !op.dependencies.includes(op.anchor)) { suppressed.push(`${op.id}:invalid-anchor`); continue; }
-    }
+    try { parseFractionalPosition(op.position); } catch { suppressed.push(`${op.id}:invalid-position`); continue; }
     let cursor: string | undefined = parent; let cycle = false;
     while (cursor !== undefined) { if (cursor === op.occurrence) { cycle = true; break; } cursor = parents[cursor]; }
     if (cycle) { suppressed.push(`${op.id}:cycle`); continue; }
     if (op.kind === 'insert') contents[op.occurrence] = op.content;
     parents[op.occurrence] = parent;
-    const placement = { ...op, parent, anchor: op.kind === 'delete' ? null : op.anchor };
+    const placement = { ...op, parent };
     placements.set(op.id, placement); currentPlacement.set(op.occurrence, op.id);
   }
   const childOrder: Record<string, string[]> = {};
   for (const parent of ['root', 'trash', ...Object.keys(contents)].sort()) {
-    const children: string[] = [];
-    const emit = (anchor: string | null): void => {
-      // RGA placements remain ordering anchors even after the occurrence moves away.
-      const next = [...placements.values()].filter(p => p.parent === parent && p.anchor === anchor).sort((a, b) => order(b, a));
-      for (const placement of next) {
-        if (currentPlacement.get(placement.occurrence) === placement.id) children.push(placement.occurrence);
-        emit(placement.id);
-      }
-    };
-    emit(null); childOrder[parent] = children;
+    childOrder[parent] = [...placements.values()]
+      .filter(p => p.parent === parent && currentPlacement.get(p.occurrence) === p.id)
+      .sort((a, b) => compareFractionalPositions(a.position, b.position) || order(a, b))
+      .map(p => p.occurrence);
   }
   const visible: string[] = [];
   const visit = (parent: string): void => { for (const child of childOrder[parent] ?? []) { visible.push(child); visit(child); } };
@@ -200,9 +235,9 @@ export function activateMembership(checkpoint: Block, oldCommit: QC, old: Commit
 }
 
 export function runReplicationModel(): Record<string, number | string> {
-  const create = (id: string, occurrence: string): TreeOp => ({ id, clock: 1, dependencies: [], kind: 'insert', occurrence, parent: 'root', anchor: null, content: occurrence });
+  const create = (id: string, occurrence: string): TreeOp => ({ id, clock: 1, dependencies: [], kind: 'insert', occurrence, parent: 'root', position: 'fi1:1/1', content: occurrence });
   const a = create('A:1', 'a'), b = create('B:1', 'b'), c = create('C:1', 'c');
-  const ab: TreeOp = { id: 'A:2', clock: 2, dependencies: [a.id,b.id], kind: 'move', occurrence: 'a', parent: 'b', anchor: null, content: '' };
+  const ab: TreeOp = { id: 'A:2', clock: 2, dependencies: [a.id,b.id], kind: 'move', occurrence: 'a', parent: 'b', position: 'fi1:1/1', content: '' };
   const ba: TreeOp = { ...ab, id: 'B:2', occurrence: 'b', parent: 'a' };
   const del: TreeOp = { ...ab, id: 'C:2', kind: 'delete', occurrence: 'a', parent: 'trash' };
   const replace: TreeOp = { ...ab, id: 'C:3', clock: 3, dependencies: [a.id,del.id], kind: 'replace', content: 'replaced' };

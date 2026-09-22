@@ -1,0 +1,22 @@
+{
+  "train": [
+    "Return the Aether integer literal for 1.\nAnswer: (int 1)",
+    "Return the Aether integer literal for 2.\nAnswer: (int 2)",
+    "Return the Aether integer literal for 3.\nAnswer: (int 3)",
+    "Return the Aether integer literal for 4.\nAnswer: (int 4)",
+    "Return the Aether integer literal for 5.\nAnswer: (int 5)",
+    "Return the Aether integer literal for 6.\nAnswer: (int 6)",
+    "Return the Aether integer literal for 7.\nAnswer: (int 7)",
+    "Return the Aether integer literal for 8.\nAnswer: (int 8)",
+    "Return the Aether integer literal for 9.\nAnswer: (int 9)",
+    "Return the Aether integer literal for 10.\nAnswer: (int 10)",
+    "Return the Aether integer literal for 11.\nAnswer: (int 11)",
+    "Return the Aether integer literal for 12.\nAnswer: (int 12)"
+  ],
+  "heldout": [
+    "Return the Aether integer literal for 101.\nAnswer: (int 101)",
+    "Return the Aether integer literal for 103.\nAnswer: (int 103)",
+    "Return the Aether integer literal for 107.\nAnswer: (int 107)",
+    "Return the Aether integer literal for 109.\nAnswer: (int 109)"
+  ]
+}
