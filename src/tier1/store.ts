@@ -170,7 +170,8 @@ export interface StoreStats {
   readonly logicalNodes: number;
   /** Fraction of occurrences served by a shared node. */
   readonly dedupRatio: number;
-  readonly distinctStructures: number;
+  /** Structural keys computed so far. Keys are calculated lazily, on demand. */
+  readonly structuralKeysComputed: number;
 }
 
 /**
@@ -220,19 +221,19 @@ export class GraphStore {
     return [...(this.parents.get(ref) ?? [])];
   }
 
-  /** Flatten a hydrated tree into the DAG, bottom-up. */
+  /**
+   * Flatten a hydrated tree into the DAG, bottom-up.
+   *
+   * Structural keys are deliberately *not* computed here. Alpha-normalization
+   * has to see a whole subtree at once, so doing it per node during interning
+   * makes a write quadratic in the size of the tree. Dedup analytics and
+   * alpha-equivalence queries are rare and can pay for themselves on demand;
+   * writes are the hot path and cannot.
+   */
   intern(term: Term): NodeRef {
     const childRefs = children(term).map((c) => this.intern(c));
     const flat = withChildren(term as never, childRefs as never) as unknown as FlatNode;
-    const ref = this.put(flat);
-    if (!this.structural.has(ref)) {
-      const key = structuralKeyOf(term);
-      this.structural.set(ref, key);
-      let set = this.byStructure.get(key);
-      if (!set) this.byStructure.set(key, (set = new Set()));
-      set.add(ref);
-    }
-    return ref;
+    return this.put(flat);
   }
 
   /** Inflate a stored node back into a hydrated tree. */
@@ -251,6 +252,15 @@ export class GraphStore {
     if (!set) this.byStructure.set(key, (set = new Set()));
     set.add(ref);
     return key;
+  }
+
+  /**
+   * Index every node's structural key. O(n * subtree size); call it when you
+   * actually want a repository-wide alpha-equivalence report, not per write.
+   */
+  indexStructures(): number {
+    for (const ref of this.nodes.keys()) this.structuralKey(ref);
+    return this.byStructure.size;
   }
 
   /** Every node sharing a structural key — alpha-equivalent code, anywhere. */
@@ -335,7 +345,7 @@ export class GraphStore {
       physicalNodes: this.nodes.size,
       logicalNodes: this.logicalWrites,
       dedupRatio: this.logicalWrites === 0 ? 0 : 1 - this.nodes.size / this.logicalWrites,
-      distinctStructures: this.byStructure.size,
+      structuralKeysComputed: this.byStructure.size,
     };
   }
 

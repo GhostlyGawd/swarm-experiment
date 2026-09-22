@@ -79,18 +79,65 @@ interface Chunk {
   readonly stable: boolean;
 }
 
-/**
- * diff3 chunking.
- *
- * Base elements matched by *both* sides are anchors. Everything between two
- * anchors is an unstable region that the caller must resolve; everything on an
- * anchor is stable and merges recursively.
- */
+/** diff3 chunking, with the cheap cases taken cheaply. */
 function chunk3(
   base: readonly NodeRef[],
   left: readonly NodeRef[],
   right: readonly NodeRef[],
 ): Chunk[] {
+  // Trim the common prefix and suffix before doing anything quadratic.
+  //
+  // This is not a micro-optimisation. LCS is O(n·m), statement lists in real
+  // code are long, and real edits are local — so without trimming, merging two
+  // versions of a 1,000-statement module costs a million table cells to
+  // discover that one element moved. With it, the table only ever covers the
+  // region that actually differs.
+  let prefix = 0;
+  const limit = Math.min(base.length, left.length, right.length);
+  while (prefix < limit && base[prefix] === left[prefix] && base[prefix] === right[prefix]) {
+    prefix++;
+  }
+  let suffix = 0;
+  while (
+    suffix < limit - prefix &&
+    base[base.length - 1 - suffix] === left[left.length - 1 - suffix] &&
+    base[base.length - 1 - suffix] === right[right.length - 1 - suffix]
+  ) {
+    suffix++;
+  }
+
+  const head: Chunk[] = [];
+  for (let i = 0; i < prefix; i++) {
+    head.push({ base: [base[i]], left: [left[i]], right: [right[i]], stable: true });
+  }
+  const tail: Chunk[] = [];
+  for (let i = suffix - 1; i >= 0; i--) {
+    const b = base[base.length - 1 - i];
+    tail.push({ base: [b], left: [b], right: [b], stable: true });
+  }
+
+  const middle = chunkMiddle(
+    base.slice(prefix, base.length - suffix),
+    left.slice(prefix, left.length - suffix),
+    right.slice(prefix, right.length - suffix),
+  );
+  return [...head, ...middle, ...tail];
+}
+
+/**
+ * Anchor walk over the region that genuinely differs.
+ *
+ * Base elements matched by *both* sides are anchors. Everything between two
+ * anchors is unstable and left for the caller to resolve; everything on an
+ * anchor is stable and merges recursively.
+ */
+function chunkMiddle(
+  base: readonly NodeRef[],
+  left: readonly NodeRef[],
+  right: readonly NodeRef[],
+): Chunk[] {
+  if (base.length === 0 && left.length === 0 && right.length === 0) return [];
+
   const matchL = new Map(lcs(base, left));
   const matchR = new Map(lcs(base, right));
   const anchors = [...matchL.keys()].filter((k) => matchR.has(k)).sort((a, z) => a - z);
@@ -142,7 +189,12 @@ export function merge3(
   let reused = 0;
 
   const go = (b: NodeRef, l: NodeRef, r: NodeRef, path: Step[]): NodeRef => {
-    if (l === r) return l; // Both sides agree (including "neither touched it").
+    if (l === r) {
+      // Both sides agree, which includes the common case of neither having
+      // touched it. One pointer comparison settles an arbitrarily large subtree.
+      reused++;
+      return l;
+    }
     if (b === l) {
       reused++;
       return r; // Only the right side moved.

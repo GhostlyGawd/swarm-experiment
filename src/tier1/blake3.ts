@@ -61,32 +61,41 @@ function permute(m: Uint32Array): void {
   m.set(PERM_SCRATCH);
 }
 
-/** Full 16-word compression output. Words 0..7 are the chaining value. */
-function compress(
+// Compression runs on every node written to the graph, so it uses fixed
+// scratch rather than allocating a state and a message buffer per call. It is
+// strictly sequential and never nested, which is what makes that safe.
+const STATE = new Uint32Array(16);
+const MESSAGE = new Uint32Array(16);
+
+/**
+ * The BLAKE3 compression function. Writes all 16 output words into `out`,
+ * which must not alias `cv`. Words 0..7 are the chaining value.
+ */
+function compressInto(
   cv: Uint32Array,
   blockWords: Uint32Array,
   counter: bigint,
   blockLen: number,
   flags: number,
-): Uint32Array {
-  const state = new Uint32Array(16);
-  state.set(cv.subarray(0, 8), 0);
-  state.set(IV.subarray(0, 4), 8);
-  state[12] = Number(counter & 0xffffffffn) >>> 0;
-  state[13] = Number((counter >> 32n) & 0xffffffffn) >>> 0;
-  state[14] = blockLen >>> 0;
-  state[15] = flags >>> 0;
+  out: Uint32Array,
+): void {
+  STATE[0] = cv[0]; STATE[1] = cv[1]; STATE[2] = cv[2]; STATE[3] = cv[3];
+  STATE[4] = cv[4]; STATE[5] = cv[5]; STATE[6] = cv[6]; STATE[7] = cv[7];
+  STATE[8] = IV[0]; STATE[9] = IV[1]; STATE[10] = IV[2]; STATE[11] = IV[3];
+  STATE[12] = Number(counter & 0xffffffffn) >>> 0;
+  STATE[13] = Number((counter >> 32n) & 0xffffffffn) >>> 0;
+  STATE[14] = blockLen >>> 0;
+  STATE[15] = flags >>> 0;
 
-  const m = Uint32Array.from(blockWords);
+  MESSAGE.set(blockWords);
   for (let r = 0; r < 7; r++) {
-    round(state, m);
-    if (r < 6) permute(m);
+    round(STATE, MESSAGE);
+    if (r < 6) permute(MESSAGE);
   }
   for (let i = 0; i < 8; i++) {
-    state[i] = (state[i] ^ state[i + 8]) >>> 0;
-    state[i + 8] = (state[i + 8] ^ cv[i]) >>> 0;
+    out[i] = (STATE[i] ^ STATE[i + 8]) >>> 0;
+    out[i + 8] = (STATE[i + 8] ^ cv[i]) >>> 0;
   }
-  return state;
 }
 
 function wordsFromLEBytes(bytes: Uint8Array, out: Uint32Array): void {
@@ -106,15 +115,26 @@ interface Output {
   flags: number;
 }
 
+const CV_SCRATCH = new Uint32Array(16);
+
+/** Finalize a tree node into `out` (8 words). */
+function chainingValueInto(o: Output, out: Uint32Array): void {
+  compressInto(o.cv, o.blockWords, o.counter, o.blockLen, o.flags, CV_SCRATCH);
+  out.set(CV_SCRATCH.subarray(0, 8));
+}
+
 function chainingValue(o: Output): Uint32Array {
-  return compress(o.cv, o.blockWords, o.counter, o.blockLen, o.flags).subarray(0, 8);
+  const out = new Uint32Array(8);
+  chainingValueInto(o, out);
+  return out;
 }
 
 /** Extendable output: the root node is squeezed for as many bytes as asked. */
 function rootOutputBytes(o: Output, out: Uint8Array): void {
+  const words = new Uint32Array(16);
   let counter = 0n;
   for (let offset = 0; offset < out.length; offset += 2 * OUT_LEN) {
-    const words = compress(o.cv, o.blockWords, counter, o.blockLen, o.flags | ROOT);
+    compressInto(o.cv, o.blockWords, counter, o.blockLen, o.flags | ROOT, words);
     for (let i = 0; i < words.length; i++) {
       const base = offset + i * 4;
       if (base >= out.length) break;
@@ -129,16 +149,17 @@ function rootOutputBytes(o: Output, out: Uint8Array): void {
 }
 
 class ChunkState {
-  cv: Uint32Array;
+  readonly cv = new Uint32Array(8);
   chunkCounter: bigint;
   block = new Uint8Array(BLOCK_LEN);
   blockLen = 0;
   blocksCompressed = 0;
   readonly flags: number;
-  private readonly scratch = new Uint32Array(16);
+  private readonly words = new Uint32Array(16);
+  private readonly out = new Uint32Array(16);
 
   constructor(key: Uint32Array, chunkCounter: bigint, flags: number) {
-    this.cv = Uint32Array.from(key);
+    this.cv.set(key.subarray(0, 8));
     this.chunkCounter = chunkCounter;
     this.flags = flags;
   }
@@ -155,11 +176,12 @@ class ChunkState {
     let pos = 0;
     while (pos < input.length) {
       if (this.blockLen === BLOCK_LEN) {
-        wordsFromLEBytes(this.block, this.scratch);
-        this.cv = Uint32Array.from(
-          compress(this.cv, this.scratch, this.chunkCounter, BLOCK_LEN, this.flags | this.startFlag())
-            .subarray(0, 8),
+        wordsFromLEBytes(this.block, this.words);
+        compressInto(
+          this.cv, this.words, this.chunkCounter, BLOCK_LEN,
+          this.flags | this.startFlag(), this.out,
         );
+        this.cv.set(this.out.subarray(0, 8));
         this.blocksCompressed++;
         this.block.fill(0);
         this.blockLen = 0;
@@ -176,7 +198,7 @@ class ChunkState {
     const blockWords = new Uint32Array(16);
     wordsFromLEBytes(this.block, blockWords);
     return {
-      cv: this.cv,
+      cv: Uint32Array.from(this.cv),
       blockWords,
       counter: this.chunkCounter,
       blockLen: this.blockLen,
@@ -185,7 +207,12 @@ class ChunkState {
   }
 }
 
-function parentOutput(left: Uint32Array, right: Uint32Array, key: Uint32Array, flags: number): Output {
+function parentOutput(
+  left: Uint32Array,
+  right: Uint32Array,
+  key: Uint32Array,
+  flags: number,
+): Output {
   const blockWords = new Uint32Array(16);
   blockWords.set(left.subarray(0, 8), 0);
   blockWords.set(right.subarray(0, 8), 8);
