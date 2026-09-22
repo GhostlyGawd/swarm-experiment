@@ -20,12 +20,14 @@ import { typecheck } from './tier2/typecheck.ts';
 import { formatReport, verifyFunction } from './tier2/verify.ts';
 import { compileSpec, parseSpec } from './tier2/spec.ts';
 import { Runtime } from './tier3/runtime.ts';
+import { ProductionRuntime, formatCompilation } from './tier3/compile.ts';
 import { formatMicroWorld, simulateModule } from './tier3/microworld.ts';
 import { compareShapes, formatPlan, generateGlue, slice } from './tier4/topology.ts';
 import { applyTuning, findSurfaces, tune, verifyOnlyParametersChanged } from './tier4/surfaces.ts';
 import { formatOutcome, synthesize } from './synthesis/loop.ts';
 import { EnumerativeSynthesizer } from './synthesis/enumerative.ts';
-import { ACCOUNT, buildLedgerExample, ledgerTelemetry } from './examples/ledger.ts';
+import { ACCOUNT, CAP_LEDGER_APPEND, buildLedgerExample, ledgerTelemetry } from './examples/ledger.ts';
+import type { Value } from './tier3/values.ts';
 import type { Term } from './tier1/ast.ts';
 import type { SymbolId } from './tier1/ids.ts';
 
@@ -38,6 +40,7 @@ Usage: aether <command> [options]
   ir [--body]          Show the Agent-IR encoding and its token cost
   check [file.ts]      Type-check, capability-check and verify
   run                  Execute the worked example and show the trace
+  compile [--policy p] Compile the stripped production artifact (Risk R2)
   simulate             Run the micro-world suites
   topology [--shape s] Compile deployment topologies from telemetry
   tune                 Run the background tuning agent over the surfaces
@@ -150,6 +153,52 @@ function cmdRun(): void {
   rule('time travel');
   rt.restore(mark);
   console.log('after restore:', JSON.stringify(rt.inspect().heap));
+}
+
+function cmdCompile(policy?: string): void {
+  const example = ex();
+  const env = environmentOf(example.module);
+  const reports = new Map<SymbolId, ReturnType<typeof verifyFunction>>();
+  for (const [symbol, decl] of env) {
+    reports.set(symbol, verifyFunction(decl, { symbols: example.syms, environment: env }));
+  }
+  const effects = new Map([[CAP_LEDGER_APPEND, () => null as Value]]);
+
+  rule('compilation');
+  const prod = ProductionRuntime.compile(example.module, {
+    registry: example.capabilities,
+    symbols: example.syms,
+    effects,
+    verification: reports,
+    policy: (policy as never) ?? 'verified_elision',
+    entryPoints: [example.symbols.settle, example.symbols.accrue],
+  });
+  console.log(formatCompilation(prod.report));
+
+  rule('overhead against the development runtime');
+  const iterations = 20_000;
+  const dev = new Runtime({ registry: example.capabilities, symbols: example.syms, effects });
+  dev.load(example.module);
+  const devA = dev.allocateRecord(ACCOUNT, { id: 'a', balance: 10n ** 15n });
+  const devB = dev.allocateRecord(ACCOUNT, { id: 'b', balance: 0n });
+  let started = process.hrtime.bigint();
+  for (let i = 0; i < iterations; i++) dev.call(example.symbols.settle, [devA, devB, 1000n]);
+  const devMs = Number(process.hrtime.bigint() - started) / 1e6;
+
+  const prodA = prod.allocateRecord(ACCOUNT, { id: 'a', balance: 10n ** 15n });
+  const prodB = prod.allocateRecord(ACCOUNT, { id: 'b', balance: 0n });
+  started = process.hrtime.bigint();
+  for (let i = 0; i < iterations; i++) prod.call(example.symbols.settle, [prodA, prodB, 1000n]);
+  const prodMs = Number(process.hrtime.bigint() - started) / 1e6;
+
+  console.log(`development (journaling) : ${devMs.toFixed(0)} ms`);
+  console.log(`production  (stripped)   : ${prodMs.toFixed(0)} ms`);
+  console.log(`speedup                  : ${(devMs / prodMs).toFixed(1)}x`);
+  console.log(
+    `identical heap           : ${
+      JSON.stringify(prod.snapshot()) === JSON.stringify(dev.inspect().heap)
+    }`,
+  );
 }
 
 function cmdSimulate(): void {
@@ -365,7 +414,10 @@ function cmdDemo(): void {
   console.log(formatPlan(slice(example.module, ledgerTelemetry(example), { symbols: example.syms }),
     example.syms));
 
-  rule('7. synthesis from a contract alone');
+  rule('7. the production artifact');
+  cmdCompile();
+
+  rule('8. synthesis from a contract alone');
   cmdSynth();
 }
 
@@ -385,6 +437,7 @@ function main(argv: readonly string[]): void {
     case 'ir': return cmdIr(rest.includes('--body'));
     case 'check': return cmdCheck(positional[0]);
     case 'run': return cmdRun();
+    case 'compile': return cmdCompile(flag('policy'));
     case 'simulate': return cmdSimulate();
     case 'topology': return cmdTopology(flag('shape'));
     case 'tune': return cmdTune();

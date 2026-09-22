@@ -15,7 +15,7 @@ bound in its non-functional section is measured rather than asserted.
 
 ```bash
 npm install
-npm test          # 128 tests
+npm test          # 139 tests
 npm run bench     # the §6 measurements
 npm run demo      # an end-to-end walkthrough of all four tiers
 ```
@@ -137,6 +137,16 @@ journal, so fifty candidate repairs can run against the exact state where a bug
 occurred; and failures are values carrying the failing clause, the bindings and
 the step index, rather than messages to parse.
 
+**Production is a different artifact.** The journaling runtime is for agents to
+debug in; `ProductionRuntime.compile` emits a stripped one — no journal, no
+interpreter loop, names resolved to frame slots — that runs **12.7× faster**
+with an identical heap. It also drops every contract clause the solver already
+proved, on the reasoning that a discharged clause cannot fail, while keeping the
+ones that rest on property evidence. Preconditions are kept by default, because
+they are the API boundary and are discharged at call sites rather than in the
+body. Every decision is recorded with its reason, so "what does production not
+check?" has an answer you can read.
+
 **Micro-worlds replace mocks.** A mock encodes what the author expected a
 collaborator to do; a micro-world encodes what must remain true whatever it
 does, then attacks it. The properties are read off the code — contract, frame,
@@ -207,6 +217,7 @@ From `npm run bench`:
 | Concurrent writers | 1,000, no lock | 1,000/1,000 survive, 0 conflicts |
 | Agent-IR token reduction | ≥ 4× | **4.25×** per unit change ‡ |
 | Reproducible execution | identical heap + trace | identical across 3 runs |
+| Production artifact overhead | strips telemetry | **12.7×** faster, identical heap |
 
 † Measured at 762k nodes, not 10M: the store is a hash index so lookup is O(1),
 but materialising 10M needs multi-GB heap. The honest thing is to name the
@@ -252,6 +263,7 @@ aether project [file.ts]    Project the graph into readable TypeScript
 aether ir [--body]          Show the Agent-IR encoding and its token cost
 aether check [file.ts]      Type-check, capability-check and verify
 aether run                  Execute the worked example and show the trace
+aether compile [--policy p] Compile the stripped production artifact
 aether simulate             Run the micro-world suites
 aether topology [--shape s] Compile deployment topologies from telemetry
 aether tune                 Run the tuning agent over the surfaces
@@ -271,13 +283,13 @@ is the round-trip property in everyday use.
 docs/PRD.md          The specification
 src/tier1/           Content addressing, merge, Agent-IR, provenance
 src/tier2/           Capabilities, type checking, SMT, verification, spec DSL
-src/tier3/           Runtime, micro-worlds, generators
+src/tier3/           Runtime, production compiler, micro-worlds, generators
 src/tier4/           Topology slicer, optimization surfaces
 src/projection/      TypeScript projection and its parser
 src/synthesis/       The synthesis loop and a reference synthesizer
 src/examples/        The worked ledger example used throughout
 bench/nfr.bench.ts   The §6 measurements
-test/                128 tests, organized by tier
+test/                139 tests, organized by tier
 ```
 
 ## Licence

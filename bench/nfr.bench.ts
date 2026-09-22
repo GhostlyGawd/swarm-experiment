@@ -20,7 +20,9 @@ import { projectTypeScript } from '../src/projection/typescript.ts';
 import { verifyFunction } from '../src/tier2/verify.ts';
 import { simulateModule } from '../src/tier3/microworld.ts';
 import { Runtime } from '../src/tier3/runtime.ts';
-import { buildLedgerExample, ACCOUNT } from '../src/examples/ledger.ts';
+import { ProductionRuntime, formatCompilation } from '../src/tier3/compile.ts';
+import { buildLedgerExample, ACCOUNT, CAP_LEDGER_APPEND } from '../src/examples/ledger.ts';
+import type { Value } from '../src/tier3/values.ts';
 import type { Term } from '../src/tier1/ast.ts';
 import type { NodeRef, SymbolId } from '../src/tier1/ids.ts';
 
@@ -306,6 +308,53 @@ console.log('\nAether — non-functional requirements\n');
     bound: 'identical heap + trace',
     measured: identical ? 'identical across 3 runs' : 'DIVERGED',
     verdict: identical ? 'met' : 'missed',
+  });
+}
+
+// --- R2 Dual-runtime overhead -----------------------------------------------
+{
+  const ex = buildLedgerExample();
+  const env = new Map<SymbolId, Term>();
+  for (const m of (ex.module as Extract<Term, { kind: 'Module' }>).members) {
+    if (m.kind === 'FunctionDecl') env.set(m.symbol, m);
+  }
+  const reports = new Map<SymbolId, ReturnType<typeof verifyFunction>>();
+  for (const [symbol, decl] of env) {
+    reports.set(symbol, verifyFunction(decl, { symbols: ex.syms, environment: env }));
+  }
+  const effects = new Map([[CAP_LEDGER_APPEND, () => null as Value]]);
+  const iterations = 20_000;
+
+  const dev = new Runtime({ registry: ex.capabilities, symbols: ex.syms, effects });
+  dev.load(ex.module);
+  const devA = dev.allocateRecord(ACCOUNT, { id: 'a', balance: 10n ** 15n });
+  const devB = dev.allocateRecord(ACCOUNT, { id: 'b', balance: 0n });
+  let t = now();
+  for (let i = 0; i < iterations; i++) dev.call(ex.symbols.settle, [devA, devB, 1000n]);
+  const devMs = now() - t;
+
+  const prod = ProductionRuntime.compile(ex.module, {
+    registry: ex.capabilities, symbols: ex.syms, effects,
+    verification: reports, entryPoints: [ex.symbols.settle],
+  });
+  const prodA = prod.allocateRecord(ACCOUNT, { id: 'a', balance: 10n ** 15n });
+  const prodB = prod.allocateRecord(ACCOUNT, { id: 'b', balance: 0n });
+  t = now();
+  for (let i = 0; i < iterations; i++) prod.call(ex.symbols.settle, [prodA, prodB, 1000n]);
+  const prodMs = now() - t;
+
+  const agree = JSON.stringify(prod.snapshot()) === JSON.stringify(dev.inspect().heap);
+  record({
+    id: 'Risk R2',
+    requirement: 'Dual-runtime overhead',
+    bound: 'production strips telemetry',
+    measured: `${(devMs / prodMs).toFixed(1)}x faster ` +
+      `(dev ${devMs.toFixed(0)} ms, prod ${prodMs.toFixed(0)} ms over ${iterations.toLocaleString()} calls)`,
+    verdict: agree && prodMs < devMs ? 'met' : 'missed',
+    note:
+      `${prod.report.clausesElided} contract clause(s) elided as already proved, ` +
+      `${prod.report.clausesKept} kept. Both runtimes end with an identical heap` +
+      (agree ? '.' : ' — THEY DID NOT, which invalidates the comparison.'),
   });
 }
 

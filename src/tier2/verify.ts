@@ -49,6 +49,14 @@ export interface Obligation {
   readonly formula: S.SmtFormula;
   readonly rigor: 'formal' | 'property';
   readonly path: readonly string[];
+  /**
+   * For `precondition_at_call`: whose precondition this is, and which clause.
+   * Matching on the rendered label would be brittle, and the production
+   * compiler needs this to decide whether a callee's precondition is
+   * established at *every* call site before it may stop checking it.
+   */
+  readonly callee?: SymbolId;
+  readonly clause?: string;
 }
 
 export type ObligationVerdict = 'proved' | 'refuted' | 'unproven' | 'delegated';
@@ -319,6 +327,8 @@ class VcBuilder {
         formula: this.implication(path, this.formula(clause.expr, callPath)),
         rigor: clause.rigor,
         path: ['call', clause.label],
+        callee: expr.callee,
+        clause: clause.label,
       });
     }
     for (const clause of contract.ensures) {
@@ -432,6 +442,7 @@ class VcBuilder {
             formula: this.implication(p, this.formula(stmt.expr, p)),
             rigor: 'formal',
             path: trail,
+            clause: stmt.label,
           });
         }
         return paths;
@@ -588,6 +599,7 @@ class VcBuilder {
             formula: this.implication(p, this.formula(clause.expr, p)),
             rigor: clause.rigor,
             path: ['ensures', clause.label],
+            clause: clause.label,
           });
         }
       }

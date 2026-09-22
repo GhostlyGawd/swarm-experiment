@@ -111,7 +111,11 @@ export interface RuntimeOptions {
   readonly revocations?: RevocationList;
   /** Implementations of the capabilities in scope. */
   readonly effects?: ReadonlyMap<CapabilityName, (args: readonly Value[]) => Value>;
-  /** Non-negotiable bound on a single execution. Prevents a hung micro-world. */
+  /**
+   * Bound on a single top-level call, not on the runtime's lifetime. A
+   * cumulative bound would make a long-lived development runtime quietly stop
+   * working part-way through a session.
+   */
   readonly maxSteps?: number;
   /** Record a trace event for every step. Off in the production runtime. */
   readonly trace?: boolean;
@@ -148,6 +152,8 @@ export class Runtime {
   private journal: Delta[] = [];
   private readonly frames: Frame[] = [];
   private stepCount = 0;
+  /** Step count when the current top-level call began. */
+  private callBaseline = 0;
   private readonly events: TraceEvent[] = [];
   /** Effects performed, in order. The replacement for reading a log. */
   private readonly effectLog: Array<{ step: number; capability: CapabilityName; args: Value[] }> = [];
@@ -324,7 +330,7 @@ export class Runtime {
 
   private tick(): void {
     this.stepCount++;
-    if (this.stepCount > (this.opts.maxSteps ?? DEFAULT_MAX_STEPS)) {
+    if (this.stepCount - this.callBaseline > (this.opts.maxSteps ?? DEFAULT_MAX_STEPS)) {
       throw new AetherFault(this.fault('step_budget', 'step budget exhausted', null));
     }
   }
@@ -358,6 +364,9 @@ export class Runtime {
     args: readonly Value[],
   ): ExecutionResult {
     const before = this.stepCount;
+    // The budget covers this call, so nested calls share it but a later
+    // top-level call starts fresh.
+    if (this.frames.length === 0) this.callBaseline = this.stepCount;
     try {
       const value = this.enter(decl, args);
       return { ok: true, value, steps: this.stepCount - before };

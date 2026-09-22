@@ -95,6 +95,7 @@ all four tiers, and the claims below are measurements, not estimates.
 | Deduplication over 200 versions | **94.6%** against storing each version independently |
 | 1,000 concurrent writers on disjoint subtrees | All edits survive, zero conflicts, no lock |
 | A body synthesized from a contract alone | Found and formally proved in one attempt |
+| The stripped production artifact | **12.7×** faster than the journaling runtime, with an identical heap |
 
 ---
 
@@ -684,6 +685,7 @@ Measurements from `npm run bench` on the reference implementation.
 | AST node resolution | < 5 ms @ 10M nodes | p99.9 **0.017 ms** @ 762k nodes | Met, qualified |
 | Micro-world harness, local module | ≤ 250 ms | **70 ms** worst declaration | Met |
 | Reversible checkpoint rollback | < 15 ms | **0.31 ms** worst over 250 transfers | Met |
+| Production artifact overhead (R2) | Strips telemetry | **12.7×** faster than the development runtime, identical heap | Met |
 
 *Qualification.* Node resolution was measured at 762k nodes, not 10M. The store
 is an in-memory hash index, so lookup is O(1) and 10M would measure the same,
@@ -732,7 +734,7 @@ repeated structure, and sharing pays off across history and across a repository.
 | # | Risk | Impact | Likelihood | Mitigation | Status |
 |---|---|---|---|---|---|
 | R1 | SMT state-space explosion | High | High | **Tiered rigor.** Core state and financial transitions require strict formal proof; complex workflow logic relies on micro-world fuzzing. A `property` clause never reaches the solver; a `formal` clause the solver cannot settle is reported as `UnprovenFormalContract` and delegated | Implemented and measured |
-| R2 | Telemetry overhead bloat | High | Medium | **Dual-runtime model.** The development runtime journals every delta for time travel; the production runtime emits stripped native artifacts with no trace overhead | Journaling is opt-in per runtime; production stripping is Phase 3 |
+| R2 | Telemetry overhead bloat | High | Medium | **Dual-runtime model.** The development runtime journals every delta for time travel; the production compiler emits a stripped artifact with no journal, no interpreter loop, and no check for any clause already proved | Implemented and measured: **12.7×** faster, identical results |
 | R3 | Projection drift | Medium | Medium | **Formally verify the projection.** `Decompile(Compile(x)) ≡ x` must be structurally invariant | Implemented; holds by content address for the worked example and 300 generated expressions |
 | R4 | Agent hallucination loops | High | Medium | **Hard budget gates.** After 5 failed synthesis iterations the system raises `SynthesisStall` and escalates with the full failure trace | Implemented and tested |
 
@@ -746,6 +748,32 @@ property-checked. The loop therefore *holds such a candidate as a fallback and
 keeps searching for a provable one*, returning the unproven body only if nothing
 better turns up inside budget — because a search that stops at the first passing
 candidate will never find the better one.
+
+**R2 — the elision policy is where Tier 2 pays for itself.** The production
+compiler takes the verification reports as input and drops exactly the
+obligations that came back `proved`, on the reasoning that a clause the solver
+discharged cannot fail and checking it buys nothing. A clause that was only
+property-checked is kept, because it *can* fail. Every clause gets a recorded
+decision and a reason, which is the artifact that answers "what does production
+not check, and why is that safe?".
+
+Two consequences worth stating, because both were discovered rather than
+designed:
+
+- **Preconditions are the API boundary and are kept by default.** A function's
+  own preconditions are *assumptions* during its verification — they are
+  discharged at each call site, not in the body. Eliding one is sound only if
+  every possible caller is known and verified, which is false for anything an
+  external client can reach. The compiler therefore elides a precondition only
+  when the caller declares the artifact's entry points *and* every internal call
+  site proved it. On the worked example that removes 4 of 7 precondition checks
+  and correctly keeps the 3 belonging to entry points.
+- **Security is not telemetry.** Capability discipline survives stripping
+  completely: the static grant is settled at compile time as before, and the
+  operator's revocation list is still consulted at the point of use, because §5
+  requires revocation to take effect without a redeploy. The only thing a
+  production fault loses is the binding snapshot, which is development
+  telemetry by definition.
 
 **R3 — the round-trip property found a real defect.** Negative literals and
 negation-applied-to-a-literal projected identically, so they round-tripped to
@@ -797,8 +825,8 @@ compilation cycle; Agent-IR specification and memory-hook protocol.
 **Phase 3 — Dynamic topology and autonomous optimization (months 13–18).**
 Fluid topology engine; differentiable optimization surfaces and continuous
 tuning agents; enterprise provenance and audit tooling.
-*Reference implementation: topology slicer and tuner complete; production
-runtime stripping and enterprise audit tooling outstanding.*
+*Reference implementation: topology slicer, tuner and production runtime
+stripping complete; enterprise audit tooling outstanding.*
 
 ---
 
@@ -825,6 +853,7 @@ runtime stripping and enterprise audit tooling outstanding.*
 | FR-2.2 contracts, solver, verification | `src/tier2/{smt,solver,verify}.ts` |
 | FR-2.3 object capabilities | `src/tier2/{ocap,typecheck}.ts` |
 | FR-3.1 telemetric runtime | `src/tier3/{runtime,values}.ts` |
+| R2 production runtime and elision | `src/tier3/compile.ts` |
 | FR-3.2 micro-worlds | `src/tier3/{microworld,generate}.ts` |
 | FR-4.1 topology | `src/tier4/topology.ts` |
 | FR-4.2 surfaces and tuning | `src/tier4/surfaces.ts` |
@@ -834,9 +863,11 @@ runtime stripping and enterprise audit tooling outstanding.*
 
 ### Open questions for review
 
-1. **Production runtime stripping (R2).** The dual-runtime model is specified
-   but only the journaling runtime is built. What is the acceptable ceiling on
-   production overhead before journaling must be compiled out entirely?
+1. **Elision and observability (R2).** The production artifact is 12.7× faster
+   and drops every already-proved clause, but a production fault now carries no
+   binding snapshot. Is the clause label and fault kind enough for an on-call
+   engineer, or does production need a narrow, sampled telemetry mode that sits
+   between the two runtimes?
 2. **Structural keys at repository scale.** Alpha-normalization is O(subtree),
    so a repository-wide alpha-equivalence index is O(n · depth). Is that a
    background job, or does the index need an incremental formulation?
