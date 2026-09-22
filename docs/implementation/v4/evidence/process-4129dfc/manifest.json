@@ -1,0 +1,148 @@
+{
+  "format": "aether.foundation-verification/1",
+  "subjectCommit": "4129dfca164caf3ffc9ec796c3db2a36e47b9196",
+  "subjectTree": "d674751e22461c3e765ce587c1ec4ddb9a29d684",
+  "workingTreeDirty": false,
+  "specVersion": "0.1.0",
+  "recordedAt": "2026-09-22T21:52:04.876214+00:00",
+  "checks": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "artifact": "tests.log"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "artifact": "typecheck.log"
+    },
+    {
+      "command": "npm run roadmap:check",
+      "exitCode": 0,
+      "artifact": "roadmap.log"
+    },
+    {
+      "command": "npm run roadmap:v4:check",
+      "exitCode": 0,
+      "artifact": "roadmap-v4.log"
+    },
+    {
+      "command": "npm pack --json (includes build)",
+      "exitCode": 0,
+      "artifact": "package.json"
+    },
+    {
+      "command": "npm install --omit=dev --ignore-scripts --no-audit --no-fund",
+      "exitCode": 0,
+      "artifact": "package-install.log"
+    },
+    {
+      "command": "node package-smoke.mjs in installed package path containing spaces",
+      "exitCode": 0,
+      "artifact": "package-smoke.log"
+    },
+    {
+      "command": "npm run bench:v4:measure -- --output <evidence>/benchmark-measure",
+      "exitCode": 0,
+      "artifact": "benchmark-measure.log"
+    },
+    {
+      "command": "npm run bench:v4:enforce -- --output <evidence>/benchmark-enforce",
+      "exitCode": 1,
+      "artifact": "benchmark-enforce.log"
+    }
+  ],
+  "releasePerformance": "fail:17 required targets remain unsatisfied; enforcement failure is retained",
+  "artifacts": [
+    {
+      "path": "V4-F07.json",
+      "sha256": "f8f18574ea2c7dd62c77cdbd0651f81fac6557977dc3acfd4644625406996096",
+      "bytes": 1064
+    },
+    {
+      "path": "V4-F08.json",
+      "sha256": "a8c2f6b75b42f7cb496fa1f316b4a61cfd21d0df7784d9eeed6fb113ec552c8f",
+      "bytes": 1064
+    },
+    {
+      "path": "benchmark-enforce/manifest.json",
+      "sha256": "af19e4f5f91c0c3e0aceac78d6b0b4dccb8b0eea4d50f1ae6911d7c793b5f9bc",
+      "bytes": 13620
+    },
+    {
+      "path": "benchmark-enforce/samples.json",
+      "sha256": "732cd0d3ba8ba765fa67d37577eab680f38e871432660db3a5f2575752f4e93f",
+      "bytes": 32171
+    },
+    {
+      "path": "benchmark-enforce.log",
+      "sha256": "5039b474a42dba7132d1c0682447916309213693fd8eafab6db95128c8b864e9",
+      "bytes": 2238
+    },
+    {
+      "path": "benchmark-measure/manifest.json",
+      "sha256": "af19e4f5f91c0c3e0aceac78d6b0b4dccb8b0eea4d50f1ae6911d7c793b5f9bc",
+      "bytes": 13620
+    },
+    {
+      "path": "benchmark-measure/samples.json",
+      "sha256": "732cd0d3ba8ba765fa67d37577eab680f38e871432660db3a5f2575752f4e93f",
+      "bytes": 32171
+    },
+    {
+      "path": "benchmark-measure.log",
+      "sha256": "9f973952875edb59d40eefbc87db7297841f29866dff6024dd0026688f52629f",
+      "bytes": 2238
+    },
+    {
+      "path": "ghostlygawd-aether-0.1.0.tgz",
+      "sha256": "c0588a338c741c4b49495e85b480ca652f6d77bbb021cb4847ed2b90ecd81132",
+      "bytes": 409963
+    },
+    {
+      "path": "package-build.log",
+      "sha256": "4825b511365fc48ef7963dcb5e5ccacbb7e496423fd598eee7b62facda8c1a92",
+      "bytes": 113
+    },
+    {
+      "path": "package-install.log",
+      "sha256": "f2be02c2c9498433a7cab5fb41e3c4bb479e730aaa5459d188bc24f3363720f7",
+      "bytes": 27
+    },
+    {
+      "path": "package-smoke.log",
+      "sha256": "78332052b2a94b23a8eacfad4bf600810bf6f049e379de969c15cbb3795362c0",
+      "bytes": 74
+    },
+    {
+      "path": "package-smoke.mjs",
+      "sha256": "c42a1ade506673d0d59b471b027999d069a6a40917b041e6436fc0477f71b0fd",
+      "bytes": 1692
+    },
+    {
+      "path": "package.json",
+      "sha256": "b1f248ded20720c0e4b60e42bc68f589e95490965be6444b517251d5d802c4ad",
+      "bytes": 22447
+    },
+    {
+      "path": "roadmap-v4.log",
+      "sha256": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+      "bytes": 182
+    },
+    {
+      "path": "roadmap.log",
+      "sha256": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+      "bytes": 135
+    },
+    {
+      "path": "tests.log",
+      "sha256": "d2de1fd924aeccb8fda27609ebe101d1a270057811ae8d4c0a8b722a3cdd23d4",
+      "bytes": 32486
+    },
+    {
+      "path": "typecheck.log",
+      "sha256": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a",
+      "bytes": 69
+    }
+  ]
+}

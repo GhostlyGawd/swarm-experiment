@@ -6,7 +6,7 @@ Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) f
 
 > This is implementation status. Publishing the specification does not complete runtime work. A verified task needs evidence for every gate; functional delivery does not imply that the release NFR/KPI gates passed.
 
-**10/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
+**13/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
 
 ## First implementation slice
 
@@ -23,13 +23,13 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-T2-10](#v4-t2-10).
+**Ready now:** [V4-T2-04](#v4-t2-04), [V4-T2-10](#v4-t2-10), [V4-T3-01](#v4-t3-01).
 
 ## Milestones
 
 | Milestone | Verified | Total | Release gate |
 |---|---:|---:|---|
-| baseline | 10 | 13 | [V4-M0](#v4-m0) |
+| baseline | 13 | 13 | [V4-M0](#v4-m0) |
 | v2 | 0 | 20 | [V4-M2](#v4-m2) |
 | v3 | 0 | 14 | [V4-M3](#v4-m3) |
 | v4 | 0 | 15 | [V4-M4](#v4-m4) |
@@ -44,8 +44,8 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-F04](#v4-f04) | Implement effect broker and replay contracts | runtime | baseline | verified | [V4-F03](#v4-f03) |
 | [V4-F05](#v4-f05) | Implement replication envelopes and delivery harness | distribution | baseline | verified | [V4-F03](#v4-f03) |
 | [V4-F06](#v4-f06) | Validate proof evidence against exact execution subjects | verification | baseline | verified | [V4-F03](#v4-f03) |
-| [V4-F07](#v4-f07) | Make state handoff durable across actual processes | distribution | baseline | in_progress | [V4-F01](#v4-f01), [V4-F04](#v4-f04) |
-| [V4-F08](#v4-f08) | Integrate exact-root admission and baseline recovery slice | governance | baseline | planned | [V4-F02](#v4-f02), [V4-F05](#v4-f05), [V4-F06](#v4-f06), [V4-F07](#v4-f07) |
+| [V4-F07](#v4-f07) | Make state handoff durable across actual processes | distribution | baseline | verified | [V4-F01](#v4-f01), [V4-F04](#v4-f04) |
+| [V4-F08](#v4-f08) | Integrate exact-root admission and baseline recovery slice | governance | baseline | verified | [V4-F02](#v4-f02), [V4-F05](#v4-f05), [V4-F06](#v4-f06), [V4-F07](#v4-f07) |
 | [V4-R01](#v4-r01) | Select and model replication and quorum algorithms | distribution | baseline | verified | [V4-F03](#v4-f03) |
 | [V4-R02](#v4-r02) | Measure native target feasibility | compiler | baseline | verified | — |
 | [V4-R03](#v4-r03) | Select certificate calculus and private attestation statement | verification | baseline | verified | [V4-F03](#v4-f03) |
@@ -96,7 +96,7 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-Q04](#v4-q04) | Multimodal quality and latency gates | measurement | v4 | planned | [V4-F02](#v4-f02), [V4-T2-12](#v4-t2-12), [V4-T3-09](#v4-t3-09) |
 | [V4-Q05](#v4-q05) | Determinism, containment and governance assurance | security | v4 | planned | [V4-T1-03](#v4-t1-03), [V4-T1-08](#v4-t1-08), [V4-T2-04](#v4-t2-04), [V4-T2-06](#v4-t2-06), [V4-T2-09](#v4-t2-09), [V4-T3-04](#v4-t3-04), [V4-T3-05](#v4-t3-05), [V4-T3-10](#v4-t3-10), [V4-T4-05](#v4-t4-05) |
 | [V4-Q06](#v4-q06) | End-to-end KPI validation | measurement | v4 | planned | [V4-Q01](#v4-q01), [V4-Q02](#v4-q02), [V4-Q03](#v4-q03), [V4-Q04](#v4-q04), [V4-Q05](#v4-q05), [V4-T1-10](#v4-t1-10), [V4-T1-11](#v4-t1-11), [V4-T3-06](#v4-t3-06), [V4-T3-12](#v4-t3-12), [V4-T4-04](#v4-t4-04) |
-| [V4-M0](#v4-m0) | baseline completion gate | release | baseline | planned | [V4-F01](#v4-f01), [V4-F02](#v4-f02), [V4-F03](#v4-f03), [V4-F04](#v4-f04), [V4-F05](#v4-f05), [V4-F06](#v4-f06), [V4-F07](#v4-f07), [V4-F08](#v4-f08), [V4-R01](#v4-r01), [V4-R02](#v4-r02), [V4-R03](#v4-r03), [V4-R04](#v4-r04) |
+| [V4-M0](#v4-m0) | baseline completion gate | release | baseline | verified | [V4-F01](#v4-f01), [V4-F02](#v4-f02), [V4-F03](#v4-f03), [V4-F04](#v4-f04), [V4-F05](#v4-f05), [V4-F06](#v4-f06), [V4-F07](#v4-f07), [V4-F08](#v4-f08), [V4-R01](#v4-r01), [V4-R02](#v4-r02), [V4-R03](#v4-r03), [V4-R04](#v4-r04) |
 | [V4-M2](#v4-m2) | v2 completion gate | release | v2 | planned | [V4-T1-01](#v4-t1-01), [V4-T1-02](#v4-t1-02), [V4-T1-03](#v4-t1-03), [V4-T1-04](#v4-t1-04), [V4-T1-06](#v4-t1-06), [V4-T1-09](#v4-t1-09), [V4-T2-01](#v4-t2-01), [V4-T2-02](#v4-t2-02), [V4-T2-03](#v4-t2-03), [V4-T2-04](#v4-t2-04), [V4-T2-05](#v4-t2-05), [V4-T2-06](#v4-t2-06), [V4-T2-07](#v4-t2-07), [V4-T2-08](#v4-t2-08), [V4-T2-10](#v4-t2-10), [V4-T3-01](#v4-t3-01), [V4-T3-03](#v4-t3-03), [V4-T3-04](#v4-t3-04), [V4-T3-07](#v4-t3-07), [V4-M0](#v4-m0) |
 | [V4-M3](#v4-m3) | v3 completion gate | release | v3 | planned | [V4-T1-05](#v4-t1-05), [V4-T1-07](#v4-t1-07), [V4-T1-11](#v4-t1-11), [V4-T2-11](#v4-t2-11), [V4-T2-12](#v4-t2-12), [V4-T3-02](#v4-t3-02), [V4-T3-08](#v4-t3-08), [V4-T3-09](#v4-t3-09), [V4-T3-11](#v4-t3-11), [V4-T3-12](#v4-t3-12), [V4-T4-01](#v4-t4-01), [V4-T4-03](#v4-t4-03), [V4-T4-04](#v4-t4-04), [V4-M2](#v4-m2) |
 | [V4-M4](#v4-m4) | v4 completion gate | release | v4 | planned | [V4-T1-08](#v4-t1-08), [V4-T1-10](#v4-t1-10), [V4-T2-09](#v4-t2-09), [V4-T3-05](#v4-t3-05), [V4-T3-06](#v4-t3-06), [V4-T3-10](#v4-t3-10), [V4-T4-02](#v4-t4-02), [V4-T4-05](#v4-t4-05), [V4-Q01](#v4-q01), [V4-Q02](#v4-q02), [V4-Q03](#v4-q03), [V4-Q04](#v4-q04), [V4-Q05](#v4-q05), [V4-Q06](#v4-q06), [V4-M3](#v4-m3) |
@@ -322,7 +322,7 @@ Evidence: [manifest](../../../docs/implementation/v4/evidence/contracts-3dce2d6/
 
 ### V4-F07
 
-**Make state handoff durable across actual processes** · implementation · baseline · owner: distribution · **in_progress**
+**Make state handoff durable across actual processes** · implementation · baseline · owner: distribution · **verified**
 
 Prerequisites: [V4-F01](#v4-f01), [V4-F04](#v4-f04).
 
@@ -335,11 +335,11 @@ Acceptance gates:
 - **V4-F07/G2** — At most one ownership epoch may write; stale owner calls and unauthorized transport calls fail.
 - **V4-F07/G3** — No heap address is mistaken for a record in another heap; in-flight effects cannot be duplicated by migration or timeout retries.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/process-4129dfc/V4-F07.json).
 
 ### V4-F08
 
-**Integrate exact-root admission and baseline recovery slice** · implementation · baseline · owner: governance · **planned**
+**Integrate exact-root admission and baseline recovery slice** · implementation · baseline · owner: governance · **verified**
 
 Prerequisites: [V4-F02](#v4-f02), [V4-F05](#v4-f05), [V4-F06](#v4-f06), [V4-F07](#v4-f07).
 
@@ -352,7 +352,7 @@ Acceptance gates:
 - **V4-F08/G2** — Crash/restart at every state converges to the durable decision, with one active root and an auditable recovery record.
 - **V4-F08/G3** — End-to-end ledger flow uses two processes, a recorded effect, migration, candidate rejection, promotion and rollback without duplicate appends.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/process-4129dfc/V4-F08.json).
 
 ### V4-R01
 
@@ -1102,7 +1102,7 @@ Evidence: not yet produced.
 
 ### V4-M0
 
-**baseline completion gate** · release · baseline · owner: release · **planned**
+**baseline completion gate** · release · baseline · owner: release · **verified**
 
 Prerequisites: [V4-F01](#v4-f01), [V4-F02](#v4-f02), [V4-F03](#v4-f03), [V4-F04](#v4-f04), [V4-F05](#v4-f05), [V4-F06](#v4-f06), [V4-F07](#v4-f07), [V4-F08](#v4-f08), [V4-R01](#v4-r01), [V4-R02](#v4-r02), [V4-R03](#v4-r03), [V4-R04](#v4-r04).
 
@@ -1112,7 +1112,7 @@ Acceptance gates:
 
 - **V4-M0/G1** — All prerequisite gates are verified with evidence for this specification version; no failed, waived or unmeasured required gate is labeled complete.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/baseline-4129dfc/V4-M0.json).
 
 ### V4-M2
 

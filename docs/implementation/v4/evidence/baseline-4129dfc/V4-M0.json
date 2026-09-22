@@ -1,0 +1,14 @@
+{
+  "task": "V4-M0",
+  "specVersion": "0.1.0",
+  "subjectCommit": "4129dfca164caf3ffc9ec796c3db2a36e47b9196",
+  "recordedAt": "2026-09-22T21:53:23.449Z",
+  "checks": [
+    {
+      "gate": "V4-M0/G1",
+      "result": "pass",
+      "method": "All12 baseline prerequisites have exact-version passing gate evidence; source commits are ancestors of357-test integration subject. Release manifest inventories evidence, local package and open requirements.",
+      "artifact": "docs/implementation/v4/evidence/baseline-4129dfc/REVIEW.md"
+    }
+  ]
+}

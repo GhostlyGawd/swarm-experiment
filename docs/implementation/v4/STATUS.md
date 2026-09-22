@@ -12,8 +12,9 @@ Branch: `aether/v4-implementation`. Planning checkpoint: `9f23a7b`. First implem
 - **V4-F04 verified:** durable broker, replay/branch isolation, budget hooks, idempotency/reconciliation and runtime bridges. Real process crashes, concurrent writers and all independent-review fixes are evidenced at `3dce2d6`.
 - **V4-F05 verified:** signed causal journals, equivocation quarantine and delivery harness; concurrent quota admission is protected by the shared ticket mutex. This is not full Tree-CRDT projection or 1,000-agent qualification.
 - **V4-F06 verified:** exact-subject proof admission and compiler integration, peer reverification, preserved entry/property checks and explicit rejection of demonstrated model gaps. Portable certificates remain separate.
-- **V4-F07 active:** real authenticated process transport, typed calls, durable ProcessHost state transitions and migration recovery are implemented. Independent review fixes are integrated; the complete actual-process crash matrix is under final validation.
-- **V4-F08 integration active:** promotion authorization/journal and actual ProcessDeployment driver are implemented. Review found pre-intent allocation validation, recovery authorization freshness and filesystem durability gaps; repairs precede checkpoint verification. Tracker remains planned until F07 is verified.
+- **V4-F07 verified:** real authenticated workers, typed calls, durable state transitions, scoped ownership and migration recovery. Actual termination at every handoff phase and same-ID retries pass.
+- **V4-F08 verified:** exact-root governor admission and actual ProcessDeployment recovery. Typed-input poisoning, stale authorization, directory durability and repeated-manifest activation review findings were repaired and regression-tested.
+- **V4-M0 verified:** [baseline release](evidence/baseline-4129dfc/REVIEW.md) collects all 12 baseline prerequisites and leaves full v2/v3/v4 requirements open. Clean integration commit `4129dfc` passed **357 tests**, build, typecheck, roadmaps and installed-package worker launch. [Process evidence](evidence/process-4129dfc/REVIEW.md) retains the local package and benchmark enforcement's 17 unmet targets.
 - **V4-R01–R04 verified as bounded research:** [research evidence](evidence/research-749ce8b/REVIEW.md) records clean source `749ce8b`, 15 JavaScript tests, two Python tests, typechecking and fresh native/certificate/ZK/learning experiments. This closes research gates only.
 - **R01 result:** exact rational fractional positions and bounded three-phase quorum/epoch models; 5,040 delivery schedules and 128 merge partitions. Production algorithms and 1,000-agent qualification remain open.
 - **R02 result:** 1,345 native/reference cases pass. Fresh-process guest bracket maximum 5.401 ms does not qualify the approved running-controller boundary; 65,536-byte bounded guest meets the guest-only memory scope. Full runtime/driver qualification and 50 ns maximum remain open.
@@ -45,9 +46,8 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 
 ## Next executable actions
 
-1. Finish F07/F08 review repairs and actual-process crash/retry coverage.
-2. Verify build, complete tests, typechecking, exports and roadmaps at a clean source checkpoint; attach exact-commit evidence before closing gates.
-3. Close M0 only after all baseline gates pass, then continue eligible v2 tasks without a milestone pause.
-4. Implement the running-controller fresh-guest campaign under the approved D07 profile as native qualification progresses.
+1. Complete and independently review V4-T1-01 durable AST persistence; verify it at an exact source checkpoint.
+2. Measure the preregistered running-controller native campaign under the approved D07 profile; retain every raw sample and any miss.
+3. Continue eligible v2 tasks, including portable certificates, resumable checkpoints and capability containment, while preserving all later scope.
 
-Goal-turn classification: progress — six foundation tasks and four bounded research tasks are evidenced. Real process coordination and deployment recovery are undergoing final validation. No global blocker has been established.
+Goal-turn classification: progress — the baseline milestone is verified. Durable AST persistence and native boundary measurements are underway; full v4 remains open. No global blocker has been established.

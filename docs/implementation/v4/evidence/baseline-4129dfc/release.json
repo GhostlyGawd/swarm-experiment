@@ -1,0 +1,1091 @@
+{
+  "format": "aether.baseline-release/1",
+  "milestone": "V4-M0",
+  "specVersion": "0.1.0",
+  "subjectCommit": "4129dfca164caf3ffc9ec796c3db2a36e47b9196",
+  "recordedAt": "2026-09-22T21:53:23.449Z",
+  "prerequisites": [
+    {
+      "id": "V4-F01",
+      "title": "Preserve state during local topology movement",
+      "specVersion": "0.1.0",
+      "subjectCommit": "4a9b0776276251cf92ca647baa114c638a2559bf",
+      "evidence": "docs/implementation/v4/evidence/foundations-4a9b077/V4-F01.json",
+      "evidenceSHA256": "2f756af5dc0245d2463594ac304c9e53fe172b5df8db3f9577174f7104f94365",
+      "gates": [
+        {
+          "gate": "V4-F01/G1",
+          "result": "pass",
+          "method": "npm test; migration suite and independent source review (see REVIEW.md)",
+          "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+        },
+        {
+          "gate": "V4-F01/G2",
+          "result": "pass",
+          "method": "npm test; migration suite and independent source review (see REVIEW.md)",
+          "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+        },
+        {
+          "gate": "V4-F01/G3",
+          "result": "pass",
+          "method": "npm test; migration suite and independent source review (see REVIEW.md)",
+          "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+        }
+      ]
+    },
+    {
+      "id": "V4-F02",
+      "title": "Replace estimated acceptance with reproducible measurements",
+      "specVersion": "0.1.0",
+      "subjectCommit": "4a9b0776276251cf92ca647baa114c638a2559bf",
+      "evidence": "docs/implementation/v4/evidence/foundations-4a9b077/V4-F02.json",
+      "evidenceSHA256": "f74f3953c346dd9d33aef89e081c182630b8941a3656e24d42df98229d432c14",
+      "gates": [
+        {
+          "gate": "V4-F02/G1",
+          "result": "pass",
+          "method": "npm test; bench:v4:measure exited 0; bench:v4:enforce exited 1 as required; raw corpus and README review",
+          "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/REVIEW.md"
+        },
+        {
+          "gate": "V4-F02/G2",
+          "result": "pass",
+          "method": "npm test; bench:v4:measure exited 0; bench:v4:enforce exited 1 as required; raw corpus and README review",
+          "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/REVIEW.md"
+        },
+        {
+          "gate": "V4-F02/G3",
+          "result": "pass",
+          "method": "npm test; bench:v4:measure exited 0; bench:v4:enforce exited 1 as required; raw corpus and README review",
+          "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/REVIEW.md"
+        }
+      ]
+    },
+    {
+      "id": "V4-F03",
+      "title": "Implement versioned identities and canonical envelopes",
+      "specVersion": "0.1.0",
+      "subjectCommit": "4a9b0776276251cf92ca647baa114c638a2559bf",
+      "evidence": "docs/implementation/v4/evidence/foundations-4a9b077/V4-F03.json",
+      "evidenceSHA256": "bffca0ce7849126e2e13ba6daf2dd1de8c24711c2bb865c242cad86c50e8761b",
+      "gates": [
+        {
+          "gate": "V4-F03/G1",
+          "result": "pass",
+          "method": "npm test; typecheck; root/fabric package exports smoke check; encoding/identity source review",
+          "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+        },
+        {
+          "gate": "V4-F03/G2",
+          "result": "pass",
+          "method": "npm test; typecheck; root/fabric package exports smoke check; encoding/identity source review",
+          "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+        },
+        {
+          "gate": "V4-F03/G3",
+          "result": "pass",
+          "method": "npm test; typecheck; root/fabric package exports smoke check; encoding/identity source review",
+          "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+        }
+      ]
+    },
+    {
+      "id": "V4-F04",
+      "title": "Implement effect broker and replay contracts",
+      "specVersion": "0.1.0",
+      "subjectCommit": "3dce2d61686129cff45a76d256d3e2681c897fcc",
+      "evidence": "docs/implementation/v4/evidence/contracts-3dce2d6/V4-F04.json",
+      "evidenceSHA256": "e6c9b09bde694a7a3419f3bab35e00d0241006cb42fe47aef8ec637d1920df73",
+      "gates": [
+        {
+          "gate": "V4-F04/G1",
+          "result": "pass",
+          "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+          "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+        },
+        {
+          "gate": "V4-F04/G2",
+          "result": "pass",
+          "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+          "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+        },
+        {
+          "gate": "V4-F04/G3",
+          "result": "pass",
+          "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+          "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+        }
+      ]
+    },
+    {
+      "id": "V4-F05",
+      "title": "Implement replication envelopes and delivery harness",
+      "specVersion": "0.1.0",
+      "subjectCommit": "3dce2d61686129cff45a76d256d3e2681c897fcc",
+      "evidence": "docs/implementation/v4/evidence/contracts-3dce2d6/V4-F05.json",
+      "evidenceSHA256": "5cd91a46d3d59799d006780b06104d0b7c60e37e2d74f04beb433e4987da6b84",
+      "gates": [
+        {
+          "gate": "V4-F05/G1",
+          "result": "pass",
+          "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+          "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+        },
+        {
+          "gate": "V4-F05/G2",
+          "result": "pass",
+          "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+          "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+        },
+        {
+          "gate": "V4-F05/G3",
+          "result": "pass",
+          "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+          "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+        }
+      ]
+    },
+    {
+      "id": "V4-F06",
+      "title": "Validate proof evidence against exact execution subjects",
+      "specVersion": "0.1.0",
+      "subjectCommit": "3dce2d61686129cff45a76d256d3e2681c897fcc",
+      "evidence": "docs/implementation/v4/evidence/contracts-3dce2d6/V4-F06.json",
+      "evidenceSHA256": "00f730ca86f076f09e68a7acd094c8e271953f540bb85a119f4d98171ba5fd6d",
+      "gates": [
+        {
+          "gate": "V4-F06/G1",
+          "result": "pass",
+          "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+          "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+        },
+        {
+          "gate": "V4-F06/G2",
+          "result": "pass",
+          "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+          "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+        },
+        {
+          "gate": "V4-F06/G3",
+          "result": "pass",
+          "method": "Exact detached checkout: npm test, npm run typecheck, both roadmap checks; gate analysis in REVIEW.md",
+          "artifact": "docs/implementation/v4/evidence/contracts-3dce2d6/REVIEW.md"
+        }
+      ]
+    },
+    {
+      "id": "V4-F07",
+      "title": "Make state handoff durable across actual processes",
+      "specVersion": "0.1.0",
+      "subjectCommit": "4129dfca164caf3ffc9ec796c3db2a36e47b9196",
+      "evidence": "docs/implementation/v4/evidence/process-4129dfc/V4-F07.json",
+      "evidenceSHA256": "f8f18574ea2c7dd62c77cdbd0651f81fac6557977dc3acfd4644625406996096",
+      "gates": [
+        {
+          "gate": "V4-F07/G1",
+          "result": "pass",
+          "method": "Clean detached checkout:357 tests, typecheck, both roadmaps and actual installed-package process launch; gate analysis in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/process-4129dfc/REVIEW.md"
+        },
+        {
+          "gate": "V4-F07/G2",
+          "result": "pass",
+          "method": "Clean detached checkout:357 tests, typecheck, both roadmaps and actual installed-package process launch; gate analysis in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/process-4129dfc/REVIEW.md"
+        },
+        {
+          "gate": "V4-F07/G3",
+          "result": "pass",
+          "method": "Clean detached checkout:357 tests, typecheck, both roadmaps and actual installed-package process launch; gate analysis in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/process-4129dfc/REVIEW.md"
+        }
+      ]
+    },
+    {
+      "id": "V4-F08",
+      "title": "Integrate exact-root admission and baseline recovery slice",
+      "specVersion": "0.1.0",
+      "subjectCommit": "4129dfca164caf3ffc9ec796c3db2a36e47b9196",
+      "evidence": "docs/implementation/v4/evidence/process-4129dfc/V4-F08.json",
+      "evidenceSHA256": "a8c2f6b75b42f7cb496fa1f316b4a61cfd21d0df7784d9eeed6fb113ec552c8f",
+      "gates": [
+        {
+          "gate": "V4-F08/G1",
+          "result": "pass",
+          "method": "Clean detached checkout:357 tests, typecheck, both roadmaps and actual installed-package process launch; gate analysis in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/process-4129dfc/REVIEW.md"
+        },
+        {
+          "gate": "V4-F08/G2",
+          "result": "pass",
+          "method": "Clean detached checkout:357 tests, typecheck, both roadmaps and actual installed-package process launch; gate analysis in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/process-4129dfc/REVIEW.md"
+        },
+        {
+          "gate": "V4-F08/G3",
+          "result": "pass",
+          "method": "Clean detached checkout:357 tests, typecheck, both roadmaps and actual installed-package process launch; gate analysis in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/process-4129dfc/REVIEW.md"
+        }
+      ]
+    },
+    {
+      "id": "V4-R01",
+      "title": "Select and model replication and quorum algorithms",
+      "specVersion": "0.1.0",
+      "subjectCommit": "749ce8bbf437af4d1ee424261f4165413036632a",
+      "evidence": "docs/implementation/v4/evidence/research-749ce8b/V4-R01.json",
+      "evidenceSHA256": "7076cceeec1bf84646ab3e991f371ec263bd1048857529196b6e4c6cbb466c65",
+      "gates": [
+        {
+          "gate": "V4-R01/G1",
+          "result": "pass",
+          "method": "Exact clean detached checkout; bounded research tests and fresh experiments. Gate-specific analysis and limitations in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/research-749ce8b/REVIEW.md"
+        }
+      ]
+    },
+    {
+      "id": "V4-R02",
+      "title": "Measure native target feasibility",
+      "specVersion": "0.1.0",
+      "subjectCommit": "749ce8bbf437af4d1ee424261f4165413036632a",
+      "evidence": "docs/implementation/v4/evidence/research-749ce8b/V4-R02.json",
+      "evidenceSHA256": "90f3a14ea348beb999a5da44db29c37484e5a387d000de0f7783573fa90e50a3",
+      "gates": [
+        {
+          "gate": "V4-R02/G1",
+          "result": "pass",
+          "method": "Exact clean detached checkout; bounded research tests and fresh experiments. Gate-specific analysis and limitations in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/research-749ce8b/REVIEW.md"
+        }
+      ]
+    },
+    {
+      "id": "V4-R03",
+      "title": "Select certificate calculus and private attestation statement",
+      "specVersion": "0.1.0",
+      "subjectCommit": "749ce8bbf437af4d1ee424261f4165413036632a",
+      "evidence": "docs/implementation/v4/evidence/research-749ce8b/V4-R03.json",
+      "evidenceSHA256": "5c11ab1efbc2a68d975240e15845ce0292f00d1a5d9e9547dc726cadd621ddae",
+      "gates": [
+        {
+          "gate": "V4-R03/G1",
+          "result": "pass",
+          "method": "Exact clean detached checkout; bounded research tests and fresh experiments. Gate-specific analysis and limitations in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/research-749ce8b/REVIEW.md"
+        }
+      ]
+    },
+    {
+      "id": "V4-R04",
+      "title": "Define numerical and learning experiment contracts",
+      "specVersion": "0.1.0",
+      "subjectCommit": "749ce8bbf437af4d1ee424261f4165413036632a",
+      "evidence": "docs/implementation/v4/evidence/research-749ce8b/V4-R04.json",
+      "evidenceSHA256": "6c9d9f94dde997024e92df9e17d018ba9462aebc5c0c2833a61e3244c740e912",
+      "gates": [
+        {
+          "gate": "V4-R04/G1",
+          "result": "pass",
+          "method": "Exact clean detached checkout; bounded research tests and fresh experiments. Gate-specific analysis and limitations in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/research-749ce8b/REVIEW.md"
+        },
+        {
+          "gate": "V4-R04/G2",
+          "result": "pass",
+          "method": "Exact clean detached checkout; bounded research tests and fresh experiments. Gate-specific analysis and limitations in REVIEW.md.",
+          "artifact": "docs/implementation/v4/evidence/research-749ce8b/REVIEW.md"
+        }
+      ]
+    }
+  ],
+  "integrationEvidence": "docs/implementation/v4/evidence/process-4129dfc/manifest.json",
+  "integrationEvidenceSHA256": "0d8cef3b197e4baea9fbf0c599b1f01049b55c84793837598df4adc1880655b2",
+  "package": {
+    "path": "docs/implementation/v4/evidence/process-4129dfc/ghostlygawd-aether-0.1.0.tgz",
+    "sha256": "c0588a338c741c4b49495e85b480ca652f6d77bbb021cb4847ed2b90ecd81132",
+    "publication": "local artifact only"
+  },
+  "requirementStatus": [
+    {
+      "id": "V4-FR-1.1",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F03",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T1-01",
+          "status": "in_progress"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-1.2",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T1-02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-1.3",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F03",
+          "status": "verified"
+        },
+        {
+          "id": "V4-F08",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T1-03",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-1.4",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T1-04",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-1.5",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T1-05",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-1.6",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F05",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T1-06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-1.7",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T1-07",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-1.8",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T1-08",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-1.9",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T1-09",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-1.10",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T1-10",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-1.11",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T1-11",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.1",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T2-01",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.2",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F06",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T2-02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.3",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T2-03",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.4",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F07",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T2-04",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.5",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T2-05",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.6",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F08",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T2-06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.7",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T2-07",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.8",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T2-08",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.9",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T2-09",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.10",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F06",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T2-10",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.11",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T2-11",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-2.12",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T2-12",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.1",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F01",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T3-01",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.2",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T3-02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.3",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T3-03",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.4",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F04",
+          "status": "verified"
+        },
+        {
+          "id": "V4-F07",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T3-04",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.5",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T3-05",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.6",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T3-06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.7",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F04",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T3-07",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.8",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T3-08",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.9",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T3-09",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.10",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T3-10",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.11",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T3-11",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-3.12",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T3-12",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-4.1",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F01",
+          "status": "verified"
+        },
+        {
+          "id": "V4-F07",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T4-01",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-4.2",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T4-02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-4.3",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T4-03",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-4.4",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F04",
+          "status": "verified"
+        },
+        {
+          "id": "V4-F08",
+          "status": "verified"
+        },
+        {
+          "id": "V4-T4-04",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-FR-4.5",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-T4-05",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-01",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q01",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-02",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q01",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-03",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-04",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-05",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-06",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-07",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-08",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-09",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-10",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q02",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-11",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-F02",
+          "status": "verified"
+        },
+        {
+          "id": "V4-Q03",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-12",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q04",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-13",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q01",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-14",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q01",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-15",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q05",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-NFR-16",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q05",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-GOV-01",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q05",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-GOV-02",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q05",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-GOV-03",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q05",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-01",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-02",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-03",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-04",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-05",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-06",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-07",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-08",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-09",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-10",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-11",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    },
+    {
+      "id": "V4-KPI-12",
+      "status": "open",
+      "tasks": [
+        {
+          "id": "V4-Q06",
+          "status": "planned"
+        }
+      ]
+    }
+  ],
+  "qualification": "Baseline foundations and bounded research only. Full v2/v3/v4 functionality and performance remain open. Release performance enforcement exits1 with17 unmet targets; no full-v4 release claim."
+}
