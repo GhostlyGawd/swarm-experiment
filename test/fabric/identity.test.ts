@@ -143,3 +143,11 @@ test('F03/G3 state envelopes preserve cycles and shared IDs and reject malformed
   for (const bad of invalid) assert.throws(() => decodeRuntimeSnapshot(encodeCanonical(bad)));
   assert.deepEqual(encodeRuntimeSnapshot(s), encoded, 'failed validation does not mutate the original snapshot');
 });
+test('canonical identity rejects proxy-backed mutable data without executing traps', () => {
+  let traps = 0;
+  const record = new Proxy({ value: 1 }, { ownKeys: () => { traps++; throw new Error('trap'); }, getPrototypeOf: () => { traps++; throw new Error('trap'); }, get: () => { traps++; throw new Error('trap'); } });
+  assert.throws(() => encodeCanonical(record), /proxy/);
+  assert.throws(() => encodeCanonical({ nested: record }), /proxy/);
+  assert.throws(() => encodeCanonical(new Proxy([], { get: () => { traps++; throw new Error('trap'); } })), /proxy/);
+  assert.equal(traps, 0);
+});

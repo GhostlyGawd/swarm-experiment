@@ -22,6 +22,8 @@ export { IrContext, decode, encode, type AgentIr } from './tier1/agent-ir.ts';
 export * as build from './tier1/build.ts';
 
 // --- Tier 2: semantics, security, contracts ---------------------------------
+export { checkPortableCertificate, encodePortableCertificate, decodePortableCertificate, validateCheckedPortableCertificate, type PortableCertificateV1, type CheckedPortableCertificate, type PortableDerivationOptions } from './tier2/portable-proof-checker.ts';
+export { generatePortableCertificate } from './tier2/portable-proof-producer.ts';
 export * from './tier2/ocap.ts';
 export { ProofCache, type ProofCacheStats } from './tier2/proof-cache.ts';
 export { verifyIncremental, type IncrementalVerificationResult } from './tier2/incremental.ts';

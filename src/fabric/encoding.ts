@@ -1,4 +1,5 @@
 /** Versioned wire encoding. Deliberately independent of immutable v1 AST encoding. */
+import { types as nodeTypes } from 'node:util';
 export interface EncodingLimits {
   maxFrameBytes: number;
   maxDecompressedBytes: number;
@@ -32,6 +33,7 @@ export function decimal(value: unknown, limits: EncodingLimits = DEFAULT_ENCODIN
   if (value.replace('-', '').length > limits.maxIntegerDigits) throw new RangeError('integer digit limit exceeded');
 }
 export function exactObject(value: unknown, keys: readonly string[]): Record<string, unknown> {
+  if (nodeTypes.isProxy(value)) throw new TypeError('proxy objects are not canonical data');
   if (value === null || typeof value !== 'object' || Array.isArray(value) || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw new TypeError('expected plain object');
   const descriptors = Object.getOwnPropertyDescriptors(value);
   if (Reflect.ownKeys(value).length !== keys.length || keys.some(k => !Object.hasOwn(descriptors, k)) || Object.values(descriptors).some(d => !('value' in d) || !d.enumerable)) throw new TypeError('unknown, missing or accessor object fields');
@@ -61,6 +63,7 @@ export function encodeCanonical(value: unknown, overrides: Partial<EncodingLimit
       decimal(String(v), limits, true); put(String(v)); return;
     }
     if (typeof v !== 'object') throw new TypeError('unsupported wire value');
+    if (nodeTypes.isProxy(v)) throw new TypeError('proxy objects are not canonical data');
     if (active.has(v)) throw new TypeError('cycles must use logical references');
     active.add(v);
     if (Array.isArray(v)) {

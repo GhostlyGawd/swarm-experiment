@@ -59,6 +59,14 @@
     "./fabric": {
       "types": "./dist/fabric/index.d.ts",
       "import": "./dist/fabric/index.js"
+    },
+    "./proof": {
+      "types": "./dist/tier2/portable-proof-checker.d.ts",
+      "import": "./dist/tier2/portable-proof-checker.js"
+    },
+    "./proof/producer": {
+      "types": "./dist/tier2/portable-proof-producer.d.ts",
+      "import": "./dist/tier2/portable-proof-producer.js"
     }
   },
   "scripts": {

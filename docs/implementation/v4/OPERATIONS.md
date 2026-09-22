@@ -75,6 +75,18 @@ Compilation verifies the unforgeable local evidence brand, manifest and report s
 
 The wrapper rejects demonstrated model gaps: nested mutable aliasing, unenforced ownership assumptions, hidden mutations in unsupported constructs, truncated exploration and incomplete obligations. Modeled flat-record ledger transitions and formally handled loops are exercised by tests. Unsupported cases require stronger verification/model support, not removal of the admission guard. A portable certificate checker is still a separate implementation task.
 
+## Portable proof certificates
+
+The independent consumer is `@ghostlygawd/aether/proof`; proof search is separately available from `@ghostlygawd/aether/proof/producer`. A consumer can validate a bundle without installing or loading the original solver, verifier or producer implementation.
+
+`generatePortableCertificate(module, options)` derives every obligation from the actual AST and dependency bodies, then produces exact integer/propositional certificates. `checkPortableCertificate(module, bundle, context)` reconstructs those obligations independently against a trusted expected execution manifest and exact specification text. Serialized local acceptance objects have no authority; send the actual bundle and check it again. Missing, duplicated, reordered, stale or unsupported obligations fail admission.
+
+The initial version proves safety and total return for pure unbounded `Int`/`Bool` functions with formal preconditions, linear arithmetic, branches, assertions, acyclic modular calls and inductive while invariants/ranking functions. Multiplication requires a syntactically closed constant factor; this profile does not infer constant factors from local variable bindings. Unsupported syntax is checked even after an unconditional return. It binds natural-language specification text by identity; it proves the formal AST contracts rather than interpreting prose. Heap/effect operations, fixed-width arithmetic, nonlinear theories, recursion, property-only clauses and other unsupported constructs remain unproved. Resource bounds are explicit and may only be tightened.
+
+Pass a checked result to `ProductionRuntime.compile` through `portableEvidence: { vetted, expectedManifest }`. This path requires all proved dependency bodies in the loaded artifact, validates scalar entry/result types, and retains runtime contract checks. It rejects external replacement hooks through missing bodies, unconditional elision and mixing portable admission with local/legacy evidence. Compiler correctness and host scheduling remain declared assumptions of the scalar proof profile.
+
+The certificate checker uses exact bounded integer arithmetic and complete propositional case coverage. Proof-generation failure returns no certificate; it does not establish the opposite claim. Current implementations and bounded tests do not establish the later proof-latency target or full native proof-carrying execution.
+
 ## Process state and recovery
 
 `ProcessHost` from the root package or `@ghostlygawd/aether/tier4` runs topology units in actual Node child processes. Its public arguments, results and snapshots use C1 tagged values and logical references. Open it with the exact module/manifest, capability registry, topology plan, private durable directory and trusted service configuration. `issueTokens(symbol)` supplies scoped call grants; `call(symbol, args, { operationId, tokens })` requires them on direct and cross-unit entry.

@@ -54,6 +54,7 @@ import { copyHeap, snapshotHeap, restoreHeap, type HeapRecord, type ProductionSn
 import { EffectInvocationError, type RuntimeEffectRouter } from './effects.ts';
 import { validateVettedEvidence, type VettedEvidence } from '../fabric/evidence.ts';
 import type { ExecutionManifestV1 } from '../fabric/identity.ts';
+import { validateCheckedPortableCertificate, type CheckedPortableCertificate } from '../tier2/portable-proof-checker.ts';
 
 // ---------------------------------------------------------------------------
 // compiled representation
@@ -143,6 +144,8 @@ export interface CompileOptions {
   readonly verification?: ReadonlyMap<SymbolId, VerificationReport>;
   /** v4 admission: expectedManifest must come from the host's current build/policy context. */
   readonly evidence?: { readonly vetted: VettedEvidence; readonly expectedManifest: ExecutionManifestV1 };
+  /** Independent portable admission for a closed scalar artifact. Runtime checks remain enabled. */
+  readonly portableEvidence?: { readonly vetted: CheckedPortableCertificate; readonly expectedManifest: ExecutionManifestV1 };
   readonly policy?: ElisionPolicy;
   /**
    * Functions reachable from outside this artifact. Anything *not* listed can
@@ -206,6 +209,19 @@ export class ProductionRuntime {
    */
   static compile(module: Term, opts: CompileOptions): ProductionRuntime {
     const moduleRef = new GraphStore().intern(module);
+    if (opts.portableEvidence) {
+      const { vetted, expectedManifest } = opts.portableEvidence;
+      validateCheckedPortableCertificate(vetted, expectedManifest);
+      if (expectedManifest.astRoot !== moduleRef) throw new TypeError('portable evidence does not match compiled module');
+      if (opts.evidence || opts.verification) throw new TypeError('portable evidence cannot be combined with another admission path');
+      if (opts.policy === 'elide') throw new TypeError('portable admission does not authorize unconditional elision');
+      const members = module.kind === 'Module' ? module.members : [module];
+      const declarations = members.filter((node): node is Extract<Term, { kind: 'FunctionDecl' }> => node.kind === 'FunctionDecl');
+      const store = new GraphStore();
+      if (expectedManifest.dependencies.some(dependency => !declarations.some(node => node.symbol === dependency.symbol && store.intern(node) === dependency.declaration))
+        || (opts.includeSymbols && declarations.some(node => !opts.includeSymbols!.includes(node.symbol)))) throw new TypeError('portable compilation requires every proved dependency in the loaded artifact');
+      opts = { ...opts, policy: 'enforce', entryPoints: declarations.map(node => node.symbol) };
+    }
     if (opts.evidence) {
       const { vetted, expectedManifest } = opts.evidence;
       validateVettedEvidence(vetted, expectedManifest);
@@ -392,6 +408,10 @@ export class ProductionRuntime {
   }
 
   private enter(fn: CompiledFunction, args: readonly Value[]): Value {
+    if (this.opts.portableEvidence && (args.length !== fn.params.length || fn.params.some((param, i) =>
+      param.ty.t === 'Int' ? typeof args[i] !== 'bigint' : param.ty.t === 'Bool' ? typeof args[i] !== 'boolean' : true))) {
+      throw new ProductionFault('type_error', 'portable scalar entry arguments do not match the proved signature');
+    }
     this.checkExecutionGuard();
     const slots = new Array<Value>(fn.slots).fill(null);
     for (let i = 0; i < fn.params.length; i++) slots[i] = args[i] ?? null;
@@ -406,6 +426,10 @@ export class ProductionRuntime {
 
     const outcome = fn.body(frame);
     const returned = outcome === FALLTHROUGH ? null : outcome;
+    if (this.opts.portableEvidence) {
+      const expected = this.declarations.get(fn.symbol)!.returns.t;
+      if (expected === 'Int' ? typeof returned !== 'bigint' : expected === 'Bool' ? typeof returned !== 'boolean' : true) throw new ProductionFault('type_error', 'portable scalar result does not match the proved signature');
+    }
 
     if (fn.postconditions.length) {
       frame.r = returned;

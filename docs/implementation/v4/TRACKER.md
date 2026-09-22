@@ -23,7 +23,7 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-T1-02](#v4-t1-02), [V4-T1-03](#v4-t1-03), [V4-T1-04](#v4-t1-04), [V4-T1-06](#v4-t1-06), [V4-T2-04](#v4-t2-04), [V4-T3-01](#v4-t3-01).
+**Ready now:** [V4-T1-02](#v4-t1-02), [V4-T1-04](#v4-t1-04), [V4-T2-04](#v4-t2-04), [V4-T3-01](#v4-t3-01).
 
 ## Milestones
 
@@ -52,10 +52,10 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-R04](#v4-r04) | Define numerical and learning experiment contracts | synthesis | baseline | verified | — |
 | [V4-T1-01](#v4-t1-01) | Content-addressed AST persistence | substrate | v2 | verified | [V4-F03](#v4-f03) |
 | [V4-T1-02](#v4-t1-02) | Agent-IR and bidirectional projections | language | v2 | planned | [V4-F02](#v4-f02), [V4-T1-01](#v4-t1-01) |
-| [V4-T1-03](#v4-t1-03) | Causal lineage and invariant fences | governance | v2 | planned | [V4-T1-01](#v4-t1-01), [V4-F06](#v4-f06) |
+| [V4-T1-03](#v4-t1-03) | Causal lineage and invariant fences | governance | v2 | in_progress | [V4-T1-01](#v4-t1-01), [V4-F06](#v4-f06) |
 | [V4-T1-04](#v4-t1-04) | Structural and semantic index | retrieval | v2 | planned | [V4-T1-01](#v4-t1-01) |
 | [V4-T1-05](#v4-t1-05) | Continuous semantic garbage collection | synthesis | v3 | planned | [V4-T1-03](#v4-t1-03), [V4-T2-10](#v4-t2-10), [V4-F08](#v4-f08) |
-| [V4-T1-06](#v4-t1-06) | Tree-CRDT concurrency | distribution | v2 | planned | [V4-F05](#v4-f05), [V4-R01](#v4-r01), [V4-T1-01](#v4-t1-01) |
+| [V4-T1-06](#v4-t1-06) | Tree-CRDT concurrency | distribution | v2 | in_progress | [V4-F05](#v4-f05), [V4-R01](#v4-r01), [V4-T1-01](#v4-t1-01) |
 | [V4-T1-07](#v4-t1-07) | Module LoRA training and loading | synthesis | v3 | planned | [V4-R04](#v4-r04), [V4-T1-09](#v4-t1-09), [V4-T2-05](#v4-t2-05), [V4-F08](#v4-f08) |
 | [V4-T1-08](#v4-t1-08) | Semantic binary lifting | compiler | v4 | planned | [V4-R02](#v4-r02), [V4-T2-04](#v4-t2-04), [V4-T3-10](#v4-t3-10) |
 | [V4-T1-09](#v4-t1-09) | Typed cognitive scratchpads | substrate | v2 | planned | [V4-T1-01](#v4-t1-01), [V4-T1-03](#v4-t1-03) |
@@ -443,7 +443,7 @@ Evidence: not yet produced.
 
 ### V4-T1-03
 
-**Causal lineage and invariant fences** · implementation · v2 · owner: governance · **planned**
+**Causal lineage and invariant fences** · implementation · v2 · owner: governance · **in_progress**
 
 Prerequisites: [V4-T1-01](#v4-t1-01), [V4-F06](#v4-f06).
 
@@ -488,7 +488,7 @@ Evidence: not yet produced.
 
 ### V4-T1-06
 
-**Tree-CRDT concurrency** · implementation · v2 · owner: distribution · **planned**
+**Tree-CRDT concurrency** · implementation · v2 · owner: distribution · **in_progress**
 
 Prerequisites: [V4-F05](#v4-f05), [V4-R01](#v4-r01), [V4-T1-01](#v4-t1-01).
 
