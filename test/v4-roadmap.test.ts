@@ -8,7 +8,7 @@ import { readArtifact, render, TRACKER_PATH } from '../roadmap/v4/render.ts';
 import type { EvidenceManifest, Plan, Task } from '../roadmap/v4/model.ts';
 
 const change = (id: string, patch: Partial<Task>): Plan => ({
-  ...PLAN, tasks: PLAN.tasks.map(task => task.id === id ? { ...task, ...patch } : task),
+  ...PLAN, tasks: PLAN.tasks.map(task => ({ ...task, status: 'planned', evidence: undefined, ...(task.id === id ? patch : {}) })),
 });
 
 test('v4 plan exactly covers the preserved functional requirements and source digest', () => {

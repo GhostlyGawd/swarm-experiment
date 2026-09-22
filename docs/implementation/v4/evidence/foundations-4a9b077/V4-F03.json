@@ -1,0 +1,26 @@
+{
+  "task": "V4-F03",
+  "specVersion": "0.1.0",
+  "subjectCommit": "4a9b0776276251cf92ca647baa114c638a2559bf",
+  "recordedAt": "2026-09-22T19:50:09.636868+00:00",
+  "checks": [
+    {
+      "gate": "V4-F03/G1",
+      "result": "pass",
+      "method": "npm test; typecheck; root/fabric package exports smoke check; encoding/identity source review",
+      "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+    },
+    {
+      "gate": "V4-F03/G2",
+      "result": "pass",
+      "method": "npm test; typecheck; root/fabric package exports smoke check; encoding/identity source review",
+      "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+    },
+    {
+      "gate": "V4-F03/G3",
+      "result": "pass",
+      "method": "npm test; typecheck; root/fabric package exports smoke check; encoding/identity source review",
+      "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+    }
+  ]
+}

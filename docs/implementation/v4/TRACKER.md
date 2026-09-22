@@ -6,7 +6,7 @@ Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) f
 
 > This is implementation status. Publishing the specification does not complete runtime work. A verified task needs evidence for every gate; functional delivery does not imply that the release NFR/KPI gates passed.
 
-**0/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
+**3/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
 
 ## First implementation slice
 
@@ -23,13 +23,13 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-R02](#v4-r02), [V4-R04](#v4-r04).
+**Ready now:** [V4-R01](#v4-r01), [V4-R02](#v4-r02), [V4-R03](#v4-r03), [V4-R04](#v4-r04), [V4-T1-01](#v4-t1-01).
 
 ## Milestones
 
 | Milestone | Verified | Total | Release gate |
 |---|---:|---:|---|
-| baseline | 0 | 13 | [V4-M0](#v4-m0) |
+| baseline | 3 | 13 | [V4-M0](#v4-m0) |
 | v2 | 0 | 20 | [V4-M2](#v4-m2) |
 | v3 | 0 | 14 | [V4-M3](#v4-m3) |
 | v4 | 0 | 15 | [V4-M4](#v4-m4) |
@@ -38,12 +38,12 @@ The four research tasks can produce decisions early; the baseline release gate a
 
 | Task | Deliverable | Owner | Milestone | Status | Prerequisites |
 |---|---|---|---|---|---|
-| [V4-F01](#v4-f01) | Preserve state during local topology movement | runtime | baseline | in_progress | — |
-| [V4-F02](#v4-f02) | Replace estimated acceptance with reproducible measurements | measurement | baseline | in_progress | — |
-| [V4-F03](#v4-f03) | Implement versioned identities and canonical envelopes | substrate | baseline | in_progress | — |
-| [V4-F04](#v4-f04) | Implement effect broker and replay contracts | runtime | baseline | planned | [V4-F03](#v4-f03) |
-| [V4-F05](#v4-f05) | Implement replication envelopes and delivery harness | distribution | baseline | planned | [V4-F03](#v4-f03) |
-| [V4-F06](#v4-f06) | Validate proof evidence against exact execution subjects | verification | baseline | planned | [V4-F03](#v4-f03) |
+| [V4-F01](#v4-f01) | Preserve state during local topology movement | runtime | baseline | verified | — |
+| [V4-F02](#v4-f02) | Replace estimated acceptance with reproducible measurements | measurement | baseline | verified | — |
+| [V4-F03](#v4-f03) | Implement versioned identities and canonical envelopes | substrate | baseline | verified | — |
+| [V4-F04](#v4-f04) | Implement effect broker and replay contracts | runtime | baseline | in_progress | [V4-F03](#v4-f03) |
+| [V4-F05](#v4-f05) | Implement replication envelopes and delivery harness | distribution | baseline | in_progress | [V4-F03](#v4-f03) |
+| [V4-F06](#v4-f06) | Validate proof evidence against exact execution subjects | verification | baseline | in_progress | [V4-F03](#v4-f03) |
 | [V4-F07](#v4-f07) | Make state handoff durable across actual processes | distribution | baseline | planned | [V4-F01](#v4-f01), [V4-F04](#v4-f04) |
 | [V4-F08](#v4-f08) | Integrate exact-root admission and baseline recovery slice | governance | baseline | planned | [V4-F02](#v4-f02), [V4-F05](#v4-f05), [V4-F06](#v4-f06), [V4-F07](#v4-f07) |
 | [V4-R01](#v4-r01) | Select and model replication and quorum algorithms | distribution | baseline | planned | [V4-F03](#v4-f03) |
@@ -219,7 +219,7 @@ flowchart TD
 
 ### V4-F01
 
-**Preserve state during local topology movement** · implementation · baseline · owner: runtime · **in_progress**
+**Preserve state during local topology movement** · implementation · baseline · owner: runtime · **verified**
 
 Prerequisites: none.
 
@@ -232,11 +232,11 @@ Acceptance gates:
 - **V4-F01/G2** — Nested/shared/cyclic records and unrelated functions retain state; fresh allocations cannot collide.
 - **V4-F01/G3** — Same-unit movement is a no-op; invalid target, active call, snapshot failure or compile failure leaves the old plan and heaps usable.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/foundations-4a9b077/V4-F01.json).
 
 ### V4-F02
 
-**Replace estimated acceptance with reproducible measurements** · implementation · baseline · owner: measurement · **in_progress**
+**Replace estimated acceptance with reproducible measurements** · implementation · baseline · owner: measurement · **verified**
 
 Prerequisites: none.
 
@@ -250,11 +250,11 @@ Acceptance gates:
 - **V4-F02/G2** — A truthful measured miss is recorded as fail, never rewritten to pass; --enforce returns nonzero for failed or unmeasured required targets.
 - **V4-F02/G3** — Ratios use summed actual tokens and include dictionary/framing costs; reports bind commit, tokenizer, corpus, environment and raw samples.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/foundations-4a9b077/V4-F02.json).
 
 ### V4-F03
 
-**Implement versioned identities and canonical envelopes** · implementation · baseline · owner: substrate · **in_progress**
+**Implement versioned identities and canonical envelopes** · implementation · baseline · owner: substrate · **verified**
 
 Prerequisites: none.
 
@@ -267,11 +267,11 @@ Acceptance gates:
 - **V4-F03/G2** — Different semantic/dependency/policy versions cannot reuse an execution-manifest digest; metadata-only observations do not change AST identity.
 - **V4-F03/G3** — Malformed tags, duplicate map keys, unsafe integer conversions, unsupported versions and oversized payloads fail before mutation.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/foundations-4a9b077/V4-F03.json).
 
 ### V4-F04
 
-**Implement effect broker and replay contracts** · implementation · baseline · owner: runtime · **planned**
+**Implement effect broker and replay contracts** · implementation · baseline · owner: runtime · **in_progress**
 
 Prerequisites: [V4-F03](#v4-f03).
 
@@ -288,7 +288,7 @@ Evidence: not yet produced.
 
 ### V4-F05
 
-**Implement replication envelopes and delivery harness** · implementation · baseline · owner: distribution · **planned**
+**Implement replication envelopes and delivery harness** · implementation · baseline · owner: distribution · **in_progress**
 
 Prerequisites: [V4-F03](#v4-f03).
 
@@ -305,7 +305,7 @@ Evidence: not yet produced.
 
 ### V4-F06
 
-**Validate proof evidence against exact execution subjects** · implementation · baseline · owner: verification · **planned**
+**Validate proof evidence against exact execution subjects** · implementation · baseline · owner: verification · **in_progress**
 
 Prerequisites: [V4-F03](#v4-f03).
 

@@ -1,0 +1,26 @@
+{
+  "task": "V4-F01",
+  "specVersion": "0.1.0",
+  "subjectCommit": "4a9b0776276251cf92ca647baa114c638a2559bf",
+  "recordedAt": "2026-09-22T19:50:09.636868+00:00",
+  "checks": [
+    {
+      "gate": "V4-F01/G1",
+      "result": "pass",
+      "method": "npm test; migration suite and independent source review (see REVIEW.md)",
+      "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+    },
+    {
+      "gate": "V4-F01/G2",
+      "result": "pass",
+      "method": "npm test; migration suite and independent source review (see REVIEW.md)",
+      "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+    },
+    {
+      "gate": "V4-F01/G3",
+      "result": "pass",
+      "method": "npm test; migration suite and independent source review (see REVIEW.md)",
+      "artifact": "docs/implementation/v4/evidence/foundations-4a9b077/tests.log"
+    }
+  ]
+}
