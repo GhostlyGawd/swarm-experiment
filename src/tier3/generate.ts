@@ -18,6 +18,7 @@
  */
 
 import type { Param, Ty } from '../tier1/ast.ts';
+import type { CapabilityName } from '../tier1/ids.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import type { Rng } from '../util/rng.ts';
 import type { Ref, Value } from './values.ts';
@@ -40,6 +41,9 @@ export type Plain =
   | { readonly k: 'bool'; readonly v: boolean }
   | { readonly k: 'str'; readonly v: string }
   | { readonly k: 'unit' }
+  | { readonly k: 'result'; readonly variant: 'ok' | 'err'; readonly value: Plain }
+  | { readonly k: 'seq'; readonly items: readonly Plain[] }
+  | { readonly k: 'fn'; readonly capabilities: readonly CapabilityName[]; readonly result: Plain }
   | { readonly k: 'record'; readonly ty: Ty; readonly fields: Readonly<Record<string, Plain>> }
   /** The same reference as an earlier argument — the aliased case. */
   | { readonly k: 'alias'; readonly index: number };
@@ -93,7 +97,15 @@ export function generatePlain(ty: Ty, random: Rng, opts: GenerationOptions = {})
     case 'Bool': return { k: 'bool', v: random.bool() };
     case 'Str': return { k: 'str', v: generateString(random, opts) };
     case 'Unit': return { k: 'unit' };
-    case 'Result': return generatePlain(random.bool() ? base.ok : base.err, random, opts);
+    case 'Result': {
+      const variant = random.bool() ? 'ok' : 'err';
+      return { k: 'result', variant, value: generatePlain(variant === 'ok' ? base.ok : base.err, random, opts) };
+    }
+    case 'Seq': {
+      const length = random.int(0, Math.max(0, Math.min(8, opts.size ?? 4)));
+      return { k: 'seq', items: Array.from({ length }, () => generatePlain(base.element, random, opts)) };
+    }
+    case 'Fn': return { k: 'fn', capabilities: base.capabilities, result: generatePlain(base.returns, random, opts) };
     case 'Record': {
       const fields: Record<string, Plain> = {};
       for (const [name, fieldTy] of base.fields) fields[name] = generatePlain(fieldTy, random, opts);
@@ -144,6 +156,12 @@ function materialiseOne(arg: Plain, rt: Allocator, earlier: readonly Value[]): V
     case 'bool': return arg.v;
     case 'str': return arg.v;
     case 'unit': return null;
+    case 'result': return { variant: arg.variant, value: materialiseOne(arg.value, rt, earlier) };
+    case 'seq': return arg.items.map((item) => materialiseOne(item, rt, earlier));
+    case 'fn': {
+      const result = materialiseOne(arg.result, rt, earlier);
+      return { closure: true, capabilities: arg.capabilities, invoke: () => result };
+    }
     case 'alias': {
       const target = earlier[arg.index];
       if (target === undefined) throw new RangeError(`alias to argument ${arg.index}, which is not yet bound`);
@@ -165,6 +183,9 @@ export function formatPlain(arg: Plain): string {
     case 'bool': return String(arg.v);
     case 'str': return JSON.stringify(arg.v);
     case 'unit': return '()';
+    case 'result': return `${arg.variant}(${formatPlain(arg.value)})`;
+    case 'seq': return `[${arg.items.map(formatPlain).join(', ')}]`;
+    case 'fn': return `<generated closure => ${formatPlain(arg.result)}>`;
     case 'alias': return `<same as argument ${arg.index}>`;
     case 'record':
       return `{ ${Object.entries(arg.fields).map(([k, v]) => `${k}: ${formatPlain(v)}`).join(', ')} }`;
@@ -197,6 +218,13 @@ export function shrinkPlain(arg: Plain): Plain[] {
     }
     case 'bool': return arg.v ? [{ k: 'bool', v: false }] : [];
     case 'unit': return [];
+    case 'result': return shrinkPlain(arg.value).map((value) => ({ ...arg, value }));
+    case 'seq': {
+      const out: Plain[] = arg.items.length ? [{ k: 'seq', items: [] }] : [];
+      if (arg.items.length > 1) out.push({ k: 'seq', items: arg.items.slice(0, Math.floor(arg.items.length / 2)) });
+      return out;
+    }
+    case 'fn': return shrinkPlain(arg.result).map((result) => ({ ...arg, result }));
     case 'alias': return []; // un-aliasing changes which case this is
     case 'record': {
       const out: Plain[] = [];

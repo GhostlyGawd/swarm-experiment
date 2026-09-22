@@ -8,10 +8,10 @@
  */
 
 import type {
-  BinOp, Objective, Param, Purity, Rigor, SurfaceDomain, Term, Ty, UnOp,
+  BinOp, Objective, Param, Purity, Rigor, StringOp, SurfaceDomain, Term, Ty, UnOp,
 } from './ast.ts';
 import { Bool, Int, Str, Unit } from './ast.ts';
-import type { CapabilityName, ProvenanceId, SymbolId, TypeName } from './ids.ts';
+import type { CapabilityName, NodeRef, ProvenanceId, SymbolId, TypeName } from './ids.ts';
 
 export const int = (value: bigint | number): Term => ({
   kind: 'Lit',
@@ -70,6 +70,38 @@ export const matchResult = (
   errSymbol: SymbolId,
   errBody: Term,
 ): Term => ({ kind: 'MatchResult', value, okSymbol, ok: okBody, errSymbol, err: errBody });
+export const seq = (element: Ty, ...items: Term[]): Term =>
+  ({ kind: 'SeqLit', ty: { t: 'Seq', element }, items });
+export const index = (sequence: Term, at: Term): Term => ({ kind: 'SeqIndex', sequence, index: at });
+export const length = (sequence: Term): Term => ({ kind: 'SeqLength', sequence });
+export const map = (sequence: Term, callee: SymbolId): Term => ({ kind: 'SeqMap', sequence, callee });
+export const fold = (sequence: Term, initial: Term, callee: SymbolId): Term =>
+  ({ kind: 'SeqFold', sequence, initial, callee });
+export const lambda = (spec: {
+  params?: readonly Param[];
+  returns: Ty;
+  capabilities?: readonly CapabilityName[];
+  body: Term;
+}): Term => ({
+  kind: 'Lambda', params: spec.params ?? [], returns: spec.returns,
+  capabilities: spec.capabilities ?? [], body: spec.body,
+});
+export const apply = (fn: Term, ...args: Term[]): Term => ({ kind: 'Apply', fn, args });
+export const stringOp = (op: StringOp, ...args: Term[]): Term => ({ kind: 'StringOp', op, args });
+export const strlen = (value: Term): Term => stringOp('strlen', value);
+export const contains = (value: Term, search: Term): Term => stringOp('contains', value, search);
+export const slice = (value: Term, start: Term, end: Term): Term => stringOp('slice', value, start, end);
+export const lower = (value: Term): Term => stringOp('lower', value);
+export const upper = (value: Term): Term => stringOp('upper', value);
+export const trim = (value: Term): Term => stringOp('trim', value);
+export const intCast = (ty: Extract<Ty, { t: 'IntN' }>, value: Term): Term =>
+  ({ kind: 'IntCast', ty, value });
+export const fixed = (
+  op: 'add' | 'sub' | 'mul' | 'div' | 'mod',
+  ty: Extract<Ty, { t: 'IntN' }>,
+  left: Term,
+  right: Term,
+): Term => ({ kind: 'FixedBin', op, ty, left, right });
 export const old = (expr: Term): Term => ({ kind: 'Old', expr });
 export const result = (): Term => ({ kind: 'ResultRef' });
 export const invoke = (capability: CapabilityName, ...args: Term[]): Term => ({
@@ -115,6 +147,7 @@ export const contract = (spec: {
 
 export const fn = (spec: {
   symbol: SymbolId;
+  typeParams?: readonly string[];
   params?: readonly Param[];
   returns: Ty;
   capabilities?: readonly CapabilityName[];
@@ -126,6 +159,7 @@ export const fn = (spec: {
 }): Term => ({
   kind: 'FunctionDecl',
   symbol: spec.symbol,
+  typeParams: spec.typeParams ?? [],
   params: spec.params ?? [],
   returns: spec.returns,
   capabilities: spec.capabilities ?? [],
@@ -152,6 +186,8 @@ export const surface = (spec: {
   current: spec.current,
   objective: spec.objective ?? 'minimize_latency',
 });
+export const import_ = (module: NodeRef, symbols: readonly SymbolId[] = []): Term =>
+  ({ kind: 'Import', module, symbols });
 
 export const module_ = (spec: {
   symbol: SymbolId;

@@ -23,6 +23,7 @@ export type BinOp =
   | 'concat';
 
 export type UnOp = 'not' | 'neg';
+export type StringOp = 'strlen' | 'contains' | 'slice' | 'lower' | 'upper' | 'trim';
 
 /** Structural types. Inline values, not separately addressed nodes. */
 export type Ty =
@@ -33,7 +34,11 @@ export type Ty =
   /** Newtype over a representation type, e.g. `type:currency:cents` over Int. */
   | { t: 'Nominal'; name: TypeName; repr: Ty }
   | { t: 'Record'; name: TypeName; fields: ReadonlyArray<readonly [string, Ty]> }
-  | { t: 'Result'; ok: Ty; err: Ty };
+  | { t: 'Result'; ok: Ty; err: Ty }
+  | { t: 'Seq'; element: Ty }
+  | { t: 'Fn'; params: readonly Ty[]; returns: Ty; capabilities: readonly CapabilityName[] }
+  | { t: 'TypeVar'; name: string }
+  | { t: 'IntN'; bits: 8 | 16 | 32 | 64; signed: boolean; overflow: 'wrap' | 'trap' | 'saturate' };
 
 export const Int: Ty = { t: 'Int' };
 export const Bool: Ty = { t: 'Bool' };
@@ -74,6 +79,22 @@ export type Term =
       okSymbol: SymbolId; ok: Term;
       errSymbol: SymbolId; err: Term;
     }
+  | { kind: 'SeqLit'; ty: Extract<Ty, { t: 'Seq' }>; items: readonly Term[] }
+  | { kind: 'SeqIndex'; sequence: Term; index: Term }
+  | { kind: 'SeqLength'; sequence: Term }
+  | { kind: 'SeqMap'; sequence: Term; callee: SymbolId }
+  | { kind: 'SeqFold'; sequence: Term; initial: Term; callee: SymbolId }
+  | {
+      kind: 'Lambda'; params: readonly Param[]; returns: Ty;
+      capabilities: readonly CapabilityName[]; body: Term;
+    }
+  | { kind: 'Apply'; fn: Term; args: readonly Term[] }
+  | { kind: 'StringOp'; op: StringOp; args: readonly Term[] }
+  | { kind: 'IntCast'; ty: Extract<Ty, { t: 'IntN' }>; value: Term }
+  | {
+      kind: 'FixedBin'; op: 'add' | 'sub' | 'mul' | 'div' | 'mod';
+      ty: Extract<Ty, { t: 'IntN' }>; left: Term; right: Term;
+    }
   /** `old(e)` — the pre-state value of `e`. Legal only inside `ensures`. */
   | { kind: 'Old'; expr: Term }
   /** `result` — the value being returned. Legal only inside `ensures`. */
@@ -96,6 +117,7 @@ export type Term =
   | {
       kind: 'FunctionDecl';
       symbol: SymbolId;
+      typeParams: readonly string[];
       params: readonly Param[];
       returns: Ty;
       capabilities: readonly CapabilityName[];
@@ -115,6 +137,7 @@ export type Term =
       objective: Objective;
     }
   | { kind: 'SymbolTable'; entries: ReadonlyArray<readonly [SymbolId, string]> }
+  | { kind: 'Import'; module: NodeRef; symbols: readonly SymbolId[] }
   | {
       kind: 'Module';
       symbol: SymbolId;
@@ -172,6 +195,7 @@ export const LINK_SCHEMA: Readonly<Record<NodeKind, readonly LinkField[]>> = {
   TypeDecl: [],
   Surface: [],
   SymbolTable: [],
+  Import: [],
   Bin: [one('left'), one('right')],
   Un: [one('operand')],
   Cond: [one('cond'), one('then'), one('otherwise')],
@@ -180,6 +204,16 @@ export const LINK_SCHEMA: Readonly<Record<NodeKind, readonly LinkField[]>> = {
   RecordLit: [{ field: 'fields', arity: 'pairs' }],
   ResultValue: [one('value')],
   MatchResult: [one('value'), one('ok'), one('err')],
+  SeqLit: [many('items')],
+  SeqIndex: [one('sequence'), one('index')],
+  SeqLength: [one('sequence')],
+  SeqMap: [one('sequence')],
+  SeqFold: [one('sequence'), one('initial')],
+  Lambda: [one('body')],
+  Apply: [one('fn'), many('args')],
+  StringOp: [many('args')],
+  IntCast: [one('value')],
+  FixedBin: [one('left'), one('right')],
   Old: [one('expr')],
   Invoke: [many('args')],
   Let: [one('init')],
@@ -198,7 +232,8 @@ export const LINK_SCHEMA: Readonly<Record<NodeKind, readonly LinkField[]>> = {
 
 const EXPRESSION_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>([
   'Lit', 'Var', 'Bin', 'Un', 'Cond', 'Call', 'Field', 'RecordLit', 'ResultValue', 'MatchResult',
-  'Old', 'ResultRef', 'Invoke',
+  'SeqLit', 'SeqIndex', 'SeqLength', 'SeqMap', 'SeqFold', 'Lambda', 'Apply', 'StringOp',
+  'IntCast', 'FixedBin', 'Old', 'ResultRef', 'Invoke',
 ]);
 
 const STATEMENT_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>([

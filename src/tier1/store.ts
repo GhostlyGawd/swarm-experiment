@@ -95,12 +95,16 @@ function boundSymbols(term: Term): readonly SymbolId[] {
       ];
     case 'MatchResult':
       return [term.okSymbol, term.errSymbol];
+    case 'Lambda':
+      return term.params.map((param) => param.symbol);
     default:
       return [];
   }
 }
 
-const SCOPE_OPENERS: ReadonlySet<NodeKind> = new Set<NodeKind>(['FunctionDecl', 'Module', 'Block', 'MatchResult']);
+const SCOPE_OPENERS: ReadonlySet<NodeKind> = new Set<NodeKind>([
+  'FunctionDecl', 'Module', 'Block', 'MatchResult', 'Lambda',
+]);
 
 /**
  * Alpha-normalized canonical form: locally bound symbols become `#0`, `#1`, …

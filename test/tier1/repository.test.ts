@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as b from '../../src/tier1/build.ts';
 import { AetherRepository } from '../../src/tier1/repository.ts';
+import { ModuleResolver } from '../../src/tier1/modules.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import { ProvenanceLedger } from '../../src/tier1/provenance.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
@@ -112,4 +113,33 @@ test('A8: named-root updates use compare-and-swap semantics', () => {
   assert.throws(() => second.updateRef('main', commit2.id, null), /reference main moved/);
   second.updateRef('main', commit2.id, commit1.id);
   assert.equal(first.head('main'), commit2.id);
+});
+
+test('B6: exact-address imports resolve explicit symbols across modules', () => {
+  const repository = new AetherRepository(temporary());
+  const syms = new SymbolSpace('module-imports');
+  const incrementSymbol = syms.define('increment');
+  const value = syms.define('value');
+  const increment = b.fn({
+    symbol: incrementSymbol, params: [b.param(value, b.Int)], returns: b.Int,
+    body: b.block(b.ret(b.add(b.v(value), b.int(1)))),
+  });
+  const dependency = b.module_({
+    symbol: syms.define('dependency'), members: [increment], symbolTable: syms.table(),
+  });
+  const dependencyRoot = repository.store.intern(dependency);
+  const mainSymbol = syms.define('main');
+  const main = b.fn({
+    symbol: mainSymbol, returns: b.Int, body: b.block(b.ret(b.call(incrementSymbol, b.int(41)))),
+  });
+  const application = b.module_({
+    symbol: syms.define('application'),
+    members: [b.import_(dependencyRoot, [incrementSymbol]), main],
+    symbolTable: syms.table(),
+  });
+  const root = repository.store.intern(application);
+  const resolved = new ModuleResolver(repository.store).resolve(root);
+  assert.deepEqual(resolved.dependencies, [dependencyRoot]);
+  assert.ok(resolved.module.members.some((member) => member.kind === 'FunctionDecl' && member.symbol === incrementSymbol));
+  assert.equal(resolved.module.members.some((member) => member.kind === 'Import'), false);
 });

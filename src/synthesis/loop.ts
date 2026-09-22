@@ -184,6 +184,7 @@ export function synthesize(
         .filter((t): t is Extract<Term, { kind: 'FunctionDecl' }> => t.kind === 'FunctionDecl')
         .map((d) => ({
           symbol: d.symbol,
+          typeParams: d.typeParams,
           params: d.params,
           returns: d.returns,
           capabilities: d.capabilities,

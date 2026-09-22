@@ -78,6 +78,11 @@ export class TypeScriptProjector {
       case 'Nominal': return this.types.short(t.name);
       case 'Record': return this.types.short(t.name);
       case 'Result': return `Result<${this.ty(t.ok)}, ${this.ty(t.err)}>`;
+      case 'Seq': return `Seq<${this.ty(t.element)}>`;
+      case 'Fn': return `Fn<(${t.params.map((param) => this.ty(param)).join(', ')}), ` +
+        `${this.ty(t.returns)}, ${JSON.stringify(t.capabilities.join(','))}>`;
+      case 'TypeVar': return t.name;
+      case 'IntN': return `IntN<${t.bits}, ${t.signed ? 'signed' : 'unsigned'}, ${t.overflow}>`;
     }
   }
 
@@ -126,6 +131,25 @@ export class TypeScriptProjector {
       case 'MatchResult':
         return `matchResult(${this.expr(t.value)}, ${this.name(t.okSymbol)} => ${this.expr(t.ok)}, ` +
           `${this.name(t.errSymbol)} => ${this.expr(t.err)})`;
+      case 'SeqLit': return `seq<${this.ty(t.ty.element)}>(${t.items.map((item) => this.expr(item)).join(', ')})`;
+      case 'SeqIndex': return `index(${this.expr(t.sequence)}, ${this.expr(t.index)})`;
+      case 'SeqLength': return `length(${this.expr(t.sequence)})`;
+      case 'SeqMap': return `seqMap(${this.expr(t.sequence)}, ${this.name(t.callee)})`;
+      case 'SeqFold': return `seqFold(${this.expr(t.sequence)}, ${this.expr(t.initial)}, ${this.name(t.callee)})`;
+      case 'Lambda':
+        return `lambda(${JSON.stringify(t.capabilities.join(','))}, (` +
+          `${t.params.map((param) => `${this.name(param.symbol)}: ${this.ty(param.ty)}`).join(', ')}` +
+          `): ${this.ty(t.returns)} => ${this.expr(t.body)})`;
+      case 'Apply': return `apply(${this.expr(t.fn)}${t.args.map((arg) => `, ${this.expr(arg)}`).join('')})`;
+      case 'StringOp': {
+        const name = { strlen: 'strLen', contains: 'strContains', slice: 'strSlice', lower: 'strLower', upper: 'strUpper', trim: 'strTrim' }[t.op];
+        return `${name}(${t.args.map((arg) => this.expr(arg)).join(', ')})`;
+      }
+      case 'IntCast': return `intCast<${this.ty(t.ty)}>(${this.expr(t.value)})`;
+      case 'FixedBin': {
+        const name = `fixed${t.op[0].toUpperCase()}${t.op.slice(1)}`;
+        return `${name}<${this.ty(t.ty)}>(${this.expr(t.left)}, ${this.expr(t.right)})`;
+      }
       case 'Old': return `old(${this.expr(t.expr)})`;
       case 'ResultRef': return 'result';
       case 'Invoke':
@@ -205,6 +229,8 @@ export class TypeScriptProjector {
         return `${pad}// @surface ${this.name(t.symbol)}: ${domain} ${t.objective} = ${current}`;
       }
       case 'FunctionDecl': return this.fnDecl(t, depth);
+      case 'Import':
+        return `${pad}// @import ${t.module}${t.symbols.length ? ` ${t.symbols.join(',')}` : ''}`;
       case 'Module': {
         const parts: string[] = [
           `// @module ${this.name(t.symbol)}`,
@@ -267,8 +293,9 @@ export class TypeScriptProjector {
       .map((p: Param) => `${this.name(p.symbol)}: ${this.ty(p.ty)}`)
       .join(', ');
     const modifier = t.purity === 'pure' ? 'pure ' : '';
+    const typeParams = t.typeParams.length ? `<${t.typeParams.join(', ')}>` : '';
     const signature =
-      `${pad}${modifier}function ${this.name(t.symbol)}(${params}): ${this.ty(t.returns)}`;
+      `${pad}${modifier}function ${this.name(t.symbol)}${typeParams}(${params}): ${this.ty(t.returns)}`;
 
     if (t.body === null) {
       // An unsynthesized contract: the specification exists, the code does not.

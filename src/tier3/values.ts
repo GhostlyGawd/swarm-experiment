@@ -8,6 +8,7 @@
  */
 
 import type { Ty } from '../tier1/ast.ts';
+import type { CapabilityName } from '../tier1/ids.ts';
 import { underlying } from '../tier2/typecheck.ts';
 
 /** A heap address. Allocation is sequential, so traces replay identically. */
@@ -20,19 +21,30 @@ export interface ResultValue {
   readonly value: Value;
 }
 
-export type Value = bigint | boolean | string | null | Ref | ResultValue;
+export type SeqValue = readonly Value[];
+export interface ClosureValue {
+  readonly closure: true;
+  readonly capabilities: readonly CapabilityName[];
+  invoke(args: readonly Value[]): Value;
+}
+export type Value = bigint | boolean | string | null | Ref | ResultValue | SeqValue | ClosureValue;
 
 export const isRef = (v: Value): v is Ref =>
-  typeof v === 'object' && v !== null && 'addr' in v;
+  typeof v === 'object' && v !== null && !Array.isArray(v) && 'addr' in v;
 
 export const isResultValue = (v: Value): v is ResultValue =>
-  typeof v === 'object' && v !== null && 'variant' in v && 'value' in v;
+  typeof v === 'object' && v !== null && !Array.isArray(v) && 'variant' in v && 'value' in v;
+export const isSeqValue = (v: Value): v is SeqValue => Array.isArray(v);
+export const isClosureValue = (v: Value): v is ClosureValue =>
+  typeof v === 'object' && v !== null && !Array.isArray(v) && 'closure' in v && v.closure === true;
 
 export function formatValue(v: Value, heap?: ReadonlyMap<number, Map<string, Value>>): string {
   if (v === null) return '()';
   if (typeof v === 'bigint') return `${v}`;
   if (typeof v === 'boolean') return String(v);
   if (typeof v === 'string') return JSON.stringify(v);
+  if (isSeqValue(v)) return `[${v.map((item) => formatValue(item, heap)).join(', ')}]`;
+  if (isClosureValue(v)) return `<closure${v.capabilities.length ? ` ${v.capabilities.join(',')}` : ''}>`;
   if (isResultValue(v)) return `${v.variant}(${formatValue(v.value, heap)})`;
   const record = heap?.get(v.addr);
   if (!record) return `@${v.addr}`;

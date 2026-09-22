@@ -49,7 +49,7 @@ import { CapabilityEnvelope, type CapabilityRegistry, type RevocationList } from
 import { underlying } from '../tier2/typecheck.ts';
 import type { VerificationReport } from '../tier2/verify.ts';
 import type { ExecutionResult, Fault, FaultKind } from './runtime.ts';
-import { formatValue, isRef, isResultValue, type Ref, type Value } from './values.ts';
+import { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, type Ref, type Value } from './values.ts';
 
 // ---------------------------------------------------------------------------
 // compiled representation
@@ -315,6 +315,7 @@ export class ProductionRuntime {
         slots.set(t.okSymbol, slots.size);
         slots.set(t.errSymbol, slots.size);
       }
+      if (t.kind === 'Lambda') for (const param of t.params) slots.set(param.symbol, slots.size);
       for (const child of childTerms(t)) allocate(child);
     };
     if (decl.body) allocate(decl.body);
@@ -608,6 +609,137 @@ export class ProductionRuntime {
           return err(f);
         };
       }
+      case 'SeqLit': {
+        const items = term.items.map((item) => this.expr(item, ctx));
+        return (f) => items.map((item) => item(f));
+      }
+      case 'SeqIndex': {
+        const sequence = this.expr(term.sequence, ctx);
+        const index = this.expr(term.index, ctx);
+        return (f) => {
+          const values = sequence(f);
+          const at = index(f);
+          if (!isSeqValue(values) || typeof at !== 'bigint') {
+            throw new ProductionFault('type_error', 'index expects a sequence and integer');
+          }
+          if (at < 0n || at >= BigInt(values.length)) {
+            throw new ProductionFault('type_error', `sequence index ${at} is out of bounds`);
+          }
+          return values[Number(at)];
+        };
+      }
+      case 'SeqLength': {
+        const sequence = this.expr(term.sequence, ctx);
+        return (f) => {
+          const values = sequence(f);
+          if (!isSeqValue(values)) throw new ProductionFault('type_error', 'length expects a sequence');
+          return BigInt(values.length);
+        };
+      }
+      case 'SeqMap': {
+        const sequence = this.expr(term.sequence, ctx);
+        const callback = this.callback(term.callee, ctx);
+        return (f) => {
+          const values = sequence(f);
+          if (!isSeqValue(values)) throw new ProductionFault('type_error', 'map expects a sequence');
+          return values.map((item) => callback([item]));
+        };
+      }
+      case 'SeqFold': {
+        const sequence = this.expr(term.sequence, ctx);
+        const initial = this.expr(term.initial, ctx);
+        const callback = this.callback(term.callee, ctx);
+        return (f) => {
+          const values = sequence(f);
+          if (!isSeqValue(values)) throw new ProductionFault('type_error', 'fold expects a sequence');
+          let accumulator = initial(f);
+          for (const item of values) accumulator = callback([accumulator, item]);
+          return accumulator;
+        };
+      }
+      case 'Lambda': {
+        for (const capability of term.capabilities) {
+          if (!ctx.envelope.has(capability)) {
+            throw new TypeError(`${ctx.functionName} cannot capture ${capability}`);
+          }
+        }
+        const body = this.expr(term.body, ctx);
+        const paramSlots = term.params.map((param) => this.slotOf(param.symbol, ctx));
+        const capabilities = [...term.capabilities];
+        return (frame) => {
+          const captured = [...frame.s];
+          return {
+            closure: true,
+            capabilities,
+            invoke: (args: readonly Value[]) => {
+              const slots = [...captured];
+              paramSlots.forEach((slot, index) => { slots[slot] = args[index] ?? null; });
+              return body({ s: slots, o: frame.o, r: null });
+            },
+          };
+        };
+      }
+      case 'Apply': {
+        const closure = this.expr(term.fn, ctx);
+        const args = term.args.map((arg) => this.expr(arg, ctx));
+        const envelope = ctx.envelope;
+        return (frame) => {
+          const value = closure(frame);
+          if (!isClosureValue(value)) throw new ProductionFault('type_error', 'apply expects a closure');
+          for (const capability of value.capabilities) {
+            if (!envelope.has(capability)) throw new ProductionFault('capability_denied', `closure requires ${capability}`);
+          }
+          return value.invoke(args.map((arg) => arg(frame)));
+        };
+      }
+      case 'StringOp': {
+        const args = term.args.map((arg) => this.expr(arg, ctx));
+        const op = term.op;
+        return (frame) => {
+          const values = args.map((arg) => arg(frame));
+          const value = values[0];
+          if (typeof value !== 'string') throw new ProductionFault('type_error', `${op} expects a string`);
+          switch (op) {
+            case 'strlen': return BigInt([...value].length);
+            case 'contains':
+              if (typeof values[1] !== 'string') throw new ProductionFault('type_error', 'contains expects a string');
+              return value.includes(values[1]);
+            case 'slice':
+              if (typeof values[1] !== 'bigint' || typeof values[2] !== 'bigint') {
+                throw new ProductionFault('type_error', 'slice expects integer bounds');
+              }
+              return [...value].slice(Number(values[1]), Number(values[2])).join('');
+            case 'lower': return value.toLowerCase();
+            case 'upper': return value.toUpperCase();
+            case 'trim': return value.trim();
+          }
+        };
+      }
+      case 'IntCast': {
+        const value = this.expr(term.value, ctx);
+        const ty = term.ty;
+        return (frame) => {
+          const integer = value(frame);
+          if (typeof integer !== 'bigint') throw new ProductionFault('type_error', 'fixed-width conversion expects an integer');
+          return normalizeFixed(integer, ty);
+        };
+      }
+      case 'FixedBin': {
+        const left = this.expr(term.left, ctx);
+        const right = this.expr(term.right, ctx);
+        const op = term.op;
+        const ty = term.ty;
+        return (frame) => {
+          const l = left(frame);
+          const r = right(frame);
+          if (typeof l !== 'bigint' || typeof r !== 'bigint') {
+            throw new ProductionFault('type_error', 'fixed-width arithmetic expects integers');
+          }
+          if ((op === 'div' || op === 'mod') && r === 0n) throw new ProductionFault('division_by_zero', `${op} by zero`);
+          const value = op === 'add' ? l + r : op === 'sub' ? l - r : op === 'mul' ? l * r : op === 'div' ? l / r : l % r;
+          return normalizeFixed(value, ty);
+        };
+      }
       case 'Call': {
         const args = term.args.map((a) => this.expr(a, ctx));
         const callee = term.callee;
@@ -672,6 +804,20 @@ export class ProductionRuntime {
 
   private calleeCapabilities(symbol: SymbolId): readonly CapabilityName[] {
     return this.declaredCapabilities.get(symbol) ?? [];
+  }
+
+  private callback(symbol: SymbolId, ctx: Ctx): (args: readonly Value[]) => Value {
+    for (const cap of this.calleeCapabilities(symbol)) {
+      if (!ctx.envelope.has(cap)) {
+        throw new TypeError(`${ctx.functionName} callback ${this.name(symbol)} needs ${cap}`);
+      }
+    }
+    let target: CompiledFunction | undefined;
+    return (args) => {
+      target ??= this.compiled.get(symbol);
+      if (!target) throw new ProductionFault('unbound', `${this.name(symbol)} is not compiled`);
+      return this.enter(target, args);
+    };
   }
 
   private slotOf(symbol: SymbolId, ctx: Ctx): number {
@@ -839,6 +985,16 @@ interface Ctx {
 function asBool(v: Value): boolean {
   if (typeof v === 'boolean') return v;
   throw new ProductionFault('type_error', `expected a boolean, got ${String(v)}`);
+}
+
+function normalizeFixed(value: bigint, ty: Extract<Ty, { t: 'IntN' }>): bigint {
+  const width = 1n << BigInt(ty.bits);
+  const min = ty.signed ? -(1n << BigInt(ty.bits - 1)) : 0n;
+  const max = ty.signed ? (1n << BigInt(ty.bits - 1)) - 1n : width - 1n;
+  if (value >= min && value <= max) return value;
+  if (ty.overflow === 'trap') throw new ProductionFault('type_error', `${ty.signed ? 'i' : 'u'}${ty.bits} overflow: ${value}`);
+  if (ty.overflow === 'saturate') return value < min ? min : max;
+  return ((value - min) % width + width) % width + min;
 }
 
 function asInt(v: Value, op: string): bigint {

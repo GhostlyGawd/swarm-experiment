@@ -26,7 +26,7 @@ import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
 import { CapabilityEnvelope, type CapabilityRegistry, type RevocationList } from '../tier2/ocap.ts';
 import { underlying } from '../tier2/typecheck.ts';
-import { formatValue, isRef, isResultValue, type Ref, type Value } from './values.ts';
+import { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, type Ref, type Value } from './values.ts';
 
 // ---------------------------------------------------------------------------
 // journal
@@ -634,6 +634,115 @@ export class Runtime {
           frame.scopes.pop();
         }
       }
+      case 'SeqLit': return expr.items.map((item) => this.eval(item, frame, result, old));
+      case 'SeqIndex': {
+        const sequence = this.eval(expr.sequence, frame, result, old);
+        const index = this.eval(expr.index, frame, result, old);
+        if (!isSeqValue(sequence) || typeof index !== 'bigint') {
+          throw new AetherFault(this.fault('type_error', 'index expects a sequence and integer', null));
+        }
+        if (index < 0n || index >= BigInt(sequence.length)) {
+          throw new AetherFault(this.fault('type_error', `sequence index ${index} is out of bounds`, null));
+        }
+        return sequence[Number(index)];
+      }
+      case 'SeqLength': {
+        const sequence = this.eval(expr.sequence, frame, result, old);
+        if (!isSeqValue(sequence)) throw new AetherFault(this.fault('type_error', 'length expects a sequence', null));
+        return BigInt(sequence.length);
+      }
+      case 'SeqMap': {
+        const sequence = this.eval(expr.sequence, frame, result, old);
+        if (!isSeqValue(sequence)) throw new AetherFault(this.fault('type_error', 'map expects a sequence', null));
+        return sequence.map((item) => this.callFrom(frame, expr.callee, [item]));
+      }
+      case 'SeqFold': {
+        const sequence = this.eval(expr.sequence, frame, result, old);
+        if (!isSeqValue(sequence)) throw new AetherFault(this.fault('type_error', 'fold expects a sequence', null));
+        let accumulator = this.eval(expr.initial, frame, result, old);
+        for (const item of sequence) accumulator = this.callFrom(frame, expr.callee, [accumulator, item]);
+        return accumulator;
+      }
+      case 'Lambda': {
+        const captured = frame.scopes.map((scope) => new Map(scope));
+        const envelope = frame.envelope.attenuate(expr.capabilities);
+        const preHeap = new Map<number, Map<string, Value>>();
+        for (const [addr, record] of this.heap) preHeap.set(addr, new Map(record));
+        return {
+          closure: true,
+          capabilities: [...expr.capabilities],
+          invoke: (args: readonly Value[]) => {
+            const parameters: Scope = new Map();
+            expr.params.forEach((param, index) => parameters.set(param.symbol, args[index] ?? null));
+            const closureFrame: Frame = {
+              decl: frame.decl,
+              scopes: [...captured.map((scope) => new Map(scope)), parameters],
+              envelope,
+              preHeap,
+              preScope: new Map(parameters),
+            };
+            this.frames.push(closureFrame);
+            try {
+              return this.eval(expr.body, closureFrame, null, old);
+            } finally {
+              this.frames.pop();
+            }
+          },
+        };
+      }
+      case 'Apply': {
+        const closure = this.eval(expr.fn, frame, result, old);
+        if (!isClosureValue(closure)) {
+          throw new AetherFault(this.fault('type_error', 'apply expects a closure', null));
+        }
+        for (const capability of closure.capabilities) {
+          if (!frame.envelope.has(capability)) {
+            throw new AetherFault(this.fault('capability_denied', `closure requires ${capability}`, capability));
+          }
+        }
+        return closure.invoke(expr.args.map((arg) => this.eval(arg, frame, result, old)));
+      }
+      case 'StringOp': {
+        const args = expr.args.map((arg) => this.eval(arg, frame, result, old));
+        const text = args[0];
+        if (typeof text !== 'string') throw new AetherFault(this.fault('type_error', `${expr.op} expects a string`, null));
+        switch (expr.op) {
+          case 'strlen': return BigInt([...text].length);
+          case 'contains':
+            if (typeof args[1] !== 'string') throw new AetherFault(this.fault('type_error', 'contains expects a string', null));
+            return text.includes(args[1]);
+          case 'slice': {
+            if (typeof args[1] !== 'bigint' || typeof args[2] !== 'bigint') {
+              throw new AetherFault(this.fault('type_error', 'slice expects integer bounds', null));
+            }
+            return [...text].slice(Number(args[1]), Number(args[2])).join('');
+          }
+          case 'lower': return text.toLowerCase();
+          case 'upper': return text.toUpperCase();
+          case 'trim': return text.trim();
+        }
+      }
+      case 'IntCast': {
+        const value = this.eval(expr.value, frame, result, old);
+        if (typeof value !== 'bigint') throw new AetherFault(this.fault('type_error', 'fixed-width conversion expects an integer', null));
+        return normalizeFixed(value, expr.ty, (message) => new AetherFault(this.fault('type_error', message, null)));
+      }
+      case 'FixedBin': {
+        const left = this.eval(expr.left, frame, result, old);
+        const right = this.eval(expr.right, frame, result, old);
+        if (typeof left !== 'bigint' || typeof right !== 'bigint') {
+          throw new AetherFault(this.fault('type_error', 'fixed-width arithmetic expects integers', null));
+        }
+        if ((expr.op === 'div' || expr.op === 'mod') && right === 0n) {
+          throw new AetherFault(this.fault('division_by_zero', `${expr.op} by zero`, null));
+        }
+        const value = expr.op === 'add' ? left + right
+          : expr.op === 'sub' ? left - right
+          : expr.op === 'mul' ? left * right
+          : expr.op === 'div' ? left / right
+          : left % right;
+        return normalizeFixed(value, expr.ty, (message) => new AetherFault(this.fault('type_error', message, null)));
+      }
       case 'Call': {
         const callee = this.functions.get(expr.callee);
         if (!callee) {
@@ -654,6 +763,21 @@ export class Runtime {
       default:
         throw new AetherFault(this.fault('type_error', `${expr.kind} is not an expression`, null));
     }
+  }
+
+  private callFrom(frame: Frame, symbol: SymbolId, args: readonly Value[]): Value {
+    const callee = this.functions.get(symbol);
+    if (!callee) throw new AetherFault(this.fault('unbound', `${this.name(symbol)} is not loaded`, null));
+    for (const cap of callee.capabilities) {
+      if (!frame.envelope.has(cap)) {
+        throw new AetherFault(this.fault(
+          'capability_denied',
+          `${this.name(callee.symbol)} needs ${cap}, which ${this.name(frame.decl.symbol)} does not hold`,
+          cap,
+        ));
+      }
+    }
+    return this.enter(callee, args);
   }
 
   private readField(owner: Value, field: string, old: boolean, frame: Frame): Value {
@@ -780,4 +904,19 @@ export class Runtime {
       .map((e) => `${String(e.step).padStart(5)} ${'  '.repeat(e.depth)}${e.kind}: ${e.detail}`)
       .join('\n');
   }
+}
+
+function normalizeFixed(
+  value: bigint,
+  ty: Extract<Ty, { t: 'IntN' }>,
+  fault: (message: string) => Error,
+): bigint {
+  const width = 1n << BigInt(ty.bits);
+  const min = ty.signed ? -(1n << BigInt(ty.bits - 1)) : 0n;
+  const max = ty.signed ? (1n << BigInt(ty.bits - 1)) - 1n : width - 1n;
+  if (value >= min && value <= max) return value;
+  if (ty.overflow === 'trap') throw fault(`${ty.signed ? 'i' : 'u'}${ty.bits} overflow: ${value}`);
+  if (ty.overflow === 'saturate') return value < min ? min : max;
+  const wrapped = ((value - min) % width + width) % width + min;
+  return wrapped;
 }

@@ -37,8 +37,8 @@
  * An *optional* index field uses 0 for "absent" and `i + 1` otherwise.
  */
 
-import { children, type Objective, type Param, type Rigor, type SurfaceDomain, type Term, type Ty } from './ast.ts';
-import type { CapabilityName, ProvenanceId, SymbolId, TypeName } from './ids.ts';
+import { children, type Objective, type Param, type Rigor, type StringOp, type SurfaceDomain, type Term, type Ty } from './ast.ts';
+import type { CapabilityName, NodeRef, ProvenanceId, SymbolId, TypeName } from './ids.ts';
 import { estimateTokens } from '../util/tokens.ts';
 
 // ---------------------------------------------------------------------------
@@ -188,6 +188,12 @@ const OBJECTIVE_CODE: Record<Objective, string> = {
 const CODE_OBJECTIVE: Record<string, Objective> = {
   '0': 'minimize_latency', '1': 'minimize_cost', '2': 'minimize_memory',
 };
+const STRING_OP_CODE: Record<StringOp, string> = {
+  strlen: '0', contains: '1', slice: '2', lower: '3', upper: '4', trim: '5',
+};
+const CODE_STRING_OP = Object.fromEntries(
+  Object.entries(STRING_OP_CODE).map(([op, code]) => [code, op]),
+) as Record<string, StringOp>;
 
 // ---------------------------------------------------------------------------
 // type grammar
@@ -210,6 +216,16 @@ function encodeTy(ty: Ty, name: (s: string) => number): string {
         ty.fields.map(([n, t]) => `${name(n)}:${encodeTy(t, name)}`).join(',')
       }>`;
     case 'Result': return `E<${encodeTy(ty.ok, name)},${encodeTy(ty.err, name)}>`;
+    case 'Seq': return `A<${encodeTy(ty.element, name)}>`;
+    case 'Fn':
+      return `F<${ty.params.map((param) => encodeTy(param, name)).join(',')};` +
+        `${encodeTy(ty.returns, name)};${ty.capabilities.join(',')}>`;
+    case 'TypeVar': return `V${name(ty.name)}`;
+    case 'IntN': {
+      const bits = { 8: '0', 16: '1', 32: '2', 64: '3' }[ty.bits];
+      const overflow = { wrap: '0', trap: '1', saturate: '2' }[ty.overflow];
+      return `D${bits}${ty.signed ? 1 : 0}${overflow}`;
+    }
   }
 }
 
@@ -244,6 +260,34 @@ function parseTy(src: string, pos: number, nameAt: (i: number) => string): [Ty, 
       const [ok, afterOk] = parseTy(src, pos + 2, nameAt);
       const [err, afterErr] = parseTy(src, afterOk + 1, nameAt);
       return [{ t: 'Result', ok, err }, afterErr + 1];
+    }
+    case 'A': {
+      const [element, after] = parseTy(src, pos + 2, nameAt);
+      return [{ t: 'Seq', element }, after + 1];
+    }
+    case 'F': {
+      let i = pos + 2;
+      const params: Ty[] = [];
+      while (src[i] !== ';') {
+        if (src[i] === ',') i++;
+        const [param, after] = parseTy(src, i, nameAt);
+        params.push(param);
+        i = after;
+      }
+      const [returns, afterReturn] = parseTy(src, i + 1, nameAt);
+      const capEnd = src.indexOf('>', afterReturn + 1);
+      const capabilities = src.slice(afterReturn + 1, capEnd).split(',').filter(Boolean) as CapabilityName[];
+      return [{ t: 'Fn', params, returns, capabilities }, capEnd + 1];
+    }
+    case 'V': {
+      let end = pos + 1;
+      while (/[0-9]/.test(src[end] ?? '')) end++;
+      return [{ t: 'TypeVar', name: nameAt(Number(src.slice(pos + 1, end))) }, end];
+    }
+    case 'D': {
+      const bits = [8, 16, 32, 64][Number(src[pos + 1])] as 8 | 16 | 32 | 64;
+      const overflow = ['wrap', 'trap', 'saturate'][Number(src[pos + 3])] as 'wrap' | 'trap' | 'saturate';
+      return [{ t: 'IntN', bits, signed: src[pos + 2] === '1', overflow }, pos + 4];
     }
     default:
       throw new SyntaxError(`unparseable type at ${pos}: ${src.slice(pos, pos + 24)}`);
@@ -315,6 +359,19 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
         pools.sym.intern(t.okSymbol);
         pools.sym.intern(t.errSymbol);
         break;
+      case 'SeqLit': pools.ty.intern(encodeTy(t.ty, internName)); break;
+      case 'SeqMap':
+      case 'SeqFold': pools.sym.intern(t.callee); break;
+      case 'Lambda':
+        pools.ty.intern(encodeTy(t.returns, internName));
+        for (const param of t.params) {
+          pools.sym.intern(param.symbol);
+          pools.ty.intern(encodeTy(param.ty, internName));
+        }
+        for (const capability of t.capabilities) pools.cap.intern(capability);
+        break;
+      case 'IntCast':
+      case 'FixedBin': pools.ty.intern(encodeTy(t.ty, internName)); break;
       case 'Invoke': pools.cap.intern(t.capability); break;
       case 'Place':
         pools.sym.intern(t.symbol);
@@ -328,6 +385,7 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
       case 'Clause': pools.label.intern(t.label); break;
       case 'FunctionDecl':
         pools.sym.intern(t.symbol);
+        for (const typeParam of t.typeParams) internName(typeParam);
         pools.ty.intern(encodeTy(t.returns, internName));
         for (const p of t.params) {
           pools.sym.intern(p.symbol);
@@ -355,6 +413,10 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
       case 'Module':
         pools.sym.intern(t.symbol);
         if (t.provenance) pools.prov.intern(t.provenance);
+        break;
+      case 'Import':
+        pools.str.intern(t.module);
+        for (const symbol of t.symbols) pools.sym.intern(symbol);
         break;
       default: break;
     }
@@ -405,6 +467,22 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
       case 'MatchResult':
         out.push(`J${sym(t.okSymbol)}${sym(t.errSymbol)}`);
         return;
+      case 'SeqLit': out.push(`V${ty(t.ty)}${f(t.items.length)}`); return;
+      case 'SeqIndex': out.push('H'); return;
+      case 'SeqLength': out.push('T'); return;
+      case 'SeqMap': out.push(`e${sym(t.callee)}`); return;
+      case 'SeqFold': out.push(`d${sym(t.callee)}`); return;
+      case 'Lambda':
+        out.push(
+          `g${ty(t.returns)}${f(t.params.length)}` +
+          t.params.map((param) => `${sym(param.symbol)}${ty(param.ty)}`).join('') +
+          `${f(t.capabilities.length)}${t.capabilities.map((capability) => f(pools.cap.intern(capability))).join('')}`,
+        );
+        return;
+      case 'Apply': out.push(`a${f(t.args.length)}`); return;
+      case 'StringOp': out.push(`s${STRING_OP_CODE[t.op]}${f(t.args.length)}`); return;
+      case 'IntCast': out.push(`c${ty(t.ty)}`); return;
+      case 'FixedBin': out.push(`b${BIN_OPCODE[t.op]}${ty(t.ty)}`); return;
       case 'Old': out.push('@'); return;
       case 'ResultRef': out.push('$'); return;
       case 'Invoke': out.push(`X${f(pools.cap.intern(t.capability))}${f(t.args.length)}`); return;
@@ -431,6 +509,7 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
             `${t.purity === 'pure' ? 0 : 1}${t.contract ? 1 : 0}${t.body ? 1 : 0}` +
             `${f(t.surfaces.length)}` +
             `${optional(t.provenance, () => pools.prov.intern(t.provenance!))}` +
+            `${f(t.typeParams.length)}${t.typeParams.map(nm).join('')}` +
             `${f(t.params.length)}` +
             `${t.params.map((p: Param) => `${sym(p.symbol)}${ty(p.ty)}`).join('')}` +
             `${f(t.capabilities.length)}` +
@@ -461,6 +540,9 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
           `M${sym(t.symbol)}${f(t.members.length)}` +
             `${optional(t.provenance, () => pools.prov.intern(t.provenance!))}`,
         );
+        return;
+      case 'Import':
+        out.push(`r${f(pools.str.intern(t.module))}${f(t.symbols.length)}${t.symbols.map(sym).join('')}`);
         return;
     }
   };
@@ -676,6 +758,75 @@ export function decode(ir: string, ctx?: IrContext): Term {
         stack.push({ kind: 'MatchResult', value, okSymbol, ok, errSymbol, err });
         continue;
       }
+      case 'V': {
+        const t = tyAt(r.field());
+        if (t.t !== 'Seq') throw new SyntaxError('SeqLit requires a Seq type');
+        stack.push({ kind: 'SeqLit', ty: t, items: popN(r.field()) });
+        continue;
+      }
+      case 'H': {
+        const [sequence, index] = popN(2);
+        stack.push({ kind: 'SeqIndex', sequence, index });
+        continue;
+      }
+      case 'T': {
+        const [sequence] = popN(1);
+        stack.push({ kind: 'SeqLength', sequence });
+        continue;
+      }
+      case 'e': {
+        const callee = symAt(r.field());
+        const [sequence] = popN(1);
+        stack.push({ kind: 'SeqMap', sequence, callee });
+        continue;
+      }
+      case 'd': {
+        const callee = symAt(r.field());
+        const [sequence, initial] = popN(2);
+        stack.push({ kind: 'SeqFold', sequence, initial, callee });
+        continue;
+      }
+      case 'g': {
+        const returns = tyAt(r.field());
+        const nParams = r.field();
+        const params: Param[] = Array.from({ length: nParams }, () => ({
+          symbol: symAt(r.field()), ty: tyAt(r.field()),
+        }));
+        const nCaps = r.field();
+        const capabilities = Array.from({ length: nCaps }, () => capAt(r.field()));
+        const [body] = popN(1);
+        stack.push({ kind: 'Lambda', params, returns, capabilities, body });
+        continue;
+      }
+      case 'a': {
+        const nArgs = r.field();
+        const popped = popN(nArgs + 1);
+        stack.push({ kind: 'Apply', fn: popped[0], args: popped.slice(1) });
+        continue;
+      }
+      case 's': {
+        const op = CODE_STRING_OP[r.digit()];
+        if (!op) throw new SyntaxError(`unknown string opcode ${tok}`);
+        stack.push({ kind: 'StringOp', op, args: popN(r.field()) });
+        continue;
+      }
+      case 'c': {
+        const t = tyAt(r.field());
+        if (t.t !== 'IntN') throw new SyntaxError('IntCast requires IntN');
+        const [value] = popN(1);
+        stack.push({ kind: 'IntCast', ty: t, value });
+        continue;
+      }
+      case 'b': {
+        const opToken = r.digit();
+        const op = OPCODE_BIN[opToken] as 'add' | 'sub' | 'mul' | 'div' | 'mod' | undefined;
+        if (!op || !['add', 'sub', 'mul', 'div', 'mod'].includes(op)) throw new SyntaxError(`bad fixed op ${tok}`);
+        const t = tyAt(r.field());
+        if (t.t !== 'IntN') throw new SyntaxError('FixedBin requires IntN');
+        const [left, right] = popN(2);
+        stack.push({ kind: 'FixedBin', op, ty: t, left, right });
+        continue;
+      }
       case 'P': {
         const symbol = symAt(r.field());
         const len = r.field();
@@ -741,6 +892,8 @@ export function decode(ir: string, ctx?: IrContext): Term {
         const hasBody = r.digit() === '1';
         const nSurf = r.field();
         const provIdx = r.optional();
+        const nTypeParams = r.field();
+        const typeParams = Array.from({ length: nTypeParams }, () => nameAt(r.field()));
         const nParams = r.field();
         const params: Param[] = Array.from({ length: nParams }, () => ({
           symbol: symAt(r.field()),
@@ -755,6 +908,7 @@ export function decode(ir: string, ctx?: IrContext): Term {
         stack.push({
           kind: 'FunctionDecl',
           symbol,
+          typeParams,
           params,
           returns,
           capabilities,
@@ -815,6 +969,13 @@ export function decode(ir: string, ctx?: IrContext): Term {
           symbolTable: popped[popped.length - 1],
           provenance: provIdx === null ? null : provAt(provIdx),
         });
+        continue;
+      }
+      case 'r': {
+        const module = strAt(r.field()) as NodeRef;
+        const n = r.field();
+        const symbols = Array.from({ length: n }, () => symAt(r.field()));
+        stack.push({ kind: 'Import', module, symbols });
         continue;
       }
       default:

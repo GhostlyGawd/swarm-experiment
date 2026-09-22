@@ -4,6 +4,7 @@ export { canonicalBytes, canonicalText, type Canonical } from './canonical.ts';
 export { Blake3, blake3, blake3Hex, bytesToHex } from './blake3.ts';
 export { GraphStore, alphaNormalize, hashNode, structuralKeyOf, type Step, type StoreStats } from './store.ts';
 export { AetherRepository, type CommitOptions, type CommitRecord, type FsckIssue, type GarbageCollectionResult, type Packfile } from './repository.ts';
+export { ModuleResolver, type ResolvedModule } from './modules.ts';
 export { merge3, type MergeConflict, type MergeResult } from './merge.ts';
 export { SymbolSpace } from './symbols.ts';
 export * from './provenance.ts';

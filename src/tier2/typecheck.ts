@@ -76,6 +76,19 @@ export const tyEqual = (a: Ty, b: Ty): boolean => {
       const other = b as typeof a;
       return tyEqual(a.ok, other.ok) && tyEqual(a.err, other.err);
     }
+    case 'Seq': return tyEqual(a.element, (b as typeof a).element);
+    case 'Fn': {
+      const other = b as typeof a;
+      return a.params.length === other.params.length &&
+        a.params.every((param, index) => tyEqual(param, other.params[index])) &&
+        tyEqual(a.returns, other.returns) &&
+        [...a.capabilities].sort().join('|') === [...other.capabilities].sort().join('|');
+    }
+    case 'TypeVar': return a.name === (b as typeof a).name;
+    case 'IntN': {
+      const other = b as typeof a;
+      return a.bits === other.bits && a.signed === other.signed && a.overflow === other.overflow;
+    }
   }
 };
 
@@ -88,11 +101,67 @@ export function tyToString(t: Ty): string {
     case 'Nominal': return t.name;
     case 'Record': return t.name;
     case 'Result': return `Result<${tyToString(t.ok)}, ${tyToString(t.err)}>`;
+    case 'Seq': return `Seq<${tyToString(t.element)}>`;
+    case 'Fn': return `(${t.params.map(tyToString).join(', ')}) => ${tyToString(t.returns)}`;
+    case 'TypeVar': return t.name;
+    case 'IntN': return `${t.signed ? 'i' : 'u'}${t.bits}/${t.overflow}`;
   }
 }
 
 /** Strip nominal wrappers to reach the underlying representation. */
-export const underlying = (t: Ty): Ty => (t.t === 'Nominal' ? underlying(t.repr) : t);
+export const underlying = (t: Ty): Ty =>
+  t.t === 'Nominal' ? underlying(t.repr) : t.t === 'IntN' ? { t: 'Int' } : t;
+
+export function substituteType(ty: Ty, substitutions: ReadonlyMap<string, Ty>): Ty {
+  switch (ty.t) {
+    case 'TypeVar': return substitutions.get(ty.name) ?? ty;
+    case 'Nominal': return { ...ty, repr: substituteType(ty.repr, substitutions) };
+    case 'Record': return { ...ty, fields: ty.fields.map(([name, field]) => [name, substituteType(field, substitutions)] as const) };
+    case 'Result': return { ...ty, ok: substituteType(ty.ok, substitutions), err: substituteType(ty.err, substitutions) };
+    case 'Seq': return { ...ty, element: substituteType(ty.element, substitutions) };
+    case 'Fn': return {
+      ...ty,
+      params: ty.params.map((param) => substituteType(param, substitutions)),
+      returns: substituteType(ty.returns, substitutions),
+    };
+    default: return ty;
+  }
+}
+
+function unifyType(pattern: Ty, actual: Ty, substitutions: Map<string, Ty>): boolean {
+  if (pattern.t === 'TypeVar') {
+    const existing = substitutions.get(pattern.name);
+    if (!existing) {
+      substitutions.set(pattern.name, actual);
+      return true;
+    }
+    return tyEqual(existing, actual);
+  }
+  if (pattern.t !== actual.t) return false;
+  switch (pattern.t) {
+    case 'Nominal': return pattern.name === (actual as typeof pattern).name &&
+      unifyType(pattern.repr, (actual as typeof pattern).repr, substitutions);
+    case 'Record': {
+      const other = actual as typeof pattern;
+      return pattern.name === other.name && pattern.fields.length === other.fields.length &&
+        pattern.fields.every(([name, field], index) =>
+          name === other.fields[index][0] && unifyType(field, other.fields[index][1], substitutions));
+    }
+    case 'Result': {
+      const other = actual as typeof pattern;
+      return unifyType(pattern.ok, other.ok, substitutions) && unifyType(pattern.err, other.err, substitutions);
+    }
+    case 'Seq': return unifyType(pattern.element, (actual as typeof pattern).element, substitutions);
+    case 'Fn': {
+      const other = actual as typeof pattern;
+      return pattern.params.length === other.params.length &&
+        pattern.params.every((param, index) => unifyType(param, other.params[index], substitutions)) &&
+        unifyType(pattern.returns, other.returns, substitutions);
+    }
+    case 'IntN': return tyEqual(pattern, actual);
+    default: return true;
+  }
+}
 
 interface FnSignature {
   readonly symbol: SymbolId;
@@ -100,6 +169,7 @@ interface FnSignature {
   readonly returns: Ty;
   readonly capabilities: readonly CapabilityName[];
   readonly purity: 'pure' | 'effectful';
+  readonly typeParams: readonly string[];
 }
 
 /** Where in a contract we are, which decides whether `old`/`result` are legal. */
@@ -165,6 +235,7 @@ export class TypeChecker {
         returns: term.returns,
         capabilities: term.capabilities,
         purity: term.purity,
+        typeParams: term.typeParams,
       });
     }
     for (const child of children(term)) this.collectSignatures(child);
@@ -283,6 +354,7 @@ export class TypeChecker {
       case 'TypeDecl':
       case 'Surface':
       case 'SymbolTable':
+      case 'Import':
         return;
       default:
         this.typeOf(term, scope, env, path, ctx);
@@ -437,6 +509,126 @@ export class TypeChecker {
         this.expect(ok, err, [...path, 'err'], 'match branches');
         return ok;
       }
+      case 'SeqLit':
+        term.items.forEach((item, i) => {
+          const actual = this.typeOf(item, scope, env, [...path, `items[${i}]`], ctx);
+          this.expect(term.ty.element, actual, [...path, `items[${i}]`], 'sequence element');
+        });
+        return term.ty;
+      case 'SeqIndex': {
+        const sequence = this.typeOf(term.sequence, scope, env, [...path, 'sequence'], ctx);
+        const index = this.typeOf(term.index, scope, env, [...path, 'index'], ctx);
+        this.expect({ t: 'Int' }, underlying(index), [...path, 'index'], 'sequence index');
+        if (sequence.t !== 'Seq') {
+          this.error('type_mismatch', `index expects Seq, got ${tyToString(sequence)}`, [...path, 'sequence']);
+          return { t: 'Unit' };
+        }
+        return sequence.element;
+      }
+      case 'SeqLength': {
+        const sequence = this.typeOf(term.sequence, scope, env, [...path, 'sequence'], ctx);
+        if (sequence.t !== 'Seq') {
+          this.error('type_mismatch', `length expects Seq, got ${tyToString(sequence)}`, [...path, 'sequence']);
+        }
+        return { t: 'Int' };
+      }
+      case 'SeqMap': {
+        const sequence = this.typeOf(term.sequence, scope, env, [...path, 'sequence'], ctx);
+        const signature = this.signatures.get(term.callee);
+        if (sequence.t !== 'Seq' || !signature || signature.params.length !== 1) {
+          this.error('type_mismatch', 'map expects a sequence and a unary function', path);
+          return { t: 'Seq', element: { t: 'Unit' } };
+        }
+        this.expect(signature.params[0].ty, sequence.element, [...path, 'sequence'], 'map input');
+        for (const cap of signature.capabilities) {
+          if (!env.has(cap)) this.error('capability_escalation', `map callback requires ${cap}`, path);
+          this.used.add(cap);
+        }
+        return { t: 'Seq', element: signature.returns };
+      }
+      case 'SeqFold': {
+        const sequence = this.typeOf(term.sequence, scope, env, [...path, 'sequence'], ctx);
+        const initial = this.typeOf(term.initial, scope, env, [...path, 'initial'], ctx);
+        const signature = this.signatures.get(term.callee);
+        if (sequence.t !== 'Seq' || !signature || signature.params.length !== 2) {
+          this.error('type_mismatch', 'fold expects a sequence and a binary function', path);
+          return initial;
+        }
+        this.expect(signature.params[0].ty, initial, [...path, 'initial'], 'fold accumulator');
+        this.expect(signature.params[1].ty, sequence.element, [...path, 'sequence'], 'fold element');
+        this.expect(signature.params[0].ty, signature.returns, path, 'fold callback result');
+        for (const cap of signature.capabilities) {
+          if (!env.has(cap)) this.error('capability_escalation', `fold callback requires ${cap}`, path);
+          this.used.add(cap);
+        }
+        return initial;
+      }
+      case 'Lambda': {
+        const inner: Scope = { vars: new Map(), parent: scope };
+        for (const param of term.params) inner.vars.set(param.symbol, param.ty);
+        for (const capability of term.capabilities) {
+          if (!this.opts.registry.get(capability)) {
+            this.error('unknown_capability', `${capability} is not registered`, path);
+          }
+          if (!env.has(capability)) {
+            this.error('capability_escalation', `closure captures ${capability}, which is not in scope`, path);
+          }
+        }
+        const closureEnv = env.attenuate(term.capabilities);
+        const body = this.typeOf(term.body, inner, closureEnv, [...path, 'body'], ctx);
+        this.expect(term.returns, body, [...path, 'body'], 'closure result');
+        return {
+          t: 'Fn', params: term.params.map((param) => param.ty), returns: term.returns,
+          capabilities: term.capabilities,
+        };
+      }
+      case 'Apply': {
+        const fn = this.typeOf(term.fn, scope, env, [...path, 'fn'], ctx);
+        if (fn.t !== 'Fn') {
+          this.error('type_mismatch', `apply expects a function, got ${tyToString(fn)}`, [...path, 'fn']);
+          return { t: 'Unit' };
+        }
+        if (fn.params.length !== term.args.length) {
+          this.error('arity_mismatch', `closure takes ${fn.params.length} arguments, got ${term.args.length}`, path);
+        }
+        term.args.forEach((arg, index) => {
+          const actual = this.typeOf(arg, scope, env, [...path, `args[${index}]`], ctx);
+          if (fn.params[index]) this.expect(fn.params[index], actual, [...path, `args[${index}]`], 'closure argument');
+        });
+        for (const capability of fn.capabilities) {
+          if (!env.has(capability)) {
+            this.error('capability_escalation', `closure application requires ${capability}`, path);
+          }
+          this.used.add(capability);
+        }
+        return fn.returns;
+      }
+      case 'StringOp': {
+        const arity = { strlen: 1, contains: 2, slice: 3, lower: 1, upper: 1, trim: 1 }[term.op];
+        if (term.args.length !== arity) {
+          this.error('arity_mismatch', `${term.op} takes ${arity} arguments, got ${term.args.length}`, path);
+        }
+        term.args.forEach((arg, index) => {
+          const actual = this.typeOf(arg, scope, env, [...path, `args[${index}]`], ctx);
+          const expected: Ty = term.op === 'slice' && index > 0 ? { t: 'Int' } : { t: 'Str' };
+          this.expect(expected, underlying(actual), [...path, `args[${index}]`], `${term.op} argument`);
+        });
+        if (term.op === 'strlen') return { t: 'Int' };
+        if (term.op === 'contains') return { t: 'Bool' };
+        return { t: 'Str' };
+      }
+      case 'IntCast': {
+        const actual = this.typeOf(term.value, scope, env, [...path, 'value'], ctx);
+        this.expect({ t: 'Int' }, underlying(actual), [...path, 'value'], 'fixed-width conversion');
+        return term.ty;
+      }
+      case 'FixedBin': {
+        const left = this.typeOf(term.left, scope, env, [...path, 'left'], ctx);
+        const right = this.typeOf(term.right, scope, env, [...path, 'right'], ctx);
+        this.expect(term.ty, left, [...path, 'left'], 'fixed-width left operand');
+        this.expect(term.ty, right, [...path, 'right'], 'fixed-width right operand');
+        return term.ty;
+      }
       case 'Old':
         if (ctx !== 'ensures') {
           this.error('contract_only_expression', 'old(…) is only meaningful in an ensures clause', path,
@@ -458,10 +650,23 @@ export class TypeChecker {
           this.error('arity_mismatch',
             `${this.show(term.callee)} takes ${sig.params.length} arguments, got ${term.args.length}`, path);
         }
+        const substitutions = new Map<string, Ty>();
         term.args.forEach((arg, i) => {
           const actual = this.typeOf(arg, scope, env, [...path, `args[${i}]`], ctx);
-          if (sig.params[i]) this.expect(sig.params[i].ty, actual, [...path, `args[${i}]`],
-            `argument ${i} of ${this.show(term.callee)}`);
+          if (sig.params[i]) {
+            const expected = sig.params[i].ty;
+            if (sig.typeParams.length) {
+              if (!unifyType(expected, actual, substitutions)) {
+                this.error('type_mismatch',
+                  `argument ${i} of ${this.show(term.callee)} has type ${tyToString(actual)}, ` +
+                    `which is inconsistent with ${tyToString(expected)}`,
+                  [...path, `args[${i}]`]);
+              }
+            } else {
+              this.expect(expected, actual, [...path, `args[${i}]`],
+                `argument ${i} of ${this.show(term.callee)}`);
+            }
+          }
         });
         // Authority flows downwards only: a callee may not need more than its caller has.
         for (const cap of sig.capabilities) {
@@ -473,7 +678,7 @@ export class TypeChecker {
           }
           this.used.add(cap);
         }
-        return sig.returns;
+        return substituteType(sig.returns, substitutions);
       }
       case 'Invoke': {
         const descriptor = this.opts.registry.get(term.capability);

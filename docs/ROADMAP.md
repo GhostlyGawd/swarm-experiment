@@ -144,12 +144,12 @@ graph LR
   end
   subgraph B["Language surface — make real programs expressible"]
     B1[✓ B1: Sum types + constructors + a Match node]
-    B2[B2: Immutable sequences]
-    B3[B3: Function values / closures]
-    B4[B4: Parametric types]
-    B5[B5: String operations beyond ++]
-    B6[B6: Cross-module imports + resolution rules]
-    B7[B7: Integer width/overflow policy]
+    B2[✓ B2: Immutable sequences]
+    B3[✓ B3: Function values / closures]
+    B4[✓ B4: Parametric types]
+    B5[✓ B5: String operations beyond ++]
+    B6[✓ B6: Cross-module imports + resolution rules]
+    B7[✓ B7: Integer width/overflow policy]
   end
   subgraph C["Verification reach"]
     C5[✓ C5: Proof cache keyed by node address]
@@ -254,11 +254,11 @@ same wave have no dependency on each other and can proceed in parallel.
 
 - `A1` Object store: write-once blobs keyed by node address, read-through cache — **M** ✓ complete
 - `B1` Sum types + constructors + a `Match` node — **L** ✓ complete
-- `B2` Immutable sequences (index, length, map/fold) — **L** *(degraded until B4, C2)*
-- `B3` Function values / closures — **XL**
-- `B4` Parametric types — **L**
-- `B5` String operations beyond `++` — **M**
-- `B7` Integer width/overflow policy — **M**
+- `B2` Immutable sequences (index, length, map/fold) — **L** ✓ complete *(degraded until B4, C2)*
+- `B3` Function values / closures — **XL** ✓ complete
+- `B4` Parametric types — **L** ✓ complete
+- `B5` String operations beyond `++` — **M** ✓ complete
+- `B7` Integer width/overflow policy — **M** ✓ complete
 - `C1` Shell out to Z3/CVC5 on `unknown` — itself capability-bounded — **S**
 - `C4` Uninterpreted functions with congruence closure — **M**
 - `C8` Separation/ownership types so non-aliasing is *checked* — **XL**
@@ -298,7 +298,7 @@ same wave have no dependency on each other and can proceed in parallel.
 - `A5` Mark-and-sweep GC from roots — **M** ✓ complete ← A1, A2
 - `A7` Packfile import/export — **M** ✓ complete ← A1, A2
 - `A8` Cross-process write safety: temp-file + atomic rename, CAS on root updates — **M** ✓ complete ← A1, A2
-- `B6` Cross-module imports + resolution rules — **M** ← A1, A2
+- `B6` Cross-module imports + resolution rules — **M** ✓ complete ← A1, A2
 - `C6` Incremental verification: re-verify only what changed, or whose callee contracts changed — **M** ← C5
 - `C3` Bounded quantifiers — **L** ← C2
 - `D1` A host that loads a topology plan and actually runs units — **L** ← A2
@@ -336,7 +336,7 @@ same wave have no dependency on each other and can proceed in parallel.
 
 ### Startable today
 
-26 open features have all blockers complete: `B2`, `B3`, `B4`, `B5`, `B6`, `B7`, `C6`, `C1`, `C4`, `C7`, `C8`, `C9`, `D1`, `E1`, `E4`, `F1`, `F2`, `F3`, `F5`, `G1`, `G3`, `G4`, `H1`, `H2`, `H3`, `H4`.
+21 open features have all blockers complete: `C6`, `C1`, `C2`, `C4`, `C7`, `C8`, `C9`, `D1`, `E1`, `E4`, `F1`, `F2`, `F3`, `F5`, `G1`, `G3`, `G4`, `H1`, `H2`, `H3`, `H4`.
 
 <!-- /generated:graph -->
 

@@ -19,7 +19,7 @@ import { TypeNames } from './names.ts';
 import * as b from '../tier1/build.ts';
 import type { BinOp, Param, Rigor, SurfaceDomain, Term, Ty } from '../tier1/ast.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
-import type { CapabilityName, ProvenanceId, SymbolId, TypeName } from '../tier1/ids.ts';
+import type { CapabilityName, NodeRef, ProvenanceId, SymbolId, TypeName } from '../tier1/ids.ts';
 
 export class ParseError extends SyntaxError {
   readonly line: number;
@@ -102,6 +102,7 @@ export class Parser {
   private readonly opts: ParseOptions;
   private readonly types: TypeNames;
   private readonly typeEnv = new Map<string, Ty>();
+  private readonly typeParams = new Set<string>();
   /** `result` and `old(…)` are legal only while parsing an ensures clause. */
   private inEnsures = false;
 
@@ -199,7 +200,45 @@ export class Parser {
         this.expect('>');
         return { t: 'Result', ok, err };
       }
+      case 'Seq': {
+        this.expect('<');
+        const element = this.parseType();
+        this.expect('>');
+        return { t: 'Seq', element };
+      }
+      case 'Fn': {
+        this.expect('<');
+        this.expect('(');
+        const params: Ty[] = [];
+        if (!this.at(')')) {
+          do params.push(this.parseType()); while (this.accept(','));
+        }
+        this.expect(')');
+        this.expect(',');
+        const returns = this.parseType();
+        this.expect(',');
+        const caps = this.peek();
+        if (caps.type !== 'string') throw new ParseError('Fn needs a capability string', caps);
+        this.pos++;
+        this.expect('>');
+        return { t: 'Fn', params, returns, capabilities: caps.value ? caps.value.split(',') as CapabilityName[] : [] };
+      }
+      case 'IntN': {
+        this.expect('<');
+        const bitsToken = this.peek();
+        if (bitsToken.type !== 'number') throw new ParseError('IntN needs a bit width', bitsToken);
+        this.pos++;
+        const bits = Number(bitsToken.value) as 8 | 16 | 32 | 64;
+        if (![8, 16, 32, 64].includes(bits)) throw new ParseError('IntN width must be 8, 16, 32, or 64', bitsToken);
+        this.expect(',');
+        const signedness = this.expectIdent();
+        this.expect(',');
+        const overflow = this.expectIdent() as 'wrap' | 'trap' | 'saturate';
+        this.expect('>');
+        return { t: 'IntN', bits, signed: signedness === 'signed', overflow };
+      }
       default: {
+        if (this.typeParams.has(name)) return { t: 'TypeVar', name };
         const known = this.typeEnv.get(name);
         if (known) return known;
         const long = this.types.long(name);
@@ -371,6 +410,129 @@ export class Parser {
         this.expect(')');
         return b.matchResult(value, okSymbol, ok, errSymbol, err);
       }
+      case 'seq': {
+        this.pos++;
+        this.expect('<');
+        const element = this.parseType();
+        this.expect('>');
+        this.expect('(');
+        const items: Term[] = [];
+        if (!this.at(')')) {
+          do items.push(this.parseExpression()); while (this.accept(','));
+        }
+        this.expect(')');
+        return b.seq(element, ...items);
+      }
+      case 'index':
+      case 'length':
+      case 'seqMap':
+      case 'seqFold': {
+        const intrinsic = t.value;
+        this.pos++;
+        this.expect('(');
+        const sequence = this.parseExpression();
+        if (intrinsic === 'length') {
+          this.expect(')');
+          return b.length(sequence);
+        }
+        this.expect(',');
+        if (intrinsic === 'index') {
+          const index = this.parseExpression();
+          this.expect(')');
+          return b.index(sequence, index);
+        }
+        if (intrinsic === 'seqMap') {
+          const name = this.expectIdent();
+          const callee = this.resolve(name);
+          if (!callee) throw new ParseError(`${name} is not in scope`, t);
+          this.expect(')');
+          return b.map(sequence, callee);
+        }
+        const initial = this.parseExpression();
+        this.expect(',');
+        const name = this.expectIdent();
+        const callee = this.resolve(name);
+        if (!callee) throw new ParseError(`${name} is not in scope`, t);
+        this.expect(')');
+        return b.fold(sequence, initial, callee);
+      }
+      case 'lambda': {
+        this.pos++;
+        this.expect('(');
+        const caps = this.peek();
+        if (caps.type !== 'string') throw new ParseError('lambda needs a capability string', caps);
+        this.pos++;
+        const capabilities = caps.value ? caps.value.split(',') as CapabilityName[] : [];
+        this.expect(',');
+        this.expect('(');
+        this.pushScope();
+        const params = [];
+        if (!this.at(')')) {
+          do {
+            const name = this.expectIdent();
+            this.expect(':');
+            params.push(b.param(this.bind(name), this.parseType()));
+          } while (this.accept(','));
+        }
+        this.expect(')');
+        this.expect(':');
+        const returns = this.parseType();
+        this.expect('=>');
+        const body = this.parseExpression();
+        this.popScope();
+        this.expect(')');
+        return b.lambda({ params, returns, capabilities, body });
+      }
+      case 'apply': {
+        this.pos++;
+        this.expect('(');
+        const fn = this.parseExpression();
+        const args: Term[] = [];
+        while (this.accept(',')) args.push(this.parseExpression());
+        this.expect(')');
+        return b.apply(fn, ...args);
+      }
+      case 'strLen':
+      case 'strContains':
+      case 'strSlice':
+      case 'strLower':
+      case 'strUpper':
+      case 'strTrim': {
+        const operations = {
+          strLen: 'strlen', strContains: 'contains', strSlice: 'slice',
+          strLower: 'lower', strUpper: 'upper', strTrim: 'trim',
+        } as const;
+        this.pos++;
+        this.expect('(');
+        const args: Term[] = [];
+        if (!this.at(')')) do args.push(this.parseExpression()); while (this.accept(','));
+        this.expect(')');
+        return b.stringOp(operations[t.value as keyof typeof operations], ...args);
+      }
+      case 'intCast':
+      case 'fixedAdd':
+      case 'fixedSub':
+      case 'fixedMul':
+      case 'fixedDiv':
+      case 'fixedMod': {
+        const intrinsic = t.value;
+        this.pos++;
+        this.expect('<');
+        const ty = this.parseType();
+        this.expect('>');
+        if (ty.t !== 'IntN') throw new ParseError(`${intrinsic} requires IntN`, t);
+        this.expect('(');
+        const left = this.parseExpression();
+        if (intrinsic === 'intCast') {
+          this.expect(')');
+          return b.intCast(ty, left);
+        }
+        this.expect(',');
+        const right = this.parseExpression();
+        this.expect(')');
+        const op = intrinsic.slice(5).toLowerCase() as 'add' | 'sub' | 'mul' | 'div' | 'mod';
+        return b.fixed(op, ty, left, right);
+      }
       default: break;
     }
 
@@ -515,6 +677,7 @@ export class Parser {
     sub.scope = this.scope;
     sub.inEnsures = ensures;
     for (const [name, ty] of this.typeEnv) sub.typeEnv.set(name, ty);
+    for (const name of this.typeParams) sub.typeParams.add(name);
     const expr = sub.parseExpression();
     if (sub.peek().type !== 'eof') throw new ParseError('trailing input in doc comment', sub.peek());
     return expr;
@@ -560,6 +723,13 @@ export class Parser {
         if (moduleTag) moduleName = moduleTag[1];
         const provTag = /^\/\/\s*@provenance\s+(\S+)/.exec(doc);
         if (provTag) provenance = provTag[1] as ProvenanceId;
+        const importTag = /^\/\/\s*@import\s+(ast:b3:[0-9a-f]{64})(?:\s+(.*))?$/.exec(doc);
+        if (importTag) {
+          const symbols = importTag[2]
+            ? importTag[2].split(',').map((symbol) => symbol.trim() as SymbolId).filter(Boolean)
+            : [];
+          members.push(b.import_(importTag[1] as NodeRef, symbols));
+        }
       }
       if (this.peek().type === 'eof') break;
       members.push(this.parseDeclaration(docs));
@@ -619,6 +789,12 @@ export class Parser {
     this.expect('function', 'ident');
     const name = this.expectIdent();
     const symbol = this.bind(name);
+    const typeParams: string[] = [];
+    if (this.accept('<')) {
+      do typeParams.push(this.expectIdent()); while (this.accept(','));
+      this.expect('>');
+    }
+    for (const typeParam of typeParams) this.typeParams.add(typeParam);
 
     this.pushScope();
     this.expect('(');
@@ -658,10 +834,12 @@ export class Parser {
       body = this.parseBlock();
     }
     this.popScope();
+    for (const typeParam of typeParams) this.typeParams.delete(typeParam);
     void docs;
 
     return b.fn({
       symbol,
+      typeParams,
       params,
       returns,
       capabilities,

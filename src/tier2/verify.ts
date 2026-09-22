@@ -270,6 +270,22 @@ class VcBuilder {
       case 'RecordLit': return this.freshVar('record');
       case 'ResultValue': return this.freshVar(`result_${expr.variant}`);
       case 'MatchResult': return this.freshVar('match_result');
+      case 'SeqLit': return this.freshVar('sequence');
+      case 'SeqIndex': return this.freshVar('sequence_index');
+      case 'SeqLength': return this.freshVar('sequence_length');
+      case 'SeqMap':
+      case 'SeqFold': {
+        const callee = this.opts.environment?.get(expr.callee);
+        if (callee?.kind === 'FunctionDecl') {
+          this.dependencies.set(callee.symbol, new GraphStore().intern(callee));
+        }
+        return this.freshVar(expr.kind === 'SeqMap' ? 'sequence_map' : 'sequence_fold');
+      }
+      case 'Lambda': return this.freshVar('closure');
+      case 'Apply': return this.freshVar('apply');
+      case 'StringOp': return this.freshVar(`string_${expr.op}`);
+      case 'IntCast': return this.freshVar('fixed_cast');
+      case 'FixedBin': return this.freshVar(`fixed_${expr.op}`);
       default: return this.freshVar('opaque');
     }
   }

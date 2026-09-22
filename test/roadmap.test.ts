@@ -201,7 +201,8 @@ test('the two confirmed language holes agree with roadmap status', () => {
   assert.ok(ast.includes("t: 'Result'"), 'Result is still declared as a type');
   assert.equal(byId.get('B1')!.status, 'complete');
   assert.ok(ast.includes("kind: 'MatchResult'"), 'B1 is complete but MatchResult is absent');
-  assert.equal(ast.includes("kind: 'Import'"), false, 'a module still cannot reference another');
+  assert.equal(byId.get('B6')!.status, 'complete');
+  assert.ok(ast.includes("kind: 'Import'"), 'B6 is complete but Import is absent');
 });
 
 // ---------------------------------------------------------------------------

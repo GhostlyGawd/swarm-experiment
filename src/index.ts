@@ -13,6 +13,7 @@ export { canonicalBytes, canonicalText, type Canonical } from './tier1/canonical
 export { Blake3, blake3, blake3Hex, bytesToHex } from './tier1/blake3.ts';
 export { GraphStore, alphaNormalize, hashNode, structuralKeyOf, type Step, type StoreStats } from './tier1/store.ts';
 export { AetherRepository, type CommitOptions, type CommitRecord, type FsckIssue, type GarbageCollectionResult, type Packfile } from './tier1/repository.ts';
+export { ModuleResolver, type ResolvedModule } from './tier1/modules.ts';
 export { merge3, type MergeConflict, type MergeResult } from './tier1/merge.ts';
 export { SymbolSpace } from './tier1/symbols.ts';
 export * from './tier1/provenance.ts';
@@ -30,7 +31,7 @@ export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec
 
 // --- Tier 3: execution and simulation ---------------------------------------
 export { AetherFault, Runtime, type Checkpoint, type ExecutionResult, type Fault, type FaultKind, type TraceEvent } from './tier3/runtime.ts';
-export { formatValue, isRef, isResultValue, type Ref, type ResultValue, type Value } from './tier3/values.ts';
+export { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, type ClosureValue, type Ref, type ResultValue, type SeqValue, type Value } from './tier3/values.ts';
 export { ProductionRuntime, formatCompilation, type ClauseDecision, type CompilationReport, type CompileOptions, type ElisionPolicy } from './tier3/compile.ts';
 export { MicroWorld, formatMicroWorld, simulateModule, type Counterexample, type MicroWorldReport, type PropertyName } from './tier3/microworld.ts';
 export { generateCase, materialise, shrinkPlain, type Plain } from './tier3/generate.ts';
