@@ -1,0 +1,6 @@
+{
+  "format": "aether.fresh-guest-run-refusal/1",
+  "recordedAt": "2026-09-22T22:09:22.571Z",
+  "guestExecutions": 0,
+  "reason": "Source-pin check refused execution: src/tier3/compile.ts changed after preregistration. No controller was launched and no guest samples were taken."
+}

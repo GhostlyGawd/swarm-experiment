@@ -1,0 +1,307 @@
+{
+  "format": "aether.fresh-guest-registration/1",
+  "registeredAt": "2026-09-22T22:06:55.326Z",
+  "subjectCommit": "3dfabcae63d42ff9382570d576fa6cedb7131b17",
+  "workingTreeDirty": true,
+  "profile": {
+    "format": "aether.fresh-guest-campaign/1",
+    "version": "2.0.0",
+    "approvedProfile": "docs/implementation/v4/decisions/D07-native-qualification-profile.json",
+    "trialCount": 1000,
+    "guestWarmupCount": 0,
+    "controllerProcesses": 1,
+    "parallelGuests": 1,
+    "controllerTimeoutMilliseconds": 60000,
+    "guestMappedBytes": 65536,
+    "bootMaximumNanoseconds": 1000000,
+    "guestResidentMaximumBytes": 2000000,
+    "controllerInitialization": [
+      "Load and admit the immutable guest image into controller memory.",
+      "Initialize timer conversion, host page-size and RSS diagnostics.",
+      "Query Hypervisor.framework vCPU capacity.",
+      "Create one empty VM and one vCPU, then destroy both, before controller_ready to exercise hypervisor context initialization.",
+      "Map no guest memory and execute no guest instructions during hypervisor initialization.",
+      "Include empty-context initialization in controller startup diagnostics; measure every subsequent fresh guest, including guest zero."
+    ],
+    "perTrialStart": "mach_absolute_time immediately before fresh anonymous guest allocation",
+    "perTrialIncluded": [
+      "fresh mmap allocation and explicit zeroing of all guest pages",
+      "copy admitted image bytes into fresh guest memory",
+      "hv_vm_create, guest RX/RW mappings, fresh vCPU creation and register setup",
+      "execute guest and read its response registers",
+      "validate HVC exception class, exact expected value and zero status",
+      "validation compiler/instruction barrier before the stop timestamp"
+    ],
+    "perTrialStop": "mach_absolute_time after response validation has completed",
+    "perTrialCleanup": "Destroy vCPU and VM and unmap guest memory before starting the next guest; cleanup is outside boot latency and must succeed.",
+    "inputs": "Trial i, zero-based: gross=1000+200*i, adjustment=7; expect gross/200+7=12+i.",
+    "memoryObservation": "After validated response and before destruction, mincore counts resident mapped guest pages. The sole guest mapping is 65536 bytes and cannot grow; observed full residency equals its peak bound.",
+    "failurePolicy": "Keep every trial and every latency miss. An API, response-validation, residency or cleanup error stops the campaign and records incomplete/failed qualification. Do not retry a failed guest or discard outliers.",
+    "latencyStatistic": "maximum over all 1000 valid trials; median/percentiles are diagnostics",
+    "diagnostics": [
+      "initial process-launch-to-controller-ready time",
+      "controller current and peak RSS before and during the campaign",
+      "guest image, mapped, resident and residency-upper-bound bytes",
+      "ambient host load before and after campaign; no controlled isolation claim",
+      "host hypervisor kernel memory explicitly not measured"
+    ],
+    "scope": "Bounded checked-i64 arithmetic guest with HVC result mailbox. No general native runtime, guest scheduler, network/storage drivers, mutable heap or full unikernel-completion claim.",
+    "hypervisorBootstrap": {
+      "emptyVmContextsCreated": 1,
+      "emptyVmContextsDestroyed": 1,
+      "vcpusCreated": 1,
+      "vcpusDestroyed": 1,
+      "guestMappings": 0,
+      "guestExecutions": 0
+    },
+    "boundaryRationale": "The capacity-query API does not guarantee hypervisor initialization. An explicit empty VM/vCPU lifecycle initializes those API resources without executing a guest. Any remaining first-execution lazy work remains inside measured guest zero."
+  },
+  "profileDigest": "sha256:9e523afdc3d44403ae4c46d46e8f0ec840005b787fa6905e8470dbaa1245af52",
+  "approvedProfile": {
+    "format": "aether.native-qualification-profile/1",
+    "version": "1.0.0",
+    "requirement": "V4-NFR-06",
+    "source": "PRD FR-4.5 and section 7; user clarification 2026-09-22",
+    "authorization": "User selected: Fresh guest on an already-running hypervisor; guest resident memory.",
+    "boot": {
+      "maximumMilliseconds": 1,
+      "start": "Begin creating a fresh guest instance on an already-running hypervisor/controller.",
+      "stop": "First validated useful response from that fresh guest.",
+      "include": [
+        "guest allocation",
+        "image loading into the guest",
+        "VM/vCPU creation and setup",
+        "guest execution through the first validated response"
+      ],
+      "exclude": [
+        "initial controller-process launch",
+        "starting the hypervisor service",
+        "artifact compilation and prior admission"
+      ],
+      "reuseExistingGuest": false,
+      "aggregate": "maximum observed over the preregistered campaign, with all raw samples retained"
+    },
+    "memory": {
+      "maximumBytes": 2000000,
+      "scope": "Peak guest resident memory, including guest code, data, stacks, heaps and guest drivers.",
+      "exclude": [
+        "controller-process RSS",
+        "host hypervisor memory"
+      ],
+      "requiredDiagnostics": [
+        "guest image bytes",
+        "guest mapped/resident bytes",
+        "controller-process RSS",
+        "host/hypervisor overhead where measurable"
+      ]
+    },
+    "qualification": "This profile fixes measurement scope; it does not establish that the target passes or that the full native/unikernel implementation exists."
+  },
+  "approvedProfileDigest": "sha256:8bad93c9a8ef4c5dad9634cdd04d6afc08da3ffe5c5f731e269f4132bdefc8d2",
+  "sourceFiles": [
+    {
+      "path": "roadmap/v4/research/native/boot.c",
+      "digest": "sha256:1812dc071534a0a8d01f5d6e15d18143dca47537ffa7b39a4daf7aab206de44f"
+    },
+    {
+      "path": "roadmap/v4/research/native/driver.c",
+      "digest": "sha256:54c456789b3c7c1c026ed7bddfdb7908ae849ef148f18acc01b9b4aa3dc8608a"
+    },
+    {
+      "path": "roadmap/v4/research/native/harness.ts",
+      "digest": "sha256:d2f18a783404c788f9525bbc65989b1e0756706e9dfe34560542396af55bc650"
+    },
+    {
+      "path": "roadmap/v4/research/native/hypervisor.entitlements",
+      "digest": "sha256:70d65ae13874e183526aa48e55bb330f2156da94effca24f89b5e2f940262723"
+    },
+    {
+      "path": "roadmap/v4/research/native/initialized-guest-campaign-profile.json",
+      "digest": "sha256:9e523afdc3d44403ae4c46d46e8f0ec840005b787fa6905e8470dbaa1245af52"
+    },
+    {
+      "path": "roadmap/v4/research/native/initialized-guest-campaign.c",
+      "digest": "sha256:602329b93a788159de3fff431e7296e0fde504ed5b49b1eec275d1a8c72062ae"
+    },
+    {
+      "path": "roadmap/v4/research/native/initialized-guest-campaign.ts",
+      "digest": "sha256:7765ae60754bfd6e5cdf2222caba1bf6441fdf93ebbf4ebe48b01fe4d478bff3"
+    },
+    {
+      "path": "roadmap/v4/research/native/kernel.ld",
+      "digest": "sha256:3b0833ef9484f104c9ea95cd78f2d1ec3b9068be76826c96d5d14847ceb21b91"
+    },
+    {
+      "path": "roadmap/v4/research/native/lower.ts",
+      "digest": "sha256:a6d7617b150a8e2f1ec9ac6ff4e3e7500a5cdfb9dbb62325608fc8cac3e39095"
+    },
+    {
+      "path": "roadmap/v4/research/native/start.S",
+      "digest": "sha256:f902b18d97da648ccae0fe67b8be6d3d57d706847d267729c503ff18066f72e2"
+    },
+    {
+      "path": "src/tier1/agent-ir.ts",
+      "digest": "sha256:bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b"
+    },
+    {
+      "path": "src/tier1/ast.ts",
+      "digest": "sha256:b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb"
+    },
+    {
+      "path": "src/tier1/blake3.ts",
+      "digest": "sha256:1fe06b0b58c78837acdb5a2a2431b313474c64427fde573196bcd58f86f709d4"
+    },
+    {
+      "path": "src/tier1/build.ts",
+      "digest": "sha256:e1617b0eed8c27cf4d3162e68494126f817f28ec1bf24d32828ebcaa55e6d934"
+    },
+    {
+      "path": "src/tier1/canonical.ts",
+      "digest": "sha256:16022baba00d8d0e87a4fe7f5eabfe1d79492945ad48c4bd6783ad22f5f83021"
+    },
+    {
+      "path": "src/tier1/durable-store.ts",
+      "digest": "sha256:a5cc4fa97c3482d965f38a87831c5c9dabd1b6379096e9b49a139a40940b1f57"
+    },
+    {
+      "path": "src/tier1/ids.ts",
+      "digest": "sha256:73a6cf5a0b6537d879b2b3980ba9b4a1937701d52f97b4bf1deb09acf1e023a5"
+    },
+    {
+      "path": "src/tier1/index.ts",
+      "digest": "sha256:66ea268e19ca4692309605f238afcb880ec5c0889609ef4ec67614c4836cb54d"
+    },
+    {
+      "path": "src/tier1/merge.ts",
+      "digest": "sha256:d4ddf96a5aa8b31820758c13250d3aa18c2a26e7776be868c3131c1d912f8d5f"
+    },
+    {
+      "path": "src/tier1/modules.ts",
+      "digest": "sha256:e8c54353d5539b6a60c31d945c36487d26b23f5c1a64314d281e7b61883eb06a"
+    },
+    {
+      "path": "src/tier1/persistence.ts",
+      "digest": "sha256:59a3d46d55aeeffadd80ecf834cbe3db5dd117142cf6ca8beb9c18abfa46ea06"
+    },
+    {
+      "path": "src/tier1/provenance.ts",
+      "digest": "sha256:2d18f16630b8eb189abd1e30cc64ab74b545234c7a6397741268fad6313a3b46"
+    },
+    {
+      "path": "src/tier1/repository.ts",
+      "digest": "sha256:e8a4811c293e773970840e3322017afad159dc84096d2d0318d1d725e43727c5"
+    },
+    {
+      "path": "src/tier1/store.ts",
+      "digest": "sha256:b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3"
+    },
+    {
+      "path": "src/tier1/symbols.ts",
+      "digest": "sha256:1520a4adfd1f837f16357205d88c330056ffe73f3c74d4f26e1d1663dc0362a9"
+    },
+    {
+      "path": "src/tier2/external-solver.ts",
+      "digest": "sha256:5b96297d2c19b5be56e27c2f8ec7404bf23dabaf37f9f2246c85dd79afa94544"
+    },
+    {
+      "path": "src/tier2/incremental.ts",
+      "digest": "sha256:7a82489a2911ef13481eee40a7e635579954786ae6f8d03ba3449f03ecb73205"
+    },
+    {
+      "path": "src/tier2/index.ts",
+      "digest": "sha256:da7f72aef47d78bb58414232a5e726149e09953bc38c760594fde5fb45308c46"
+    },
+    {
+      "path": "src/tier2/ocap.ts",
+      "digest": "sha256:22f6bcedac0bf081e4a0f6045928eb9e4526efd2d46153c5832d6f058d9bfbad"
+    },
+    {
+      "path": "src/tier2/portable-formula-checker.ts",
+      "digest": "sha256:64bff6b34cf7adc049bc0b6a63842ebcacba99157da6654365532b5492bba4bc"
+    },
+    {
+      "path": "src/tier2/portable-formula-producer.ts",
+      "digest": "sha256:61b8f25a87ae5324b1939fcd805eb33101b2775aa95509cc15f6a9f7cc240de3"
+    },
+    {
+      "path": "src/tier2/portable-formula.ts",
+      "digest": "sha256:4517cc179874cf5a5fba82b28399a8fff215fbe0eba3f645f7b4130633611fa8"
+    },
+    {
+      "path": "src/tier2/portable-linear-kernel.ts",
+      "digest": "sha256:1550cd7c79c26c9d2e513b0abbfb903040055d3b2fc5fb726b46fbdf3d40c6fb"
+    },
+    {
+      "path": "src/tier2/portable-linear-producer.ts",
+      "digest": "sha256:36ba2d14916782cc1d2b0d7c9895a0ebe232da3ad40726707c10a23981f0fad5"
+    },
+    {
+      "path": "src/tier2/portable-obligations.ts",
+      "digest": "sha256:578e341c9e23ae6c3f7a13d4b41d9cf6d21ee49c5941d79369f3c03eb76e320d"
+    },
+    {
+      "path": "src/tier2/portable-proof-checker.ts",
+      "digest": "sha256:1c664b922a9e89b3c570a42290820d154013db1a8918bc9d612c668201cbef99"
+    },
+    {
+      "path": "src/tier2/portable-proof-producer.ts",
+      "digest": "sha256:d8b0bc7af8fd7d8550da2649a9732362de138799af0836619c909bc0c46a7f30"
+    },
+    {
+      "path": "src/tier2/proof-cache.ts",
+      "digest": "sha256:48ed4b3a46b510c16a4d162ea61fe1f356e792426193c1b6410c5f2f72de43ca"
+    },
+    {
+      "path": "src/tier2/smt.ts",
+      "digest": "sha256:bcb8cfa291cf52294e56150808a89b012e56ab7242e2b807c3f2310f59aa3628"
+    },
+    {
+      "path": "src/tier2/solver.ts",
+      "digest": "sha256:97a78f1e654402bb9e55d1d34d8d71689417ac8710144984cc306f31d624cf77"
+    },
+    {
+      "path": "src/tier2/spec.ts",
+      "digest": "sha256:9748346355c73771c98ce1f133365aec000388d8f022ec39a1645371b7a39f88"
+    },
+    {
+      "path": "src/tier2/typecheck.ts",
+      "digest": "sha256:19113ce88ac99a02a1e7b1f4acad694a1d1c83f9520b2fe7f2545669a5da1b18"
+    },
+    {
+      "path": "src/tier2/verify.ts",
+      "digest": "sha256:99f540c247a0371425e6c79b89a301a6c9cb2b479545f993680a9f30d295908f"
+    },
+    {
+      "path": "src/tier3/compile.ts",
+      "digest": "sha256:241fd360bfd28affa16a51915730f9ca0d6257c358735daba92bb7ca12679705"
+    },
+    {
+      "path": "src/tier3/effects.ts",
+      "digest": "sha256:8ac615990162090a618bfed364bd26650a73e64c4dc28ea2c922df54742fa72f"
+    },
+    {
+      "path": "src/tier3/generate.ts",
+      "digest": "sha256:e0616810c70361b4f9d44462d55498dbbdc24ac46bcd4827369f409f0b351612"
+    },
+    {
+      "path": "src/tier3/heap-state.ts",
+      "digest": "sha256:4d2fb86e19d86a767dfd8a676adf955627116c98e12fbc607fca6212d40e788a"
+    },
+    {
+      "path": "src/tier3/index.ts",
+      "digest": "sha256:edb7dc5a3cf7af3df166fdae68fdbfa2bf06b53c4024bf670d851169317649d7"
+    },
+    {
+      "path": "src/tier3/microworld.ts",
+      "digest": "sha256:b7423075f310f19a9d634da52486eabf72a459260fb4973a7f2e7fc5c102c86c"
+    },
+    {
+      "path": "src/tier3/runtime.ts",
+      "digest": "sha256:0c2f2f24663611f881c7e50519e2e3f8927eeb984db08f1f7f72c93381aee93a"
+    },
+    {
+      "path": "src/tier3/values.ts",
+      "digest": "sha256:0b48ec39f48128c65c11a3fcd3edfec06720fd1c0c9871fd33ad3ea92759a99e"
+    }
+  ]
+}

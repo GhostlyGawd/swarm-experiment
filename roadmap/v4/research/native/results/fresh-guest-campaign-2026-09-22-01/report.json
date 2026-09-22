@@ -1,0 +1,99 @@
+{
+  "format": "aether.fresh-guest-report/1",
+  "completedAt": "2026-09-22T22:01:33.631Z",
+  "registrationDigest": "sha256:3faa6bad0f13827f082e1316a9e7d1e86c59ced6b551b84d3de31e6dbdd5bff7",
+  "admissionDigest": "sha256:e34a8b79019f8a7705ab86642519dda9f528fdf3a2bef018d6dae62eff990f93",
+  "rawDigest": "sha256:e88f198bc6a638a4eb38480cc9babaab87cba9abd34645cfd336f9677ab975d6",
+  "executionDigest": "sha256:98912629a23c52f837596a70adb760789a1e6bd336010da6f8a19410acfd6eb1",
+  "approvedProfileDigest": "sha256:8bad93c9a8ef4c5dad9634cdd04d6afc08da3ffe5c5f731e269f4132bdefc8d2",
+  "environment": {
+    "os": "darwin",
+    "release": "25.6.0",
+    "architecture": "arm64",
+    "cpu": "Apple M4 Pro",
+    "logicalCpus": 12,
+    "ramBytes": 25769803776,
+    "node": "v26.7.0",
+    "loadAverageBefore": [
+      2.73681640625,
+      3.93603515625,
+      4.3291015625
+    ],
+    "loadAverageAfter": [
+      2.73681640625,
+      3.93603515625,
+      4.3291015625
+    ],
+    "isolation": "Ambient machine; no exclusive CPU/core reservation or controlled release-isolation claim."
+  },
+  "assessment": {
+    "validCampaign": true,
+    "requestedTrials": 1000,
+    "recordedTrials": 1000,
+    "validTrials": 1000,
+    "reasons": [],
+    "boot": {
+      "verdict": "fail",
+      "thresholdNanoseconds": 1000000,
+      "summaryNanoseconds": {
+        "count": 1000,
+        "min": 20916.666666666668,
+        "p50": 31166.666666666668,
+        "p95": 69333.33333333333,
+        "p99": 118458.33333333333,
+        "max": 2534583.3333333335,
+        "mean": 39701.74999999995
+      },
+      "misses": [
+        {
+          "trial": 0,
+          "nanoseconds": 2534583.3333333335
+        },
+        {
+          "trial": 17,
+          "nanoseconds": 1403958.3333333333
+        }
+      ]
+    },
+    "guestMemory": {
+      "verdict": "pass",
+      "thresholdBytes": 2000000,
+      "observedResidentBytes": {
+        "count": 1000,
+        "min": 65536,
+        "p50": 65536,
+        "p95": 65536,
+        "p99": 65536,
+        "max": 65536,
+        "mean": 65536
+      },
+      "peakUpperBoundBytes": 65536
+    },
+    "diagnostics": {
+      "processLaunchToControllerReadyNs": 229492833,
+      "controllerCurrentRssBytes": {
+        "count": 1000,
+        "min": 6275072,
+        "p50": 6635520,
+        "p95": 6635520,
+        "p99": 6635520,
+        "max": 6635520,
+        "mean": 6613417.984
+      },
+      "controllerPeakRssBytes": {
+        "count": 1000,
+        "min": 6275072,
+        "p50": 6635520,
+        "p95": 6651904,
+        "p99": 6651904,
+        "max": 6651904,
+        "mean": 6624100.352
+      },
+      "imageBytes": 60,
+      "hostHypervisorKernelOverheadBytes": null,
+      "hostHypervisorKernelOverheadReason": "Not directly measured; excluded by the approved guest-resident-memory profile."
+    },
+    "qualification": "not_qualified",
+    "scope": "One preregistered scalar guest campaign on the named host. This result does not complete the native/unikernel implementation or prove universal latency bounds."
+  }
+}

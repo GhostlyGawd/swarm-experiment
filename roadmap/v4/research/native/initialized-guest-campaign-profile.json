@@ -1,0 +1,53 @@
+{
+  "format": "aether.fresh-guest-campaign/1",
+  "version": "2.0.0",
+  "approvedProfile": "docs/implementation/v4/decisions/D07-native-qualification-profile.json",
+  "trialCount": 1000,
+  "guestWarmupCount": 0,
+  "controllerProcesses": 1,
+  "parallelGuests": 1,
+  "controllerTimeoutMilliseconds": 60000,
+  "guestMappedBytes": 65536,
+  "bootMaximumNanoseconds": 1000000,
+  "guestResidentMaximumBytes": 2000000,
+  "controllerInitialization": [
+    "Load and admit the immutable guest image into controller memory.",
+    "Initialize timer conversion, host page-size and RSS diagnostics.",
+    "Query Hypervisor.framework vCPU capacity.",
+    "Create one empty VM and one vCPU, then destroy both, before controller_ready to exercise hypervisor context initialization.",
+    "Map no guest memory and execute no guest instructions during hypervisor initialization.",
+    "Include empty-context initialization in controller startup diagnostics; measure every subsequent fresh guest, including guest zero."
+  ],
+  "perTrialStart": "mach_absolute_time immediately before fresh anonymous guest allocation",
+  "perTrialIncluded": [
+    "fresh mmap allocation and explicit zeroing of all guest pages",
+    "copy admitted image bytes into fresh guest memory",
+    "hv_vm_create, guest RX/RW mappings, fresh vCPU creation and register setup",
+    "execute guest and read its response registers",
+    "validate HVC exception class, exact expected value and zero status",
+    "validation compiler/instruction barrier before the stop timestamp"
+  ],
+  "perTrialStop": "mach_absolute_time after response validation has completed",
+  "perTrialCleanup": "Destroy vCPU and VM and unmap guest memory before starting the next guest; cleanup is outside boot latency and must succeed.",
+  "inputs": "Trial i, zero-based: gross=1000+200*i, adjustment=7; expect gross/200+7=12+i.",
+  "memoryObservation": "After validated response and before destruction, mincore counts resident mapped guest pages. The sole guest mapping is 65536 bytes and cannot grow; observed full residency equals its peak bound.",
+  "failurePolicy": "Keep every trial and every latency miss. An API, response-validation, residency or cleanup error stops the campaign and records incomplete/failed qualification. Do not retry a failed guest or discard outliers.",
+  "latencyStatistic": "maximum over all 1000 valid trials; median/percentiles are diagnostics",
+  "diagnostics": [
+    "initial process-launch-to-controller-ready time",
+    "controller current and peak RSS before and during the campaign",
+    "guest image, mapped, resident and residency-upper-bound bytes",
+    "ambient host load before and after campaign; no controlled isolation claim",
+    "host hypervisor kernel memory explicitly not measured"
+  ],
+  "scope": "Bounded checked-i64 arithmetic guest with HVC result mailbox. No general native runtime, guest scheduler, network/storage drivers, mutable heap or full unikernel-completion claim.",
+  "hypervisorBootstrap": {
+    "emptyVmContextsCreated": 1,
+    "emptyVmContextsDestroyed": 1,
+    "vcpusCreated": 1,
+    "vcpusDestroyed": 1,
+    "guestMappings": 0,
+    "guestExecutions": 0
+  },
+  "boundaryRationale": "The capacity-query API does not guarantee hypervisor initialization. An explicit empty VM/vCPU lifecycle initializes those API resources without executing a guest. Any remaining first-execution lazy work remains inside measured guest zero."
+}
