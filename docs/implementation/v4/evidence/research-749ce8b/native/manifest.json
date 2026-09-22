@@ -1,0 +1,577 @@
+{
+  "format": "aether.native-feasibility/2",
+  "specificationVersion": "0.1.0",
+  "createdAt": "2026-09-22T21:26:01.490Z",
+  "qualificationProfile": {
+    "path": "docs/implementation/v4/decisions/D07-native-qualification-profile.json",
+    "digest": "sha256:8bad93c9a8ef4c5dad9634cdd04d6afc08da3ffe5c5f731e269f4132bdefc8d2",
+    "value": {
+      "format": "aether.native-qualification-profile/1",
+      "version": "1.0.0",
+      "requirement": "V4-NFR-06",
+      "source": "PRD FR-4.5 and section 7; user clarification 2026-09-22",
+      "authorization": "User selected: Fresh guest on an already-running hypervisor; guest resident memory.",
+      "boot": {
+        "maximumMilliseconds": 1,
+        "start": "Begin creating a fresh guest instance on an already-running hypervisor/controller.",
+        "stop": "First validated useful response from that fresh guest.",
+        "include": [
+          "guest allocation",
+          "image loading into the guest",
+          "VM/vCPU creation and setup",
+          "guest execution through the first validated response"
+        ],
+        "exclude": [
+          "initial controller-process launch",
+          "starting the hypervisor service",
+          "artifact compilation and prior admission"
+        ],
+        "reuseExistingGuest": false,
+        "aggregate": "maximum observed over the preregistered campaign, with all raw samples retained"
+      },
+      "memory": {
+        "maximumBytes": 2000000,
+        "scope": "Peak guest resident memory, including guest code, data, stacks, heaps and guest drivers.",
+        "exclude": [
+          "controller-process RSS",
+          "host hypervisor memory"
+        ],
+        "requiredDiagnostics": [
+          "guest image bytes",
+          "guest mapped/resident bytes",
+          "controller-process RSS",
+          "host/hypervisor overhead where measurable"
+        ]
+      },
+      "qualification": "This profile fixes measurement scope; it does not establish that the target passes or that the full native/unikernel implementation exists."
+    }
+  },
+  "subjectCommit": "749ce8bbf437af4d1ee424261f4165413036632a",
+  "workingTreeDirty": false,
+  "sourceDigest": "sha256:098504c75ee788667911bf0bdada66302541b83efaeae656a24e5c0ffff77c43",
+  "sources": [
+    {
+      "path": "roadmap/v4/research/native/boot.c",
+      "digest": "sha256:1812dc071534a0a8d01f5d6e15d18143dca47537ffa7b39a4daf7aab206de44f"
+    },
+    {
+      "path": "roadmap/v4/research/native/driver.c",
+      "digest": "sha256:54c456789b3c7c1c026ed7bddfdb7908ae849ef148f18acc01b9b4aa3dc8608a"
+    },
+    {
+      "path": "roadmap/v4/research/native/harness.ts",
+      "digest": "sha256:d2f18a783404c788f9525bbc65989b1e0756706e9dfe34560542396af55bc650"
+    },
+    {
+      "path": "roadmap/v4/research/native/hypervisor.entitlements",
+      "digest": "sha256:70d65ae13874e183526aa48e55bb330f2156da94effca24f89b5e2f940262723"
+    },
+    {
+      "path": "roadmap/v4/research/native/kernel.ld",
+      "digest": "sha256:3b0833ef9484f104c9ea95cd78f2d1ec3b9068be76826c96d5d14847ceb21b91"
+    },
+    {
+      "path": "roadmap/v4/research/native/lower.ts",
+      "digest": "sha256:a6d7617b150a8e2f1ec9ac6ff4e3e7500a5cdfb9dbb62325608fc8cac3e39095"
+    },
+    {
+      "path": "roadmap/v4/research/native/run.ts",
+      "digest": "sha256:ce1b6202baf8f8d4f8edb749ebd8ee66b83d65b8e6ecc6ac96e1e41c0607fbe0"
+    },
+    {
+      "path": "roadmap/v4/research/native/start.S",
+      "digest": "sha256:f902b18d97da648ccae0fe67b8be6d3d57d706847d267729c503ff18066f72e2"
+    },
+    {
+      "path": "src/agent/index.ts",
+      "digest": "sha256:aa898229983f1f0bfd2d309fc80dc52fd636949398df68d1b96931d2c948e790"
+    },
+    {
+      "path": "src/agent/protocol.ts",
+      "digest": "sha256:1864a86a9b06b9622958fedad86bbd69e3072d3ed739acc1617d07a85a90f16a"
+    },
+    {
+      "path": "src/cli.ts",
+      "digest": "sha256:80c921bb3f55cefa3405497a877c2b0e684893c07d3910cdeb179439007c2e9c"
+    },
+    {
+      "path": "src/examples/ledger.ts",
+      "digest": "sha256:ef3ee4a64ab5227a6c4a4d135afe227583bcef0b313f50d30f5eee5de63362cd"
+    },
+    {
+      "path": "src/fabric/effects.ts",
+      "digest": "sha256:3e774625003d165acfde4defa1d1fbb13b24e5c53eac40923141da0a969d3baf"
+    },
+    {
+      "path": "src/fabric/encoding.ts",
+      "digest": "sha256:dfbdebe832235f87e372a1d955da1f2f1b428bf37090c27b2156bf7360b2fe09"
+    },
+    {
+      "path": "src/fabric/evidence.ts",
+      "digest": "sha256:d1e79ce2306d7e02acf1511ff2b5dea565e59d3a7ce75a6fa3f85ee27ba087fb"
+    },
+    {
+      "path": "src/fabric/identity.ts",
+      "digest": "sha256:a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd"
+    },
+    {
+      "path": "src/fabric/index.ts",
+      "digest": "sha256:5282c7585a6b6a2a37aaa852618838bfda171639ae55fc838d749216b9fe30f6"
+    },
+    {
+      "path": "src/fabric/journal-lock.ts",
+      "digest": "sha256:06f0eb7ad4f21c512bc8489646e2ddaa8ac1ecede1b777e7403ca2920d1245c6"
+    },
+    {
+      "path": "src/fabric/replication.ts",
+      "digest": "sha256:e63801126d5331bfc27619dea8d9803309c1ec52465f9ed8cfb7846658c1442d"
+    },
+    {
+      "path": "src/fabric/snapshot.ts",
+      "digest": "sha256:08736c7077a3cbfedebffba3c8a150a9b2b5d2aba85247458ca9b42288b5b9c6"
+    },
+    {
+      "path": "src/index.ts",
+      "digest": "sha256:0ca9b50f34cc5c196e4f1da2ea8735fdc32129f868f04553136ecb61b1e7a2ac"
+    },
+    {
+      "path": "src/projection/coverage.ts",
+      "digest": "sha256:03fbe67ac38b4db71c2b82b6d8d8dce47ab44e836af61f93c94dde059ed246c3"
+    },
+    {
+      "path": "src/projection/diff.ts",
+      "digest": "sha256:6944d7e90d8b461327671de624ed11513669bfcc0d9753ddf797d91b39df499d"
+    },
+    {
+      "path": "src/projection/index.ts",
+      "digest": "sha256:45e0f832e6fb8dbc63f424c1907a4fc6bcae768261be652e28b97685cc39bebe"
+    },
+    {
+      "path": "src/projection/lexer.ts",
+      "digest": "sha256:66f325dcc26370aa51e2bd1368cc51f0709187765c2b16063d150ee69c24abe3"
+    },
+    {
+      "path": "src/projection/lsp.ts",
+      "digest": "sha256:a362f537ba3ee0f9942938d976e6518fa76e586d04329f34605fc55d79276cc3"
+    },
+    {
+      "path": "src/projection/names.ts",
+      "digest": "sha256:077540144599bbae53061cc7e2e89324618b68677b7aca08511f9c203a0ab7cf"
+    },
+    {
+      "path": "src/projection/parse.ts",
+      "digest": "sha256:97c0beb5aa1d9130a664e897769ee379d93b68b5f43cb3fc52afe3d801271fd5"
+    },
+    {
+      "path": "src/projection/python.ts",
+      "digest": "sha256:a830ae6b08af98867a2cce8ac2acba1b3f64b2158057dc8bf223bd5aae680c7c"
+    },
+    {
+      "path": "src/projection/rust.ts",
+      "digest": "sha256:bd0cd8ff016ab0ae976247b6a1f1d27fbe0a232c9b0b0723c19819614c088aca"
+    },
+    {
+      "path": "src/projection/typescript.ts",
+      "digest": "sha256:952e790f7da01ab12dd2fa0a247c7ac1699e106462c70fe388fe9923e592594a"
+    },
+    {
+      "path": "src/synthesis/enumerative.ts",
+      "digest": "sha256:e84d5a562b9389c529a8f7c52d60b1b967fdd2eb1f31ee49151b183d139f6a22"
+    },
+    {
+      "path": "src/synthesis/loop.ts",
+      "digest": "sha256:90359515623b776d8173cab7d52d9f6d74189b44129a940b1153fae1d389d0fc"
+    },
+    {
+      "path": "src/tier1/agent-ir.ts",
+      "digest": "sha256:bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b"
+    },
+    {
+      "path": "src/tier1/ast.ts",
+      "digest": "sha256:b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb"
+    },
+    {
+      "path": "src/tier1/blake3.ts",
+      "digest": "sha256:1fe06b0b58c78837acdb5a2a2431b313474c64427fde573196bcd58f86f709d4"
+    },
+    {
+      "path": "src/tier1/build.ts",
+      "digest": "sha256:e1617b0eed8c27cf4d3162e68494126f817f28ec1bf24d32828ebcaa55e6d934"
+    },
+    {
+      "path": "src/tier1/canonical.ts",
+      "digest": "sha256:16022baba00d8d0e87a4fe7f5eabfe1d79492945ad48c4bd6783ad22f5f83021"
+    },
+    {
+      "path": "src/tier1/ids.ts",
+      "digest": "sha256:73a6cf5a0b6537d879b2b3980ba9b4a1937701d52f97b4bf1deb09acf1e023a5"
+    },
+    {
+      "path": "src/tier1/index.ts",
+      "digest": "sha256:9175f2256003dd3e38078f3d9b5a2f1b2f935d8cbda79af87ca6fa179c5e2e5f"
+    },
+    {
+      "path": "src/tier1/merge.ts",
+      "digest": "sha256:d4ddf96a5aa8b31820758c13250d3aa18c2a26e7776be868c3131c1d912f8d5f"
+    },
+    {
+      "path": "src/tier1/modules.ts",
+      "digest": "sha256:e8c54353d5539b6a60c31d945c36487d26b23f5c1a64314d281e7b61883eb06a"
+    },
+    {
+      "path": "src/tier1/persistence.ts",
+      "digest": "sha256:59a3d46d55aeeffadd80ecf834cbe3db5dd117142cf6ca8beb9c18abfa46ea06"
+    },
+    {
+      "path": "src/tier1/provenance.ts",
+      "digest": "sha256:2d18f16630b8eb189abd1e30cc64ab74b545234c7a6397741268fad6313a3b46"
+    },
+    {
+      "path": "src/tier1/repository.ts",
+      "digest": "sha256:e8a4811c293e773970840e3322017afad159dc84096d2d0318d1d725e43727c5"
+    },
+    {
+      "path": "src/tier1/store.ts",
+      "digest": "sha256:b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3"
+    },
+    {
+      "path": "src/tier1/symbols.ts",
+      "digest": "sha256:1520a4adfd1f837f16357205d88c330056ffe73f3c74d4f26e1d1663dc0362a9"
+    },
+    {
+      "path": "src/tier2/external-solver.ts",
+      "digest": "sha256:5b96297d2c19b5be56e27c2f8ec7404bf23dabaf37f9f2246c85dd79afa94544"
+    },
+    {
+      "path": "src/tier2/incremental.ts",
+      "digest": "sha256:7a82489a2911ef13481eee40a7e635579954786ae6f8d03ba3449f03ecb73205"
+    },
+    {
+      "path": "src/tier2/index.ts",
+      "digest": "sha256:da7f72aef47d78bb58414232a5e726149e09953bc38c760594fde5fb45308c46"
+    },
+    {
+      "path": "src/tier2/ocap.ts",
+      "digest": "sha256:22f6bcedac0bf081e4a0f6045928eb9e4526efd2d46153c5832d6f058d9bfbad"
+    },
+    {
+      "path": "src/tier2/proof-cache.ts",
+      "digest": "sha256:48ed4b3a46b510c16a4d162ea61fe1f356e792426193c1b6410c5f2f72de43ca"
+    },
+    {
+      "path": "src/tier2/smt.ts",
+      "digest": "sha256:bcb8cfa291cf52294e56150808a89b012e56ab7242e2b807c3f2310f59aa3628"
+    },
+    {
+      "path": "src/tier2/solver.ts",
+      "digest": "sha256:97a78f1e654402bb9e55d1d34d8d71689417ac8710144984cc306f31d624cf77"
+    },
+    {
+      "path": "src/tier2/spec.ts",
+      "digest": "sha256:9748346355c73771c98ce1f133365aec000388d8f022ec39a1645371b7a39f88"
+    },
+    {
+      "path": "src/tier2/typecheck.ts",
+      "digest": "sha256:19113ce88ac99a02a1e7b1f4acad694a1d1c83f9520b2fe7f2545669a5da1b18"
+    },
+    {
+      "path": "src/tier2/verify.ts",
+      "digest": "sha256:99f540c247a0371425e6c79b89a301a6c9cb2b479545f993680a9f30d295908f"
+    },
+    {
+      "path": "src/tier3/compile.ts",
+      "digest": "sha256:bc1afe7ca4051f1a908e3d24b69d012b6094839aaeb07e61bf036b98b85d57ed"
+    },
+    {
+      "path": "src/tier3/effects.ts",
+      "digest": "sha256:8ac615990162090a618bfed364bd26650a73e64c4dc28ea2c922df54742fa72f"
+    },
+    {
+      "path": "src/tier3/generate.ts",
+      "digest": "sha256:e0616810c70361b4f9d44462d55498dbbdc24ac46bcd4827369f409f0b351612"
+    },
+    {
+      "path": "src/tier3/heap-state.ts",
+      "digest": "sha256:4d2fb86e19d86a767dfd8a676adf955627116c98e12fbc607fca6212d40e788a"
+    },
+    {
+      "path": "src/tier3/index.ts",
+      "digest": "sha256:edb7dc5a3cf7af3df166fdae68fdbfa2bf06b53c4024bf670d851169317649d7"
+    },
+    {
+      "path": "src/tier3/microworld.ts",
+      "digest": "sha256:b7423075f310f19a9d634da52486eabf72a459260fb4973a7f2e7fc5c102c86c"
+    },
+    {
+      "path": "src/tier3/runtime.ts",
+      "digest": "sha256:696be6afbc409ebf42fac10c7fbc71955b7462f605a01f88cce6b7e369adb307"
+    },
+    {
+      "path": "src/tier3/values.ts",
+      "digest": "sha256:0b48ec39f48128c65c11a3fcd3edfec06720fd1c0c9871fd33ad3ea92759a99e"
+    },
+    {
+      "path": "src/tier4/host.ts",
+      "digest": "sha256:45ac16861fe2d12e4b7d2a4510d930bf317a3fbbf210fb59a4033758d55ca0ac"
+    },
+    {
+      "path": "src/tier4/index.ts",
+      "digest": "sha256:ee786091654ce9f845ca46df03112f8ee7b2cc6cf0f4019383510314b1b7523b"
+    },
+    {
+      "path": "src/tier4/surfaces.ts",
+      "digest": "sha256:2346f3cefec35336f1732b653233288c48dac33cb29dd1a2ce56ef8e7389beb2"
+    },
+    {
+      "path": "src/tier4/topology.ts",
+      "digest": "sha256:7e9f1b49cf8c4bcf5b17f1957d7874bd45def2165cede5f36830d64aa52530c1"
+    },
+    {
+      "path": "src/util/rng.ts",
+      "digest": "sha256:722540744b859c0995931e6c0270f3b9a80012b6e31b2371c027cf19f4518295"
+    },
+    {
+      "path": "src/util/tokens.ts",
+      "digest": "sha256:42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9"
+    }
+  ],
+  "environment": {
+    "os": "darwin",
+    "osRelease": "25.6.0",
+    "architecture": "arm64",
+    "cpu": "Apple M4 Pro",
+    "logicalCpus": 12,
+    "ramBytes": 25769803776,
+    "loadAverage": [
+      3.57958984375,
+      3.423828125,
+      3.19482421875
+    ],
+    "node": "v26.7.0",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /Library/Developer/CommandLineTools/usr/bin",
+    "hypervisor": "Apple Hypervisor.framework (EL1 AArch64 guest)",
+    "hypervisorSupported": true,
+    "target": "aarch64-none-elf (guest) / arm64-apple-darwin (host)",
+    "linkerVersion": "LLD 22.1.6 (https://github.com/rust-lang/llvm-project.git dcc3606807c989700e0ac1cac18c31741bcd40d9) (compatible with GNU linkers)",
+    "hostSignature": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"https://www.apple.com/DTDs/PropertyList-1.0.dtd\"><plist version=\"1.0\"><dict><key>com.apple.security.hypervisor</key><true/></dict></plist>"
+  },
+  "abi": "aether.native-i64/1",
+  "astRoots": {
+    "fee": "ast:b3:39a16f7116e65378eac11b430ebacbdc6da807dc87764ba779c7124249504e7f",
+    "arithmetic": [
+      "ast:b3:229c27fb14c8b58e3317cf911ffc63ec84969fdb46d8c7eaebad9617a450f757",
+      "ast:b3:03203970b7575a0ad3e406738db62348e9c276e486bc7fda073bf53c833e2d7a",
+      "ast:b3:2e5aca408e1e96542a98113593398d4c422aca54ec7b2db6d0ced34ef068a11e",
+      "ast:b3:2888b9e00be4c9c586de955930d0179d60e6cb20a050485798d531196a6e6551",
+      "ast:b3:bb4503cc760946b8bfb4a15f762bfe066385b964ce4f0499939d1b2a4de448ee"
+    ]
+  },
+  "workload": {
+    "id": "checked-i64-fee-and-fallback/1",
+    "conformanceCases": 1345,
+    "seed": "0x726f322d / PCG LCG constants, signed64 output",
+    "bootInputs": [
+      "1000",
+      "7"
+    ],
+    "expectedBootResult": {
+      "value": "12",
+      "status": 0
+    },
+    "requestedBootTrials": 20,
+    "completedBootTrials": 20,
+    "fallbackWarmup": 10000,
+    "fallbackBatchIterations": 100000,
+    "fallbackTrials": 30,
+    "fallbackIndividualTrials": 2000,
+    "bootWarmup": 0,
+    "cache": "Fresh host process and VM per trial; OS file cache is uncontrolled. First launch retained.",
+    "drivers": [
+      "HVC result mailbox"
+    ],
+    "guestCodePermissions": "one read/execute page; remaining mapped memory read/write, nonexecutable",
+    "excludedFeatures": [
+      "native mutable heap/alias migration",
+      "external-effect broker",
+      "asynchronous repair queue",
+      "proof-carrying native lowering",
+      "network/storage/device drivers",
+      "bare-metal deployment qualification"
+    ]
+  },
+  "results": {
+    "conformance": {
+      "verdict": "pass",
+      "cases": 1345,
+      "fallback": {
+        "threeTiers": true,
+        "rollbackPreserved": true,
+        "revocationTrap": true
+      }
+    },
+    "dispatchBatchNsPerCall": {
+      "count": 30,
+      "min": 0.764166667,
+      "p50": 0.765,
+      "p95": 0.854583333,
+      "p99": 0.890833333,
+      "max": 0.890833333,
+      "mean": 0.7855555554666668,
+      "scope": "Warm amortized path-selection diagnostic; begins after a fault flag is supplied."
+    },
+    "fullFlowBatchNsPerCall": {
+      "count": 30,
+      "min": 5.626666667,
+      "p50": 5.69875,
+      "p95": 5.877083333,
+      "p99": 5.927083333,
+      "max": 5.927083333,
+      "mean": 5.722097222233333,
+      "scope": "Warm amortized pure fixture including speculative calculation, status/invariant guard, frame restoration and conservative result."
+    },
+    "timerPairNs": {
+      "count": 2000,
+      "min": 0,
+      "p50": 0,
+      "p95": 41.666666667,
+      "p99": 41.666666667,
+      "max": 41.666666667,
+      "mean": 2.7500000000219944
+    },
+    "fallback50ns": {
+      "unit": "ns",
+      "threshold": 50,
+      "clockTickNs": 41.666666667,
+      "observedIndividual": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666667,
+        "p99": 41.666666667,
+        "max": 41.666666667,
+        "mean": 6.645833333386536
+      },
+      "verdict": "inconclusive",
+      "reason": "Uncorrected individual timed brackets include observer overhead. Quantized zero-duration samples and this bounded fixture cannot establish the full runtime hard maximum; amortized means never qualify the 50 ns requirement."
+    },
+    "boot1ms": {
+      "unit": "ns",
+      "threshold": 1000000,
+      "mainToResponse": {
+        "count": 20,
+        "min": 456041.667,
+        "p50": 523625,
+        "p95": 2383708.333,
+        "p99": 5401375,
+        "max": 5401375,
+        "mean": 875674.9999499999
+      },
+      "processLaunchToFirstResponse": {
+        "count": 20,
+        "min": 3893250,
+        "p50": 4396792,
+        "p95": 10419458,
+        "p99": 154338458,
+        "max": 154338458,
+        "mean": 12554110.45
+      },
+      "verdict": "fail",
+      "reason": "Approved boundary excludes controller-process launch. Main-to-response includes fresh guest allocation/image load and VM/vCPU creation, but a repeated fresh-guest campaign on an already-running controller is still required; this fresh-process prototype cannot alone qualify that profile."
+    },
+    "footprint2mb": {
+      "unit": "bytes",
+      "threshold": 2000000,
+      "hostProcessPeakRss": {
+        "count": 20,
+        "min": 6291456,
+        "p50": 6307840,
+        "p95": 6307840,
+        "p99": 6307840,
+        "max": 6307840,
+        "mean": 6306201.6
+      },
+      "guestResidentUpperBound": {
+        "count": 20,
+        "min": 65536,
+        "p50": 65536,
+        "p95": 65536,
+        "p99": 65536,
+        "max": 65536,
+        "mean": 65536
+      },
+      "guestMappedBytes": 65536,
+      "guestImageBytes": 60,
+      "verdict": "pass_bounded_profile",
+      "reason": "User-approved scope is guest resident memory. The fully zero-initialized mapped allocation bounds resident guest memory for this fixed prototype; controller RSS and unmeasured hypervisor memory are separate diagnostics. Full runtime/driver qualification remains open."
+    }
+  },
+  "bootError": null,
+  "artifacts": [
+    {
+      "path": "boot-samples.json",
+      "bytes": 6670,
+      "digest": "sha256:6165ff511dcc126dc5960ee785deb16c44409b88c5436f62ac9186204ec5b8a9"
+    },
+    {
+      "path": "conformance.json",
+      "bytes": 303380,
+      "digest": "sha256:20bded944b9dee4ca118da181436e9cbf7269887225d10165643a398bd3ac2ba"
+    },
+    {
+      "path": "fallback-samples.json",
+      "bytes": 34165,
+      "digest": "sha256:5feaf8a50abd7e144dfffc42eebc2072e31afe69007250c9ad7613d8fe69394e"
+    },
+    {
+      "path": "generated.h",
+      "bytes": 1956,
+      "digest": "sha256:3340a326b381b767f239dd255dcb1e9ff43911f7fa0332c76ecc3a6553f4b173"
+    },
+    {
+      "path": "kernel.bin",
+      "bytes": 60,
+      "digest": "sha256:81c8b3d987c5b108b9720946f825ad8a770c1de9be23d61b3bf64b3ed62c307e"
+    },
+    {
+      "path": "kernel.c",
+      "bytes": 717,
+      "digest": "sha256:a16f33cece201eca37eb3ca6794720edd515f4df1cb3ed52c16d5ab6ac708fff"
+    },
+    {
+      "path": "kernel.elf",
+      "bytes": 66136,
+      "digest": "sha256:45790b15b5ab00b1c9507b629bc3ae3c2c2cfddb74a06fb4113efd5b288fed3d"
+    },
+    {
+      "path": "kernel.o",
+      "bytes": 824,
+      "digest": "sha256:a159809f71d5623612c0afc67a077417da0dc0f9da97fd2c907a8d8288f728f6"
+    },
+    {
+      "path": "native-boot",
+      "bytes": 53824,
+      "digest": "sha256:28ac5725e0b08597ab3fb1e2858131eedee58cf9e68c94f44fc01af132ee66f1"
+    },
+    {
+      "path": "native-driver",
+      "bytes": 50672,
+      "digest": "sha256:023239dd75bd2969208cc644bfbd70ed64917751ec657adbbf00b0c35b29162d"
+    },
+    {
+      "path": "native-driver.s",
+      "bytes": 22231,
+      "digest": "sha256:f88c84670ac281171ca4d0d89b0e3463f3ef81961753ed579dc0d31ba8a8d019"
+    },
+    {
+      "path": "start.o",
+      "bytes": 648,
+      "digest": "sha256:cb048bb87239ce8d5fa506884f65768c762fb16c27b63e652f086403d88eda07"
+    }
+  ],
+  "limitations": [
+    "Finite samples do not establish universal latency guarantees.",
+    "No unbounded Int-to-i64 coercion; unsupported native AST features reject.",
+    "C/LLVM, linker, Darwin, firmware and Hypervisor.framework are in the trusted computing base.",
+    "This native feasibility prototype does not complete FR-3.5, FR-3.7, FR-3.10 or FR-4.5."
+  ]
+}

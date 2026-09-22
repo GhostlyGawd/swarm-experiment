@@ -1,0 +1,10 @@
+{
+  "kind": "bounded-research-model",
+  "deliverySchedules": 5040,
+  "mergePartitions": 128,
+  "quorumPairs": 16,
+  "equivocationSchedules": 27,
+  "maxTreeOperations": 7,
+  "committeeSize": 4,
+  "faultBound": 1
+}

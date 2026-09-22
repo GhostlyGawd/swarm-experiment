@@ -1,0 +1,20 @@
+{
+  "task": "V4-R04",
+  "specVersion": "0.1.0",
+  "subjectCommit": "749ce8bbf437af4d1ee424261f4165413036632a",
+  "recordedAt": "2026-09-22T21:39:18.884217+00:00",
+  "checks": [
+    {
+      "gate": "V4-R04/G1",
+      "result": "pass",
+      "method": "Exact clean detached checkout; bounded research tests and fresh experiments. Gate-specific analysis and limitations in REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/research-749ce8b/REVIEW.md"
+    },
+    {
+      "gate": "V4-R04/G2",
+      "result": "pass",
+      "method": "Exact clean detached checkout; bounded research tests and fresh experiments. Gate-specific analysis and limitations in REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/research-749ce8b/REVIEW.md"
+    }
+  ]
+}

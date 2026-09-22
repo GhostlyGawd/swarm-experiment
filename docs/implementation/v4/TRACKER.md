@@ -6,7 +6,7 @@ Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) f
 
 > This is implementation status. Publishing the specification does not complete runtime work. A verified task needs evidence for every gate; functional delivery does not imply that the release NFR/KPI gates passed.
 
-**6/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
+**10/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
 
 ## First implementation slice
 
@@ -23,13 +23,13 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-T1-01](#v4-t1-01).
+**Ready now:** [V4-T1-01](#v4-t1-01), [V4-T2-10](#v4-t2-10).
 
 ## Milestones
 
 | Milestone | Verified | Total | Release gate |
 |---|---:|---:|---|
-| baseline | 6 | 13 | [V4-M0](#v4-m0) |
+| baseline | 10 | 13 | [V4-M0](#v4-m0) |
 | v2 | 0 | 20 | [V4-M2](#v4-m2) |
 | v3 | 0 | 14 | [V4-M3](#v4-m3) |
 | v4 | 0 | 15 | [V4-M4](#v4-m4) |
@@ -46,10 +46,10 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-F06](#v4-f06) | Validate proof evidence against exact execution subjects | verification | baseline | verified | [V4-F03](#v4-f03) |
 | [V4-F07](#v4-f07) | Make state handoff durable across actual processes | distribution | baseline | in_progress | [V4-F01](#v4-f01), [V4-F04](#v4-f04) |
 | [V4-F08](#v4-f08) | Integrate exact-root admission and baseline recovery slice | governance | baseline | planned | [V4-F02](#v4-f02), [V4-F05](#v4-f05), [V4-F06](#v4-f06), [V4-F07](#v4-f07) |
-| [V4-R01](#v4-r01) | Select and model replication and quorum algorithms | distribution | baseline | in_progress | [V4-F03](#v4-f03) |
-| [V4-R02](#v4-r02) | Measure native target feasibility | compiler | baseline | in_progress | — |
-| [V4-R03](#v4-r03) | Select certificate calculus and private attestation statement | verification | baseline | in_progress | [V4-F03](#v4-f03) |
-| [V4-R04](#v4-r04) | Define numerical and learning experiment contracts | synthesis | baseline | in_progress | — |
+| [V4-R01](#v4-r01) | Select and model replication and quorum algorithms | distribution | baseline | verified | [V4-F03](#v4-f03) |
+| [V4-R02](#v4-r02) | Measure native target feasibility | compiler | baseline | verified | — |
+| [V4-R03](#v4-r03) | Select certificate calculus and private attestation statement | verification | baseline | verified | [V4-F03](#v4-f03) |
+| [V4-R04](#v4-r04) | Define numerical and learning experiment contracts | synthesis | baseline | verified | — |
 | [V4-T1-01](#v4-t1-01) | Content-addressed AST persistence | substrate | v2 | planned | [V4-F03](#v4-f03) |
 | [V4-T1-02](#v4-t1-02) | Agent-IR and bidirectional projections | language | v2 | planned | [V4-F02](#v4-f02), [V4-T1-01](#v4-t1-01) |
 | [V4-T1-03](#v4-t1-03) | Causal lineage and invariant fences | governance | v2 | planned | [V4-T1-01](#v4-t1-01), [V4-F06](#v4-f06) |
@@ -356,7 +356,7 @@ Evidence: not yet produced.
 
 ### V4-R01
 
-**Select and model replication and quorum algorithms** · research · baseline · owner: distribution · **in_progress**
+**Select and model replication and quorum algorithms** · research · baseline · owner: distribution · **verified**
 
 Prerequisites: [V4-F03](#v4-f03).
 
@@ -366,11 +366,11 @@ Acceptance gates:
 
 - **V4-R01/G1** — Model cycles, concurrent moves, quorum intersection, equivocation, membership changes and partition recovery; record assumptions and rejected alternatives.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/research-749ce8b/V4-R01.json).
 
 ### V4-R02
 
-**Measure native target feasibility** · research · baseline · owner: compiler · **in_progress**
+**Measure native target feasibility** · research · baseline · owner: compiler · **verified**
 
 Prerequisites: none.
 
@@ -380,11 +380,11 @@ Acceptance gates:
 
 - **V4-R02/G1** — Measure real code and boot artifacts with named hardware; report misses for 50 ns / 1 ms / 2 MB without weakening the targets.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/research-749ce8b/V4-R02.json).
 
 ### V4-R03
 
-**Select certificate calculus and private attestation statement** · research · baseline · owner: verification · **in_progress**
+**Select certificate calculus and private attestation statement** · research · baseline · owner: verification · **verified**
 
 Prerequisites: [V4-F03](#v4-f03).
 
@@ -394,11 +394,11 @@ Acceptance gates:
 
 - **V4-R03/G1** — Prototype a nontrivial certificate and private artifact assertion, reject false claims, measure proof generation/checking and document fragment limits.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/research-749ce8b/V4-R03.json).
 
 ### V4-R04
 
-**Define numerical and learning experiment contracts** · research · baseline · owner: synthesis · **in_progress**
+**Define numerical and learning experiment contracts** · research · baseline · owner: synthesis · **verified**
 
 Prerequisites: none.
 
@@ -409,7 +409,7 @@ Acceptance gates:
 - **V4-R04/G1** — Demonstrate a gradient path and adapter load/train path on bounded fixtures; document numerical behavior, cost and provider capability constraints.
 - **V4-R04/G2** — Fix numerical acceptance profiles for the source millions-of-permutations-per-second and tens-of-iterations targets before experiments; state exact thresholds and supported workloads.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/research-749ce8b/V4-R04.json).
 
 ### V4-T1-01
 

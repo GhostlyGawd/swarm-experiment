@@ -1,0 +1,181 @@
+{
+  "format": "aether.research-evidence/1",
+  "subjectCommit": "749ce8bbf437af4d1ee424261f4165413036632a",
+  "workingTreeDirty": false,
+  "specVersion": "0.1.0",
+  "recordedAt": "2026-09-22T21:39:18.884217+00:00",
+  "scope": "Research gate closure only. No full feature or release performance qualification.",
+  "concurrency": "Native, ZK and learning fresh experiments ran concurrently; performance samples retain contention and are not a controlled release campaign.",
+  "artifacts": [
+    {
+      "path": "V4-R01.json",
+      "sha256": "7076cceeec1bf84646ab3e991f371ec263bd1048857529196b6e4c6cbb466c65",
+      "bytes": 474
+    },
+    {
+      "path": "V4-R02.json",
+      "sha256": "90f3a14ea348beb999a5da44db29c37484e5a387d000de0f7783573fa90e50a3",
+      "bytes": 474
+    },
+    {
+      "path": "V4-R03.json",
+      "sha256": "5c11ab1efbc2a68d975240e15845ce0292f00d1a5d9e9547dc726cadd621ddae",
+      "bytes": 474
+    },
+    {
+      "path": "V4-R04.json",
+      "sha256": "6c9d9f94dde997024e92df9e17d018ba9462aebc5c0c2833a61e3244c740e912",
+      "bytes": 766
+    },
+    {
+      "path": "certificate-clean.json",
+      "sha256": "2cb1a634a23325eb481600078dd69e56f825c04466a39e831273dc12016b18b2",
+      "bytes": 6240
+    },
+    {
+      "path": "certificate-clean.log",
+      "sha256": "d4a27c4c8830280bbe71ed05d9085a261dc59b5682ed0f723174eca3ab46bcca",
+      "bytes": 38
+    },
+    {
+      "path": "learning/adapter/adapter_config.json",
+      "sha256": "73f91b72b89ed88d734db4b1bd85e0c8fed7915fb92fc629b005efce3e393e5e",
+      "bytes": 202
+    },
+    {
+      "path": "learning/adapter/adapters.safetensors",
+      "sha256": "74ba6f3690599c3e22c454febb9b4d0b95e9decb9d278bcf4ad4c431e1a36ba9",
+      "bytes": 62287
+    },
+    {
+      "path": "learning/corpus.json",
+      "sha256": "3305ee32115b4dc2a6a10bd231257ba6adc337be615186c227f4a0b06f7e555f",
+      "bytes": 1101
+    },
+    {
+      "path": "learning/numerical-results.json",
+      "sha256": "285b2e03e40ce1d2408b017f41ceca04056509cb1fcdb5096b002ea672333412",
+      "bytes": 7580
+    },
+    {
+      "path": "learning/results.json",
+      "sha256": "7055801a3e0b798237647c2d263214c1402f9787b4273ff854fb803912f1b27a",
+      "bytes": 12780
+    },
+    {
+      "path": "learning-clean.log",
+      "sha256": "305e9ac70e2bf8804b4b8369af0c63116e45741041d4f2ecbc16bde81215806d",
+      "bytes": 5229
+    },
+    {
+      "path": "learning-tests.log",
+      "sha256": "188b408a64f26e077a165fd3c2a5fea6cd582f1b68fe093f3813ad511d79d3ac",
+      "bytes": 100
+    },
+    {
+      "path": "native/boot-samples.json",
+      "sha256": "6165ff511dcc126dc5960ee785deb16c44409b88c5436f62ac9186204ec5b8a9",
+      "bytes": 6670
+    },
+    {
+      "path": "native/conformance.json",
+      "sha256": "20bded944b9dee4ca118da181436e9cbf7269887225d10165643a398bd3ac2ba",
+      "bytes": 303380
+    },
+    {
+      "path": "native/fallback-samples.json",
+      "sha256": "5feaf8a50abd7e144dfffc42eebc2072e31afe69007250c9ad7613d8fe69394e",
+      "bytes": 34165
+    },
+    {
+      "path": "native/generated.h",
+      "sha256": "3340a326b381b767f239dd255dcb1e9ff43911f7fa0332c76ecc3a6553f4b173",
+      "bytes": 1956
+    },
+    {
+      "path": "native/kernel.bin",
+      "sha256": "81c8b3d987c5b108b9720946f825ad8a770c1de9be23d61b3bf64b3ed62c307e",
+      "bytes": 60
+    },
+    {
+      "path": "native/kernel.c",
+      "sha256": "a16f33cece201eca37eb3ca6794720edd515f4df1cb3ed52c16d5ab6ac708fff",
+      "bytes": 717
+    },
+    {
+      "path": "native/kernel.elf",
+      "sha256": "45790b15b5ab00b1c9507b629bc3ae3c2c2cfddb74a06fb4113efd5b288fed3d",
+      "bytes": 66136
+    },
+    {
+      "path": "native/kernel.o",
+      "sha256": "a159809f71d5623612c0afc67a077417da0dc0f9da97fd2c907a8d8288f728f6",
+      "bytes": 824
+    },
+    {
+      "path": "native/manifest.json",
+      "sha256": "8b647300fe4eaadd58b936540478a191eb6a4942592e82a7190c399a64aee763",
+      "bytes": 20767
+    },
+    {
+      "path": "native/native-boot",
+      "sha256": "28ac5725e0b08597ab3fb1e2858131eedee58cf9e68c94f44fc01af132ee66f1",
+      "bytes": 53824
+    },
+    {
+      "path": "native/native-driver",
+      "sha256": "023239dd75bd2969208cc644bfbd70ed64917751ec657adbbf00b0c35b29162d",
+      "bytes": 50672
+    },
+    {
+      "path": "native/native-driver.s",
+      "sha256": "f88c84670ac281171ca4d0d89b0e3463f3ef81961753ed579dc0d31ba8a8d019",
+      "bytes": 22231
+    },
+    {
+      "path": "native/start.o",
+      "sha256": "cb048bb87239ce8d5fa506884f65768c762fb16c27b63e652f086403d88eda07",
+      "bytes": 648
+    },
+    {
+      "path": "native-clean.log",
+      "sha256": "d1cc99f182fbb0ac6de18f86b85dd3956b50b945eb7532eb59e399885b372054",
+      "bytes": 3624
+    },
+    {
+      "path": "private-artifact-results.json",
+      "sha256": "2f1acef221a3238c8c50114479f095c9a9722af9f98b03b42f1f29e7d15e105a",
+      "bytes": 12648
+    },
+    {
+      "path": "private-clean-verify.log",
+      "sha256": "8f50d989fd88ca39cd8cd38bc7c8a830b174febf4304a5ce9d641d530c10bc71",
+      "bytes": 92
+    },
+    {
+      "path": "private-clean.log",
+      "sha256": "879a128fe20b96c2f07a07a61810d0f1208825a786efdfa46e006fef3430cb98",
+      "bytes": 673
+    },
+    {
+      "path": "private-proof.log",
+      "sha256": "8f50d989fd88ca39cd8cd38bc7c8a830b174febf4304a5ce9d641d530c10bc71",
+      "bytes": 92
+    },
+    {
+      "path": "replication-model.log",
+      "sha256": "cbab82589eb216c1602fe742df917abe312c1eaa65c6c13fafa737adf0ff769c",
+      "bytes": 213
+    },
+    {
+      "path": "tests.log",
+      "sha256": "12bae5ed6f77ad1060a9bf3dddd700b0d5da0ea5a6f0ce70bc1c3b062e30d850",
+      "bytes": 1767
+    },
+    {
+      "path": "typecheck.log",
+      "sha256": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a",
+      "bytes": 69
+    }
+  ]
+}

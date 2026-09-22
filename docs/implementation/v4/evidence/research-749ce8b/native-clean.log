@@ -1,0 +1,112 @@
+{
+  "output": "/private/tmp/aether-v4-foundation-verification/.aether-store/evidence/research/native-clean",
+  "subjectCommit": "749ce8bbf437af4d1ee424261f4165413036632a",
+  "conformanceCases": 1345,
+  "results": {
+    "conformance": {
+      "verdict": "pass",
+      "cases": 1345,
+      "fallback": {
+        "threeTiers": true,
+        "rollbackPreserved": true,
+        "revocationTrap": true
+      }
+    },
+    "dispatchBatchNsPerCall": {
+      "count": 30,
+      "min": 0.764166667,
+      "p50": 0.765,
+      "p95": 0.854583333,
+      "p99": 0.890833333,
+      "max": 0.890833333,
+      "mean": 0.7855555554666668,
+      "scope": "Warm amortized path-selection diagnostic; begins after a fault flag is supplied."
+    },
+    "fullFlowBatchNsPerCall": {
+      "count": 30,
+      "min": 5.626666667,
+      "p50": 5.69875,
+      "p95": 5.877083333,
+      "p99": 5.927083333,
+      "max": 5.927083333,
+      "mean": 5.722097222233333,
+      "scope": "Warm amortized pure fixture including speculative calculation, status/invariant guard, frame restoration and conservative result."
+    },
+    "timerPairNs": {
+      "count": 2000,
+      "min": 0,
+      "p50": 0,
+      "p95": 41.666666667,
+      "p99": 41.666666667,
+      "max": 41.666666667,
+      "mean": 2.7500000000219944
+    },
+    "fallback50ns": {
+      "unit": "ns",
+      "threshold": 50,
+      "clockTickNs": 41.666666667,
+      "observedIndividual": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666667,
+        "p99": 41.666666667,
+        "max": 41.666666667,
+        "mean": 6.645833333386536
+      },
+      "verdict": "inconclusive",
+      "reason": "Uncorrected individual timed brackets include observer overhead. Quantized zero-duration samples and this bounded fixture cannot establish the full runtime hard maximum; amortized means never qualify the 50 ns requirement."
+    },
+    "boot1ms": {
+      "unit": "ns",
+      "threshold": 1000000,
+      "mainToResponse": {
+        "count": 20,
+        "min": 456041.667,
+        "p50": 523625,
+        "p95": 2383708.333,
+        "p99": 5401375,
+        "max": 5401375,
+        "mean": 875674.9999499999
+      },
+      "processLaunchToFirstResponse": {
+        "count": 20,
+        "min": 3893250,
+        "p50": 4396792,
+        "p95": 10419458,
+        "p99": 154338458,
+        "max": 154338458,
+        "mean": 12554110.45
+      },
+      "verdict": "fail",
+      "reason": "Approved boundary excludes controller-process launch. Main-to-response includes fresh guest allocation/image load and VM/vCPU creation, but a repeated fresh-guest campaign on an already-running controller is still required; this fresh-process prototype cannot alone qualify that profile."
+    },
+    "footprint2mb": {
+      "unit": "bytes",
+      "threshold": 2000000,
+      "hostProcessPeakRss": {
+        "count": 20,
+        "min": 6291456,
+        "p50": 6307840,
+        "p95": 6307840,
+        "p99": 6307840,
+        "max": 6307840,
+        "mean": 6306201.6
+      },
+      "guestResidentUpperBound": {
+        "count": 20,
+        "min": 65536,
+        "p50": 65536,
+        "p95": 65536,
+        "p99": 65536,
+        "max": 65536,
+        "mean": 65536
+      },
+      "guestMappedBytes": 65536,
+      "guestImageBytes": 60,
+      "verdict": "pass_bounded_profile",
+      "reason": "User-approved scope is guest resident memory. The fully zero-initialized mapped allocation bounds resident guest memory for this fixed prototype; controller RSS and unmeasured hypervisor memory are separate diagnostics. Full runtime/driver qualification remains open."
+    }
+  },
+  "bootError": null
+}

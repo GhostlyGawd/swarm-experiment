@@ -1,0 +1,23 @@
+✔ V4-R02 native lowering explicitly rejects unbounded arithmetic, contracts and effects (2.515417ms)
+✔ V4-R02 compiled native arithmetic agrees with TypeScript reference on signed limits, overflow and negative division (525.227125ms)
+✔ R03: independent exact-arithmetic checker accepts an extracted nontrivial certificate (1.65425ms)
+✔ R03: false, stale, malformed and oversized certificates fail without a solver (1.168333ms)
+✔ R03: integer-bound transformation and large exact values do not use floating point (0.298833ms)
+✔ R01 finite OpSet schedules, merge algebra and quorum/equivocation campaign (223.281ms)
+✔ R01 cycles are suppressed, concurrent moves keep one occurrence, and content sharing does not alias occurrences (0.122583ms)
+✔ R01 trash deletion, concurrent replacement and restoration have explicit deterministic precedence (0.092542ms)
+✔ R01 exact fractional positions preserve order under concurrent allocation, moves and Lamport ties (3.344917ms)
+✔ R01 fractional keys reject noncanonical and oversized values before projection mutation (6.486541ms)
+✔ R01 same-ID equivocation is retained and quarantines dependents independently of first arrival (0.2865ms)
+✔ R01 HotStuff requires all three certified phases; commits prevent conflicting higher-view prepare quorum (0.153916ms)
+✔ R01 partitions stop quorum progress and view recovery extends highest certified branch (0.199791ms)
+✔ R01 quorum intersection covers n=4 and n=7; duplicate/stale/family-monoculture votes fail (0.328416ms)
+✔ R01 membership activation binds both committees to one terminal checkpoint and rejects stale epochs (0.332792ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 639.053125

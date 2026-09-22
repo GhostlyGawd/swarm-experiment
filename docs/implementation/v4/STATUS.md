@@ -12,12 +12,13 @@ Branch: `aether/v4-implementation`. Planning checkpoint: `9f23a7b`. First implem
 - **V4-F04 verified:** durable broker, replay/branch isolation, budget hooks, idempotency/reconciliation and runtime bridges. Real process crashes, concurrent writers and all independent-review fixes are evidenced at `3dce2d6`.
 - **V4-F05 verified:** signed causal journals, equivocation quarantine and delivery harness; concurrent quota admission is protected by the shared ticket mutex. This is not full Tree-CRDT projection or 1,000-agent qualification.
 - **V4-F06 verified:** exact-subject proof admission and compiler integration, peer reverification, preserved entry/property checks and explicit rejection of demonstrated model gaps. Portable certificates remain separate.
-- **V4-F07 active:** real authenticated process-channel transport and nested call/effect tests implemented. Root added guarded heap-transfer boundaries and asynchronous journal ownership. Durable ProcessHost coordinator is being implemented and reviewed; no completion claim yet.
-- **V4-F08 core work underway:** promotion journal/signature/driver protocol implementation can proceed while F07 is built. Tracker remains planned until its dependency is verified; full closure requires the actual process driver.
-- **V4-R01 awaiting corrected evidence:** D04 v0.2.0 restores the PRD's required fractional indexing after detecting an incompatible RGA substitution. Exact rational position model and ten tests pass; checkpoint evidence pending.
-- **V4-R02 research artifacts ready:** actual 60-byte freestanding guest boots under Hypervisor.framework; 1,345 checked native/reference cases pass. Cold-process launch and VMM RSS miss the chosen strict timing/footprint profiles; 50 ns bound is inconclusive at available timer resolution. No hardware-access blocker.
-- **V4-R03 research artifacts ready:** independent certificate kernel plus actual Groth16 bounded private-artifact proof and independent public verifier. Three verification samples exceed 5 ms; production setup/full-module attestation remains open.
-- **V4-R04 research artifacts ready:** actual public SmolLM2-135M LoRA adapter trained/saved/reloaded; held-out gradient fixtures pass. Boundary throughput around 0.49M/sec misses the preregistered 2M target. No full synthesis/efficiency claim.
+- **V4-F07 active:** real authenticated process transport, typed calls, durable ProcessHost state transitions and migration recovery are implemented. Independent review fixes are integrated; the complete actual-process crash matrix is under final validation.
+- **V4-F08 integration active:** promotion authorization/journal and actual ProcessDeployment driver are implemented. Review found pre-intent allocation validation, recovery authorization freshness and filesystem durability gaps; repairs precede checkpoint verification. Tracker remains planned until F07 is verified.
+- **V4-R01–R04 verified as bounded research:** [research evidence](evidence/research-749ce8b/REVIEW.md) records clean source `749ce8b`, 15 JavaScript tests, two Python tests, typechecking and fresh native/certificate/ZK/learning experiments. This closes research gates only.
+- **R01 result:** exact rational fractional positions and bounded three-phase quorum/epoch models; 5,040 delivery schedules and 128 merge partitions. Production algorithms and 1,000-agent qualification remain open.
+- **R02 result:** 1,345 native/reference cases pass. Fresh-process guest bracket maximum 5.401 ms does not qualify the approved running-controller boundary; 65,536-byte bounded guest meets the guest-only memory scope. Full runtime/driver qualification and 50 ns maximum remain open.
+- **R03 result:** actual bounded Groth16 proof rejects 14 altered/false claims; fresh verification samples 6.699/5.457/5.946 ms all miss 5 ms. Production setup and full-module attestation remain open.
+- **R04 result:** actual adapter train/save/reload and held-out gradient fixtures pass. Fresh boundary throughput 0.448–0.466M/sec misses 2M/sec. No full synthesis/efficiency claim.
 
 Exact-commit evidence is in [foundations-4a9b077](evidence/foundations-4a9b077/REVIEW.md). A detached verification checkout passed 242 tests, typechecking and both roadmap checks. Clean pinned-dependency benchmark measurement exited 0; release enforcement correctly exited 1 with 17 unsatisfied required rows.
 
@@ -31,19 +32,20 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 - Snapshot heap array identity must remain stable: compiled expressions capture that array.
 - Retain slicer memory, isolation and single-writer constraints in topology plans, then validate/reprice candidate moves.
 - Benchmarks must report the actual tokenizer miss instead of retaining the old estimator-based passing assertion.
+- User clarified the native budget boundary: fresh guest on an already-running hypervisor, guest resident memory. Profile `decisions/D07-native-qualification-profile.json` v1.0.0 records it. Historical guest-startup maximum 2.832 ms and clean rerun maximum 5.401 ms do not establish the approved boot gate; host RSS/controller launch are diagnostics.
 
 ## Failed attempts and limitations
 
 - Initial snapshot test used an invalid nominal type identifier; corrected. Independent review also found stale closure access, broken moved callbacks and inconsistent memory/latency pricing; all were repaired with regression tests before verification.
-- Native targets, proof kernel/ZK, full Tree-CRDT/BFT, and numerical/model research gates are still planned.
+- Bounded research is verified; full native targets, portable proof kernel/ZK, Tree-CRDT/BFT and numerical/model features remain to be implemented and qualified.
 - No 100M-node or 1,000-agent production result exists. No task is verified merely because related unit tests pass.
 - No external blocker has been established; substantial local work remains.
 
 ## Next executable actions
 
-1. Integrate F04 effect routing into both runtimes and preserve structured indeterminate outcomes.
-2. Review F05 causal/equivocation recovery and bind F06 admission to actual verifier/dependency evidence.
-3. Verify these contracts at an exact implementation checkpoint, then begin durable process migration and exact-root promotion.
-4. Start the four research decision tasks as independent work becomes available; retain all full v4 scope.
+1. Finish F07/F08 review repairs and actual-process crash/retry coverage.
+2. Verify build, complete tests, typechecking, exports and roadmaps at a clean source checkpoint; attach exact-commit evidence before closing gates.
+3. Close M0 only after all baseline gates pass, then continue eligible v2 tasks without a milestone pause.
+4. Implement the running-controller fresh-guest campaign under the approved D07 profile as native qualification progresses.
 
-Goal-turn classification: progress — six foundation tasks implemented and evidenced; real process coordination, promotion and four research gates are progressing. No global blocker has been established.
+Goal-turn classification: progress — six foundation tasks and four bounded research tasks are evidenced. Real process coordination and deployment recovery are undergoing final validation. No global blocker has been established.

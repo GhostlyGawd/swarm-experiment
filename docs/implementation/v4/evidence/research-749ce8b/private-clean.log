@@ -1,0 +1,25 @@
+ERROR:  4 Error in template Num2Bits_0 line: 38
+Error in template PrivateAffineArtifact_86 line: 34
+
+{
+  "status": "research-proof-verified",
+  "samples": [
+    {
+      "generationMs": 231.04054199999882,
+      "checkingMs": 6.698749999999563,
+      "proofBytes": 722
+    },
+    {
+      "generationMs": 119.08024999999907,
+      "checkingMs": 5.4569160000028205,
+      "proofBytes": 723
+    },
+    {
+      "generationMs": 135.61862499999916,
+      "checkingMs": 5.946499999998196,
+      "proofBytes": 721
+    }
+  ],
+  "rejected": 14,
+  "output": "/private/tmp/aether-v4-foundation-verification/.aether-store/evidence/research/private-clean/private-artifact-results.json"
+}

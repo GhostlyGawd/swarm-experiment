@@ -1,0 +1,173 @@
+{
+  "boundaryVerdict": "fail",
+  "gradientVerdict": "pass",
+  "lora": {
+    "model": {
+      "id": "HuggingFaceTB/SmolLM2-135M-Instruct",
+      "revision": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
+      "files": [
+        {
+          "path": "README.md",
+          "size": 6772,
+          "sha256": "4f97533ad95b1b2fea15fbc075c01b94578ebdd7c8138888fa43fa3abd530dc4"
+        },
+        {
+          "path": "all_results.json",
+          "size": 783,
+          "sha256": "1f68a2e167194d764c414643b54f0960945dc3f46bc47ec53b02475df527f376"
+        },
+        {
+          "path": "config.json",
+          "size": 861,
+          "sha256": "8eb740e8bbe4cff95ea7b4588d17a2432deb16e8075bc5828ff7ba9be94d982a"
+        },
+        {
+          "path": "eval_results.json",
+          "size": 586,
+          "sha256": "6c7ecd0c2c0e8f6af8cbb34065fb2d5eb4c504febf2e266a7c7f948f13c70b7c"
+        },
+        {
+          "path": "generation_config.json",
+          "size": 132,
+          "sha256": "87b916edaaab66b3899b9d0dd0752727dff6666686da0504d89ae0a6e055a013"
+        },
+        {
+          "path": "model.safetensors",
+          "size": 269060552,
+          "sha256": "5af571cbf074e6d21a03528d2330792e532ca608f24ac70a143f6b369968ab8c"
+        },
+        {
+          "path": "special_tokens_map.json",
+          "size": 655,
+          "sha256": "2b7379f3ae813529281a5c602bc5a11c1d4e0a99107aaa597fe936c1e813ca52"
+        },
+        {
+          "path": "tokenizer.json",
+          "size": 2104556,
+          "sha256": "9ca9acddb6525a194ec8ac7a87f24fbba7232a9a15ffa1af0c1224fcd888e47c"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "size": 3764,
+          "sha256": "4ec77d44f62efeb38d7e044a1db318f6a939438425312dfa333b8382dbad98df"
+        },
+        {
+          "path": "train_results.json",
+          "size": 232,
+          "sha256": "713996ce10b9d99a440fec73c0f3bdb2f3c4db6adba3d027bdaa40796f059b2d"
+        },
+        {
+          "path": "trainer_state.json",
+          "size": 57225,
+          "sha256": "9664b2f12a8a29cad27a12da7b0d3a1081c8ba1392bcec71fa3bfd4fafc11284"
+        },
+        {
+          "path": "vocab.json",
+          "size": 800662,
+          "sha256": "82b84012e3add4d01d12ba14442026e49b8cbbaead1f79ecf3d919784f82dc79"
+        }
+      ]
+    },
+    "baseTensorSHA256": "ffe11dd0c13d384c2391f84da463baa862338041976b870cc2df591bdd14802d",
+    "baseUnchanged": true,
+    "trainingTokens": 210,
+    "trainingSteps": [
+      {
+        "step": 1,
+        "loss": 5.068714141845703,
+        "gradientNorm": 0.07318617403507233,
+        "seconds": 0.01771112500136951
+      },
+      {
+        "step": 2,
+        "loss": 5.0687575340271,
+        "gradientNorm": 0.07099028676748276,
+        "seconds": 0.012052874997607432
+      },
+      {
+        "step": 3,
+        "loss": 5.0451483726501465,
+        "gradientNorm": 0.07656797766685486,
+        "seconds": 0.011247083002672298
+      },
+      {
+        "step": 4,
+        "loss": 5.1452317237854,
+        "gradientNorm": 0.09094735980033875,
+        "seconds": 0.011214125002879882
+      },
+      {
+        "step": 5,
+        "loss": 5.119670391082764,
+        "gradientNorm": 0.1018114984035492,
+        "seconds": 0.010046291998150991
+      },
+      {
+        "step": 6,
+        "loss": 5.086781978607178,
+        "gradientNorm": 0.11518784612417221,
+        "seconds": 0.011955250000028173
+      },
+      {
+        "step": 7,
+        "loss": 5.138550281524658,
+        "gradientNorm": 0.13024674355983734,
+        "seconds": 0.016548917003092356
+      },
+      {
+        "step": 8,
+        "loss": 5.106165409088135,
+        "gradientNorm": 0.15305277705192566,
+        "seconds": 0.02161987500221585
+      },
+      {
+        "step": 9,
+        "loss": 5.14607572555542,
+        "gradientNorm": 0.1691560596227646,
+        "seconds": 0.020555250001052627
+      },
+      {
+        "step": 10,
+        "loss": 4.560640811920166,
+        "gradientNorm": 0.17481236159801483,
+        "seconds": 0.018961624999064952
+      },
+      {
+        "step": 11,
+        "loss": 4.596620082855225,
+        "gradientNorm": 0.19228582084178925,
+        "seconds": 0.009436583997739945
+      },
+      {
+        "step": 12,
+        "loss": 4.576119899749756,
+        "gradientNorm": 0.20942574739456177,
+        "seconds": 0.009143666000454687
+      }
+    ],
+    "trainingSeconds": 0.17052912500003004,
+    "trainableParameters": 15360,
+    "heldoutLossBefore": [
+      4.311404228210449,
+      4.401000499725342,
+      4.458012104034424,
+      4.418581962585449
+    ],
+    "heldoutLossAfter": [
+      4.2763991355896,
+      4.370054244995117,
+      4.421679496765137,
+      4.387722969055176
+    ],
+    "heldoutMeanBefore": 4.397249698638916,
+    "heldoutMeanAfter": 4.363963961601257,
+    "reloadMaximumLogitError": 0.0,
+    "reloadSeconds": 0.14261262500076555,
+    "adapterSHA256": "74ba6f3690599c3e22c454febb9b4d0b95e9decb9d278bcf4ad4c431e1a36ba9",
+    "adapterBytes": 62287,
+    "corpusSHA256": "3305ee32115b4dc2a6a10bd231257ba6adc337be615186c227f4a0b06f7e555f",
+    "totalSeconds": 1.5541197909988114,
+    "verdict": "pass",
+    "scope": "actual pretrained transformer train/save/reload path, not verified code synthesis or autonomous continual tuning"
+  }
+}
