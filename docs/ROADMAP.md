@@ -163,30 +163,30 @@ graph LR
     C9[✓ C9: Termination checking when no variant is …]
   end
   subgraph D["Real distribution"]
-    D1[D1: A host that loads a topology plan and ac…]
-    D2[D2: Wire protocol with unforgeable capabilit…]
-    D3[D3: Distributed fault semantics]
-    D4[D4: Hot reconfiguration]
-    D5[D5: Telemetry collection]
+    D1[✓ D1: A host that loads a topology plan and ac…]
+    D2[✓ D2: Wire protocol with unforgeable capabilit…]
+    D3[✓ D3: Distributed fault semantics]
+    D4[✓ D4: Hot reconfiguration]
+    D5[✓ D5: Telemetry collection]
   end
   subgraph E["Concurrency"]
-    E1[E1: A concurrency model in the language]
-    E2[E2: Systematic schedule exploration in micro…]
-    E3[E3: Transactions / atomicity]
-    E4[E4: Feed concurrency findings to the slicer …]
+    E1[✓ E1: A concurrency model in the language]
+    E2[✓ E2: Systematic schedule exploration in micro…]
+    E3[✓ E3: Transactions / atomicity]
+    E4[✓ E4: Feed concurrency findings to the slicer …]
   end
   subgraph F["Governance — the last Phase 3 deliverable"]
-    F1[F1: Lineage query API over the persisted led…]
-    F2[F2: Signed append-only audit export]
-    F3[F3: Operator revocation console with a durab…]
-    F4[F4: Approval workflow for fence discharges]
-    F5[F5: Incremental structural-key index]
+    F1[✓ F1: Lineage query API over the persisted led…]
+    F2[✓ F2: Signed append-only audit export]
+    F3[✓ F3: Operator revocation console with a durab…]
+    F4[✓ F4: Approval workflow for fence discharges]
+    F5[✓ F5: Incremental structural-key index]
   end
   subgraph G["Agent ergonomics"]
-    G1[G1: Wire protocol for the agent↔fabric session]
-    G2[G2: Subtree leases/claims]
-    G3[G3: Real tokenizer binding]
-    G4[G4: Sampled production telemetry mode]
+    G1[✓ G1: Wire protocol for the agent↔fabric session]
+    G2[✓ G2: Subtree leases/claims]
+    G3[✓ G3: Real tokenizer binding]
+    G4[✓ G4: Sampled production telemetry mode]
   end
   subgraph H["Projection"]
     H1[H1: Rust projection]
@@ -263,10 +263,10 @@ same wave have no dependency on each other and can proceed in parallel.
 - `C4` Uninterpreted functions with congruence closure — **M** ✓ complete
 - `C8` Separation/ownership types so non-aliasing is *checked* — **XL** ✓ complete
 - `C9` Termination checking when no variant is supplied — **M** ✓ complete
-- `E1` A concurrency model in the language — **XL**
-- `E4` Feed concurrency findings to the slicer as placement constraints — **S**
-- `G3` Real tokenizer binding — **S**
-- `G4` Sampled production telemetry mode — **M**
+- `E1` A concurrency model in the language — **XL** ✓ complete
+- `E4` Feed concurrency findings to the slicer as placement constraints — **S** ✓ complete
+- `G3` Real tokenizer binding — **S** ✓ complete
+- `G4` Sampled production telemetry mode — **M** ✓ complete
 - `H1` Rust projection (read-only) — **M**
 - `H2` Python projection — **M**
 - `H4` Diff projection — render the change between two roots as readable text — **M**
@@ -289,9 +289,9 @@ same wave have no dependency on each other and can proceed in parallel.
 - `C5` Proof cache keyed by node address — **S** ✓ complete ← A1
 - `C2` Array/sequence theory — **L** ✓ complete ← B2
 - `C7` Materialize an SMT counterexample as a persisted micro-world case — **S** ✓ complete ← A1
-- `E2` Systematic schedule exploration in micro-worlds — **L** ← E1
-- `E3` Transactions / atomicity — **L** ← E1
-- `F5` Incremental structural-key index — **M** ← A1
+- `E2` Systematic schedule exploration in micro-worlds — **L** ✓ complete ← E1
+- `E3` Transactions / atomicity — **L** ✓ complete ← E1
+- `F5` Incremental structural-key index — **M** ✓ complete ← A1
 
 **Wave 2** — 12 feature(s), weight 66
 
@@ -301,24 +301,24 @@ same wave have no dependency on each other and can proceed in parallel.
 - `B6` Cross-module imports + resolution rules — **M** ✓ complete ← A1, A2
 - `C6` Incremental verification: re-verify only what changed, or whose callee contracts changed — **M** ✓ complete ← C5
 - `C3` Bounded quantifiers — **L** ✓ complete ← C2
-- `D1` A host that loads a topology plan and actually runs units — **L** ← A2
-- `F1` Lineage query API over the persisted ledger — **M** ← A3
-- `F2` Signed append-only audit export — **M** ← A3
-- `F3` Operator revocation console with a durable trail — **S** ← A3
-- `G1` Wire protocol for the agent↔fabric session — **L** ← A1, A2
+- `D1` A host that loads a topology plan and actually runs units — **L** ✓ complete ← A2
+- `F1` Lineage query API over the persisted ledger — **M** ✓ complete ← A3
+- `F2` Signed append-only audit export — **M** ✓ complete ← A3
+- `F3` Operator revocation console with a durable trail — **S** ✓ complete ← A3
+- `G1` Wire protocol for the agent↔fabric session — **L** ✓ complete ← A1, A2
 - `H3` LSP / projectional editor so the virtual-filesystem story is real — **XL** ← A2
 
 **Wave 3** — 4 feature(s), weight 17
 
-- `D2` Wire protocol with unforgeable capability tokens — **L** ← D1
-- `D5` Telemetry collection — **M** ← D1
-- `F4` Approval workflow for fence discharges — **M** ← A3, F1
-- `G2` Subtree leases/claims — **M** ← G1, A8
+- `D2` Wire protocol with unforgeable capability tokens — **L** ✓ complete ← D1
+- `D5` Telemetry collection — **M** ✓ complete ← D1
+- `F4` Approval workflow for fence discharges — **M** ✓ complete ← A3, F1
+- `G2` Subtree leases/claims — **M** ✓ complete ← G1, A8
 
 **Wave 4** — 2 feature(s), weight 28
 
-- `D3` Distributed fault semantics — what a contract means across a partition — **L** ← D2
-- `D4` Hot reconfiguration: move a function between units live — **XL** ← D1, D2
+- `D3` Distributed fault semantics — what a contract means across a partition — **L** ✓ complete ← D2
+- `D4` Hot reconfiguration: move a function between units live — **XL** ✓ complete ← D1, D2
 
 ### Weight by epic
 
@@ -336,7 +336,7 @@ same wave have no dependency on each other and can proceed in parallel.
 
 ### Startable today
 
-14 open features have all blockers complete: `D1`, `E1`, `E4`, `F1`, `F2`, `F3`, `F5`, `G1`, `G3`, `G4`, `H1`, `H2`, `H3`, `H4`.
+4 open features have all blockers complete: `H1`, `H2`, `H3`, `H4`.
 
 <!-- /generated:graph -->
 

@@ -495,6 +495,44 @@ export interface PersistedCounterexample {
   readonly counterexample: Counterexample;
 }
 
+export interface ScheduleStep<State> {
+  readonly label: string;
+  run(state: State): void;
+}
+
+export interface ScheduleOutcome<State> {
+  readonly order: readonly string[];
+  readonly state: State;
+}
+
+/** Exhaust every bounded interleaving while preserving each task's local order. */
+export function exploreSchedules<State>(
+  initial: State,
+  left: readonly ScheduleStep<State>[],
+  right: readonly ScheduleStep<State>[],
+  clone: (state: State) => State,
+  maxSchedules = 10_000,
+): ScheduleOutcome<State>[] {
+  const orders: Array<Array<{ side: 'left' | 'right'; index: number }>> = [];
+  const build = (li: number, ri: number, order: Array<{ side: 'left' | 'right'; index: number }>): void => {
+    if (orders.length >= maxSchedules) return;
+    if (li === left.length && ri === right.length) { orders.push(order); return; }
+    if (li < left.length) build(li + 1, ri, [...order, { side: 'left', index: li }]);
+    if (ri < right.length) build(li, ri + 1, [...order, { side: 'right', index: ri }]);
+  };
+  build(0, 0, []);
+  return orders.map((order) => {
+    const state = clone(initial);
+    const labels: string[] = [];
+    for (const entry of order) {
+      const step = entry.side === 'left' ? left[entry.index] : right[entry.index];
+      step.run(state);
+      labels.push(`${entry.side}:${step.label}`);
+    }
+    return { order: labels, state };
+  });
+}
+
 /** Persist one exact shrunk case as a permanent, content-addressed replay. */
 export function materializeCounterexample(
   directory: string,

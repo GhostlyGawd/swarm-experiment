@@ -227,6 +227,7 @@ function encodeTy(ty: Ty, name: (s: string) => number): string {
       return `D${bits}${ty.signed ? 1 : 0}${overflow}`;
     }
     case 'Owned': return `O<${encodeTy(ty.inner, name)}>`;
+    case 'Task': return `K<${encodeTy(ty.result, name)}>`;
   }
 }
 
@@ -293,6 +294,10 @@ function parseTy(src: string, pos: number, nameAt: (i: number) => string): [Ty, 
     case 'O': {
       const [inner, after] = parseTy(src, pos + 2, nameAt);
       return [{ t: 'Owned', inner }, after + 1];
+    }
+    case 'K': {
+      const [result, after] = parseTy(src, pos + 2, nameAt);
+      return [{ t: 'Task', result }, after + 1];
     }
     default:
       throw new SyntaxError(`unparseable type at ${pos}: ${src.slice(pos, pos + 24)}`);
@@ -490,6 +495,8 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
       case 'IntCast': out.push(`c${ty(t.ty)}`); return;
       case 'FixedBin': out.push(`b${BIN_OPCODE[t.op]}${ty(t.ty)}`); return;
       case 'ForAll': out.push(`p${sym(t.symbol)}`); return;
+      case 'Spawn': out.push('q'); return;
+      case 'Await': out.push('w'); return;
       case 'Old': out.push('@'); return;
       case 'ResultRef': out.push('$'); return;
       case 'Invoke': out.push(`X${f(pools.cap.intern(t.capability))}${f(t.args.length)}`); return;
@@ -504,6 +511,8 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
       case 'Assert': out.push(`A${f(pools.label.intern(t.label))}`); return;
       case 'ExprStmt': out.push('E'); return;
       case 'Block': out.push(`B${f(t.stmts.length)}`); return;
+      case 'Yield': out.push('y'); return;
+      case 'Atomic': out.push('o'); return;
       case 'Clause':
         out.push(`Q${f(pools.label.intern(t.label))}${RIGOR_CODE[t.rigor]}`);
         return;
@@ -840,6 +849,10 @@ export function decode(ir: string, ctx?: IrContext): Term {
         stack.push({ kind: 'ForAll', symbol, start, end, body });
         continue;
       }
+      case 'q': { const [body] = popN(1); stack.push({ kind: 'Spawn', body }); continue; }
+      case 'w': { const [task] = popN(1); stack.push({ kind: 'Await', task }); continue; }
+      case 'y': stack.push({ kind: 'Yield' }); continue;
+      case 'o': { const [body] = popN(1); stack.push({ kind: 'Atomic', body }); continue; }
       case 'P': {
         const symbol = symAt(r.field());
         const len = r.field();

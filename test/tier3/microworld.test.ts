@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MicroWorld, materializeCounterexample, simulateModule } from '../../src/tier3/microworld.ts';
+import { MicroWorld, exploreSchedules, materializeCounterexample, simulateModule } from '../../src/tier3/microworld.ts';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -228,4 +228,19 @@ test('shrinking moves strictly towards simpler values', () => {
   });
   assert.ok(record.length > 0);
   assert.ok(record.every((r) => r.k === 'record'));
+});
+
+test('E2: systematic schedule exploration enumerates the lost-update interleaving', () => {
+  interface State { value: number; leftRead?: number; rightRead?: number }
+  const left = [
+    { label: 'read', run: (state: State) => { state.leftRead = state.value; } },
+    { label: 'write', run: (state: State) => { state.value = state.leftRead! + 1; } },
+  ];
+  const right = [
+    { label: 'read', run: (state: State) => { state.rightRead = state.value; } },
+    { label: 'write', run: (state: State) => { state.value = state.rightRead! + 1; } },
+  ];
+  const outcomes = exploreSchedules<State>({ value: 0 }, left, right, (state) => ({ ...state }));
+  assert.deepEqual(new Set(outcomes.map((outcome) => outcome.state.value)), new Set([1, 2]));
+  assert.equal(outcomes.length, 6);
 });

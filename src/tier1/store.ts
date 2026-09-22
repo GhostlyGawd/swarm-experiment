@@ -187,6 +187,7 @@ export interface StoreStats {
 export interface GraphStoreOptions {
   /** Directory containing the durable object database. Omit for memory-only use. */
   readonly directory?: string;
+  readonly incrementalStructuralIndex?: boolean;
 }
 
 /**
@@ -204,10 +205,15 @@ export class GraphStore {
   private readonly parents = new Map<NodeRef, Set<NodeRef>>();
   private logicalWrites = 0;
   private readonly objectDirectory: string | null;
+  private readonly structureDirectory: string | null;
+  private readonly incrementalIndex: boolean;
 
   constructor(opts: GraphStoreOptions = {}) {
     this.objectDirectory = opts.directory ? join(opts.directory, 'objects') : null;
+    this.structureDirectory = opts.directory ? join(opts.directory, 'structures') : null;
+    this.incrementalIndex = opts.incrementalStructuralIndex ?? false;
     if (this.objectDirectory) mkdirSync(this.objectDirectory, { recursive: true });
+    if (this.structureDirectory) mkdirSync(this.structureDirectory, { recursive: true });
   }
 
   get size(): number {
@@ -222,6 +228,11 @@ export class GraphStore {
     if (!this.objectDirectory) throw new Error('this GraphStore is memory-only');
     const digest = ref.slice(ref.lastIndexOf(':') + 1);
     return join(this.objectDirectory, digest.slice(0, 2), `${digest.slice(2)}.json`);
+  }
+
+  private structuralPath(ref: NodeRef): string {
+    if (!this.structureDirectory) throw new Error('this GraphStore is memory-only');
+    return join(this.structureDirectory, `${ref.slice(ref.lastIndexOf(':') + 1)}.json`);
   }
 
   /** Every durable or cached object address. */
@@ -252,6 +263,7 @@ export class GraphStore {
       if (!set) this.parents.set(child, (set = new Set()));
       set.add(ref);
     }
+    if (this.incrementalIndex) this.incrementalStructural(ref);
     return ref;
   }
 
@@ -313,12 +325,26 @@ export class GraphStore {
   structuralKey(ref: NodeRef): StructuralKey {
     const cached = this.structural.get(ref);
     if (cached) return cached;
+    if (this.structureDirectory && existsSync(this.structuralPath(ref))) {
+      const key = readStored<StructuralKey>(this.structuralPath(ref));
+      this.structural.set(ref, key);
+      let set = this.byStructure.get(key);
+      if (!set) this.byStructure.set(key, (set = new Set()));
+      set.add(ref);
+      return key;
+    }
     const key = structuralKeyOf(this.hydrate(ref));
     this.structural.set(ref, key);
     let set = this.byStructure.get(key);
     if (!set) this.byStructure.set(key, (set = new Set()));
     set.add(ref);
+    if (this.structureDirectory) atomicWriteOnce(this.structuralPath(ref), encodeStored(key));
     return key;
+  }
+
+  /** Index one newly-written subtree without rescanning unrelated repository objects. */
+  incrementalStructural(ref: NodeRef): StructuralKey {
+    return this.structuralKey(ref);
   }
 
   /**

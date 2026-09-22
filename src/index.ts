@@ -33,19 +33,20 @@ export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec
 
 // --- Tier 3: execution and simulation ---------------------------------------
 export { AetherFault, Runtime, type Checkpoint, type ExecutionResult, type Fault, type FaultKind, type TraceEvent } from './tier3/runtime.ts';
-export { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, type ClosureValue, type Ref, type ResultValue, type SeqValue, type Value } from './tier3/values.ts';
-export { ProductionRuntime, formatCompilation, type ClauseDecision, type CompilationReport, type CompileOptions, type ElisionPolicy } from './tier3/compile.ts';
-export { MicroWorld, formatMicroWorld, materializeCounterexample, simulateModule, type Counterexample, type MicroWorldReport, type PersistedCounterexample, type PropertyName } from './tier3/microworld.ts';
+export { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type ClosureValue, type Ref, type ResultValue, type SeqValue, type TaskValue, type Value } from './tier3/values.ts';
+export { ProductionRuntime, formatCompilation, type ClauseDecision, type CompilationReport, type CompileOptions, type ElisionPolicy, type ProductionSampling, type TelemetrySample } from './tier3/compile.ts';
+export { MicroWorld, exploreSchedules, formatMicroWorld, materializeCounterexample, simulateModule, type Counterexample, type MicroWorldReport, type PersistedCounterexample, type PropertyName, type ScheduleOutcome, type ScheduleStep } from './tier3/microworld.ts';
 export { generateCase, materialise, shrinkPlain, type Plain } from './tier3/generate.ts';
 
 // --- Tier 4: topology and optimization --------------------------------------
 export {
   DEFAULT_COST_MODEL, callGraph, compareShapes, formatPlan, generateGlue, slice,
-  type CostModel, type CrossUnitEdge, type EdgeTelemetry, type FunctionTelemetry,
+  type ConcurrencyFinding, type CostModel, type CrossUnitEdge, type EdgeTelemetry, type FunctionTelemetry,
   type Placement, type SliceOptions, type TargetShape, type Telemetry, type TopologyPlan,
   type Unit,
 } from './tier4/topology.ts';
 export { applyTuning, domainValues, findSurfaces, tune, verifyOnlyParametersChanged, type Assignment, type Objective, type TuningResult } from './tier4/surfaces.ts';
+export { TelemetryCollector, TopologyHost, type DistributedFault, type DistributedFaultKind, type DistributedResult, type TopologyHostOptions, type WireRequest } from './tier4/host.ts';
 
 // --- Projection (§5) ---------------------------------------------------------
 export { TypeScriptProjector, projectTypeScript, type ProjectOptions } from './projection/typescript.ts';
@@ -58,7 +59,10 @@ export { EnumerativeSynthesizer } from './synthesis/enumerative.ts';
 
 // --- Utilities ---------------------------------------------------------------
 export { rng, type Rng } from './util/rng.ts';
-export { estimateTokens, measure, type SizeReport } from './util/tokens.ts';
+export { countTokens, estimateTokens, measure, measureWithTokenizer, type SizeReport } from './util/tokens.ts';
+
+// --- Agent wire protocol ----------------------------------------------------
+export { AgentSession, FrameDecoder, LeaseManager, encodeFrame, type AgentRequest, type AgentResponse, type Lease } from './agent/protocol.ts';
 
 // --- The worked example ------------------------------------------------------
 export { buildLedgerExample, ledgerCapabilities, ledgerTelemetry, ACCOUNT, CENTS } from './examples/ledger.ts';

@@ -104,3 +104,17 @@ test('a plan renders to something a human can review', () => {
   assert.match(text, /\{settle, transfer, feeFor\}/);
   assert.match(text, /3 member\(s\) sharing one memory domain/);
 });
+
+test('E4: concurrency findings become single-writer placement constraints', () => {
+  const ex = buildLedgerExample();
+  const plan = slice(ex.module, { edges: [], functions: ledgerTelemetry(ex).functions }, {
+    symbols: ex.syms,
+    concurrencyFindings: [{
+      symbols: [ex.symbols.settle, ex.symbols.transfer],
+      reason: 'lost update on account balances',
+    }],
+  });
+  const settle = plan.units.find((unit) => unit.members.includes(ex.symbols.settle));
+  assert.ok(settle?.members.includes(ex.symbols.transfer));
+  assert.ok(plan.recombinations.some((reason) => /single-writer domain/.test(reason)));
+});

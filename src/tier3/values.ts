@@ -27,7 +27,11 @@ export interface ClosureValue {
   readonly capabilities: readonly CapabilityName[];
   invoke(args: readonly Value[]): Value;
 }
-export type Value = bigint | boolean | string | null | Ref | ResultValue | SeqValue | ClosureValue;
+export interface TaskValue {
+  readonly task: true;
+  run(): Value;
+}
+export type Value = bigint | boolean | string | null | Ref | ResultValue | SeqValue | ClosureValue | TaskValue;
 
 export const isRef = (v: Value): v is Ref =>
   typeof v === 'object' && v !== null && !Array.isArray(v) && 'addr' in v;
@@ -37,6 +41,8 @@ export const isResultValue = (v: Value): v is ResultValue =>
 export const isSeqValue = (v: Value): v is SeqValue => Array.isArray(v);
 export const isClosureValue = (v: Value): v is ClosureValue =>
   typeof v === 'object' && v !== null && !Array.isArray(v) && 'closure' in v && v.closure === true;
+export const isTaskValue = (v: Value): v is TaskValue =>
+  typeof v === 'object' && v !== null && !Array.isArray(v) && 'task' in v && v.task === true;
 
 export function formatValue(v: Value, heap?: ReadonlyMap<number, Map<string, Value>>): string {
   if (v === null) return '()';
@@ -45,6 +51,7 @@ export function formatValue(v: Value, heap?: ReadonlyMap<number, Map<string, Val
   if (typeof v === 'string') return JSON.stringify(v);
   if (isSeqValue(v)) return `[${v.map((item) => formatValue(item, heap)).join(', ')}]`;
   if (isClosureValue(v)) return `<closure${v.capabilities.length ? ` ${v.capabilities.join(',')}` : ''}>`;
+  if (isTaskValue(v)) return '<task>';
   if (isResultValue(v)) return `${v.variant}(${formatValue(v.value, heap)})`;
   const record = heap?.get(v.addr);
   if (!record) return `@${v.addr}`;

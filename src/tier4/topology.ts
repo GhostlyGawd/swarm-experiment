@@ -174,6 +174,13 @@ export interface SliceOptions {
   readonly mergeThresholdMsPerSecond?: number;
   /** Capabilities that must not share a unit with anything else. */
   readonly isolate?: readonly CapabilityName[];
+  /** Race findings that require all named functions to share one single-writer unit. */
+  readonly concurrencyFindings?: readonly ConcurrencyFinding[];
+}
+
+export interface ConcurrencyFinding {
+  readonly symbols: readonly SymbolId[];
+  readonly reason: string;
 }
 
 /**
@@ -192,6 +199,16 @@ export function slice(
   const cost = opts.cost ?? DEFAULT_COST_MODEL;
   const isolate = new Set(opts.isolate ?? []);
   const threshold = opts.mergeThresholdMsPerSecond ?? 1;
+  const forced = new Map<string, string>();
+  const effectiveEdges: EdgeTelemetry[] = [...telemetry.edges];
+  for (const finding of opts.concurrencyFindings ?? []) {
+    const [first, ...rest] = finding.symbols;
+    if (!first) continue;
+    for (const symbol of rest) {
+      effectiveEdges.push({ from: first, to: symbol, callsPerSecond: Number.MAX_VALUE, payloadBytes: 0 });
+      forced.set(`${first}\0${symbol}`, finding.reason);
+    }
+  }
 
   const members = module.kind === 'Module' ? module.members : [module];
   const declarations = new Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>();
@@ -236,7 +253,7 @@ export function slice(
     for (;;) {
       let best: { a: WorkingUnit; b: WorkingUnit; saving: number } | null = null;
 
-      for (const edge of telemetry.edges) {
+      for (const edge of effectiveEdges) {
         const a = unitOf.get(edge.from);
         const b = unitOf.get(edge.to);
         if (!a || !b || a === b) continue;
@@ -264,8 +281,10 @@ export function slice(
       units.push(merged);
       for (const m of merged.members) unitOf.set(m, merged);
       recombinations.push(
-        `${best.a.id} and ${best.b.id} exchanged ${best.saving.toFixed(1)}ms/s of transport; ` +
-          'recombined into one in-process shared-memory domain',
+        forced.get(`${best.a.members[0]}\0${best.b.members[0]}`)
+          ? `${best.a.id} and ${best.b.id} share a concurrency finding; recombined into one single-writer domain`
+          : `${best.a.id} and ${best.b.id} exchanged ${best.saving.toFixed(1)}ms/s of transport; ` +
+            'recombined into one in-process shared-memory domain',
       );
     }
   }

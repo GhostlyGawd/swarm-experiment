@@ -26,7 +26,7 @@ import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
 import { CapabilityEnvelope, type CapabilityRegistry, type RevocationList } from '../tier2/ocap.ts';
 import { underlying } from '../tier2/typecheck.ts';
-import { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, type Ref, type Value } from './values.ts';
+import { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
 
 // ---------------------------------------------------------------------------
 // journal
@@ -494,6 +494,19 @@ export class Runtime {
       case 'ExprStmt':
         this.eval(stmt.expr, frame, null);
         return;
+      case 'Yield':
+        this.emit('branch', 'Yield', 'cooperative yield');
+        return;
+      case 'Atomic': {
+        const checkpoint = this.checkpoint('atomic');
+        try {
+          this.exec(stmt.body, frame);
+        } catch (error) {
+          this.restore(checkpoint);
+          throw error;
+        }
+        return;
+      }
       default:
         this.eval(stmt, frame, null);
     }
@@ -760,6 +773,31 @@ export class Runtime {
         } finally {
           frame.scopes.pop();
         }
+      }
+      case 'Spawn': {
+        const captured = frame.scopes.map((scope) => new Map(scope));
+        let settled = false;
+        let value: Value = null;
+        return {
+          task: true,
+          run: () => {
+            if (settled) return value;
+            const taskFrame: Frame = { ...frame, scopes: captured.map((scope) => new Map(scope)) };
+            this.frames.push(taskFrame);
+            try {
+              value = this.eval(expr.body, taskFrame, result, old);
+              settled = true;
+              return value;
+            } finally {
+              this.frames.pop();
+            }
+          },
+        };
+      }
+      case 'Await': {
+        const task = this.eval(expr.task, frame, result, old);
+        if (!isTaskValue(task)) throw new AetherFault(this.fault('type_error', 'await expects a task', null));
+        return task.run();
       }
       case 'Call': {
         const callee = this.functions.get(expr.callee);

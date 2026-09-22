@@ -44,6 +44,7 @@ export type Plain =
   | { readonly k: 'result'; readonly variant: 'ok' | 'err'; readonly value: Plain }
   | { readonly k: 'seq'; readonly items: readonly Plain[] }
   | { readonly k: 'fn'; readonly capabilities: readonly CapabilityName[]; readonly result: Plain }
+  | { readonly k: 'task'; readonly result: Plain }
   | { readonly k: 'record'; readonly ty: Ty; readonly fields: Readonly<Record<string, Plain>> }
   /** The same reference as an earlier argument — the aliased case. */
   | { readonly k: 'alias'; readonly index: number };
@@ -106,6 +107,7 @@ export function generatePlain(ty: Ty, random: Rng, opts: GenerationOptions = {})
       return { k: 'seq', items: Array.from({ length }, () => generatePlain(base.element, random, opts)) };
     }
     case 'Fn': return { k: 'fn', capabilities: base.capabilities, result: generatePlain(base.returns, random, opts) };
+    case 'Task': return { k: 'task', result: generatePlain(base.result, random, opts) };
     case 'Record': {
       const fields: Record<string, Plain> = {};
       for (const [name, fieldTy] of base.fields) fields[name] = generatePlain(fieldTy, random, opts);
@@ -162,6 +164,10 @@ function materialiseOne(arg: Plain, rt: Allocator, earlier: readonly Value[]): V
       const result = materialiseOne(arg.result, rt, earlier);
       return { closure: true, capabilities: arg.capabilities, invoke: () => result };
     }
+    case 'task': {
+      const result = materialiseOne(arg.result, rt, earlier);
+      return { task: true, run: () => result };
+    }
     case 'alias': {
       const target = earlier[arg.index];
       if (target === undefined) throw new RangeError(`alias to argument ${arg.index}, which is not yet bound`);
@@ -186,6 +192,7 @@ export function formatPlain(arg: Plain): string {
     case 'result': return `${arg.variant}(${formatPlain(arg.value)})`;
     case 'seq': return `[${arg.items.map(formatPlain).join(', ')}]`;
     case 'fn': return `<generated closure => ${formatPlain(arg.result)}>`;
+    case 'task': return `<generated task => ${formatPlain(arg.result)}>`;
     case 'alias': return `<same as argument ${arg.index}>`;
     case 'record':
       return `{ ${Object.entries(arg.fields).map(([k, v]) => `${k}: ${formatPlain(v)}`).join(', ')} }`;
@@ -225,6 +232,7 @@ export function shrinkPlain(arg: Plain): Plain[] {
       return out;
     }
     case 'fn': return shrinkPlain(arg.result).map((result) => ({ ...arg, result }));
+    case 'task': return shrinkPlain(arg.result).map((result) => ({ ...arg, result }));
     case 'alias': return []; // un-aliasing changes which case this is
     case 'record': {
       const out: Plain[] = [];

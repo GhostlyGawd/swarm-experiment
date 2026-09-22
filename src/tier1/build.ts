@@ -104,6 +104,8 @@ export const fixed = (
 ): Term => ({ kind: 'FixedBin', op, ty, left, right });
 export const forall = (symbol: SymbolId, start: Term, end: Term, body: Term): Term =>
   ({ kind: 'ForAll', symbol, start, end, body });
+export const spawn = (body: Term): Term => ({ kind: 'Spawn', body });
+export const await_ = (task: Term): Term => ({ kind: 'Await', task });
 export const old = (expr: Term): Term => ({ kind: 'Old', expr });
 export const result = (): Term => ({ kind: 'ResultRef' });
 export const invoke = (capability: CapabilityName, ...args: Term[]): Term => ({
@@ -131,6 +133,8 @@ export const ret = (value: Term): Term => ({ kind: 'Return', value });
 export const assert_ = (expr: Term, label: string): Term => ({ kind: 'Assert', expr, label });
 export const exprStmt = (expr: Term): Term => ({ kind: 'ExprStmt', expr });
 export const block = (...stmts: Term[]): Term => ({ kind: 'Block', stmts });
+export const yield_ = (): Term => ({ kind: 'Yield' });
+export const atomic = (body: Term): Term => ({ kind: 'Atomic', body });
 
 export const clause = (expr: Term, label: string, rigor: Rigor = 'formal'): Term => ({
   kind: 'Clause', expr, label, rigor,

@@ -14,6 +14,10 @@
 
 import type { CapabilityName } from '../tier1/ids.ts';
 import { capability } from '../tier1/ids.ts';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { atomicWrite, encodeStored, readStored } from '../tier1/persistence.ts';
 
 /** What a capability lets its holder do, and to what. */
 export interface CapabilityDescriptor {
@@ -137,11 +141,36 @@ export class CapabilityEnvelope {
 export class RevocationList {
   private readonly globally = new Set<CapabilityName>();
   private readonly scoped = new Map<string, Set<CapabilityName>>();
-  private readonly log: Array<{ at: number; cap: CapabilityName; scope: string | null; by: string }> = [];
+  private readonly log: Array<{ at: number; cap: CapabilityName; scope: string | null; by: string; action: 'revoke' | 'restore' }> = [];
   private readonly clock: () => number;
+  private readonly path: string | null;
 
-  constructor(clock: () => number = () => Date.now()) {
-    this.clock = clock;
+  constructor(clockOrOptions: (() => number) | { clock?: () => number; directory?: string } = () => Date.now()) {
+    const opts = typeof clockOrOptions === 'function' ? { clock: clockOrOptions } : clockOrOptions;
+    this.clock = opts.clock ?? (() => Date.now());
+    this.path = opts.directory ? join(opts.directory, 'revocations.json') : null;
+    if (this.path) {
+      mkdirSync(opts.directory!, { recursive: true });
+      if (existsSync(this.path)) {
+        const saved = readStored<{
+          globally: CapabilityName[];
+          scoped: Array<[string, CapabilityName[]]>;
+          log: Array<{ at: number; cap: CapabilityName; scope: string | null; by: string; action: 'revoke' | 'restore' }>;
+        }>(this.path);
+        for (const cap of saved.globally) this.globally.add(cap);
+        for (const [scope, caps] of saved.scoped) this.scoped.set(scope, new Set(caps));
+        this.log.push(...saved.log);
+      }
+    }
+  }
+
+  private persist(): void {
+    if (!this.path) return;
+    atomicWrite(this.path, encodeStored({
+      globally: [...this.globally],
+      scoped: [...this.scoped].map(([scope, caps]) => [scope, [...caps]]),
+      log: this.log,
+    }));
   }
 
   /** Revoke `cap` everywhere, or only within the named module. */
@@ -153,12 +182,15 @@ export class RevocationList {
     } else {
       this.globally.add(cap);
     }
-    this.log.push({ at: this.clock(), cap, scope: opts.scope ?? null, by: opts.by });
+    this.log.push({ at: this.clock(), cap, scope: opts.scope ?? null, by: opts.by, action: 'revoke' });
+    this.persist();
   }
 
   restore(cap: CapabilityName, scope?: string): void {
     if (scope) this.scoped.get(scope)?.delete(cap);
     else this.globally.delete(cap);
+    this.log.push({ at: this.clock(), cap, scope: scope ?? null, by: 'operator', action: 'restore' });
+    this.persist();
   }
 
   isRevoked(cap: CapabilityName, scope?: string): boolean {
@@ -167,7 +199,67 @@ export class RevocationList {
   }
 
   /** The audit trail an operator is asked for after an incident. */
-  get history(): ReadonlyArray<{ at: number; cap: CapabilityName; scope: string | null; by: string }> {
+  get history(): ReadonlyArray<{ at: number; cap: CapabilityName; scope: string | null; by: string; action: 'revoke' | 'restore' }> {
     return this.log;
+  }
+}
+
+export class RevocationConsole {
+  private readonly list: RevocationList;
+  constructor(list: RevocationList) { this.list = list; }
+  revoke(capability: CapabilityName, by: string, scope?: string): void {
+    this.list.revoke(capability, { by, scope });
+  }
+  restore(capability: CapabilityName, scope?: string): void { this.list.restore(capability, scope); }
+  status(capability: CapabilityName, scope?: string): boolean { return this.list.isRevoked(capability, scope); }
+  history(): RevocationList['history'] { return this.list.history; }
+}
+
+export interface CapabilityToken {
+  readonly capability: CapabilityName;
+  readonly scope: string;
+  readonly expiresAt: number;
+  readonly nonce: string;
+  readonly signature: string;
+}
+
+/** HMAC-sealed wire tokens: attenuable data whose authority cannot be forged. */
+export class CapabilitySealer {
+  private readonly key: Uint8Array;
+  private readonly clock: () => number;
+
+  constructor(key: Uint8Array = randomBytes(32), clock: () => number = () => Date.now()) {
+    if (key.byteLength < 32) throw new RangeError('capability sealing keys must be at least 32 bytes');
+    this.key = key;
+    this.clock = clock;
+  }
+
+  private mac(token: Omit<CapabilityToken, 'signature'>): string {
+    return createHmac('sha256', this.key)
+      .update(`${token.capability}\0${token.scope}\0${token.expiresAt}\0${token.nonce}`)
+      .digest('hex');
+  }
+
+  issue(capability: CapabilityName, scope: string, ttlMs = 60_000): CapabilityToken {
+    const unsigned = {
+      capability, scope, expiresAt: this.clock() + ttlMs,
+      nonce: randomBytes(16).toString('hex'),
+    };
+    return { ...unsigned, signature: this.mac(unsigned) };
+  }
+
+  verify(token: CapabilityToken, scope = token.scope): boolean {
+    if (token.scope !== scope || token.expiresAt < this.clock()) return false;
+    const expected = Buffer.from(this.mac(token), 'hex');
+    const actual = Buffer.from(token.signature, 'hex');
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  }
+
+  /** Re-seal a subset for a narrower scope; widening is impossible without the key. */
+  attenuate(tokens: readonly CapabilityToken[], capabilities: readonly CapabilityName[], scope: string): CapabilityToken[] {
+    const allowed = new Set(capabilities);
+    return tokens
+      .filter((token) => this.verify(token) && allowed.has(token.capability))
+      .map((token) => this.issue(token.capability, scope, Math.max(0, token.expiresAt - this.clock())));
   }
 }

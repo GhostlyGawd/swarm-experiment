@@ -265,3 +265,20 @@ test('R2: a contract that does fail still faults in production', () => {
     assert.deepEqual(result.fault.bindings, {});
   }
 });
+
+test('G4: production telemetry sampling is opt-in and rate bounded', () => {
+  const ex = buildLedgerExample();
+  const samples: Array<{ symbol: SymbolId; ok: boolean }> = [];
+  const prod = ProductionRuntime.compile(ex.module, {
+    registry: ex.capabilities,
+    symbols: ex.syms,
+    sampling: {
+      rate: 0.5,
+      random: (() => { let value = 0; return () => (value++ % 2 === 0 ? 0.25 : 0.75); })(),
+      onSample: (sample) => samples.push(sample),
+    },
+  });
+  for (let i = 0; i < 10; i++) prod.call(ex.symbols.feeFor, [100n]);
+  assert.equal(samples.length, 5);
+  assert.ok(samples.every((sample) => sample.symbol === ex.symbols.feeFor && sample.ok));
+});

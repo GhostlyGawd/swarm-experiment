@@ -91,6 +91,7 @@ export const tyEqual = (a: Ty, b: Ty): boolean => {
       return a.bits === other.bits && a.signed === other.signed && a.overflow === other.overflow;
     }
     case 'Owned': return tyEqual(a.inner, (b as typeof a).inner);
+    case 'Task': return tyEqual(a.result, (b as typeof a).result);
   }
 };
 
@@ -108,6 +109,7 @@ export function tyToString(t: Ty): string {
     case 'TypeVar': return t.name;
     case 'IntN': return `${t.signed ? 'i' : 'u'}${t.bits}/${t.overflow}`;
     case 'Owned': return `Owned<${tyToString(t.inner)}>`;
+    case 'Task': return `Task<${tyToString(t.result)}>`;
   }
 }
 
@@ -130,6 +132,7 @@ export function substituteType(ty: Ty, substitutions: ReadonlyMap<string, Ty>): 
       returns: substituteType(ty.returns, substitutions),
     };
     case 'Owned': return { ...ty, inner: substituteType(ty.inner, substitutions) };
+    case 'Task': return { ...ty, result: substituteType(ty.result, substitutions) };
     default: return ty;
   }
 }
@@ -166,6 +169,7 @@ function unifyType(pattern: Ty, actual: Ty, substitutions: Map<string, Ty>): boo
     }
     case 'IntN': return tyEqual(pattern, actual);
     case 'Owned': return unifyType(pattern.inner, actual.t === 'Owned' ? actual.inner : actual, substitutions);
+    case 'Task': return unifyType(pattern.result, (actual as typeof pattern).result, substitutions);
     default: return true;
   }
 }
@@ -357,6 +361,10 @@ export class TypeChecker {
         return;
       case 'ExprStmt':
         this.typeOf(term.expr, scope, env, [...path, 'expr'], ctx);
+        return;
+      case 'Yield': return;
+      case 'Atomic':
+        this.checkTerm(term.body, scope, env, [...path, 'body'], ctx);
         return;
       case 'TypeDecl':
       case 'Surface':
@@ -645,6 +653,16 @@ export class TypeChecker {
         const body = this.typeOf(term.body, inner, env, [...path, 'body'], ctx);
         this.expect({ t: 'Bool' }, body, [...path, 'body'], 'forall body');
         return { t: 'Bool' };
+      }
+      case 'Spawn':
+        return { t: 'Task', result: this.typeOf(term.body, scope, env, [...path, 'body'], ctx) };
+      case 'Await': {
+        const task = this.typeOf(term.task, scope, env, [...path, 'task'], ctx);
+        if (task.t !== 'Task') {
+          this.error('type_mismatch', `await expects Task, got ${tyToString(task)}`, [...path, 'task']);
+          return { t: 'Unit' };
+        }
+        return task.result;
       }
       case 'Old':
         if (ctx !== 'ensures') {

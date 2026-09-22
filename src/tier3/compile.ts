@@ -49,7 +49,7 @@ import { CapabilityEnvelope, type CapabilityRegistry, type RevocationList } from
 import { underlying } from '../tier2/typecheck.ts';
 import type { VerificationReport } from '../tier2/verify.ts';
 import type { ExecutionResult, Fault, FaultKind } from './runtime.ts';
-import { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, type Ref, type Value } from './values.ts';
+import { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
 
 // ---------------------------------------------------------------------------
 // compiled representation
@@ -141,6 +141,19 @@ export interface CompileOptions {
    */
   readonly entryPoints?: readonly SymbolId[];
   readonly scope?: string;
+  readonly sampling?: ProductionSampling;
+}
+
+export interface TelemetrySample {
+  readonly symbol: SymbolId;
+  readonly elapsedMs: number;
+  readonly ok: boolean;
+}
+
+export interface ProductionSampling {
+  readonly rate: number;
+  readonly random?: () => number;
+  readonly onSample: (sample: TelemetrySample) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,14 +265,26 @@ export class ProductionRuntime {
         steps: 0,
       };
     }
+    const sampling = this.opts.sampling;
+    const sampled = sampling !== undefined && (sampling.random?.() ?? Math.random()) < sampling.rate;
+    const started = sampled ? process.hrtime.bigint() : 0n;
+    let outcome: ExecutionResult;
     try {
-      return { ok: true, value: this.enter(fn, args), steps: 0 };
+      outcome = { ok: true, value: this.enter(fn, args), steps: 0 };
     } catch (e) {
       if (e instanceof ProductionFault) {
-        return { ok: false, fault: this.fault(e.kind, e.message, e.label), steps: 0 };
+        outcome = { ok: false, fault: this.fault(e.kind, e.message, e.label), steps: 0 };
+      } else {
+        throw e;
       }
-      throw e;
     }
+    if (sampled) {
+      sampling!.onSample({
+        symbol, ok: outcome.ok,
+        elapsedMs: Number(process.hrtime.bigint() - started) / 1e6,
+      });
+    }
+    return outcome;
   }
 
   /**
@@ -759,6 +784,29 @@ export class ProductionRuntime {
           return true;
         };
       }
+      case 'Spawn': {
+        const body = this.expr(term.body, ctx);
+        return (frame) => {
+          const captured = { s: [...frame.s], o: [...frame.o], r: frame.r };
+          let settled = false;
+          let value: Value = null;
+          return {
+            task: true,
+            run: () => {
+              if (!settled) { value = body(captured); settled = true; }
+              return value;
+            },
+          };
+        };
+      }
+      case 'Await': {
+        const task = this.expr(term.task, ctx);
+        return (frame) => {
+          const value = task(frame);
+          if (!isTaskValue(value)) throw new ProductionFault('type_error', 'await expects a task');
+          return value.run();
+        };
+      }
       case 'Call': {
         const args = term.args.map((a) => this.expr(a, ctx));
         const callee = term.callee;
@@ -935,6 +983,20 @@ export class ProductionRuntime {
         return (f) => {
           expr(f);
           return FALLTHROUGH;
+        };
+      }
+      case 'Yield': return () => FALLTHROUGH;
+      case 'Atomic': {
+        const body = this.stmt(term.body, ctx);
+        return (frame) => {
+          const snapshot = this.heap.map((record) => ({ ...record }));
+          try {
+            return body(frame);
+          } catch (error) {
+            this.heap.length = 0;
+            this.heap.push(...snapshot);
+            throw error;
+          }
         };
       }
       default: {

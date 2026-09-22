@@ -1,7 +1,7 @@
 {
   "name": "@ghostlygawd/aether",
   "version": "0.1.0",
-  "description": "Project Aether \u2014 a unified, agent-native programming fabric and runtime substrate.",
+  "description": "Project Aether — a unified, agent-native programming fabric and runtime substrate.",
   "type": "module",
   "license": "Apache-2.0",
   "files": [
@@ -15,11 +15,30 @@
     "aether": "./dist/cli.js"
   },
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./tier1": { "types": "./dist/tier1/index.d.ts", "import": "./dist/tier1/index.js" },
-    "./tier2": { "types": "./dist/tier2/index.d.ts", "import": "./dist/tier2/index.js" },
-    "./tier3": { "types": "./dist/tier3/index.d.ts", "import": "./dist/tier3/index.js" },
-    "./tier4": { "types": "./dist/tier4/index.d.ts", "import": "./dist/tier4/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./tier1": {
+      "types": "./dist/tier1/index.d.ts",
+      "import": "./dist/tier1/index.js"
+    },
+    "./tier2": {
+      "types": "./dist/tier2/index.d.ts",
+      "import": "./dist/tier2/index.js"
+    },
+    "./tier3": {
+      "types": "./dist/tier3/index.d.ts",
+      "import": "./dist/tier3/index.js"
+    },
+    "./tier4": {
+      "types": "./dist/tier4/index.d.ts",
+      "import": "./dist/tier4/index.js"
+    },
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "import": "./dist/agent/index.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -35,5 +54,8 @@
   "devDependencies": {
     "@types/node": "^22.9.0",
     "typescript": "5.8.3"
+  },
+  "dependencies": {
+    "js-tiktoken": "^1.0.21"
   }
 }

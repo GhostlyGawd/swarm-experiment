@@ -19,6 +19,7 @@ import type { GraphStore } from './store.ts';
 import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { atomicWrite, atomicWriteOnce, encodeStored, readStored } from './persistence.ts';
+import { sign, verify, type KeyLike } from 'node:crypto';
 
 export type OriginKind =
   | 'human_prompt'
@@ -112,12 +113,35 @@ export interface ProvenanceLedgerOptions {
   readonly directory?: string;
 }
 
+export interface LineageQuery {
+  readonly node?: NodeRef;
+  readonly originKind?: OriginKind;
+  readonly actor?: string;
+  readonly clause?: InvariantId;
+}
+
+export interface SignedAuditExport {
+  readonly algorithm: 'Ed25519';
+  readonly payload: string;
+  readonly signature: string;
+}
+
+export interface DischargeApproval {
+  readonly node: NodeRef;
+  readonly replacement: NodeRef;
+  readonly invariant: InvariantId;
+  readonly verdict: DischargeProof['verdict'];
+  readonly by: string;
+  readonly at: number;
+}
+
 export class ProvenanceLedger {
   private readonly records = new Map<ProvenanceId, ProvenanceRecord>();
   private readonly nodeToProv = new Map<NodeRef, ProvenanceId>();
   private readonly provToNodes = new Map<ProvenanceId, Set<NodeRef>>();
   private readonly clauseToProv = new Map<InvariantId, Set<ProvenanceId>>();
   private readonly flags = new Map<NodeRef, InvalidationFlag>();
+  private readonly approvals = new Map<string, DischargeApproval>();
   private clock: () => number;
   private readonly directory: string | null;
 
@@ -127,14 +151,14 @@ export class ProvenanceLedger {
     this.clock = opts.clock ?? (() => Date.now());
     this.directory = opts.directory ?? null;
     if (this.directory) {
-      for (const name of ['records', 'bindings', 'flags']) {
+      for (const name of ['records', 'bindings', 'flags', 'approvals']) {
         mkdirSync(join(this.directory, 'provenance', name), { recursive: true });
       }
       this.loadDurableState();
     }
   }
 
-  private durablePath(kind: 'records' | 'bindings' | 'flags', id: string): string {
+  private durablePath(kind: 'records' | 'bindings' | 'flags' | 'approvals', id: string): string {
     if (!this.directory) throw new Error('this provenance ledger is memory-only');
     return join(this.directory, 'provenance', kind, `${id.slice(id.lastIndexOf(':') + 1)}.json`);
   }
@@ -150,7 +174,7 @@ export class ProvenanceLedger {
 
   private loadDurableState(): void {
     if (!this.directory) return;
-    const readAll = <T>(kind: 'records' | 'bindings' | 'flags'): T[] => {
+    const readAll = <T>(kind: 'records' | 'bindings' | 'flags' | 'approvals'): T[] => {
       const directory = join(this.directory!, 'provenance', kind);
       return readdirSync(directory, { withFileTypes: true })
         .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
@@ -166,6 +190,17 @@ export class ProvenanceLedger {
     for (const entry of readAll<{ ref: NodeRef; flag: InvalidationFlag }>('flags')) {
       this.flags.set(entry.ref, entry.flag);
     }
+    for (const approval of readAll<DischargeApproval>('approvals')) {
+      this.approvals.set(this.approvalKey(approval.node, approval.replacement, approval.invariant), approval);
+    }
+  }
+
+  private approvalKey(node: NodeRef, replacement: NodeRef, invariant: InvariantId): string {
+    return `${node}\0${replacement}\0${invariant}`;
+  }
+
+  private approvalFileId(key: string): ProvenanceId {
+    return bytesToHexRef(blake3(canonicalBytes(key)), PROVENANCE_PREFIX) as string as ProvenanceId;
   }
 
   record(input: ProvenanceInput): ProvenanceId {
@@ -235,6 +270,50 @@ export class ProvenanceLedger {
       queue.push(...rec.parents);
     }
     return out;
+  }
+
+  queryLineage(query: LineageQuery = {}): readonly ProvenanceRecord[] {
+    const candidates = query.node
+      ? (() => { const id = this.nodeToProv.get(query.node!); return id ? this.lineage(id) : []; })()
+      : [...this.records.values()];
+    return candidates.filter((record) =>
+      (!query.originKind || record.origin.kind === query.originKind) &&
+      (!query.actor || record.origin.actor === query.actor) &&
+      (!query.clause || record.specClauses.includes(query.clause)),
+    ).sort((a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id));
+  }
+
+  exportSignedAudit(privateKey: KeyLike): SignedAuditExport {
+    const payload = encodeStored({
+      records: [...this.records.values()].sort((a, b) => a.id.localeCompare(b.id)),
+      bindings: [...this.nodeToProv].sort(([a], [b]) => a.localeCompare(b)),
+      flags: [...this.flags].sort(([a], [b]) => a.localeCompare(b)),
+      approvals: [...this.approvals.values()].sort((a, b) => a.at - b.at),
+    });
+    return { algorithm: 'Ed25519', payload, signature: sign(null, Buffer.from(payload), privateKey).toString('base64') };
+  }
+
+  static verifySignedAudit(audit: SignedAuditExport, publicKey: KeyLike): boolean {
+    return audit.algorithm === 'Ed25519' &&
+      verify(null, Buffer.from(audit.payload), publicKey, Buffer.from(audit.signature, 'base64'));
+  }
+
+  approveDischarge(
+    node: NodeRef,
+    replacement: NodeRef,
+    proof: DischargeProof,
+    by: string,
+  ): DischargeApproval {
+    if (proof.subject !== replacement) throw new TypeError('approval proof does not match replacement');
+    const approval: DischargeApproval = {
+      node, replacement, invariant: proof.invariant, verdict: proof.verdict, by, at: this.clock(),
+    };
+    const key = this.approvalKey(node, replacement, proof.invariant);
+    this.approvals.set(key, approval);
+    if (this.directory) {
+      atomicWriteOnce(this.durablePath('approvals', this.approvalFileId(key)), encodeStored(approval));
+    }
+    return approval;
   }
 
   /** The causal lineage of a node, rendered for a human auditor. */
@@ -363,7 +442,10 @@ export class ProvenanceLedger {
           p.subject === replacement &&
           (guard.priority === 'architectural' ? p.verdict === 'proved' : true),
       );
-      if (!proof) {
+      const approval = proof
+        ? this.approvals.get(this.approvalKey(ref, replacement, guard.invariant))
+        : undefined;
+      if (!proof || (guard.priority === 'required' && proof.verdict === 'property_checked' && !approval)) {
         return {
           allowed: false,
           blockedBy: guard,
@@ -371,7 +453,9 @@ export class ProvenanceLedger {
             `Node ${ref} is protected by ${guard.priority} invariant ${guard.invariant}: ` +
             `${guard.rationale}\n` +
             `To modify it, supply a DischargeProof showing the invariant still holds` +
-            (guard.priority === 'architectural' ? ' (verdict must be "proved", not fuzzed).' : '.'),
+            (guard.priority === 'architectural'
+              ? ' (verdict must be "proved", not fuzzed).'
+              : ' (property-checked evidence also needs a recorded approval).'),
           lineage,
         };
       }

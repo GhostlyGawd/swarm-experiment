@@ -22,6 +22,8 @@
  * an exact count must use the real tokenizer of the model in question.
  */
 
+import { getEncoding, type TiktokenEncoding } from 'js-tiktoken';
+
 const DIGRAPHS = new Set(['==', '!=', '<=', '>=', '=>', '->', '&&', '||', '::', '++', '**', '//']);
 
 const CHARS_PER_TOKEN = 4;
@@ -68,6 +70,29 @@ export function measure(text: string): SizeReport {
   return {
     bytes: new TextEncoder().encode(text).length,
     tokens: estimateTokens(text),
+    lines: text.length === 0 ? 0 : text.split('\n').length,
+  };
+}
+
+const tokenizers = new Map<TiktokenEncoding, ReturnType<typeof getEncoding>>();
+
+/** Exact token count from the same BPE tables used by production model APIs. */
+export function countTokens(text: string, encoding: TiktokenEncoding = 'cl100k_base'): number {
+  let tokenizer = tokenizers.get(encoding);
+  if (!tokenizer) {
+    tokenizer = getEncoding(encoding);
+    tokenizers.set(encoding, tokenizer);
+  }
+  return tokenizer.encode(text).length;
+}
+
+export function measureWithTokenizer(
+  text: string,
+  encoding: TiktokenEncoding = 'cl100k_base',
+): SizeReport {
+  return {
+    bytes: new TextEncoder().encode(text).length,
+    tokens: countTokens(text, encoding),
     lines: text.length === 0 ? 0 : text.split('\n').length,
   };
 }

@@ -243,6 +243,12 @@ export class Parser {
         this.expect('>');
         return { t: 'Owned', inner };
       }
+      case 'Task': {
+        this.expect('<');
+        const result = this.parseType();
+        this.expect('>');
+        return { t: 'Task', result };
+      }
       default: {
         if (this.typeParams.has(name)) return { t: 'TypeVar', name };
         const known = this.typeEnv.get(name);
@@ -555,6 +561,15 @@ export class Parser {
         this.expect(')');
         return b.forall(symbol, start, end, body);
       }
+      case 'spawn':
+      case 'awaitTask': {
+        const spawn = t.value === 'spawn';
+        this.pos++;
+        this.expect('(');
+        const value = this.parseExpression();
+        this.expect(')');
+        return spawn ? b.spawn(value) : b.await_(value);
+      }
       default: break;
     }
 
@@ -666,6 +681,13 @@ export class Parser {
           this.accept(';');
           return b.assert_(expr, label.value);
         }
+        case 'yield':
+          this.pos++;
+          this.accept(';');
+          return b.yield_();
+        case 'atomic':
+          this.pos++;
+          return b.atomic(this.parseBlock());
         default: break;
       }
     }

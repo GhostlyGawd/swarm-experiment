@@ -287,6 +287,8 @@ class VcBuilder {
       case 'IntCast': return this.freshVar('fixed_cast');
       case 'FixedBin': return this.freshVar(`fixed_${expr.op}`);
       case 'ForAll': return S.ite(this.formula(expr, path, old), S.num(1), S.num(0));
+      case 'Spawn': return this.freshVar('task');
+      case 'Await': return this.freshVar('await');
       default: return this.freshVar('opaque');
     }
   }
@@ -552,6 +554,8 @@ class VcBuilder {
       case 'ExprStmt':
         for (const p of paths) if (!p.done) this.term(stmt.expr, p);
         return paths;
+      case 'Yield': return paths;
+      case 'Atomic': return this.execute(stmt.body, paths, [...trail, 'atomic']);
       case 'If': {
         const out: Path[] = [];
         for (const p of paths) {

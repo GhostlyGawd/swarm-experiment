@@ -39,7 +39,8 @@ export type Ty =
   | { t: 'Fn'; params: readonly Ty[]; returns: Ty; capabilities: readonly CapabilityName[] }
   | { t: 'TypeVar'; name: string }
   | { t: 'IntN'; bits: 8 | 16 | 32 | 64; signed: boolean; overflow: 'wrap' | 'trap' | 'saturate' }
-  | { t: 'Owned'; inner: Ty };
+  | { t: 'Owned'; inner: Ty }
+  | { t: 'Task'; result: Ty };
 
 export const Int: Ty = { t: 'Int' };
 export const Bool: Ty = { t: 'Bool' };
@@ -97,6 +98,8 @@ export type Term =
       ty: Extract<Ty, { t: 'IntN' }>; left: Term; right: Term;
     }
   | { kind: 'ForAll'; symbol: SymbolId; start: Term; end: Term; body: Term }
+  | { kind: 'Spawn'; body: Term }
+  | { kind: 'Await'; task: Term }
   /** `old(e)` — the pre-state value of `e`. Legal only inside `ensures`. */
   | { kind: 'Old'; expr: Term }
   /** `result` — the value being returned. Legal only inside `ensures`. */
@@ -113,6 +116,8 @@ export type Term =
   | { kind: 'Assert'; expr: Term; label: string }
   | { kind: 'ExprStmt'; expr: Term }
   | { kind: 'Block'; stmts: readonly Term[] }
+  | { kind: 'Yield' }
+  | { kind: 'Atomic'; body: Term }
   // ---- declarations ------------------------------------------------------
   | { kind: 'Clause'; expr: Term; label: string; rigor: Rigor }
   | { kind: 'Contract'; requires: readonly Term[]; ensures: readonly Term[]; modifies: readonly Term[] }
@@ -217,6 +222,8 @@ export const LINK_SCHEMA: Readonly<Record<NodeKind, readonly LinkField[]>> = {
   IntCast: [one('value')],
   FixedBin: [one('left'), one('right')],
   ForAll: [one('start'), one('end'), one('body')],
+  Spawn: [one('body')],
+  Await: [one('task')],
   Old: [one('expr')],
   Invoke: [many('args')],
   Let: [one('init')],
@@ -227,6 +234,8 @@ export const LINK_SCHEMA: Readonly<Record<NodeKind, readonly LinkField[]>> = {
   Assert: [one('expr')],
   ExprStmt: [one('expr')],
   Block: [many('stmts')],
+  Yield: [],
+  Atomic: [one('body')],
   Clause: [one('expr')],
   Contract: [many('requires'), many('ensures'), many('modifies')],
   FunctionDecl: [opt('contract'), opt('body'), many('surfaces')],
@@ -236,11 +245,11 @@ export const LINK_SCHEMA: Readonly<Record<NodeKind, readonly LinkField[]>> = {
 const EXPRESSION_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>([
   'Lit', 'Var', 'Bin', 'Un', 'Cond', 'Call', 'Field', 'RecordLit', 'ResultValue', 'MatchResult',
   'SeqLit', 'SeqIndex', 'SeqLength', 'SeqMap', 'SeqFold', 'Lambda', 'Apply', 'StringOp',
-  'IntCast', 'FixedBin', 'ForAll', 'Old', 'ResultRef', 'Invoke',
+  'IntCast', 'FixedBin', 'ForAll', 'Spawn', 'Await', 'Old', 'ResultRef', 'Invoke',
 ]);
 
 const STATEMENT_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>([
-  'Let', 'Assign', 'If', 'While', 'Return', 'Assert', 'ExprStmt', 'Block',
+  'Let', 'Assign', 'If', 'While', 'Return', 'Assert', 'ExprStmt', 'Block', 'Yield', 'Atomic',
 ]);
 
 export const isExpressionKind = (k: NodeKind): boolean => EXPRESSION_KINDS.has(k);

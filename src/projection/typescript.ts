@@ -84,6 +84,7 @@ export class TypeScriptProjector {
       case 'TypeVar': return t.name;
       case 'IntN': return `IntN<${t.bits}, ${t.signed ? 'signed' : 'unsigned'}, ${t.overflow}>`;
       case 'Owned': return `Owned<${this.ty(t.inner)}>`;
+      case 'Task': return `Task<${this.ty(t.result)}>`;
     }
   }
 
@@ -153,6 +154,8 @@ export class TypeScriptProjector {
       }
       case 'ForAll':
         return `forall(${this.expr(t.start)}, ${this.expr(t.end)}, ${this.name(t.symbol)} => ${this.expr(t.body)})`;
+      case 'Spawn': return `spawn(${this.expr(t.body)})`;
+      case 'Await': return `awaitTask(${this.expr(t.task)})`;
       case 'Old': return `old(${this.expr(t.expr)})`;
       case 'ResultRef': return 'result';
       case 'Invoke':
@@ -194,6 +197,8 @@ export class TypeScriptProjector {
       case 'Return': return `${pad}return ${this.expr(t.value)};`;
       case 'Assert': return `${pad}assert(${this.expr(t.expr)}, ${JSON.stringify(t.label)});`;
       case 'ExprStmt': return `${pad}${this.expr(t.expr)};`;
+      case 'Yield': return `${pad}yield;`;
+      case 'Atomic': return `${pad}atomic ${this.blockInline(t.body, depth)}`;
       default:
         return `${pad}${this.expr(t, 0)};`;
     }

@@ -10,6 +10,7 @@ import { TypeScriptProjector } from '../../src/projection/typescript.ts';
 import { parseTypeScript } from '../../src/projection/parse.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import type { Term } from '../../src/tier1/ast.ts';
+import { ACCOUNT, CENTS } from '../../src/examples/ledger.ts';
 
 test('B1: Result constructors and exhaustive matching execute in both runtimes', () => {
   const syms = new SymbolSpace('result-language');
@@ -229,4 +230,41 @@ test('B7: fixed-width integers enforce wrap, saturate, and trap policies', () =>
   const productionWrapped = production.call(wrapped.symbol, []);
   assert.equal(productionWrapped.ok && productionWrapped.value, 4n);
   assert.equal(production.call(trapped.symbol, []).ok, false);
+});
+
+test('E1/E3: spawned tasks await deterministically and atomic faults roll back writes', () => {
+  const syms = new SymbolSpace('task-language');
+  const taskSymbol = syms.define('taskValue');
+  const accountSymbol = syms.define('account');
+  const atomicSymbol = syms.define('atomicFailure');
+  const task = b.fn({
+    symbol: taskSymbol, returns: b.Int,
+    body: b.block(b.ret(b.await_(b.spawn(b.add(b.int(2), b.int(3)))))),
+  });
+  const atomic = b.fn({
+    symbol: atomicSymbol, params: [b.param(accountSymbol, ACCOUNT)], returns: b.Unit,
+    body: b.block(
+      b.atomic(b.block(
+        b.assign(b.place(accountSymbol, 'balance'), b.typed(CENTS, 0n)),
+        b.assert_(b.bool(false), 'rollback'),
+      )),
+      b.ret(b.unit()),
+    ),
+  });
+  const module = b.module_({
+    symbol: syms.define('tasks'), members: [task, atomic], symbolTable: syms.table(),
+  });
+  const registry = new CapabilityRegistry();
+  assert.equal(typecheck(module, { registry, symbols: syms }).ok, true);
+  const development = new Runtime({ registry, symbols: syms }).load(module);
+  const taskResult = development.call(taskSymbol, []);
+  assert.equal(taskResult.ok && taskResult.value, 5n);
+  const account = development.allocateRecord(ACCOUNT, { id: 'a', balance: 10n });
+  assert.equal(development.call(atomicSymbol, [account]).ok, false);
+  assert.equal(development.readRecord(account).get('balance'), 10n);
+
+  const production = ProductionRuntime.compile(module, { registry, symbols: syms });
+  const prodAccount = production.allocateRecord(ACCOUNT, { id: 'a', balance: 10n });
+  assert.equal(production.call(atomicSymbol, [prodAccount]).ok, false);
+  assert.equal(production.readRecord(prodAccount).get('balance'), 10n);
 });
