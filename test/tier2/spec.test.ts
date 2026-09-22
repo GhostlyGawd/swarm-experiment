@@ -134,6 +134,45 @@ test('an architectural guard from a spec blocks unexplained deletion', () => {
   }
 });
 
+test('comments are ignored without shifting clause positions', () => {
+  const ex = buildLedgerExample();
+  const commented = `
+// a leading comment
+spec ledger {
+  /* a block comment */
+  rule "Transfers conserve money" on transfer {
+    // and one inside a rule
+    then sender.balance + receiver.balance === old(sender.balance) + old(receiver.balance);
+    enforce gateway;
+  }
+}
+`;
+  const spec = parseSpec(commented, context(ex));
+  assert.equal(spec.rules.length, 1);
+  // The clause is recovered by slicing raw source, so a shifted offset would
+  // corrupt the expression rather than merely fail to parse.
+  const plain = parseSpec(
+    'spec ledger {\n  rule "Transfers conserve money" on transfer {\n' +
+      '    then sender.balance + receiver.balance === old(sender.balance) + old(receiver.balance);\n' +
+      '    enforce gateway;\n  }\n}',
+    context(ex),
+  );
+  assert.deepEqual(spec.rules[0].then, plain.rules[0].then);
+  assert.equal(spec.rules[0].invariant, plain.rules[0].invariant);
+});
+
+test('a comment marker inside a string literal is not treated as a comment', () => {
+  const ex = buildLedgerExample();
+  const spec = parseSpec(
+    'spec s {\n  rule "not // a comment" on transfer {\n    given amount > 0n;\n' +
+      '    because "neither /* is this */";\n  }\n}',
+    context(ex),
+  );
+  assert.equal(spec.rules[0].label, 'not // a comment');
+  assert.equal(spec.rules[0].rationale, 'neither /* is this */');
+  assert.equal(spec.rules[0].given.length, 1);
+});
+
 test('malformed specifications are rejected with a line number', () => {
   const ex = buildLedgerExample();
   const ctx = context(ex);

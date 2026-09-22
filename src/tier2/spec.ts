@@ -78,7 +78,11 @@ export interface SpecContext {
  * product manager's `sender.balance >= amount` and an engineer's are literally
  * the same parser — there is no second dialect to keep in step.
  */
-export function parseSpec(source: string, ctx: SpecContext): ProductSpec {
+export function parseSpec(rawSource: string, ctx: SpecContext): ProductSpec {
+  // Clause expressions are recovered by slicing the raw source between
+  // tokens, so comments are blanked in place rather than dropped: offsets and
+  // line numbers have to stay exactly where they were.
+  const source = blankComments(rawSource);
   const tokens = tokenize(source);
   let pos = 0;
 
@@ -217,6 +221,41 @@ export function parseSpec(source: string, ctx: SpecContext): ProductSpec {
   expect('}');
 
   return { name, rules };
+}
+
+/** Replace comments with spaces, preserving every character position. */
+function blankComments(source: string): string {
+  const out = source.split('');
+  let i = 0;
+  let inString: string | null = null;
+  while (i < source.length) {
+    const ch = source[i];
+    if (inString) {
+      if (ch === '\\') i += 2;
+      else {
+        if (ch === inString) inString = null;
+        i++;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = ch;
+      i++;
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '/') {
+      while (i < source.length && source[i] !== '\n') out[i++] = ' ';
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '*') {
+      const end = source.indexOf('*/', i + 2);
+      const stop = end === -1 ? source.length : end + 2;
+      for (; i < stop; i++) if (out[i] !== '\n') out[i] = ' ';
+      continue;
+    }
+    i++;
+  }
+  return out.join('');
 }
 
 function toPlace(expr: Term): Term {

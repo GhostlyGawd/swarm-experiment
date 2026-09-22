@@ -15,7 +15,7 @@ bound in its non-functional section is measured rather than asserted.
 
 ```bash
 npm install
-npm test          # 126 tests
+npm test          # 128 tests
 npm run bench     # the §6 measurements
 npm run demo      # an end-to-end walkthrough of all four tiers
 ```
@@ -277,7 +277,7 @@ src/projection/      TypeScript projection and its parser
 src/synthesis/       The synthesis loop and a reference synthesizer
 src/examples/        The worked ledger example used throughout
 bench/nfr.bench.ts   The §6 measurements
-test/                126 tests, organized by tier
+test/                128 tests, organized by tier
 ```
 
 ## Licence
