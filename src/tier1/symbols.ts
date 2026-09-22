@@ -10,13 +10,35 @@
 import { freshSymbolId, type SymbolId } from './ids.ts';
 import { rng, type Rng } from '../util/rng.ts';
 import type { Term } from './ast.ts';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { atomicWrite, encodeStored, readStored } from './persistence.ts';
+
+export interface SymbolSpaceOptions {
+  readonly seed?: number | string;
+  readonly directory?: string;
+}
 
 export class SymbolSpace {
   private readonly names = new Map<SymbolId, string>();
   private readonly random: Rng;
+  private readonly path: string | null;
 
-  constructor(seed: number | string = 'aether') {
-    this.random = rng(seed);
+  constructor(seedOrOptions: number | string | SymbolSpaceOptions = 'aether') {
+    const opts = typeof seedOrOptions === 'object' ? seedOrOptions : { seed: seedOrOptions };
+    this.random = rng(opts.seed ?? 'aether');
+    this.path = opts.directory ? join(opts.directory, 'symbols.json') : null;
+    if (this.path) {
+      mkdirSync(opts.directory!, { recursive: true });
+      if (existsSync(this.path)) {
+        for (const [id, name] of readStored<Array<[SymbolId, string]>>(this.path)) this.names.set(id, name);
+      }
+    }
+  }
+
+  private persist(): void {
+    if (!this.path) return;
+    atomicWrite(this.path, encodeStored([...this.names.entries()].sort((a, b) => a[0].localeCompare(b[0]))));
   }
 
   /** Mint a new binding. The name is metadata; the id is the identity. */
@@ -24,6 +46,7 @@ export class SymbolSpace {
     let id = freshSymbolId(() => this.random.next());
     while (this.names.has(id)) id = freshSymbolId(() => this.random.next());
     this.names.set(id, name);
+    this.persist();
     return id;
   }
 
@@ -34,6 +57,7 @@ export class SymbolSpace {
   rename(symbol: SymbolId, name: string): void {
     if (!this.names.has(symbol)) throw new ReferenceError(`unknown symbol ${symbol}`);
     this.names.set(symbol, name);
+    this.persist();
   }
 
   nameOf(symbol: SymbolId): string {

@@ -30,9 +30,11 @@ import type { Term, Ty } from '../tier1/ast.ts';
 import type { InvariantId, NodeRef, SymbolId } from '../tier1/ids.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
 import type { DischargeProof } from '../tier1/provenance.ts';
+import { GraphStore } from '../tier1/store.ts';
 import * as S from './smt.ts';
 import { DEFAULT_TIMEOUT_MS, prove, type SolverResult } from './solver.ts';
 import { underlying } from './typecheck.ts';
+import type { ProofCache } from './proof-cache.ts';
 
 export type ObligationKind =
   | 'precondition_at_call'
@@ -84,6 +86,10 @@ export type Verdict = 'proved' | 'delegated' | 'unproven' | 'refuted';
 
 export interface VerificationReport {
   readonly symbol: SymbolId | null;
+  /** Content address of the exact declaration this report verified. */
+  readonly subject: NodeRef;
+  /** Exact callee declarations whose contracts were used as proof assumptions. */
+  readonly dependencies: readonly VerificationDependency[];
   readonly verdict: Verdict;
   readonly results: readonly ObligationResult[];
   /** Clauses the solver could not settle, now owed to property testing. */
@@ -101,6 +107,11 @@ export interface VerificationReport {
   readonly pathsExplored: number;
 }
 
+export interface VerificationDependency {
+  readonly symbol: SymbolId;
+  readonly subject: NodeRef;
+}
+
 export interface VerifyOptions {
   readonly symbols?: SymbolSpace;
   /** NFR 6.2: 2,000 ms per function, across all of its obligations. */
@@ -109,6 +120,8 @@ export interface VerifyOptions {
   readonly maxPaths?: number;
   /** Contracts of functions this one calls, for modular verification. */
   readonly environment?: ReadonlyMap<SymbolId, Term>;
+  /** Reuse a report only when its declaration and every contract dependency match. */
+  readonly proofCache?: ProofCache;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +133,8 @@ type PlaceKey = string;
 
 interface Path {
   readonly store: Map<PlaceKey, S.SmtTerm>;
+  /** Call-entry snapshot used by `old(…)`; absent means function entry. */
+  readonly oldStore?: Map<PlaceKey, S.SmtTerm>;
   readonly condition: S.SmtFormula[];
   readonly assumptions: S.SmtFormula[];
   returned: S.SmtTerm | null;
@@ -128,6 +143,7 @@ interface Path {
 
 const clonePath = (p: Path): Path => ({
   store: new Map(p.store),
+  oldStore: p.oldStore ? new Map(p.oldStore) : undefined,
   condition: [...p.condition],
   assumptions: [...p.assumptions],
   returned: p.returned,
@@ -139,11 +155,13 @@ class VcBuilder {
   private fresh = 0;
   readonly obligations: Obligation[] = [];
   readonly frameViolations: string[] = [];
+  readonly dependencies = new Map<SymbolId, NodeRef>();
   /** Snapshot of the entry store, which is what `old(…)` reads. */
   private initial: Map<PlaceKey, S.SmtTerm> = new Map();
   private declaredModifies: Set<PlaceKey> = new Set();
   private locals = new Set<PlaceKey>();
   private truncated = false;
+  private hasFrameContract = false;
 
   constructor(opts: VerifyOptions) {
     this.opts = opts;
@@ -176,6 +194,10 @@ class VcBuilder {
     }
   }
 
+  private frameAllows(key: PlaceKey): boolean {
+    return [...this.declaredModifies].some((root) => key === root || key.startsWith(`${root}.`));
+  }
+
   private read(path: Path, key: PlaceKey): S.SmtTerm {
     const hit = path.store.get(key);
     if (hit) return hit;
@@ -189,7 +211,7 @@ class VcBuilder {
 
   /** Integer-valued translation. Non-arithmetic values become opaque integers. */
   term(expr: Term, path: Path, old = false): S.SmtTerm {
-    const store = old ? this.initial : path.store;
+    const store = old ? (path.oldStore ?? this.initial) : path.store;
     switch (expr.kind) {
       case 'Lit':
         if (typeof expr.value === 'bigint') return S.num(expr.value);
@@ -207,6 +229,11 @@ class VcBuilder {
         if (old) {
           const snapshot = store.get(key);
           if (snapshot) return snapshot;
+          if (path.oldStore) {
+            const value = this.freshVar(`old!${key}`);
+            path.oldStore.set(key, value);
+            return value;
+          }
           return this.read(path, key);
         }
         return this.read(path, key);
@@ -288,20 +315,43 @@ class VcBuilder {
   private call(expr: Extract<Term, { kind: 'Call' }>, path: Path, old: boolean): S.SmtTerm {
     const callee = this.opts.environment?.get(expr.callee);
     const value = this.freshVar('call');
-    if (!callee || callee.kind !== 'FunctionDecl' || !callee.contract) return value;
+    if (!callee || callee.kind !== 'FunctionDecl') return value;
+    this.dependencies.set(callee.symbol, new GraphStore().intern(callee));
+    if (!callee.contract) return value;
     const contract = callee.contract;
     if (contract.kind !== 'Contract') return value;
 
-    // Bind the callee's parameters to the argument terms at this site.
-    //
-    // Binding the parameter *name* alone is not enough: the callee's contract
-    // speaks about `sender.balance`, and unless that whole path is mapped onto
-    // `payer.balance` the obligation is about a variable the caller has never
-    // heard of, and is trivially refutable. Record parameters therefore bind
-    // every nested field path, not just the root.
-    const bindings = new Map<PlaceKey, S.SmtTerm>();
+    // A mutating call has two stores. Preconditions and `old(…)` read the
+    // call-entry bindings. Postconditions read fresh values for every declared
+    // write, and those values replace the corresponding caller places after
+    // the call. Reusing one binding for both states creates contradictions such
+    // as `x = x + 1`, from which any later assertion can be proved vacuously.
+    const before = new Map<PlaceKey, S.SmtTerm>();
+    const after = new Map<PlaceKey, S.SmtTerm>();
+    const modified = new Set(
+      contract.modifies
+        .map((place) => this.placeKey(place))
+        .filter((key): key is string => key !== null),
+    );
+    const isModified = (key: PlaceKey): boolean =>
+      [...modified].some((root) => key === root || key.startsWith(`${root}.`));
+
     const bindPaths = (key: PlaceKey, ty: Ty, argExpr: Term): void => {
-      bindings.set(key, this.term(argExpr, path, old));
+      const prior = this.term(argExpr, path, old);
+      before.set(key, prior);
+      let next = prior;
+      if (!old && isModified(key)) {
+        next = this.freshVar(`callpost!${key}`);
+        const callerKey = this.placeKey(argExpr);
+        if (callerKey) {
+          if (!this.locals.has(callerKey) && this.hasFrameContract && !this.frameAllows(callerKey)) {
+            const message = `${callerKey} is modified by ${this.name(callee.symbol)} but not listed in modifies`;
+            if (!this.frameViolations.includes(message)) this.frameViolations.push(message);
+          }
+          path.store.set(callerKey, next);
+        }
+      }
+      after.set(key, next);
       const base = underlying(ty);
       if (base.t !== 'Record') return;
       for (const [field, fieldTy] of base.fields) {
@@ -312,8 +362,17 @@ class VcBuilder {
       const arg = expr.args[i];
       if (arg) bindPaths(this.name(p.symbol), p.ty, arg);
     });
+    const prePath: Path = {
+      store: new Map([...path.store, ...before]),
+      oldStore: new Map(before),
+      condition: path.condition,
+      assumptions: path.assumptions,
+      returned: value,
+      done: false,
+    };
     const callPath: Path = {
-      store: new Map([...path.store, ...bindings]),
+      store: new Map([...path.store, ...after]),
+      oldStore: new Map(before),
       condition: path.condition,
       assumptions: path.assumptions,
       returned: value,
@@ -324,7 +383,7 @@ class VcBuilder {
       this.emit({
         kind: 'precondition_at_call',
         label: `${this.name(expr.callee)}.${clause.label}`,
-        formula: this.implication(path, this.formula(clause.expr, callPath)),
+        formula: this.implication(path, this.formula(clause.expr, prePath)),
         rigor: clause.rigor,
         path: ['call', clause.label],
         callee: expr.callee,
@@ -333,6 +392,9 @@ class VcBuilder {
     }
     for (const clause of contract.ensures) {
       if (clause.kind !== 'Clause') continue;
+      // Property clauses are not solver facts. Treating one as an axiom would
+      // let a caller obtain a formal proof from a callee that was only fuzzed.
+      if (clause.rigor !== 'formal') continue;
       path.assumptions.push(this.formula(clause.expr, callPath));
     }
     return value;
@@ -419,7 +481,7 @@ class VcBuilder {
           const key = this.placeKey(stmt.target);
           if (key === null) continue;
           const value = this.term(stmt.value, p);
-          if (!this.locals.has(key) && this.declaredModifies.size > 0 && !this.declaredModifies.has(key)) {
+          if (!this.locals.has(key) && this.hasFrameContract && !this.frameAllows(key)) {
             const message = `${key} is assigned but not listed in modifies`;
             if (!this.frameViolations.includes(message)) this.frameViolations.push(message);
           }
@@ -576,6 +638,7 @@ class VcBuilder {
 
     const contract = decl.contract?.kind === 'Contract' ? decl.contract : null;
     if (contract) {
+      this.hasFrameContract = true;
       for (const m of contract.modifies) {
         const key = this.placeKey(m);
         if (key) this.declaredModifies.add(key);
@@ -649,6 +712,15 @@ export function verifyFunction(
   if (decl.kind !== 'FunctionDecl') {
     throw new TypeError(`verifyFunction expects a FunctionDecl, got ${decl.kind}`);
   }
+  const subject = new GraphStore().intern(decl);
+  const cached = opts.proofCache?.get(subject);
+  if (cached) {
+    const dependenciesCurrent = cached.dependencies.every((dependency) => {
+      const current = opts.environment?.get(dependency.symbol);
+      return current?.kind === 'FunctionDecl' && new GraphStore().intern(current) === dependency.subject;
+    });
+    if (dependenciesCurrent) return cached;
+  }
   const budget = opts.budgetMs ?? DEFAULT_TIMEOUT_MS;
   const builder = new VcBuilder(opts);
   const pathsExplored = builder.build(decl);
@@ -698,18 +770,23 @@ export function verifyFunction(
     }
   }
 
-  if (builder.wasTruncated) budgetExhausted = true;
+  if (builder.wasTruncated) {
+    budgetExhausted = true;
+    unproven.push('path exploration truncated');
+  }
 
-  const verdict: Verdict = results.some((r) => r.verdict === 'refuted')
+  const verdict: Verdict = builder.frameViolations.length > 0 || results.some((r) => r.verdict === 'refuted')
     ? 'refuted'
-    : results.some((r) => r.verdict === 'unproven')
+    : builder.wasTruncated || results.some((r) => r.verdict === 'unproven')
       ? 'unproven'
       : results.some((r) => r.verdict === 'delegated')
         ? 'delegated'
         : 'proved';
 
-  return {
+  const report: VerificationReport = {
     symbol: decl.symbol,
+    subject,
+    dependencies: [...builder.dependencies].map(([symbol, subject]) => ({ symbol, subject })),
     verdict,
     results,
     unprovenFormalContracts: unproven,
@@ -720,6 +797,8 @@ export function verifyFunction(
     budgetExhausted,
     pathsExplored,
   };
+  if (!report.budgetExhausted && report.verdict !== 'unproven') opts.proofCache?.put(report);
+  return report;
 }
 
 /**
@@ -783,7 +862,12 @@ export function dischargeProof(
   invariant: InvariantId,
   subject: NodeRef,
 ): DischargeProof | null {
-  if (report.verdict === 'refuted') return null;
+  if (
+    report.verdict === 'refuted' ||
+    report.subject !== subject ||
+    report.frameViolations.length > 0 ||
+    report.budgetExhausted
+  ) return null;
   const proved = report.results.filter((r) => r.verdict === 'proved').length;
   const total = report.results.length;
   // An architectural guard demands `proved`, so an unchecked modelling

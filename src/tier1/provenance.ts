@@ -16,6 +16,9 @@ import { blake3 } from './blake3.ts';
 import { canonicalBytes, type Canonical } from './canonical.ts';
 import { bytesToHexRef, PROVENANCE_PREFIX, type InvariantId, type NodeRef, type ProvenanceId } from './ids.ts';
 import type { GraphStore } from './store.ts';
+import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { atomicWrite, atomicWriteOnce, encodeStored, readStored } from './persistence.ts';
 
 export type OriginKind =
   | 'human_prompt'
@@ -104,6 +107,11 @@ export interface InvalidationReport {
   readonly reconciliationQueue: readonly NodeRef[];
 }
 
+export interface ProvenanceLedgerOptions {
+  readonly clock?: () => number;
+  readonly directory?: string;
+}
+
 export class ProvenanceLedger {
   private readonly records = new Map<ProvenanceId, ProvenanceRecord>();
   private readonly nodeToProv = new Map<NodeRef, ProvenanceId>();
@@ -111,10 +119,53 @@ export class ProvenanceLedger {
   private readonly clauseToProv = new Map<InvariantId, Set<ProvenanceId>>();
   private readonly flags = new Map<NodeRef, InvalidationFlag>();
   private clock: () => number;
+  private readonly directory: string | null;
 
   /** Injectable clock so provenance ids are reproducible in tests and replays. */
-  constructor(clock: () => number = () => Date.now()) {
-    this.clock = clock;
+  constructor(clockOrOptions: (() => number) | ProvenanceLedgerOptions = () => Date.now()) {
+    const opts = typeof clockOrOptions === 'function' ? { clock: clockOrOptions } : clockOrOptions;
+    this.clock = opts.clock ?? (() => Date.now());
+    this.directory = opts.directory ?? null;
+    if (this.directory) {
+      for (const name of ['records', 'bindings', 'flags']) {
+        mkdirSync(join(this.directory, 'provenance', name), { recursive: true });
+      }
+      this.loadDurableState();
+    }
+  }
+
+  private durablePath(kind: 'records' | 'bindings' | 'flags', id: string): string {
+    if (!this.directory) throw new Error('this provenance ledger is memory-only');
+    return join(this.directory, 'provenance', kind, `${id.slice(id.lastIndexOf(':') + 1)}.json`);
+  }
+
+  private indexRecord(record: ProvenanceRecord): void {
+    this.records.set(record.id, record);
+    for (const clause of record.specClauses) {
+      let set = this.clauseToProv.get(clause);
+      if (!set) this.clauseToProv.set(clause, (set = new Set()));
+      set.add(record.id);
+    }
+  }
+
+  private loadDurableState(): void {
+    if (!this.directory) return;
+    const readAll = <T>(kind: 'records' | 'bindings' | 'flags'): T[] => {
+      const directory = join(this.directory!, 'provenance', kind);
+      return readdirSync(directory, { withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+        .map((entry) => readStored<T>(join(directory, entry.name)));
+    };
+    for (const record of readAll<ProvenanceRecord>('records')) this.indexRecord(record);
+    for (const binding of readAll<{ ref: NodeRef; provenance: ProvenanceId }>('bindings')) {
+      this.nodeToProv.set(binding.ref, binding.provenance);
+      let set = this.provToNodes.get(binding.provenance);
+      if (!set) this.provToNodes.set(binding.provenance, (set = new Set()));
+      set.add(binding.ref);
+    }
+    for (const entry of readAll<{ ref: NodeRef; flag: InvalidationFlag }>('flags')) {
+      this.flags.set(entry.ref, entry.flag);
+    }
   }
 
   record(input: ProvenanceInput): ProvenanceId {
@@ -132,12 +183,9 @@ export class ProvenanceLedger {
       PROVENANCE_PREFIX,
     ) as string as ProvenanceId;
     if (!this.records.has(id)) {
-      this.records.set(id, { ...rec, id });
-      for (const clause of rec.specClauses) {
-        let set = this.clauseToProv.get(clause);
-        if (!set) this.clauseToProv.set(clause, (set = new Set()));
-        set.add(id);
-      }
+      const record = { ...rec, id };
+      this.indexRecord(record);
+      if (this.directory) atomicWriteOnce(this.durablePath('records', id), encodeStored(record));
     }
     return id;
   }
@@ -155,10 +203,17 @@ export class ProvenanceLedger {
   /** Attach a provenance record to a node address. */
   bind(ref: NodeRef, provenance: ProvenanceId): void {
     this.get(provenance);
+    const existing = this.nodeToProv.get(ref);
+    if (existing && existing !== provenance) {
+      throw new Error(`node ${ref} is already bound to immutable provenance ${existing}`);
+    }
     this.nodeToProv.set(ref, provenance);
     let set = this.provToNodes.get(provenance);
     if (!set) this.provToNodes.set(provenance, (set = new Set()));
     set.add(ref);
+    if (this.directory) {
+      atomicWriteOnce(this.durablePath('bindings', ref), encodeStored({ ref, provenance }));
+    }
   }
 
   provenanceOf(ref: NodeRef): ProvenanceId | undefined {
@@ -241,7 +296,9 @@ export class ProvenanceLedger {
       const ref = queue.pop()!;
       if (affected.has(ref)) continue;
       affected.add(ref);
-      this.flags.set(ref, { reason: 'InvalidatedSpec', clause, detectedAt: this.clock(), via });
+      const flag: InvalidationFlag = { reason: 'InvalidatedSpec', clause, detectedAt: this.clock(), via };
+      this.flags.set(ref, flag);
+      if (this.directory) atomicWrite(this.durablePath('flags', ref), encodeStored({ ref, flag }));
       for (const parent of store.parentsOf(ref)) queue.push(parent);
     }
 
@@ -270,6 +327,10 @@ export class ProvenanceLedger {
   /** Clear the flag once an agent has reconciled the node. */
   reconcile(ref: NodeRef): void {
     this.flags.delete(ref);
+    if (this.directory) {
+      const path = this.durablePath('flags', ref);
+      if (existsSync(path)) unlinkSync(path);
+    }
   }
 
   /**
@@ -281,7 +342,11 @@ export class ProvenanceLedger {
    * still holds after the change. Prose justifications are not accepted,
    * because an agent can always produce prose.
    */
-  guardMutation(ref: NodeRef, proofs: readonly DischargeProof[] = []): FenceVerdict {
+  guardMutation(
+    ref: NodeRef,
+    replacement: NodeRef,
+    proofs: readonly DischargeProof[] = [],
+  ): FenceVerdict {
     const prov = this.nodeToProv.get(ref);
     if (!prov) return { allowed: true, discharged: [] };
 
@@ -295,6 +360,7 @@ export class ProvenanceLedger {
       const proof = proofs.find(
         (p) =>
           p.invariant === guard.invariant &&
+          p.subject === replacement &&
           (guard.priority === 'architectural' ? p.verdict === 'proved' : true),
       );
       if (!proof) {

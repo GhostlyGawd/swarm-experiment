@@ -34,6 +34,9 @@ import {
   type StructuralKey,
   type SymbolId,
 } from './ids.ts';
+import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { atomicWriteOnce, encodeStored, readStored } from './persistence.ts';
 
 /** Structured, unambiguous hash preimage for a stored node. */
 function preimage(node: FlatNode): Canonical {
@@ -174,6 +177,11 @@ export interface StoreStats {
   readonly structuralKeysComputed: number;
 }
 
+export interface GraphStoreOptions {
+  /** Directory containing the durable object database. Omit for memory-only use. */
+  readonly directory?: string;
+}
+
 /**
  * An immutable content-addressed node store.
  *
@@ -188,21 +196,50 @@ export class GraphStore {
   /** child -> parents, for invalidation propagation (FR-1.3). */
   private readonly parents = new Map<NodeRef, Set<NodeRef>>();
   private logicalWrites = 0;
+  private readonly objectDirectory: string | null;
+
+  constructor(opts: GraphStoreOptions = {}) {
+    this.objectDirectory = opts.directory ? join(opts.directory, 'objects') : null;
+    if (this.objectDirectory) mkdirSync(this.objectDirectory, { recursive: true });
+  }
 
   get size(): number {
-    return this.nodes.size;
+    return this.objectDirectory ? this.listRefs().length : this.nodes.size;
   }
 
   has(ref: NodeRef): boolean {
-    return this.nodes.has(ref);
+    return this.nodes.has(ref) || (this.objectDirectory !== null && existsSync(this.objectPath(ref)));
+  }
+
+  private objectPath(ref: NodeRef): string {
+    if (!this.objectDirectory) throw new Error('this GraphStore is memory-only');
+    const digest = ref.slice(ref.lastIndexOf(':') + 1);
+    return join(this.objectDirectory, digest.slice(0, 2), `${digest.slice(2)}.json`);
+  }
+
+  /** Every durable or cached object address. */
+  listRefs(): NodeRef[] {
+    if (!this.objectDirectory) return [...this.nodes.keys()];
+    const refs: NodeRef[] = [];
+    if (!existsSync(this.objectDirectory)) return refs;
+    for (const shard of readdirSync(this.objectDirectory, { withFileTypes: true })) {
+      if (!shard.isDirectory() || !/^[0-9a-f]{2}$/.test(shard.name)) continue;
+      const directory = join(this.objectDirectory, shard.name);
+      for (const file of readdirSync(directory, { withFileTypes: true })) {
+        if (!file.isFile() || !/^[0-9a-f]{62}\.json$/.test(file.name)) continue;
+        refs.push(`ast:b3:${shard.name}${file.name.slice(0, -5)}` as NodeRef);
+      }
+    }
+    return refs.sort();
   }
 
   /** Persist a flat node, returning its address. Idempotent. */
   put(node: FlatNode): NodeRef {
     const ref = hashNode(node);
     this.logicalWrites++;
-    if (this.nodes.has(ref)) return ref;
+    if (this.has(ref)) return ref;
     this.nodes.set(ref, node);
+    if (this.objectDirectory) atomicWriteOnce(this.objectPath(ref), encodeStored(node));
     for (const child of children(node)) {
       let set = this.parents.get(child);
       if (!set) this.parents.set(child, (set = new Set()));
@@ -212,13 +249,36 @@ export class GraphStore {
   }
 
   get(ref: NodeRef): FlatNode {
-    const node = this.nodes.get(ref);
+    let node = this.nodes.get(ref);
+    if (!node && this.objectDirectory && existsSync(this.objectPath(ref))) {
+      node = readStored<FlatNode>(this.objectPath(ref));
+      if (hashNode(node) !== ref) throw new Error(`corrupt object ${ref}: content hash does not match its address`);
+      this.nodes.set(ref, node);
+      for (const child of children(node)) {
+        let set = this.parents.get(child);
+        if (!set) this.parents.set(child, (set = new Set()));
+        set.add(ref);
+      }
+    }
     if (!node) throw new ReferenceError(`unknown node ${ref}`);
     return node;
   }
 
   parentsOf(ref: NodeRef): readonly NodeRef[] {
+    // A fresh process has no reverse index yet. Hydrating every durable object
+    // once reconstructs it without giving up the read-through cache for normal
+    // point lookups.
+    if (this.objectDirectory) for (const candidate of this.listRefs()) this.get(candidate);
     return [...(this.parents.get(ref) ?? [])];
+  }
+
+  /** Delete a durable object. Repository GC is the only intended caller. */
+  delete(ref: NodeRef): boolean {
+    const cached = this.nodes.delete(ref);
+    this.structural.delete(ref);
+    if (!this.objectDirectory || !existsSync(this.objectPath(ref))) return cached;
+    unlinkSync(this.objectPath(ref));
+    return true;
   }
 
   /**

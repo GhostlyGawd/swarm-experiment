@@ -23,7 +23,7 @@
 import type { Term } from '../tier1/ast.ts';
 import type { InvariantId, NodeRef, SymbolId } from '../tier1/ids.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
-import type { GraphStore } from '../tier1/store.ts';
+import { GraphStore } from '../tier1/store.ts';
 import { type DischargeProof, type ProvenanceLedger } from '../tier1/provenance.ts';
 import type { CapabilityRegistry } from '../tier2/ocap.ts';
 import { typecheck, type Diagnostic } from '../tier2/typecheck.ts';
@@ -271,7 +271,7 @@ export function synthesize(
       verification,
       simulation,
       proof: opts.invariant
-        ? dischargeProof(verification, opts.invariant, ('ast:b3:' + '0'.repeat(64)) as NodeRef)
+        ? dischargeProof(verification, opts.invariant, new GraphStore().intern(candidate))
         : null,
       // Reaching this line does not imply a proof: with `preferProved` off the
       // loop accepts the first candidate that passes its micro-worlds, whatever
@@ -290,7 +290,11 @@ export function synthesize(
       verification: fallback.verification,
       simulation: fallback.simulation,
       proof: opts.invariant
-        ? dischargeProof(fallback.verification, opts.invariant, ('ast:b3:' + '0'.repeat(64)) as NodeRef)
+        ? dischargeProof(
+            fallback.verification,
+            opts.invariant,
+            new GraphStore().intern(fallback.declaration),
+          )
         : null,
       provenFormally: false,
       elapsedMs: Date.now() - started,

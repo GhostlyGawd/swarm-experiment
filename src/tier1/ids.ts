@@ -11,6 +11,8 @@
 export type NodeRef = string & { readonly __brand: 'NodeRef' };
 /** Alpha-normalized structural key: `struct:b3:<64 hex>`. Drives dedup. */
 export type StructuralKey = string & { readonly __brand: 'StructuralKey' };
+/** Content address of a repository commit. */
+export type CommitRef = string & { readonly __brand: 'CommitRef' };
 /** Opaque binding identity: `sym:<22 base32>`. Survives renaming. */
 export type SymbolId = string & { readonly __brand: 'SymbolId' };
 /** Causal provenance record: `prov:b3:<64 hex>`. */
@@ -26,6 +28,7 @@ const HEX64 = /^[0-9a-f]{64}$/;
 
 export const NODE_PREFIX = 'ast:b3:';
 export const STRUCT_PREFIX = 'struct:b3:';
+export const COMMIT_PREFIX = 'commit:b3:';
 export const SYMBOL_PREFIX = 'sym:';
 export const PROVENANCE_PREFIX = 'prov:b3:';
 export const INVARIANT_PREFIX = 'inv:b3:';

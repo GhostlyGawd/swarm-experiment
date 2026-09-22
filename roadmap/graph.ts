@@ -192,7 +192,8 @@ export function classifySequence(
 // rendering
 // ---------------------------------------------------------------------------
 
-const label = (f: Feature): string => `${f.id}[${f.id}: ${escapeMermaid(shorten(f.title))}]`;
+const label = (f: Feature): string =>
+  `${f.id}[${f.status === 'complete' ? '✓ ' : ''}${f.id}: ${escapeMermaid(shorten(f.title))}]`;
 
 function shorten(title: string): string {
   const cut = title.split(/[:—(]/)[0].trim();
@@ -251,7 +252,8 @@ export function renderGraphSection(): string {
       const degraded = f.degradedUntil?.length
         ? ` *(degraded until ${f.degradedUntil.join(', ')})*`
         : '';
-      lines.push(`- \`${f.id}\` ${f.title} — **${f.size}**${blockers}${degraded}`);
+      const status = f.status === 'complete' ? ' ✓ complete' : '';
+      lines.push(`- \`${f.id}\` ${f.title} — **${f.size}**${status}${blockers}${degraded}`);
     }
     lines.push('');
   }
@@ -277,10 +279,11 @@ export function renderGraphSection(): string {
   }
   lines.push('');
 
-  const startable = ready(new Set());
+  const complete = new Set(FEATURES.filter((f) => f.status === 'complete').map((f) => f.id));
+  const startable = ready(complete).filter((f) => f.status !== 'complete');
   lines.push('### Startable today', '');
   lines.push(
-    `${startable.length} of ${FEATURES.length} features have no blockers at all: ` +
+    `${startable.length} open features have all blockers complete: ` +
       `${startable.map((f) => `\`${f.id}\``).join(', ')}.`,
     '',
   );
@@ -326,7 +329,8 @@ export function renderOrderingSection(): string {
     '',
     `\`${FIRST_SLICE.join('`, `')}\`  — weight ${sliceWeight}.`,
     '',
-    'Make it a repository, and make proofs persist with it. The slice is **closed',
+    'First close the correctness findings, then make it a repository and make',
+    'proofs persist with it. The slice is **closed',
     'under dependencies**: nothing in it requires anything outside it, so it can be',
     'built and shipped without pulling in the rest of the roadmap. Together these',
     'turn three current claims — deduplication, lock-free writes, and an immutable',

@@ -125,7 +125,7 @@ test('an architectural guard from a spec blocks unexplained deletion', () => {
   const ref = store.intern(transfer);
   ex.ledger.bind(ref, compiled.provenance.get('A transfer may not overdraw the sender')! as never);
 
-  const verdict = ex.ledger.guardMutation(ref, []);
+  const verdict = ex.ledger.guardMutation(ref, ref, []);
   assert.equal(verdict.allowed, false);
   if (!verdict.allowed) {
     assert.equal(verdict.blockedBy.priority, 'architectural');

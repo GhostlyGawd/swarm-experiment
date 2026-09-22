@@ -21,7 +21,7 @@ function tableRows(): Array<{ id: string; title: string; size: string }> {
     const cells = line.split('|').slice(1, -1).map((c) => c.trim());
     if (cells.length < 3) continue;
     const id = cells[0].replace(/\*/g, '');
-    if (!/^[A-H]\d+$/.test(id)) continue;
+    if (!/^[A-I]\d+$/.test(id)) continue;
     out.push({
       id,
       title: cells[1].replace(/\*\*/g, ''),
@@ -44,11 +44,12 @@ test('the dependency graph is acyclic', () => {
 test('feature ids are unique and well formed', () => {
   const seen = new Set<string>();
   for (const feature of FEATURES) {
-    assert.match(feature.id, /^[A-H]\d+$/, feature.id);
+    assert.match(feature.id, /^[A-I]\d+$/, feature.id);
     assert.equal(feature.id[0], feature.epic, `${feature.id} is filed under ${feature.epic}`);
     assert.equal(seen.has(feature.id), false, `duplicate id ${feature.id}`);
     seen.add(feature.id);
     assert.ok(feature.title.length > 0 && feature.why.length > 0, feature.id);
+    assert.ok((feature.status ?? 'open') === 'open' || feature.status === 'complete', feature.id);
   }
 });
 
@@ -169,7 +170,7 @@ test('sizes are drawn from the declared scale', () => {
   }
 });
 
-test('every feature claimed unbuilt is checked against the codebase', () => {
+test('every feature has evidence matching its completion status', () => {
   for (const feature of FEATURES) {
     const evidence = feature.evidence;
     if (evidence.kind === 'none') {
@@ -178,12 +179,19 @@ test('every feature claimed unbuilt is checked against the codebase', () => {
     }
     for (const file of evidence.files) {
       const source = readFileSync(`${ROOT}${file}`, 'utf8');
-      assert.equal(
-        source.toLowerCase().includes(evidence.pattern.toLowerCase()),
-        false,
-        `${feature.id} claims to be unbuilt, but ${file} already mentions ` +
-          `"${evidence.pattern}" — the roadmap is listing something that exists`,
-      );
+      const found = source.toLowerCase().includes(evidence.pattern.toLowerCase());
+      if ((feature.status ?? 'open') === 'complete') {
+        assert.equal(evidence.kind, 'present', `${feature.id}: completed work needs positive evidence`);
+        assert.equal(found, true, `${feature.id}: completion evidence is missing from ${file}`);
+      } else {
+        assert.equal(evidence.kind, 'absent', `${feature.id}: open work needs absence evidence`);
+        assert.equal(
+          found,
+          false,
+          `${feature.id} claims to be unbuilt, but ${file} already mentions ` +
+            `"${evidence.pattern}" — the roadmap is listing something that exists`,
+        );
+      }
     }
   }
 });

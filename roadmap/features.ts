@@ -14,6 +14,7 @@
  */
 
 export type Size = 'S' | 'M' | 'L' | 'XL';
+export type FeatureStatus = 'open' | 'complete';
 
 /**
  * A checkable justification that a feature is still open.
@@ -24,6 +25,7 @@ export type Size = 'S' | 'M' | 'L' | 'XL';
  */
 export type Evidence =
   | { readonly kind: 'absent'; readonly pattern: string; readonly files: readonly string[] }
+  | { readonly kind: 'present'; readonly pattern: string; readonly files: readonly string[] }
   | { readonly kind: 'none'; readonly reason: string };
 
 export interface Feature {
@@ -32,6 +34,7 @@ export interface Feature {
   readonly title: string;
   readonly why: string;
   readonly size: Size;
+  readonly status?: FeatureStatus;
   /** Hard blockers: this cannot be built until all of these exist. */
   readonly deps: readonly string[];
   /** Ships without these, but incomplete in the stated way until they land. */
@@ -53,6 +56,7 @@ export const EPICS: readonly Epic[] = [
   { id: 'F', title: 'Governance — the last Phase 3 deliverable' },
   { id: 'G', title: 'Agent ergonomics' },
   { id: 'H', title: 'Projection' },
+  { id: 'I', title: 'Correctness and release integrity' },
 ];
 
 const STORE = 'src/tier1/store.ts';
@@ -64,57 +68,57 @@ export const FEATURES: readonly Feature[] = [
     id: 'A1', epic: 'A',
     title: 'Object store: write-once blobs keyed by node address, read-through cache',
     why: 'The graph must outlive a process',
-    size: 'M', deps: [],
-    evidence: { kind: 'absent', pattern: 'writeFile', files: [STORE] },
+    size: 'M', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: 'GraphStoreOptions', files: [STORE] },
   },
   {
     id: 'A2', epic: 'A',
     title: 'Named roots (branches/tags) + a commit object binding root × provenance × time',
     why: "Otherwise there's nothing to *find* a module by",
-    size: 'S', deps: ['A1'],
-    evidence: { kind: 'absent', pattern: 'branch', files: [STORE] },
+    size: 'S', status: 'complete', deps: ['A1'],
+    evidence: { kind: 'present', pattern: 'class AetherRepository', files: ['src/tier1/repository.ts'] },
   },
   {
     id: 'A3', epic: 'A',
     title: 'Durable provenance ledger and `InvalidatedSpec` flags',
     why: 'Currently in-memory Maps; the audit trail dies on exit',
-    size: 'M', deps: ['A1'],
-    evidence: { kind: 'absent', pattern: 'writeFile', files: ['src/tier1/provenance.ts'] },
+    size: 'M', status: 'complete', deps: ['A1'],
+    evidence: { kind: 'present', pattern: 'loadDurableState', files: ['src/tier1/provenance.ts'] },
   },
   {
     id: 'A4', epic: 'A',
     title: 'Durable `SymbolSpace`',
     why: 'The `SymbolTable` is already a node; the allocator isn\'t',
-    size: 'S', deps: ['A1'],
-    evidence: { kind: 'absent', pattern: 'writeFile', files: ['src/tier1/symbols.ts'] },
+    size: 'S', status: 'complete', deps: ['A1'],
+    evidence: { kind: 'present', pattern: 'SymbolSpaceOptions', files: ['src/tier1/symbols.ts'] },
   },
   {
     id: 'A5', epic: 'A',
     title: 'Mark-and-sweep GC from roots',
     why: 'Every edit mints nodes; without this it only grows',
-    size: 'M', deps: ['A1', 'A2'],
-    evidence: { kind: 'absent', pattern: 'collectGarbage', files: [STORE] },
+    size: 'M', status: 'complete', deps: ['A1', 'A2'],
+    evidence: { kind: 'present', pattern: 'collectGarbage', files: ['src/tier1/repository.ts'] },
   },
   {
     id: 'A6', epic: 'A',
     title: '`aether fsck` — re-hash every object, confirm the address matches',
     why: 'Content addressing makes corruption *detectable*; nothing detects it yet',
-    size: 'S', deps: ['A1'],
-    evidence: { kind: 'absent', pattern: 'fsck', files: ['src/cli.ts'] },
+    size: 'S', status: 'complete', deps: ['A1'],
+    evidence: { kind: 'present', pattern: 'fsck', files: ['src/cli.ts'] },
   },
   {
     id: 'A7', epic: 'A',
     title: 'Packfile import/export',
     why: 'Ships a repo, and makes the 94.6% dedup figure a measurement on disk',
-    size: 'M', deps: ['A1', 'A2'],
-    evidence: { kind: 'absent', pattern: 'packfile', files: [STORE] },
+    size: 'M', status: 'complete', deps: ['A1', 'A2'],
+    evidence: { kind: 'present', pattern: 'exportPackfile', files: ['src/tier1/repository.ts'] },
   },
   {
     id: 'A8', epic: 'A',
     title: 'Cross-process write safety: temp-file + atomic rename, CAS on root updates',
     why: 'The lock-free claim currently holds *within one process* only',
-    size: 'M', deps: ['A1', 'A2'],
-    evidence: { kind: 'absent', pattern: 'rename', files: [STORE] },
+    size: 'M', status: 'complete', deps: ['A1', 'A2'],
+    evidence: { kind: 'present', pattern: 'withFileLock', files: ['src/tier1/persistence.ts', 'src/tier1/repository.ts'] },
   },
 
   // --- B. Language surface -------------------------------------------------
@@ -173,8 +177,8 @@ export const FEATURES: readonly Feature[] = [
     id: 'C5', epic: 'C',
     title: 'Proof cache keyed by node address',
     why: "The payoff of content addressing that isn't exploited yet — a proved subtree never needs re-proving. Cheap, large win",
-    size: 'S', deps: ['A1'],
-    evidence: { kind: 'absent', pattern: 'proofCache', files: ['src/tier2/verify.ts'] },
+    size: 'S', status: 'complete', deps: ['A1'],
+    evidence: { kind: 'present', pattern: 'proofCache', files: ['src/tier2/verify.ts'] },
   },
   {
     id: 'C6', epic: 'C',
@@ -396,13 +400,81 @@ export const FEATURES: readonly Feature[] = [
     size: 'M', deps: [],
     evidence: { kind: 'absent', pattern: 'projectDiff', files: ['src/projection/typescript.ts'] },
   },
+
+  // --- I. Correctness and release integrity -------------------------------
+  {
+    id: 'I1', epic: 'I',
+    title: 'Sound modular verification for mutating callees',
+    why: 'Call postconditions must relate distinct entry and exit stores instead of proving callers from contradictory assumptions',
+    size: 'L', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: 'oldStore', files: ['src/tier2/verify.ts'] },
+  },
+  {
+    id: 'I2', epic: 'I',
+    title: 'Bind proof elision to exact content and admissible evidence',
+    why: 'Stale, truncated, assumption-dependent, or dependency-stale reports must never remove production checks',
+    size: 'M', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: 'reportProblem', files: ['src/tier3/compile.ts'] },
+  },
+  {
+    id: 'I3', epic: 'I',
+    title: 'Downgrade truncated path exploration to unproven',
+    why: 'Dropping a branch cannot yield a formal proof',
+    size: 'S', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: 'path exploration truncated', files: ['src/tier2/verify.ts'] },
+  },
+  {
+    id: 'I4', epic: 'I',
+    title: 'Make frame violations proof-blocking, including empty frames',
+    why: 'A function that writes outside modifies cannot receive a discharge proof',
+    size: 'S', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: 'hasFrameContract', files: ['src/tier2/verify.ts', 'src/tier3/microworld.ts'] },
+  },
+  {
+    id: 'I5', epic: 'I',
+    title: 'Check return expressions against declared return types',
+    why: 'A typed function must not return a value of an unrelated type',
+    size: 'S', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: 'return value', files: ['src/tier2/typecheck.ts'] },
+  },
+  {
+    id: 'I6', epic: 'I',
+    title: 'Enforce the capability registry in production compilation',
+    why: 'An unregistered capability must not compile or execute in the stripped runtime',
+    size: 'S', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: 'unregistered capability', files: ['src/tier3/compile.ts'] },
+  },
+  {
+    id: 'I7', epic: 'I',
+    title: 'Bind fence discharge proofs to the replacement node',
+    why: 'Evidence for unrelated code must not authorize a guarded mutation',
+    size: 'S', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: 'p.subject === replacement', files: ['src/tier1/provenance.ts'] },
+  },
+  {
+    id: 'I8', epic: 'I',
+    title: 'Ship a consumable scoped npm package with valid tier exports',
+    why: 'Clean packages need built artifacts and every declared export must resolve',
+    size: 'S', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: 'GraphStore', files: ['src/tier1/index.ts'] },
+  },
+  {
+    id: 'I9', epic: 'I',
+    title: 'Honor the containers topology target for every unit',
+    why: 'A requested container plan must not silently place pure functions at the edge',
+    size: 'S', status: 'complete', deps: [],
+    evidence: { kind: 'present', pattern: "shape === 'containers'", files: ['src/tier4/topology.ts'] },
+  },
 ];
 
 /**
  * The recommended first slice: make it a repository, and make proofs persist
  * with it. Asserted to be closed under dependencies.
  */
-export const FIRST_SLICE: readonly string[] = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'C5'];
+export const FIRST_SLICE: readonly string[] = [
+  'I1', 'I2', 'I3', 'I4', 'I5', 'I6', 'I7', 'I8', 'I9',
+  'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'C5',
+];
 
 /**
  * The recommended build order from the brainstorm.

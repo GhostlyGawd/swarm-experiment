@@ -6,7 +6,8 @@ inventories what stands between the reference implementation and a product.
 Sizes are relative (S < M < L < XL), not estimates in time. The dependency
 graph in §2 is generated from `roadmap/features.ts` and machine-checked by
 `test/roadmap.test.ts` — the tables below and the graph are verified to agree,
-so neither can drift from the other.
+so neither can drift from the other. Completed items remain in the graph with
+positive source evidence, preserving the history of what the roadmap closed.
 
 ---
 
@@ -100,6 +101,25 @@ so neither can drift from the other.
 | H3 | LSP / projectional editor so the virtual-filesystem story is real | XL |
 | H4 | Diff projection — render the change between two roots as readable text | M |
 
+### I. Correctness and release integrity
+
+These findings came from adversarial review of the verifier, production
+compiler, governance boundary, package surface, and topology targets. They are
+completed before feature expansion because the rest of the roadmap depends on
+their guarantees.
+
+| # | Feature | Why | Status | Size |
+|---|---|---|---|---|
+| I1 | Sound modular verification for mutating callees | Prevent contradictory call assumptions from proving false callers | Complete | L |
+| I2 | Bind proof elision to exact content and admissible evidence | Reject stale, truncated, assumption-dependent, and dependency-stale reports | Complete | M |
+| I3 | Downgrade truncated path exploration to unproven | Dropped branches cannot yield a proof | Complete | S |
+| I4 | Make frame violations proof-blocking, including empty frames | Writes outside `modifies` must block discharge | Complete | S |
+| I5 | Check return expressions against declared return types | Preserve the declared type boundary | Complete | S |
+| I6 | Enforce the capability registry in production compilation | Unknown authority must fail before execution | Complete | S |
+| I7 | Bind fence discharge proofs to the replacement node | Prevent reuse of evidence for unrelated code | Complete | S |
+| I8 | Ship a consumable scoped npm package with valid tier exports | Make clean package artifacts executable | Complete | S |
+| I9 | Honor the containers topology target for every unit | Keep explicit deployment targets exact | Complete | S |
+
 ---
 
 ## 2. Dependency graph
@@ -113,14 +133,14 @@ in a stated way until the source lands.
 ```mermaid
 graph LR
   subgraph A["Durability — make it a repository"]
-    A1[A1: Object store]
-    A2[A2: Named roots]
-    A3[A3: Durable provenance ledger and Invalidat…]
-    A4[A4: Durable SymbolSpace]
-    A5[A5: Mark-and-sweep GC from roots]
-    A6[A6: aether fsck]
-    A7[A7: Packfile import/export]
-    A8[A8: Cross-process write safety]
+    A1[✓ A1: Object store]
+    A2[✓ A2: Named roots]
+    A3[✓ A3: Durable provenance ledger and Invalidat…]
+    A4[✓ A4: Durable SymbolSpace]
+    A5[✓ A5: Mark-and-sweep GC from roots]
+    A6[✓ A6: aether fsck]
+    A7[✓ A7: Packfile import/export]
+    A8[✓ A8: Cross-process write safety]
   end
   subgraph B["Language surface — make real programs expressible"]
     B1[B1: Sum types + constructors + a Match node]
@@ -132,7 +152,7 @@ graph LR
     B7[B7: Integer width/overflow policy]
   end
   subgraph C["Verification reach"]
-    C5[C5: Proof cache keyed by node address]
+    C5[✓ C5: Proof cache keyed by node address]
     C6[C6: Incremental verification]
     C1[C1: Shell out to Z3/CVC5 on unknown]
     C2[C2: Array/sequence theory]
@@ -173,6 +193,17 @@ graph LR
     H2[H2: Python projection]
     H3[H3: LSP / projectional editor so the virtual…]
     H4[H4: Diff projection]
+  end
+  subgraph I["Correctness and release integrity"]
+    I1[✓ I1: Sound modular verification for mutating …]
+    I2[✓ I2: Bind proof elision to exact content and …]
+    I3[✓ I3: Downgrade truncated path exploration to …]
+    I4[✓ I4: Make frame violations proof-blocking, in…]
+    I5[✓ I5: Check return expressions against declare…]
+    I6[✓ I6: Enforce the capability registry in produ…]
+    I7[✓ I7: Bind fence discharge proofs to the repla…]
+    I8[✓ I8: Ship a consumable scoped npm package wit…]
+    I9[✓ I9: Honor the containers topology target for…]
   end
   A1 --> A2
   A1 --> A3
@@ -219,9 +250,9 @@ graph LR
 Wave *n* is everything whose deepest blocker sits in wave *n − 1*. Items in the
 same wave have no dependency on each other and can proceed in parallel.
 
-**Wave 0** — 18 feature(s), weight 114
+**Wave 0** — 27 feature(s), weight 132
 
-- `A1` Object store: write-once blobs keyed by node address, read-through cache — **M**
+- `A1` Object store: write-once blobs keyed by node address, read-through cache — **M** ✓ complete
 - `B1` Sum types + constructors + a `Match` node — **L**
 - `B2` Immutable sequences (index, length, map/fold) — **L** *(degraded until B4, C2)*
 - `B3` Function values / closures — **XL**
@@ -239,14 +270,23 @@ same wave have no dependency on each other and can proceed in parallel.
 - `H1` Rust projection (read-only) — **M**
 - `H2` Python projection — **M**
 - `H4` Diff projection — render the change between two roots as readable text — **M**
+- `I1` Sound modular verification for mutating callees — **L** ✓ complete
+- `I2` Bind proof elision to exact content and admissible evidence — **M** ✓ complete
+- `I3` Downgrade truncated path exploration to unproven — **S** ✓ complete
+- `I4` Make frame violations proof-blocking, including empty frames — **S** ✓ complete
+- `I5` Check return expressions against declared return types — **S** ✓ complete
+- `I6` Enforce the capability registry in production compilation — **S** ✓ complete
+- `I7` Bind fence discharge proofs to the replacement node — **S** ✓ complete
+- `I8` Ship a consumable scoped npm package with valid tier exports — **S** ✓ complete
+- `I9` Honor the containers topology target for every unit — **S** ✓ complete
 
 **Wave 1** — 10 feature(s), weight 35
 
-- `A2` Named roots (branches/tags) + a commit object binding root × provenance × time — **S** ← A1
-- `A3` Durable provenance ledger and `InvalidatedSpec` flags — **M** ← A1
-- `A4` Durable `SymbolSpace` — **S** ← A1
-- `A6` `aether fsck` — re-hash every object, confirm the address matches — **S** ← A1
-- `C5` Proof cache keyed by node address — **S** ← A1
+- `A2` Named roots (branches/tags) + a commit object binding root × provenance × time — **S** ✓ complete ← A1
+- `A3` Durable provenance ledger and `InvalidatedSpec` flags — **M** ✓ complete ← A1
+- `A4` Durable `SymbolSpace` — **S** ✓ complete ← A1
+- `A6` `aether fsck` — re-hash every object, confirm the address matches — **S** ✓ complete ← A1
+- `C5` Proof cache keyed by node address — **S** ✓ complete ← A1
 - `C2` Array/sequence theory — **L** ← B2
 - `C7` Materialize an SMT counterexample as a persisted micro-world case — **S** ← A1
 - `E2` Systematic schedule exploration in micro-worlds — **L** ← E1
@@ -255,9 +295,9 @@ same wave have no dependency on each other and can proceed in parallel.
 
 **Wave 2** — 12 feature(s), weight 66
 
-- `A5` Mark-and-sweep GC from roots — **M** ← A1, A2
-- `A7` Packfile import/export — **M** ← A1, A2
-- `A8` Cross-process write safety: temp-file + atomic rename, CAS on root updates — **M** ← A1, A2
+- `A5` Mark-and-sweep GC from roots — **M** ✓ complete ← A1, A2
+- `A7` Packfile import/export — **M** ✓ complete ← A1, A2
+- `A8` Cross-process write safety: temp-file + atomic rename, CAS on root updates — **M** ✓ complete ← A1, A2
 - `B6` Cross-module imports + resolution rules — **M** ← A1, A2
 - `C6` Incremental verification: re-verify only what changed, or whose callee contracts changed — **M** ← C5
 - `C3` Bounded quantifiers — **L** ← C2
@@ -292,10 +332,11 @@ same wave have no dependency on each other and can proceed in parallel.
 | F. Governance — the last Phase 3 deliverable | 5 | 13 | A |
 | G. Agent ergonomics | 4 | 15 | A |
 | H. Projection | 4 | 29 | A |
+| I. Correctness and release integrity | 9 | 18 | — |
 
 ### Startable today
 
-18 of 46 features have no blockers at all: `A1`, `B1`, `B2`, `B3`, `B4`, `B5`, `B7`, `C1`, `C4`, `C8`, `C9`, `E1`, `E4`, `G3`, `G4`, `H1`, `H2`, `H4`.
+27 open features have all blockers complete: `B1`, `B2`, `B3`, `B4`, `B5`, `B6`, `B7`, `C6`, `C1`, `C4`, `C7`, `C8`, `C9`, `D1`, `E1`, `E4`, `F1`, `F2`, `F3`, `F5`, `G1`, `G3`, `G4`, `H1`, `H2`, `H3`, `H4`.
 
 <!-- /generated:graph -->
 
@@ -317,9 +358,10 @@ opinion about what to learn first. Both are legitimate; conflating them is not.
 
 ### Recommended first slice
 
-`A1`, `A2`, `A3`, `A4`, `A5`, `A6`, `C5`  — weight 13.
+`I1`, `I2`, `I3`, `I4`, `I5`, `I6`, `I7`, `I8`, `I9`, `A1`, `A2`, `A3`, `A4`, `A5`, `A6`, `C5`  — weight 31.
 
-Make it a repository, and make proofs persist with it. The slice is **closed
+First close the correctness findings, then make it a repository and make
+proofs persist with it. The slice is **closed
 under dependencies**: nothing in it requires anything outside it, so it can be
 built and shipped without pulling in the rest of the roadmap. Together these
 turn three current claims — deduplication, lock-free writes, and an immutable

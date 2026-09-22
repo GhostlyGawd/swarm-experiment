@@ -12,6 +12,7 @@ export * from './tier1/ids.ts';
 export { canonicalBytes, canonicalText, type Canonical } from './tier1/canonical.ts';
 export { Blake3, blake3, blake3Hex, bytesToHex } from './tier1/blake3.ts';
 export { GraphStore, alphaNormalize, hashNode, structuralKeyOf, type Step, type StoreStats } from './tier1/store.ts';
+export { AetherRepository, type CommitOptions, type CommitRecord, type FsckIssue, type GarbageCollectionResult, type Packfile } from './tier1/repository.ts';
 export { merge3, type MergeConflict, type MergeResult } from './tier1/merge.ts';
 export { SymbolSpace } from './tier1/symbols.ts';
 export * from './tier1/provenance.ts';
@@ -20,10 +21,11 @@ export * as build from './tier1/build.ts';
 
 // --- Tier 2: semantics, security, contracts ---------------------------------
 export * from './tier2/ocap.ts';
+export { ProofCache, type ProofCacheStats } from './tier2/proof-cache.ts';
 export { TypeChecker, typecheck, tyEqual, tyToString, underlying, type CheckResult, type Diagnostic } from './tier2/typecheck.ts';
 export * as smt from './tier2/smt.ts';
 export { DEFAULT_TIMEOUT_MS, checkSat, prove, type SolverResult, type SolverStatus } from './tier2/solver.ts';
-export { dischargeProof, formatReport, verifyFunction, type Obligation, type VerificationReport, type Verdict } from './tier2/verify.ts';
+export { dischargeProof, formatReport, verifyFunction, type Obligation, type VerificationDependency, type VerificationReport, type Verdict } from './tier2/verify.ts';
 export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec, type SpecRule } from './tier2/spec.ts';
 
 // --- Tier 3: execution and simulation ---------------------------------------

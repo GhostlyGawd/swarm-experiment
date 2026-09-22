@@ -121,6 +121,7 @@ const EDGE_FORBIDDEN_DOMAINS: ReadonlySet<string> = new Set(['db', 'fs', 'secret
 
 function placementFor(capabilities: readonly CapabilityName[], shape: TargetShape): Placement {
   if (shape === 'single_binary') return 'linked';
+  if (shape === 'containers') return 'container';
   const domains = capabilities.map((c) => c.split(':')[1]);
   if (shape === 'edge_workers') {
     return domains.some((d) => EDGE_FORBIDDEN_DOMAINS.has(d)) ? 'container' : 'edge';

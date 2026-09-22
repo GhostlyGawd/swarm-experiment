@@ -215,16 +215,16 @@ export class TypeChecker {
           if (term.contract) {
             this.checkContract(term.contract, inner, fnEnv, [...path, 'contract']);
           }
+          if (term.body) {
+            this.checkTerm(term.body, inner, fnEnv, [...path, 'body'], 'body');
+            if (!tyEqual(term.returns, { t: 'Unit' }) && !this.alwaysReturns(term.body)) {
+              this.error('missing_return',
+                `${this.show(term.symbol)} returns ${tyToString(term.returns)} but a path falls off the end`,
+                [...path, 'body']);
+            }
+          }
         } finally {
           this.resultType = outerResult;
-        }
-        if (term.body) {
-          this.checkTerm(term.body, inner, fnEnv, [...path, 'body'], 'body');
-          if (!tyEqual(term.returns, { t: 'Unit' }) && !this.alwaysReturns(term.body)) {
-            this.error('missing_return',
-              `${this.show(term.symbol)} returns ${tyToString(term.returns)} but a path falls off the end`,
-              [...path, 'body']);
-          }
         }
         return;
       }
@@ -268,9 +268,11 @@ export class TypeChecker {
         this.checkTerm(term.body, scope, env, [...path, 'body'], ctx);
         return;
       }
-      case 'Return':
-        this.typeOf(term.value, scope, env, [...path, 'value'], ctx);
+      case 'Return': {
+        const actual = this.typeOf(term.value, scope, env, [...path, 'value'], ctx);
+        this.expect(this.resultType ?? { t: 'Unit' }, actual, [...path, 'value'], 'return value');
         return;
+      }
       case 'Assert':
         this.expect({ t: 'Bool' }, this.typeOf(term.expr, scope, env, [...path, 'expr'], ctx),
           [...path, 'expr'], `assertion "${term.label}"`);

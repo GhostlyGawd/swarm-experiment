@@ -141,6 +141,7 @@ export class MicroWorld {
   private readonly decl: Extract<Term, { kind: 'FunctionDecl' }>;
   private readonly opts: MicroWorldOptions;
   private readonly frame: ReadonlySet<string>;
+  private readonly hasFrameContract: boolean;
 
   constructor(decl: Term, opts: MicroWorldOptions) {
     if (decl.kind !== 'FunctionDecl') {
@@ -148,6 +149,7 @@ export class MicroWorld {
     }
     this.decl = decl;
     this.opts = opts;
+    this.hasFrameContract = decl.contract?.kind === 'Contract';
     this.frame = this.declaredFrame();
   }
 
@@ -254,7 +256,7 @@ export class MicroWorld {
         return fail('contract', `assertion ${outcome.fault.label} failed`, outcome.fault);
       }
     }
-    if (properties.includes('frame') && outcome.ok && this.frame.size > 0) {
+    if (properties.includes('frame') && outcome.ok && this.hasFrameContract) {
       const stray = outcome.writes.filter((w) => !this.frame.has(w));
       if (stray.length) return fail('frame', `wrote outside modifies: ${stray.join(', ')}`);
     }

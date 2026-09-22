@@ -41,9 +41,10 @@
  * revocation to take effect without a redeploy.
  */
 
-import type { BinOp, Param, Term, Ty } from '../tier1/ast.ts';
+import { children, type BinOp, type Param, type Term, type Ty } from '../tier1/ast.ts';
 import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
+import { GraphStore } from '../tier1/store.ts';
 import { CapabilityEnvelope, type CapabilityRegistry, type RevocationList } from '../tier2/ocap.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import type { VerificationReport } from '../tier2/verify.ts';
@@ -151,6 +152,7 @@ export class ProductionRuntime {
   private readonly compiled = new Map<SymbolId, CompiledFunction>();
   private readonly opts: CompileOptions;
   private readonly decisions: ClauseDecision[] = [];
+  private readonly declarations = new Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>();
   private reportCache: CompilationReport | null = null;
 
   private constructor(opts: CompileOptions) {
@@ -170,6 +172,12 @@ export class ProductionRuntime {
     const collect = (t: Term): void => {
       if (t.kind === 'FunctionDecl') {
         rt.declaredCapabilities.set(t.symbol, t.capabilities);
+        rt.declarations.set(t.symbol, t);
+        for (const cap of t.capabilities) {
+          if (!opts.registry.get(cap)) {
+            throw new TypeError(`${rt.name(t.symbol)} declares unregistered capability ${cap}`);
+          }
+        }
         if (t.body !== null) declarations.push(t);
       }
       if (t.kind === 'Module') for (const m of t.members) collect(m);
@@ -361,6 +369,35 @@ export class ProductionRuntime {
     });
   }
 
+  /** Why a report cannot authorize removal of runtime checks. */
+  private reportProblem(
+    decl: Extract<Term, { kind: 'FunctionDecl' }>,
+    report: VerificationReport,
+  ): string | null {
+    if (report.symbol !== decl.symbol) return 'verification result belongs to a different symbol';
+    const subject = new GraphStore().intern(decl);
+    if (report.subject !== subject) return 'verification result belongs to different declaration contents';
+    if (report.budgetExhausted) return 'verification was incomplete';
+    if (report.assumptions.length) return 'verification rests on unenforced modelling assumptions';
+    if (report.frameViolations.length) return 'verification reported frame violations';
+    if (report.verdict === 'refuted' || report.verdict === 'unproven') {
+      return `verification verdict was ${report.verdict}`;
+    }
+    for (const dependency of report.dependencies) {
+      const current = this.declarations.get(dependency.symbol);
+      if (!current || new GraphStore().intern(current) !== dependency.subject) {
+        return `callee ${this.name(dependency.symbol)} changed after verification`;
+      }
+      const depReport = this.opts.verification?.get(dependency.symbol);
+      if (!depReport || depReport.subject !== dependency.subject || depReport.budgetExhausted ||
+          depReport.assumptions.length || depReport.frameViolations.length ||
+          depReport.verdict === 'refuted' || depReport.verdict === 'unproven') {
+        return `callee ${this.name(dependency.symbol)} has no admissible verification result`;
+      }
+    }
+    return null;
+  }
+
   /**
    * Which clauses of a kind survive into the artifact.
    *
@@ -401,6 +438,11 @@ export class ProductionRuntime {
     const report = this.opts.verification?.get(decl.symbol);
     if (!report) {
       for (const label of labels) record(label, 'kept', 'no verification result for this function');
+      return labels;
+    }
+    const reportProblem = this.reportProblem(decl, report);
+    if (reportProblem) {
+      for (const label of labels) record(label, 'kept', reportProblem);
       return labels;
     }
 
@@ -457,15 +499,23 @@ export class ProductionRuntime {
     }
 
     let sites = 0;
-    for (const report of this.opts.verification?.values() ?? []) {
-      for (const result of report.results) {
+    for (const caller of this.declarations.values()) {
+      const expected = countCalls(caller.body, symbol);
+      if (expected === 0) continue;
+      const report = this.opts.verification?.get(caller.symbol);
+      if (!report) return { elide: false, reason: `caller ${this.name(caller.symbol)} was not verified` };
+      const problem = this.reportProblem(caller, report);
+      if (problem) return { elide: false, reason: `caller ${this.name(caller.symbol)}: ${problem}` };
+      const matching = report.results.filter((result) => {
         const o = result.obligation;
-        if (o.kind !== 'precondition_at_call' || o.callee !== symbol || o.clause !== label) continue;
-        sites++;
-        if (result.verdict !== 'proved') {
-          return { elide: false, reason: `a call site left it ${result.verdict}` };
-        }
+        return o.kind === 'precondition_at_call' && o.callee === symbol && o.clause === label;
+      });
+      if (matching.length !== expected) {
+        return { elide: false, reason: `caller ${this.name(caller.symbol)} has incomplete call-site evidence` };
       }
+      sites += expected;
+      const failed = matching.find((result) => result.verdict !== 'proved');
+      if (failed) return { elide: false, reason: `a call site left it ${failed.verdict}` };
     }
     if (sites === 0) {
       return { elide: false, reason: 'not an entry point, but no verified call site was found either' };
@@ -556,6 +606,11 @@ export class ProductionRuntime {
         }
         const capability = term.capability;
         const args = term.args.map((a) => this.expr(a, ctx));
+        const descriptor = this.opts.registry.get(capability);
+        if (!descriptor) throw new TypeError(`${capability} is not registered`);
+        if (descriptor.arity !== args.length) {
+          throw new TypeError(`${capability} takes ${descriptor.arity} arguments, got ${args.length}`);
+        }
         const handler = this.opts.effects?.get(capability);
         const revocations = this.opts.revocations;
         const scope = this.opts.scope;
@@ -817,6 +872,13 @@ function childTerms(term: Term): readonly Term[] {
     }
   }
   return out;
+}
+
+function countCalls(term: Term | null, callee: SymbolId): number {
+  if (!term) return 0;
+  let total = term.kind === 'Call' && term.callee === callee ? 1 : 0;
+  for (const child of children(term)) total += countCalls(child, callee);
+  return total;
 }
 
 /** A one-screen summary of what production will and will not check. */

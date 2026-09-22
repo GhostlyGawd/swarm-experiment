@@ -9,6 +9,7 @@
 
 import { readFileSync } from 'node:fs';
 import { GraphStore } from './tier1/store.ts';
+import { AetherRepository } from './tier1/repository.ts';
 import { encode, IrContext } from './tier1/agent-ir.ts';
 import { merge3 } from './tier1/merge.ts';
 import * as b from './tier1/build.ts';
@@ -48,6 +49,7 @@ Usage: aether <command> [options]
   spec <file.spec>     Compile an executable product specification
   provenance           Show the causal lineage of the example
   merge                Demonstrate a three-way structural merge
+  fsck [store]         Verify every durable object, commit, and named root
 
 With no file argument, commands operate on the built-in worked example.
 `;
@@ -421,6 +423,16 @@ function cmdDemo(): void {
   cmdSynth();
 }
 
+function cmdFsck(directory = '.aether-store'): void {
+  const issues = new AetherRepository(directory).fsck();
+  if (issues.length === 0) {
+    console.log(`ok: ${directory}`);
+    return;
+  }
+  for (const issue of issues) console.error(`${issue.kind} ${issue.id}: ${issue.message}`);
+  process.exitCode = 1;
+}
+
 // ---------------------------------------------------------------------------
 
 function main(argv: readonly string[]): void {
@@ -447,6 +459,7 @@ function main(argv: readonly string[]): void {
       return cmdSpec(positional[0]);
     case 'provenance': return cmdProvenance();
     case 'merge': return cmdMerge();
+    case 'fsck': return cmdFsck(positional[0]);
     case undefined:
     case '--help':
     case '-h':

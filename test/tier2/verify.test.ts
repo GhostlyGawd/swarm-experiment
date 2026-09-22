@@ -95,7 +95,7 @@ test('an un-ruled-out aliasing assumption is reported, not hidden', () => {
   assert.equal(report.assumptions.length, 1);
   assert.match(report.assumptions[0], /assumed not to alias/);
   // ...but the proof is no longer good enough to open an architectural fence.
-  const proof = dischargeProof(report, 'inv:b3:aa' as InvariantId, 'ast:b3:bb' as NodeRef);
+  const proof = dischargeProof(report, 'inv:b3:aa' as InvariantId, report.subject);
   assert.equal(proof!.verdict, 'property_checked');
 });
 
