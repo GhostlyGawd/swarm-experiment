@@ -83,6 +83,7 @@ export class TypeScriptProjector {
         `${this.ty(t.returns)}, ${JSON.stringify(t.capabilities.join(','))}>`;
       case 'TypeVar': return t.name;
       case 'IntN': return `IntN<${t.bits}, ${t.signed ? 'signed' : 'unsigned'}, ${t.overflow}>`;
+      case 'Owned': return `Owned<${this.ty(t.inner)}>`;
     }
   }
 
@@ -150,6 +151,8 @@ export class TypeScriptProjector {
         const name = `fixed${t.op[0].toUpperCase()}${t.op.slice(1)}`;
         return `${name}<${this.ty(t.ty)}>(${this.expr(t.left)}, ${this.expr(t.right)})`;
       }
+      case 'ForAll':
+        return `forall(${this.expr(t.start)}, ${this.expr(t.end)}, ${this.name(t.symbol)} => ${this.expr(t.body)})`;
       case 'Old': return `old(${this.expr(t.expr)})`;
       case 'ResultRef': return 'result';
       case 'Invoke':

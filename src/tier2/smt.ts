@@ -19,7 +19,8 @@ export type SmtTerm =
   | { k: 'mul'; args: readonly SmtTerm[] }
   | { k: 'sub'; left: SmtTerm; right: SmtTerm }
   | { k: 'neg'; arg: SmtTerm }
-  | { k: 'ite'; cond: SmtFormula; then: SmtTerm; otherwise: SmtTerm };
+  | { k: 'ite'; cond: SmtFormula; then: SmtTerm; otherwise: SmtTerm }
+  | { k: 'app'; name: string; args: readonly SmtTerm[] };
 
 export type Comparison = 'eq' | 'lt' | 'le' | 'gt' | 'ge';
 
@@ -34,6 +35,10 @@ export type SmtFormula =
   | { k: 'iff'; left: SmtFormula; right: SmtFormula }
   | { k: 'cmp'; op: Comparison; left: SmtTerm; right: SmtTerm };
 
+export type SmtSequence =
+  | { k: 'sequence'; items: readonly SmtTerm[] }
+  | { k: 'sequence_var'; name: string };
+
 // --- constructors ----------------------------------------------------------
 
 export const T: SmtFormula = { k: 'true' };
@@ -47,6 +52,31 @@ export const sub = (left: SmtTerm, right: SmtTerm): SmtTerm => ({ k: 'sub', left
 export const neg = (arg: SmtTerm): SmtTerm => ({ k: 'neg', arg });
 export const ite = (cond: SmtFormula, then: SmtTerm, otherwise: SmtTerm): SmtTerm =>
   ({ k: 'ite', cond, then, otherwise });
+export const app = (name: string, ...args: SmtTerm[]): SmtTerm => ({ k: 'app', name, args });
+export const sequence = (...items: SmtTerm[]): SmtSequence => ({ k: 'sequence', items });
+export const sequenceVar = (name: string): SmtSequence => ({ k: 'sequence_var', name });
+export const select = (value: SmtSequence, index: SmtTerm): SmtTerm => {
+  if (value.k === 'sequence' && index.k === 'int' && index.v >= 0n && index.v < BigInt(value.items.length)) {
+    return value.items[Number(index.v)];
+  }
+  const key = value.k === 'sequence' ? value.items.map(termToSmtLib).join(',') : value.name;
+  return intVar(`select!${key}!${termToSmtLib(index)}`);
+};
+export const sequenceLength = (value: SmtSequence): SmtTerm =>
+  value.k === 'sequence' ? num(value.items.length) : intVar(`length!${value.name}`);
+export const forall = (
+  name: string,
+  lower: bigint,
+  upper: bigint,
+  body: (value: SmtTerm) => SmtFormula,
+  maxInstances = 256,
+): SmtFormula => {
+  if (upper <= lower) return T;
+  if (upper - lower > BigInt(maxInstances)) return boolVar(`forall!${name}!${lower}!${upper}`);
+  const instances: SmtFormula[] = [];
+  for (let value = lower; value < upper; value++) instances.push(body(num(value)));
+  return and(...instances);
+};
 
 export const cmp = (op: Comparison, left: SmtTerm, right: SmtTerm): SmtFormula =>
   ({ k: 'cmp', op, left, right });
@@ -83,11 +113,13 @@ export const iff = (left: SmtFormula, right: SmtFormula): SmtFormula => ({ k: 'i
 export interface Declarations {
   readonly ints: readonly string[];
   readonly bools: readonly string[];
+  readonly functions: ReadonlyArray<{ readonly name: string; readonly arity: number }>;
 }
 
 export function declarations(formula: SmtFormula): Declarations {
   const ints = new Set<string>();
   const bools = new Set<string>();
+  const functions = new Map<string, number>();
   const walkTerm = (t: SmtTerm): void => {
     switch (t.k) {
       case 'int': return;
@@ -96,6 +128,7 @@ export function declarations(formula: SmtFormula): Declarations {
       case 'sub': walkTerm(t.left); walkTerm(t.right); return;
       case 'neg': walkTerm(t.arg); return;
       case 'ite': walkFormula(t.cond); walkTerm(t.then); walkTerm(t.otherwise); return;
+      case 'app': functions.set(t.name, t.args.length); t.args.forEach(walkTerm); return;
     }
   };
   const walkFormula = (f: SmtFormula): void => {
@@ -109,7 +142,10 @@ export function declarations(formula: SmtFormula): Declarations {
     }
   };
   walkFormula(formula);
-  return { ints: [...ints].sort(), bools: [...bools].sort() };
+  return {
+    ints: [...ints].sort(), bools: [...bools].sort(),
+    functions: [...functions].sort(([a], [b]) => a.localeCompare(b)).map(([name, arity]) => ({ name, arity })),
+  };
 }
 
 // --- SMT-LIB 2 rendering ---------------------------------------------------
@@ -130,6 +166,7 @@ export function termToSmtLib(t: SmtTerm): string {
     case 'neg': return `(- ${termToSmtLib(t.arg)})`;
     case 'ite':
       return `(ite ${formulaToSmtLib(t.cond)} ${termToSmtLib(t.then)} ${termToSmtLib(t.otherwise)})`;
+    case 'app': return `(${symbol(t.name)}${t.args.length ? ` ${t.args.map(termToSmtLib).join(' ')}` : ''})`;
   }
 }
 
@@ -159,12 +196,15 @@ export function toSmtLibScript(
   formula: SmtFormula,
   opts: { logic?: string; getModel?: boolean; comment?: string } = {},
 ): string {
-  const { ints, bools } = declarations(formula);
+  const { ints, bools, functions } = declarations(formula);
   const lines: string[] = [];
   if (opts.comment) for (const line of opts.comment.split('\n')) lines.push(`; ${line}`);
   lines.push(`(set-logic ${opts.logic ?? 'QF_LIA'})`);
   for (const name of ints) lines.push(`(declare-const ${symbol(name)} Int)`);
   for (const name of bools) lines.push(`(declare-const ${symbol(name)} Bool)`);
+  for (const fn of functions) {
+    lines.push(`(declare-fun ${symbol(fn.name)} (${Array.from({ length: fn.arity }, () => 'Int').join(' ')}) Int)`);
+  }
   lines.push(`(assert ${formulaToSmtLib(formula)})`);
   lines.push('(check-sat)');
   if (opts.getModel !== false) lines.push('(get-model)');
@@ -189,6 +229,12 @@ export function evaluate(
       case 'sub': return term(t.left) - term(t.right);
       case 'neg': return -term(t.arg);
       case 'ite': return form(t.cond) ? term(t.then) : term(t.otherwise);
+      case 'app': {
+        const key = `uf!${termToSmtLib(t)}`;
+        const value = model[key];
+        if (typeof value !== 'bigint') throw new ReferenceError(`no UF binding for ${key}`);
+        return value;
+      }
     }
   };
   const form = (f: SmtFormula): boolean => {

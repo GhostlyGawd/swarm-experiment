@@ -237,6 +237,12 @@ export class Parser {
         this.expect('>');
         return { t: 'IntN', bits, signed: signedness === 'signed', overflow };
       }
+      case 'Owned': {
+        this.expect('<');
+        const inner = this.parseType();
+        this.expect('>');
+        return { t: 'Owned', inner };
+      }
       default: {
         if (this.typeParams.has(name)) return { t: 'TypeVar', name };
         const known = this.typeEnv.get(name);
@@ -532,6 +538,22 @@ export class Parser {
         this.expect(')');
         const op = intrinsic.slice(5).toLowerCase() as 'add' | 'sub' | 'mul' | 'div' | 'mod';
         return b.fixed(op, ty, left, right);
+      }
+      case 'forall': {
+        this.pos++;
+        this.expect('(');
+        const start = this.parseExpression();
+        this.expect(',');
+        const end = this.parseExpression();
+        this.expect(',');
+        const name = this.expectIdent();
+        this.expect('=>');
+        this.pushScope();
+        const symbol = this.bind(name);
+        const body = this.parseExpression();
+        this.popScope();
+        this.expect(')');
+        return b.forall(symbol, start, end, body);
       }
       default: break;
     }

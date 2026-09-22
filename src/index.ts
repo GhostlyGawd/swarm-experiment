@@ -23,9 +23,11 @@ export * as build from './tier1/build.ts';
 // --- Tier 2: semantics, security, contracts ---------------------------------
 export * from './tier2/ocap.ts';
 export { ProofCache, type ProofCacheStats } from './tier2/proof-cache.ts';
+export { verifyIncremental, type IncrementalVerificationResult } from './tier2/incremental.ts';
 export { TypeChecker, typecheck, tyEqual, tyToString, underlying, type CheckResult, type Diagnostic } from './tier2/typecheck.ts';
 export * as smt from './tier2/smt.ts';
 export { DEFAULT_TIMEOUT_MS, checkSat, prove, type SolverResult, type SolverStatus } from './tier2/solver.ts';
+export { SMT_SOLVER_PROCESS, proveWithExternalFallback, type ExternalSolverOptions } from './tier2/external-solver.ts';
 export { dischargeProof, formatReport, verifyFunction, type Obligation, type VerificationDependency, type VerificationReport, type Verdict } from './tier2/verify.ts';
 export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec, type SpecRule } from './tier2/spec.ts';
 
@@ -33,7 +35,7 @@ export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec
 export { AetherFault, Runtime, type Checkpoint, type ExecutionResult, type Fault, type FaultKind, type TraceEvent } from './tier3/runtime.ts';
 export { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, type ClosureValue, type Ref, type ResultValue, type SeqValue, type Value } from './tier3/values.ts';
 export { ProductionRuntime, formatCompilation, type ClauseDecision, type CompilationReport, type CompileOptions, type ElisionPolicy } from './tier3/compile.ts';
-export { MicroWorld, formatMicroWorld, simulateModule, type Counterexample, type MicroWorldReport, type PropertyName } from './tier3/microworld.ts';
+export { MicroWorld, formatMicroWorld, materializeCounterexample, simulateModule, type Counterexample, type MicroWorldReport, type PersistedCounterexample, type PropertyName } from './tier3/microworld.ts';
 export { generateCase, materialise, shrinkPlain, type Plain } from './tier3/generate.ts';
 
 // --- Tier 4: topology and optimization --------------------------------------

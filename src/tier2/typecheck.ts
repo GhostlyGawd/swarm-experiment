@@ -40,7 +40,8 @@ export type DiagnosticCode =
   | 'contract_only_expression'
   | 'missing_return'
   | 'assign_to_immutable'
-  | 'frame_violation';
+  | 'frame_violation'
+  | 'separation_violation';
 
 export interface Diagnostic {
   readonly code: DiagnosticCode;
@@ -89,6 +90,7 @@ export const tyEqual = (a: Ty, b: Ty): boolean => {
       const other = b as typeof a;
       return a.bits === other.bits && a.signed === other.signed && a.overflow === other.overflow;
     }
+    case 'Owned': return tyEqual(a.inner, (b as typeof a).inner);
   }
 };
 
@@ -105,12 +107,15 @@ export function tyToString(t: Ty): string {
     case 'Fn': return `(${t.params.map(tyToString).join(', ')}) => ${tyToString(t.returns)}`;
     case 'TypeVar': return t.name;
     case 'IntN': return `${t.signed ? 'i' : 'u'}${t.bits}/${t.overflow}`;
+    case 'Owned': return `Owned<${tyToString(t.inner)}>`;
   }
 }
 
 /** Strip nominal wrappers to reach the underlying representation. */
 export const underlying = (t: Ty): Ty =>
-  t.t === 'Nominal' ? underlying(t.repr) : t.t === 'IntN' ? { t: 'Int' } : t;
+  t.t === 'Nominal' ? underlying(t.repr)
+    : t.t === 'Owned' ? underlying(t.inner)
+      : t.t === 'IntN' ? { t: 'Int' } : t;
 
 export function substituteType(ty: Ty, substitutions: ReadonlyMap<string, Ty>): Ty {
   switch (ty.t) {
@@ -124,6 +129,7 @@ export function substituteType(ty: Ty, substitutions: ReadonlyMap<string, Ty>): 
       params: ty.params.map((param) => substituteType(param, substitutions)),
       returns: substituteType(ty.returns, substitutions),
     };
+    case 'Owned': return { ...ty, inner: substituteType(ty.inner, substitutions) };
     default: return ty;
   }
 }
@@ -159,6 +165,7 @@ function unifyType(pattern: Ty, actual: Ty, substitutions: Map<string, Ty>): boo
         unifyType(pattern.returns, other.returns, substitutions);
     }
     case 'IntN': return tyEqual(pattern, actual);
+    case 'Owned': return unifyType(pattern.inner, actual.t === 'Owned' ? actual.inner : actual, substitutions);
     default: return true;
   }
 }
@@ -629,6 +636,16 @@ export class TypeChecker {
         this.expect(term.ty, right, [...path, 'right'], 'fixed-width right operand');
         return term.ty;
       }
+      case 'ForAll': {
+        const start = this.typeOf(term.start, scope, env, [...path, 'start'], ctx);
+        const end = this.typeOf(term.end, scope, env, [...path, 'end'], ctx);
+        this.expect({ t: 'Int' }, underlying(start), [...path, 'start'], 'forall lower bound');
+        this.expect({ t: 'Int' }, underlying(end), [...path, 'end'], 'forall upper bound');
+        const inner: Scope = { vars: new Map([[term.symbol, { t: 'Int' }]]), parent: scope };
+        const body = this.typeOf(term.body, inner, env, [...path, 'body'], ctx);
+        this.expect({ t: 'Bool' }, body, [...path, 'body'], 'forall body');
+        return { t: 'Bool' };
+      }
       case 'Old':
         if (ctx !== 'ensures') {
           this.error('contract_only_expression', 'old(…) is only meaningful in an ensures clause', path,
@@ -655,19 +672,21 @@ export class TypeChecker {
           const actual = this.typeOf(arg, scope, env, [...path, `args[${i}]`], ctx);
           if (sig.params[i]) {
             const expected = sig.params[i].ty;
+            const assignable = expected.t === 'Owned' ? expected.inner : expected;
             if (sig.typeParams.length) {
-              if (!unifyType(expected, actual, substitutions)) {
+              if (!unifyType(assignable, actual, substitutions)) {
                 this.error('type_mismatch',
                   `argument ${i} of ${this.show(term.callee)} has type ${tyToString(actual)}, ` +
-                    `which is inconsistent with ${tyToString(expected)}`,
+                  `which is inconsistent with ${tyToString(assignable)}`,
                   [...path, `args[${i}]`]);
               }
             } else {
-              this.expect(expected, actual, [...path, `args[${i}]`],
+              this.expect(assignable, actual, [...path, `args[${i}]`],
                 `argument ${i} of ${this.show(term.callee)}`);
             }
           }
         });
+        this.checkSeparation(sig, term.args, path);
         // Authority flows downwards only: a callee may not need more than its caller has.
         for (const cap of sig.capabilities) {
           if (!env.has(cap)) {
@@ -706,6 +725,26 @@ export class TypeChecker {
 
   /** The declared return type of the function whose contract is being checked. */
   private resultType: Ty | null = null;
+
+  private checkSeparation(sig: FnSignature, args: readonly Term[], path: readonly string[]): void {
+    const root = (term: Term): SymbolId | null =>
+      term.kind === 'Var' || term.kind === 'Place' ? term.symbol
+        : term.kind === 'Field' ? root(term.object) : null;
+    for (let i = 0; i < sig.params.length; i++) {
+      if (sig.params[i].ty.t !== 'Owned') continue;
+      const ownedRoot = args[i] ? root(args[i]) : null;
+      if (!ownedRoot) continue;
+      for (let j = 0; j < args.length; j++) {
+        if (i !== j && root(args[j]) === ownedRoot) {
+          this.error(
+            'separation_violation',
+            `argument ${i} transfers ownership but aliases argument ${j}`,
+            [...path, `args[${i}]`],
+          );
+        }
+      }
+    }
+  }
 
   private fieldType(owner: Ty, field: string, path: readonly string[]): Ty {
     const base = underlying(owner);

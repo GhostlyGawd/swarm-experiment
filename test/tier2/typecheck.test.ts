@@ -163,3 +163,27 @@ test('unknown fields and missing returns are caught with a usable path', () => {
   assert.deepEqual(field.path, ['body', 'stmts[0]', 'expr']);
   assert.match(field.hint!, /id, balance/);
 });
+
+test('C8: owned parameters enforce separation at call sites', () => {
+  const syms = new SymbolSpace('ownership');
+  const left = syms.define('left');
+  const right = syms.define('right');
+  const consumeSymbol = syms.define('consume');
+  const consume = b.fn({
+    symbol: consumeSymbol,
+    params: [b.param(left, b.owned(ACCOUNT)), b.param(right, b.owned(ACCOUNT))],
+    returns: b.Unit,
+    body: b.block(b.ret(b.unit())),
+  });
+  const account = syms.define('account');
+  const caller = b.fn({
+    symbol: syms.define('caller'), params: [b.param(account, ACCOUNT)], returns: b.Unit,
+    body: b.block(b.exprStmt(b.call(consumeSymbol, b.v(account), b.v(account))), b.ret(b.unit())),
+  });
+  const module = b.module_({
+    symbol: syms.define('ownershipModule'), members: [consume, caller], symbolTable: syms.table(),
+  });
+  const result = typecheck(module, { registry: new CapabilityRegistry(), symbols: syms });
+  assert.equal(result.ok, false);
+  assert.ok(codes(result).includes('separation_violation'));
+});

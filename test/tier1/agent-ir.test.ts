@@ -22,6 +22,7 @@ test('every node kind survives an Agent-IR round trip', () => {
   const errValue = syms.define('errValue');
   const lambdaValue = syms.define('lambdaValue');
   const u8 = { t: 'IntN' as const, bits: 8 as const, signed: false, overflow: 'wrap' as const };
+  const quantified = syms.define('quantified');
 
   const term = b.module_({
     symbol: syms.define('m'),
@@ -73,6 +74,7 @@ test('every node kind survives an Agent-IR round trip', () => {
           }), b.int(2))),
           b.exprStmt(b.strlen(b.upper(b.trim(b.str(' hi '))))),
           b.exprStmt(b.fixed('add', u8, b.intCast(u8, b.int(250)), b.intCast(u8, b.int(10)))),
+          b.exprStmt(b.forall(quantified, b.int(0), b.int(3), b.ge(b.v(quantified), b.int(0)))),
           b.assign(b.place(a, 'left'), b.v(a)),
           b.exprStmt(b.field(b.v(a), 'balance')),
           b.exprStmt(b.mod(b.div(b.mul(b.sub(b.add(b.int(1), b.int(2)), b.int(3)), b.int(4)), b.int(5)), b.int(6))),
@@ -89,7 +91,7 @@ test('every node kind survives an Agent-IR round trip', () => {
   // The fixture is meant to be exhaustive; fail loudly if a kind is missing.
   const covered = new Set([...walk(term)].map((n) => n.kind));
   for (const kind of ['Lit','Var','Bin','Un','Cond','Call','Field','RecordLit','ResultValue','MatchResult',
-    'SeqLit','SeqIndex','SeqLength','SeqMap','SeqFold','Lambda','Apply','StringOp','IntCast','FixedBin','Old','ResultRef',
+    'SeqLit','SeqIndex','SeqLength','SeqMap','SeqFold','Lambda','Apply','StringOp','IntCast','FixedBin','ForAll','Old','ResultRef',
     'Invoke','Place','Let','Assign','If','While','Return','Assert','ExprStmt','Block','Clause',
     'Contract','FunctionDecl','TypeDecl','Surface','Import','SymbolTable','Module']) {
     assert.ok(covered.has(kind as never), `round-trip fixture does not cover ${kind}`);

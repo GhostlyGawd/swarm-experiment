@@ -44,6 +44,11 @@ import {
 } from './generate.ts';
 import { Runtime, type Fault, type RuntimeOptions } from './runtime.ts';
 import { isRef, type Value } from './values.ts';
+import { blake3 } from '../tier1/blake3.ts';
+import { canonicalBytes } from '../tier1/canonical.ts';
+import { bytesToHex } from '../tier1/blake3.ts';
+import { atomicWriteOnce, encodeStored } from '../tier1/persistence.ts';
+import { join } from 'node:path';
 
 export type PropertyName =
   | 'contract'
@@ -79,6 +84,8 @@ export interface Counterexample {
   readonly fault: Fault | null;
   /** Seed that regenerates this exact case (NFR 6.2). */
   readonly seed: string;
+  /** Exact generated values, retained so the failure can become a durable replay. */
+  readonly caseData: readonly Plain[];
 }
 
 export interface MicroWorldReport {
@@ -243,6 +250,7 @@ export class MicroWorld {
       arguments: args.map(formatPlain),
       fault,
       seed,
+      caseData: args,
     });
 
     if (properties.includes('no_internal_fault') && outcome.fault && INTERNAL_FAULTS.has(outcome.fault.kind)) {
@@ -371,7 +379,7 @@ export class MicroWorld {
       }
       if (!improved) break;
     }
-    return { ...best, arguments: current.map(formatPlain), seed };
+    return { ...best, arguments: current.map(formatPlain), caseData: current, seed };
   }
 
   // --- driver --------------------------------------------------------------
@@ -479,4 +487,23 @@ export function formatMicroWorld(
   }
   if (report.budgetExhausted) lines.push('  (budget exhausted before the case limit)');
   return lines.join('\n');
+}
+
+export interface PersistedCounterexample {
+  readonly id: string;
+  readonly path: string;
+  readonly counterexample: Counterexample;
+}
+
+/** Persist one exact shrunk case as a permanent, content-addressed replay. */
+export function materializeCounterexample(
+  directory: string,
+  symbol: SymbolId,
+  counterexample: Counterexample,
+): PersistedCounterexample {
+  const payload = { symbol, counterexample };
+  const id = bytesToHex(blake3(canonicalBytes(payload as never)));
+  const path = join(directory, 'counterexamples', symbol.slice(symbol.lastIndexOf(':') + 1), `${id}.json`);
+  atomicWriteOnce(path, encodeStored(payload));
+  return { id, path, counterexample };
 }

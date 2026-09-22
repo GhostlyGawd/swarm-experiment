@@ -213,7 +213,7 @@ interface Elimination {
 }
 
 /** Why the theory solver gave up, so the caller can report it accurately. */
-export type IncompleteReason = 'timeout' | 'too_large' | 'no_integer_model';
+export type IncompleteReason = 'timeout' | 'too_large' | 'no_integer_model' | 'external_no_model';
 
 type TheoryResult =
   | { status: 'unsat' }
@@ -410,6 +410,17 @@ class Normalizer {
   private abstractTerm(t: SmtTerm, prefix: string): Linear {
     const name = `${prefix}!${termToSmtLib(t)}`;
     if (!this.abstractions.has(name)) {
+      if (t.k === 'app') {
+        for (const [otherName, other] of this.abstractions) {
+          if (other.k !== 'app' || other.name !== t.name || other.args.length !== t.args.length) continue;
+          this.sideConditions.push(
+            fImplies(
+              fAnd(...t.args.map((arg, index) => fEq(arg, other.args[index]))),
+              fEq(intVar(name), intVar(otherName)),
+            ),
+          );
+        }
+      }
       this.abstractions.set(name, t);
       this.intVars.add(name);
       this.abstractCounter++;
@@ -460,6 +471,7 @@ class Normalizer {
         }
         return linVar(name);
       }
+      case 'app': return this.abstractTerm(t, 'uf');
     }
   }
 
@@ -790,7 +802,8 @@ function assembleModel(
   const model: Record<string, bigint | boolean> = {};
   for (const [name, idx] of norm.boolNames) model[name] = assignment[idx] === 1;
   for (const [name, value] of theoryModel) {
-    if (!norm.abstractions.has(name)) model[name] = value;
+    const abstraction = norm.abstractions.get(name);
+    if (!abstraction || abstraction.k === 'app') model[name] = value;
   }
   for (const name of decls.ints) if (!(name in model)) model[name] = 0n;
   for (const name of decls.bools) if (!(name in model)) model[name] = false;

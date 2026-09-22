@@ -97,13 +97,14 @@ function boundSymbols(term: Term): readonly SymbolId[] {
       return [term.okSymbol, term.errSymbol];
     case 'Lambda':
       return term.params.map((param) => param.symbol);
+    case 'ForAll': return [term.symbol];
     default:
       return [];
   }
 }
 
 const SCOPE_OPENERS: ReadonlySet<NodeKind> = new Set<NodeKind>([
-  'FunctionDecl', 'Module', 'Block', 'MatchResult', 'Lambda',
+  'FunctionDecl', 'Module', 'Block', 'MatchResult', 'Lambda', 'ForAll',
 ]);
 
 /**

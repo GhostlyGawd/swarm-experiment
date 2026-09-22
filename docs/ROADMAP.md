@@ -153,14 +153,14 @@ graph LR
   end
   subgraph C["Verification reach"]
     C5[✓ C5: Proof cache keyed by node address]
-    C6[C6: Incremental verification]
-    C1[C1: Shell out to Z3/CVC5 on unknown]
-    C2[C2: Array/sequence theory]
-    C3[C3: Bounded quantifiers]
-    C4[C4: Uninterpreted functions with congruence …]
-    C7[C7: Materialize an SMT counterexample as a p…]
-    C8[C8: Separation/ownership types so non-aliasi…]
-    C9[C9: Termination checking when no variant is …]
+    C6[✓ C6: Incremental verification]
+    C1[✓ C1: Shell out to Z3/CVC5 on unknown]
+    C2[✓ C2: Array/sequence theory]
+    C3[✓ C3: Bounded quantifiers]
+    C4[✓ C4: Uninterpreted functions with congruence …]
+    C7[✓ C7: Materialize an SMT counterexample as a p…]
+    C8[✓ C8: Separation/ownership types so non-aliasi…]
+    C9[✓ C9: Termination checking when no variant is …]
   end
   subgraph D["Real distribution"]
     D1[D1: A host that loads a topology plan and ac…]
@@ -259,10 +259,10 @@ same wave have no dependency on each other and can proceed in parallel.
 - `B4` Parametric types — **L** ✓ complete
 - `B5` String operations beyond `++` — **M** ✓ complete
 - `B7` Integer width/overflow policy — **M** ✓ complete
-- `C1` Shell out to Z3/CVC5 on `unknown` — itself capability-bounded — **S**
-- `C4` Uninterpreted functions with congruence closure — **M**
-- `C8` Separation/ownership types so non-aliasing is *checked* — **XL**
-- `C9` Termination checking when no variant is supplied — **M**
+- `C1` Shell out to Z3/CVC5 on `unknown` — itself capability-bounded — **S** ✓ complete
+- `C4` Uninterpreted functions with congruence closure — **M** ✓ complete
+- `C8` Separation/ownership types so non-aliasing is *checked* — **XL** ✓ complete
+- `C9` Termination checking when no variant is supplied — **M** ✓ complete
 - `E1` A concurrency model in the language — **XL**
 - `E4` Feed concurrency findings to the slicer as placement constraints — **S**
 - `G3` Real tokenizer binding — **S**
@@ -287,8 +287,8 @@ same wave have no dependency on each other and can proceed in parallel.
 - `A4` Durable `SymbolSpace` — **S** ✓ complete ← A1
 - `A6` `aether fsck` — re-hash every object, confirm the address matches — **S** ✓ complete ← A1
 - `C5` Proof cache keyed by node address — **S** ✓ complete ← A1
-- `C2` Array/sequence theory — **L** ← B2
-- `C7` Materialize an SMT counterexample as a persisted micro-world case — **S** ← A1
+- `C2` Array/sequence theory — **L** ✓ complete ← B2
+- `C7` Materialize an SMT counterexample as a persisted micro-world case — **S** ✓ complete ← A1
 - `E2` Systematic schedule exploration in micro-worlds — **L** ← E1
 - `E3` Transactions / atomicity — **L** ← E1
 - `F5` Incremental structural-key index — **M** ← A1
@@ -299,8 +299,8 @@ same wave have no dependency on each other and can proceed in parallel.
 - `A7` Packfile import/export — **M** ✓ complete ← A1, A2
 - `A8` Cross-process write safety: temp-file + atomic rename, CAS on root updates — **M** ✓ complete ← A1, A2
 - `B6` Cross-module imports + resolution rules — **M** ✓ complete ← A1, A2
-- `C6` Incremental verification: re-verify only what changed, or whose callee contracts changed — **M** ← C5
-- `C3` Bounded quantifiers — **L** ← C2
+- `C6` Incremental verification: re-verify only what changed, or whose callee contracts changed — **M** ✓ complete ← C5
+- `C3` Bounded quantifiers — **L** ✓ complete ← C2
 - `D1` A host that loads a topology plan and actually runs units — **L** ← A2
 - `F1` Lineage query API over the persisted ledger — **M** ← A3
 - `F2` Signed append-only audit export — **M** ← A3
@@ -336,7 +336,7 @@ same wave have no dependency on each other and can proceed in parallel.
 
 ### Startable today
 
-21 open features have all blockers complete: `C6`, `C1`, `C2`, `C4`, `C7`, `C8`, `C9`, `D1`, `E1`, `E4`, `F1`, `F2`, `F3`, `F5`, `G1`, `G3`, `G4`, `H1`, `H2`, `H3`, `H4`.
+14 open features have all blockers complete: `D1`, `E1`, `E4`, `F1`, `F2`, `F3`, `F5`, `G1`, `G3`, `G4`, `H1`, `H2`, `H3`, `H4`.
 
 <!-- /generated:graph -->
 

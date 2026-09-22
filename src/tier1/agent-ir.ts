@@ -226,6 +226,7 @@ function encodeTy(ty: Ty, name: (s: string) => number): string {
       const overflow = { wrap: '0', trap: '1', saturate: '2' }[ty.overflow];
       return `D${bits}${ty.signed ? 1 : 0}${overflow}`;
     }
+    case 'Owned': return `O<${encodeTy(ty.inner, name)}>`;
   }
 }
 
@@ -288,6 +289,10 @@ function parseTy(src: string, pos: number, nameAt: (i: number) => string): [Ty, 
       const bits = [8, 16, 32, 64][Number(src[pos + 1])] as 8 | 16 | 32 | 64;
       const overflow = ['wrap', 'trap', 'saturate'][Number(src[pos + 3])] as 'wrap' | 'trap' | 'saturate';
       return [{ t: 'IntN', bits, signed: src[pos + 2] === '1', overflow }, pos + 4];
+    }
+    case 'O': {
+      const [inner, after] = parseTy(src, pos + 2, nameAt);
+      return [{ t: 'Owned', inner }, after + 1];
     }
     default:
       throw new SyntaxError(`unparseable type at ${pos}: ${src.slice(pos, pos + 24)}`);
@@ -372,6 +377,7 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
         break;
       case 'IntCast':
       case 'FixedBin': pools.ty.intern(encodeTy(t.ty, internName)); break;
+      case 'ForAll': pools.sym.intern(t.symbol); break;
       case 'Invoke': pools.cap.intern(t.capability); break;
       case 'Place':
         pools.sym.intern(t.symbol);
@@ -483,6 +489,7 @@ export function encode(term: Term, ctx?: IrContext): AgentIr {
       case 'StringOp': out.push(`s${STRING_OP_CODE[t.op]}${f(t.args.length)}`); return;
       case 'IntCast': out.push(`c${ty(t.ty)}`); return;
       case 'FixedBin': out.push(`b${BIN_OPCODE[t.op]}${ty(t.ty)}`); return;
+      case 'ForAll': out.push(`p${sym(t.symbol)}`); return;
       case 'Old': out.push('@'); return;
       case 'ResultRef': out.push('$'); return;
       case 'Invoke': out.push(`X${f(pools.cap.intern(t.capability))}${f(t.args.length)}`); return;
@@ -825,6 +832,12 @@ export function decode(ir: string, ctx?: IrContext): Term {
         if (t.t !== 'IntN') throw new SyntaxError('FixedBin requires IntN');
         const [left, right] = popN(2);
         stack.push({ kind: 'FixedBin', op, ty: t, left, right });
+        continue;
+      }
+      case 'p': {
+        const symbol = symAt(r.field());
+        const [start, end, body] = popN(3);
+        stack.push({ kind: 'ForAll', symbol, start, end, body });
         continue;
       }
       case 'P': {

@@ -271,8 +271,8 @@ class VcBuilder {
       case 'ResultValue': return this.freshVar(`result_${expr.variant}`);
       case 'MatchResult': return this.freshVar('match_result');
       case 'SeqLit': return this.freshVar('sequence');
-      case 'SeqIndex': return this.freshVar('sequence_index');
-      case 'SeqLength': return this.freshVar('sequence_length');
+      case 'SeqIndex': return S.select(this.sequence(expr.sequence, path, old), this.term(expr.index, path, old));
+      case 'SeqLength': return S.sequenceLength(this.sequence(expr.sequence, path, old));
       case 'SeqMap':
       case 'SeqFold': {
         const callee = this.opts.environment?.get(expr.callee);
@@ -286,8 +286,15 @@ class VcBuilder {
       case 'StringOp': return this.freshVar(`string_${expr.op}`);
       case 'IntCast': return this.freshVar('fixed_cast');
       case 'FixedBin': return this.freshVar(`fixed_${expr.op}`);
+      case 'ForAll': return S.ite(this.formula(expr, path, old), S.num(1), S.num(0));
       default: return this.freshVar('opaque');
     }
+  }
+
+  private sequence(expr: Term, path: Path, old = false): S.SmtSequence {
+    if (expr.kind === 'SeqLit') return S.sequence(...expr.items.map((item) => this.term(item, path, old)));
+    const key = this.placeKey(expr);
+    return S.sequenceVar(key ?? `sequence!${this.fresh++}`);
   }
 
   /**
@@ -445,6 +452,21 @@ class VcBuilder {
           S.and(this.formula(expr.cond, path, old), this.formula(expr.then, path, old)),
           S.and(S.not(this.formula(expr.cond, path, old)), this.formula(expr.otherwise, path, old)),
         );
+      case 'ForAll': {
+        if (expr.start.kind !== 'Lit' || typeof expr.start.value !== 'bigint' ||
+            expr.end.kind !== 'Lit' || typeof expr.end.value !== 'bigint') {
+          return S.boolVar(`forall!${this.fresh++}`);
+        }
+        const key = this.name(expr.symbol);
+        const previous = path.store.get(key);
+        const formula = S.forall(key, expr.start.value, expr.end.value, (value) => {
+          path.store.set(key, value);
+          return this.formula(expr.body, path, old);
+        });
+        if (previous) path.store.set(key, previous);
+        else path.store.delete(key);
+        return formula;
+      }
       case 'Old': return this.formula(expr.expr, path, true);
       default:
         return S.gt(this.term(expr, path, old), S.num(0));
@@ -594,7 +616,17 @@ class VcBuilder {
       for (const key of modified) inside.store.set(key, this.freshVar(`havoc!${key}`));
       const invariantsInside = stmt.invariants.map((inv) => this.formula(inv, inside));
       inside.assumptions.push(...invariantsInside);
-      const variantBefore = stmt.variant ? this.term(stmt.variant, inside) : null;
+      const variant = stmt.variant ?? inferVariant(stmt);
+      if (!variant) {
+        this.emit({
+          kind: 'variant_bounded',
+          label: 'termination_variant_missing',
+          formula: S.F,
+          rigor: 'property',
+          path: [...trail, 'variant'],
+        });
+      }
+      const variantBefore = variant ? this.term(variant, inside) : null;
       inside.condition.push(this.formula(stmt.cond, inside));
 
       const after = this.execute(stmt.body, [inside], [...trail, 'body']);
@@ -609,8 +641,8 @@ class VcBuilder {
             path: [...trail, 'body', `invariants[${i}]`],
           });
         });
-        if (stmt.variant && variantBefore) {
-          const variantAfter = this.term(stmt.variant, branch);
+        if (variant && variantBefore) {
+          const variantAfter = this.term(variant, branch);
           this.emit({
             kind: 'variant_decreases',
             label: 'variant',
@@ -698,6 +730,37 @@ class VcBuilder {
       this.seedRecordFields(path, key, fieldTy);
     }
   }
+}
+
+/** Infer the standard distance-to-bound ranking function for monotone counters. */
+export function inferVariant(stmt: Extract<Term, { kind: 'While' }>): Term | null {
+  const condition = stmt.cond;
+  if (condition.kind !== 'Bin' || !['lt', 'le', 'gt', 'ge'].includes(condition.op)) return null;
+  const counter = condition.left;
+  const key = (term: Term): string | null => {
+    if (term.kind === 'Var' || term.kind === 'Place') return `${term.symbol}:${term.kind === 'Place' ? term.path.join('.') : ''}`;
+    return null;
+  };
+  const counterKey = key(counter);
+  if (!counterKey) return null;
+  let direction: 'up' | 'down' | null = null;
+  const visit = (term: Term): void => {
+    if (term.kind === 'Assign' && key(term.target) === counterKey && term.value.kind === 'Bin') {
+      const sameLeft = key(term.value.left) === counterKey;
+      const positive = term.value.right.kind === 'Lit' && typeof term.value.right.value === 'bigint' && term.value.right.value > 0n;
+      if (sameLeft && positive && term.value.op === 'add') direction = 'up';
+      if (sameLeft && positive && term.value.op === 'sub') direction = 'down';
+    }
+    for (const child of childrenOf(term)) visit(child);
+  };
+  visit(stmt.body);
+  if (direction === 'up' && (condition.op === 'lt' || condition.op === 'le')) {
+    return { kind: 'Bin', op: 'sub', left: condition.right, right: counter };
+  }
+  if (direction === 'down' && (condition.op === 'gt' || condition.op === 'ge')) {
+    return { kind: 'Bin', op: 'sub', left: counter, right: condition.right };
+  }
+  return null;
 }
 
 function childrenOf(term: Term): readonly Term[] {
@@ -831,12 +894,12 @@ export function verifyFunction(
  * the aliased case.
  */
 function aliasingAssumptions(decl: Extract<Term, { kind: 'FunctionDecl' }>): string[] {
-  const byType = new Map<string, SymbolId[]>();
+  const byType = new Map<string, Array<{ symbol: SymbolId; owned: boolean }>>();
   for (const p of decl.params) {
     const base = underlying(p.ty);
     if (base.t !== 'Record') continue;
     const list = byType.get(base.name) ?? [];
-    list.push(p.symbol);
+    list.push({ symbol: p.symbol, owned: p.ty.t === 'Owned' });
     byType.set(base.name, list);
   }
 
@@ -854,10 +917,12 @@ function aliasingAssumptions(decl: Extract<Term, { kind: 'FunctionDecl' }>): str
   }
 
   const out: string[] = [];
-  for (const [typeName, symbols] of byType) {
-    for (let i = 0; i < symbols.length; i++) {
-      for (let j = i + 1; j < symbols.length; j++) {
-        if (disequal.has([symbols[i], symbols[j]].sort().join('|'))) continue;
+  for (const [typeName, parameters] of byType) {
+    for (let i = 0; i < parameters.length; i++) {
+      for (let j = i + 1; j < parameters.length; j++) {
+        if (parameters[i].owned || parameters[j].owned) continue;
+        const symbols = [parameters[i].symbol, parameters[j].symbol];
+        if (disequal.has([...symbols].sort().join('|'))) continue;
         out.push(
           `parameters of type ${typeName} are assumed not to alias; ` +
             'add a requires-disequality between them, or rely on the micro-world suite ' +

@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MicroWorld, simulateModule } from '../../src/tier3/microworld.ts';
+import { MicroWorld, materializeCounterexample, simulateModule } from '../../src/tier3/microworld.ts';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { readStored } from '../../src/tier1/persistence.ts';
 import { generateCase, materialise, shrinkPlain, type Plain } from '../../src/tier3/generate.ts';
 import { buildLedgerExample, ACCOUNT, CENTS } from '../../src/examples/ledger.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
@@ -67,9 +71,10 @@ test('counterexamples are shrunk to something an agent can read', () => {
   const ex = buildLedgerExample();
   const syms = ex.syms;
   const amount = syms.define('amt');
+  const wrongSymbol = syms.define('abs');
   // Claims to be non-negative, but returns the input unchanged.
   const wrong = b.fn({
-    symbol: syms.define('abs'),
+    symbol: wrongSymbol,
     params: [b.param(amount, b.Int)],
     returns: b.Int,
     purity: 'pure',
@@ -80,6 +85,14 @@ test('counterexamples are shrunk to something an agent can read', () => {
   assert.equal(report.accepted, false);
   // The minimal witness for "not >= 0" is -1.
   assert.equal(report.failures[0].arguments[0], '-1');
+  const directory = mkdtempSync(join(tmpdir(), 'aether-counterexample-'));
+  try {
+    const persisted = materializeCounterexample(directory, wrongSymbol, report.failures[0]);
+    const stored = readStored<{ counterexample: { caseData: Plain[] } }>(persisted.path);
+    assert.deepEqual(stored.counterexample.caseData, report.failures[0].caseData);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('the frame property catches a clobbered neighbouring field', () => {

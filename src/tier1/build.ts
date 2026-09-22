@@ -102,6 +102,8 @@ export const fixed = (
   left: Term,
   right: Term,
 ): Term => ({ kind: 'FixedBin', op, ty, left, right });
+export const forall = (symbol: SymbolId, start: Term, end: Term, body: Term): Term =>
+  ({ kind: 'ForAll', symbol, start, end, body });
 export const old = (expr: Term): Term => ({ kind: 'Old', expr });
 export const result = (): Term => ({ kind: 'ResultRef' });
 export const invoke = (capability: CapabilityName, ...args: Term[]): Term => ({
@@ -203,5 +205,6 @@ export const module_ = (spec: {
 });
 
 export const param = (symbol: SymbolId, ty: Ty): Param => ({ symbol, ty });
+export const owned = (inner: Ty): Ty => ({ t: 'Owned', inner });
 
 export { Bool, Int, Str, Unit };

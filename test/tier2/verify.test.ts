@@ -201,3 +201,54 @@ test('every obligation carries a runnable SMT-LIB script', () => {
     assert.match(r.smtLib, /\(check-sat\)/);
   }
 });
+
+test('C2: finite sequence length and constant select reduce exactly', () => {
+  const syms = new SymbolSpace('sequence-theory');
+  const declaration = b.fn({
+    symbol: syms.define('sequenceFact'),
+    returns: b.Int,
+    contract: b.contract({ ensures: [b.clause(b.eq(b.result(), b.int(4)), 'exact')] }),
+    body: b.block(b.ret(b.add(
+      b.length(b.seq(b.Int, b.int(1), b.int(2))),
+      b.index(b.seq(b.Int, b.int(1), b.int(2)), b.int(1)),
+    ))),
+  });
+  const report = verifyFunction(declaration, { symbols: syms });
+  assert.equal(report.verdict, 'proved');
+});
+
+test('C3: bounded quantifiers expand into finite proof obligations', () => {
+  const syms = new SymbolSpace('bounded-quantifier');
+  const index = syms.define('index');
+  const declaration = b.fn({
+    symbol: syms.define('bounded'), returns: b.Bool,
+    contract: b.contract({ ensures: [b.clause(b.eq(b.result(), b.bool(true)), 'all_non_negative')] }),
+    body: b.block(b.ret(b.forall(index, b.int(0), b.int(8), b.ge(b.v(index), b.int(0))))),
+  });
+  assert.equal(verifyFunction(declaration, { symbols: syms }).verdict, 'proved');
+});
+
+test('C9: a monotone loop gets an inferred variant and an opaque loop is delegated', () => {
+  const syms = new SymbolSpace('inferred-variant');
+  const n = syms.define('n');
+  const index = syms.define('index');
+  const monotone = b.fn({
+    symbol: syms.define('monotone'), params: [b.param(n, b.Int)], returns: b.Int,
+    contract: b.contract({ requires: [b.clause(b.ge(b.v(n), b.int(0)), 'non_negative')] }),
+    body: b.block(
+      b.let_(index, b.Int, b.int(0)),
+      b.while_(
+        b.lt(b.v(index), b.v(n)),
+        b.block(b.assign(b.place(index), b.add(b.v(index), b.int(1)))),
+      ),
+      b.ret(b.v(index)),
+    ),
+  });
+  const proved = verifyFunction(monotone, { symbols: syms });
+  assert.ok(proved.results.some((result) => result.obligation.kind === 'variant_decreases' && result.verdict === 'proved'));
+
+  const opaque = { ...monotone, body: b.block(b.while_(b.bool(true), b.block()), b.ret(b.int(0))) };
+  const delegated = verifyFunction(opaque, { symbols: syms });
+  assert.equal(delegated.verdict, 'delegated');
+  assert.ok(delegated.delegatedToFuzzing.includes('termination_variant_missing'));
+});

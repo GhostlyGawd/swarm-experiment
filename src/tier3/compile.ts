@@ -316,6 +316,7 @@ export class ProductionRuntime {
         slots.set(t.errSymbol, slots.size);
       }
       if (t.kind === 'Lambda') for (const param of t.params) slots.set(param.symbol, slots.size);
+      if (t.kind === 'ForAll') slots.set(t.symbol, slots.size);
       for (const child of childTerms(t)) allocate(child);
     };
     if (decl.body) allocate(decl.body);
@@ -738,6 +739,24 @@ export class ProductionRuntime {
           if ((op === 'div' || op === 'mod') && r === 0n) throw new ProductionFault('division_by_zero', `${op} by zero`);
           const value = op === 'add' ? l + r : op === 'sub' ? l - r : op === 'mul' ? l * r : op === 'div' ? l / r : l % r;
           return normalizeFixed(value, ty);
+        };
+      }
+      case 'ForAll': {
+        const start = this.expr(term.start, ctx);
+        const end = this.expr(term.end, ctx);
+        const body = this.expr(term.body, ctx);
+        const slot = this.slotOf(term.symbol, ctx);
+        return (frame) => {
+          const lower = start(frame);
+          const upper = end(frame);
+          if (typeof lower !== 'bigint' || typeof upper !== 'bigint') {
+            throw new ProductionFault('type_error', 'forall bounds must be integers');
+          }
+          for (let value = lower; value < upper; value++) {
+            frame.s[slot] = value;
+            if (body(frame) !== true) return false;
+          }
+          return true;
         };
       }
       case 'Call': {

@@ -38,7 +38,8 @@ export type Ty =
   | { t: 'Seq'; element: Ty }
   | { t: 'Fn'; params: readonly Ty[]; returns: Ty; capabilities: readonly CapabilityName[] }
   | { t: 'TypeVar'; name: string }
-  | { t: 'IntN'; bits: 8 | 16 | 32 | 64; signed: boolean; overflow: 'wrap' | 'trap' | 'saturate' };
+  | { t: 'IntN'; bits: 8 | 16 | 32 | 64; signed: boolean; overflow: 'wrap' | 'trap' | 'saturate' }
+  | { t: 'Owned'; inner: Ty };
 
 export const Int: Ty = { t: 'Int' };
 export const Bool: Ty = { t: 'Bool' };
@@ -95,6 +96,7 @@ export type Term =
       kind: 'FixedBin'; op: 'add' | 'sub' | 'mul' | 'div' | 'mod';
       ty: Extract<Ty, { t: 'IntN' }>; left: Term; right: Term;
     }
+  | { kind: 'ForAll'; symbol: SymbolId; start: Term; end: Term; body: Term }
   /** `old(e)` — the pre-state value of `e`. Legal only inside `ensures`. */
   | { kind: 'Old'; expr: Term }
   /** `result` — the value being returned. Legal only inside `ensures`. */
@@ -214,6 +216,7 @@ export const LINK_SCHEMA: Readonly<Record<NodeKind, readonly LinkField[]>> = {
   StringOp: [many('args')],
   IntCast: [one('value')],
   FixedBin: [one('left'), one('right')],
+  ForAll: [one('start'), one('end'), one('body')],
   Old: [one('expr')],
   Invoke: [many('args')],
   Let: [one('init')],
@@ -233,7 +236,7 @@ export const LINK_SCHEMA: Readonly<Record<NodeKind, readonly LinkField[]>> = {
 const EXPRESSION_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>([
   'Lit', 'Var', 'Bin', 'Un', 'Cond', 'Call', 'Field', 'RecordLit', 'ResultValue', 'MatchResult',
   'SeqLit', 'SeqIndex', 'SeqLength', 'SeqMap', 'SeqFold', 'Lambda', 'Apply', 'StringOp',
-  'IntCast', 'FixedBin', 'Old', 'ResultRef', 'Invoke',
+  'IntCast', 'FixedBin', 'ForAll', 'Old', 'ResultRef', 'Invoke',
 ]);
 
 const STATEMENT_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>([

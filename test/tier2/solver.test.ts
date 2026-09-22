@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { CapabilityEnvelope } from '../../src/tier2/ocap.ts';
+import { SMT_SOLVER_PROCESS, proveWithExternalFallback } from '../../src/tier2/external-solver.ts';
 import { checkSat, prove } from '../../src/tier2/solver.ts';
 import * as s from '../../src/tier2/smt.ts';
 
@@ -128,4 +130,39 @@ test('SMT-LIB output is a runnable script', () => {
   assert.match(script, /\(check-sat\)/);
   // Names that are not plain SMT-LIB symbols are quoted.
   assert.match(s.toSmtLibScript(s.ge(s.intVar('a b'), s.num(0))), /\|a b\|/);
+});
+
+test('C1: external SMT fallback is capability-bounded and only trusts proofs', () => {
+  const formula = s.eq(x, x);
+  assert.throws(
+    () => proveWithExternalFallback(formula, {
+      envelope: CapabilityEnvelope.empty(), timeoutMs: -1,
+      runner: () => ({ stdout: 'unsat\n' }),
+    }),
+    /requires cap:process:smt_solver/,
+  );
+  const proved = proveWithExternalFallback(formula, {
+    envelope: CapabilityEnvelope.of(SMT_SOLVER_PROCESS), timeoutMs: -1,
+    runner: (_command, _args, input) => {
+      assert.match(input, /\(check-sat\)/);
+      return { stdout: 'unsat\n' };
+    },
+  });
+  assert.equal(proved.status, 'unsat');
+  const satWithoutModel = proveWithExternalFallback(s.ge(x, s.num(0)), {
+    envelope: CapabilityEnvelope.of(SMT_SOLVER_PROCESS), timeoutMs: -1,
+    runner: () => ({ stdout: 'sat\n' }),
+  });
+  assert.equal(satWithoutModel.status, 'unknown');
+  assert.equal(satWithoutModel.reason, 'external_no_model');
+});
+
+test('C4: uninterpreted applications obey congruence', () => {
+  const congruence = s.implies(
+    s.eq(x, y),
+    s.eq(s.app('price', x), s.app('price', y)),
+  );
+  assert.equal(prove(congruence).status, 'unsat');
+  const script = s.toSmtLibScript(s.eq(s.app('price', x), s.num(1)));
+  assert.match(script, /\(declare-fun price \(Int\) Int\)/);
 });

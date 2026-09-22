@@ -130,7 +130,7 @@ export function generateCase(
     const base = underlying(param.ty);
     if (base.t === 'Record') {
       const seen = recordsByType.get(base.name);
-      if (seen?.length && random.bool(aliasBias)) {
+      if (param.ty.t !== 'Owned' && seen?.length && random.bool(aliasBias)) {
         args.push({ k: 'alias', index: random.pick(seen) });
         return;
       }

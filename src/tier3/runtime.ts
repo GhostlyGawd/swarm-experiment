@@ -743,6 +743,24 @@ export class Runtime {
           : left % right;
         return normalizeFixed(value, expr.ty, (message) => new AetherFault(this.fault('type_error', message, null)));
       }
+      case 'ForAll': {
+        const start = this.eval(expr.start, frame, result, old);
+        const end = this.eval(expr.end, frame, result, old);
+        if (typeof start !== 'bigint' || typeof end !== 'bigint') {
+          throw new AetherFault(this.fault('type_error', 'forall bounds must be integers', null));
+        }
+        const scope: Scope = new Map();
+        frame.scopes.push(scope);
+        try {
+          for (let value = start; value < end; value++) {
+            scope.set(expr.symbol, value);
+            if (!this.truthy(this.eval(expr.body, frame, result, old))) return false;
+          }
+          return true;
+        } finally {
+          frame.scopes.pop();
+        }
+      }
       case 'Call': {
         const callee = this.functions.get(expr.callee);
         if (!callee) {
