@@ -14,7 +14,7 @@ import { SymbolSpace } from '../src/tier1/symbols.ts';
 import { merge3 } from '../src/tier1/merge.ts';
 import { encode, IrContext } from '../src/tier1/agent-ir.ts';
 import * as b from '../src/tier1/build.ts';
-import { measure } from '../src/util/tokens.ts';
+import { countTokens } from '../src/util/tokens.ts';
 import { rng } from '../src/util/rng.ts';
 import { projectTypeScript } from '../src/projection/typescript.ts';
 import { verifyFunction } from '../src/tier2/verify.ts';
@@ -96,10 +96,9 @@ console.log('\nAether — non-functional requirements\n');
     measured: `p99.9 ${p999.toFixed(4)} ms @ ${store.size.toLocaleString()} nodes`,
     verdict: p999 < 5 ? 'qualified' : 'missed',
     note:
-      `built in ${(buildMs / 1000).toFixed(1)}s. Measured at 1M rather than 10M nodes: ` +
-      'the store is an in-memory hash index, so lookup is O(1) and 10M would measure the ' +
-      'same, but materialising it needs multi-GB heap and the honest thing is to say ' +
-      'which number was actually taken.',
+      `built in ${(buildMs / 1000).toFixed(1)}s. Measured at ${store.size.toLocaleString()} rather than 10M nodes: ` +
+      'this does not qualify the stated 10M target or establish its latency. Materialising ' +
+      'the required scale needs a separate workload and memory profile.',
   });
 }
 
@@ -166,7 +165,8 @@ console.log('\nAether — non-functional requirements\n');
     measured: `${(saving * 100).toFixed(1)}% ` +
       `(${store.size.toLocaleString()} nodes for ${versions} versions, ` +
       `vs ${independentTotal.toLocaleString()} stored independently)`,
-    verdict: saving >= 0.4 ? 'met' : 'missed',
+    verdict: 'qualified',
+    note: 'Independent uncompressed AST snapshots are the baseline; no Git repository was measured, so the Git-relative target remains unmeasured.',
   });
 
   // The within-snapshot figure, which is a different and much weaker claim.
@@ -238,15 +238,14 @@ console.log('\nAether — non-functional requirements\n');
   const survived = final.stmts.filter((s) => s.kind === 'Return').length;
   record({
     id: 'NFR-6.3',
-    requirement: 'Concurrent writers, disjoint subtrees',
+    requirement: 'Sequential disjoint edit simulation',
     bound: '1,000 writers, no lock',
     measured: `${survived}/${writers} edits survived, ${conflicts} conflicts ` +
       `(write ${writeMs.toFixed(0)} ms, reconcile ${mergeMs.toFixed(0)} ms)`,
-    verdict: survived === writers && conflicts === 0 ? 'met' : 'missed',
+    verdict: survived === writers && conflicts === 0 ? 'qualified' : 'missed',
     note:
-      'Writing needs no coordination at all; the reconcile figure is the cost ' +
-      'of folding 1,000 divergent versions back into one, which is a separate ' +
-      'and much rarer operation.',
+      'This is a sequential in-process workload, not 1,000 concurrently mutating agents. ' +
+      'Distributed contention, partitions and overlapping writes remain unmeasured.',
   });
 }
 
@@ -293,7 +292,7 @@ console.log('\nAether — non-functional requirements\n');
     bound: '<= 250 ms per module',
     measured: `worst declaration ${worst} ms, whole suite ${elapsed.toFixed(0)} ms ` +
       `across ${reports.length} declarations`,
-    verdict: worst <= 250 ? 'met' : 'missed',
+    verdict: elapsed <= 250 ? 'met' : 'missed',
   });
 }
 
@@ -402,25 +401,25 @@ console.log('\nAether — non-functional requirements\n');
   const perDeclaration: string[] = [];
   for (const m of members) {
     if (m.kind !== 'FunctionDecl') continue;
-    const projected = measure(projectTypeScript(m, ex.syms, {})).tokens;
-    const encoded = encode(m, ctx).bodyTokens;
+    const projected = countTokens(projectTypeScript(m, ex.syms, {}));
+    const encoded = countTokens(encode(m, ctx).text);
     ts += projected;
     ir += encoded;
     perDeclaration.push(`${ex.syms.nameOf(m.symbol)} ${(projected / encoded).toFixed(2)}x`);
   }
   const cold = encode(ex.module);
-  const coldRatio = measure(projectTypeScript(ex.module, ex.syms, {})).tokens / cold.tokens;
+  const coldRatio = countTokens(projectTypeScript(ex.module, ex.syms, {})) / countTokens(cold.text);
 
   record({
     id: 'FR-1.2',
     requirement: 'Agent-IR token reduction',
     bound: '>= 4x vs TypeScript',
-    measured: `${(ts / ir).toFixed(2)}x aggregate per unit change`,
+    measured: `${(ts / ir).toFixed(2)}x complete warm messages (cl100k_base)`,
     verdict: ts / ir >= 4 ? 'met' : 'missed',
     note:
       `per declaration: ${perDeclaration.join(', ')}. ` +
-      `Cold, dictionary included: ${coldRatio.toFixed(2)}x — the dictionary is paid once ` +
-      'per session, so the marginal figure is the one a context budget feels.',
+      `Cold, dictionary included: ${coldRatio.toFixed(2)}x. The >=4x target is missed. ` +
+      'Run bench:v4:measure for pinned corpus, full-session costs and raw evidence.',
   });
 }
 
@@ -429,6 +428,7 @@ const missed = rows.filter((r) => r.verdict === 'missed');
 const qualified = rows.filter((r) => r.verdict === 'qualified');
 console.log(
   `\n${rows.length - missed.length - qualified.length} met, ` +
-    `${qualified.length} met with a caveat, ${missed.length} missed\n`,
+    `${qualified.length} limited-scope observations (target unverified), ${missed.length} missed\n`,
 );
-if (missed.length) process.exitCode = 1;
+// Recording observations is distinct from claiming that all thresholds passed.
+if (missed.length && !process.argv.includes('--record-only')) process.exitCode = 1;

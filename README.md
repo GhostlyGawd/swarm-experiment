@@ -9,27 +9,29 @@ of a byte stream, bounds all authority with object-capabilities, and decides
 deployment topology from measured traffic rather than from an architecture
 diagram.
 
-**[docs/PRD.md](docs/PRD.md)** is the specification. This repository is its
-reference implementation: every requirement it states is implemented, and every
-bound in its non-functional section is measured rather than asserted.
+**[docs/PRD.md](docs/PRD.md)** is the original v1 specification. This repository
+contains its reference implementation and the foundations for v4. The readiness
+review and versioned evidence tracker identify implementation gaps and unmet
+performance targets.
 
 The v4 extension is planned in the versioned
 **[implementation specification](docs/implementation/v4/SPEC.md)** and
 **[dependency tracker](docs/implementation/v4/TRACKER.md)**. The
 [readiness review](docs/V4-READINESS-REVIEW.md) records the current baseline's
-limits, including state preservation during movement and estimator-based token
-claims. Run `npm run roadmap:v4:check` to validate the v4 plan and its evidence.
+limits and the original estimator-based token overstatement. Run `npm run roadmap:v4:check` to validate the v4 plan and its evidence.
 
 ```bash
 npm install
-npm test          # 160 tests
+npm test          # correctness/regression suite; prints the current test count
 npm run typecheck # src, tests, bench and roadmap
-npm run bench     # the §6 measurements
+npm run bench     # legacy v1 §6 measurements; fails on the known token target miss
+npm run bench:v4:measure # versioned raw evidence; records failures successfully
+npm run bench:v4:enforce # release profile gate; currently fails on unmet targets
 npm run demo      # an end-to-end walkthrough of all four tiers
 ```
 
-Requires Node 22.6+ (for native TypeScript type-stripping). No runtime
-dependencies.
+Requires Node 22.6+ (for native TypeScript type-stripping). Runtime token
+measurement uses `js-tiktoken`; see the package lock for installed dependencies.
 
 ---
 
@@ -78,8 +80,10 @@ And here is what the agent sees for the same declaration:
 v0 F3 v1 >= Q00 v1 j00 > Q10 v0 F2 v2 F2 != Q20 v0 F3 v0 F3 @ v1 - == Q30 …
 ```
 
-77 tokens instead of 315. Names appear once per session, in a dictionary, so
-every *use* is one token — which is what makes descriptive naming free.
+Names are transmitted through a session dictionary. Dictionary entries,
+indices and opcodes all incur tokenizer costs. On the default four-function
+ledger corpus, actual `cl100k_base` counts are **698 TypeScript tokens versus
+375 complete warm IR-message tokens (1.86×)**. The ≥4× target remains unmet.
 
 ---
 
@@ -213,27 +217,33 @@ pure function max(a: bigint, b: bigint): bigint {
 
 ## What the measurements say
 
-From `npm run bench`:
+From `npm run bench:v4:measure`, using the versioned
+`ledger-baseline/1` fixture and `js-tiktoken@1.0.21` / `cl100k_base`:
 
-| Requirement | Bound | Measured |
-|---|---|---|
-| AST node resolution | < 5 ms @ 10M nodes | p99.9 **0.017 ms** @ 762k nodes † |
-| Reversible checkpoint rollback | < 15 ms | **0.31 ms** worst |
-| Micro-world harness | ≤ 250 ms per module | **70 ms** worst declaration |
-| SMT budget per function | ≤ 2,000 ms | **9 ms** worst |
-| Deduplication over history | ≥ 40% vs Git | **94.6%** over 200 versions |
-| Concurrent writers | 1,000, no lock | 1,000/1,000 survive, 0 conflicts |
-| Agent-IR token reduction | ≥ 4× | **4.25×** per unit change ‡ |
-| Reproducible execution | identical heap + trace | identical across 3 runs |
-| Production artifact overhead | strips telemetry | **12.7×** faster, identical heap |
+| Scope | TypeScript tokens | IR tokens | Ratio |
+|---|---:|---:|---:|
+| Warm body diagnostic | 698 | 343 | 2.03× |
+| Complete warm messages | 698 | 375 | 1.86× — fails ≥4× |
+| Cold module, dictionary included | 878 | 933 | 0.94× |
+| Complete offline change session | 1361 | 1226 | 1.11× |
 
-† Measured at 762k nodes, not 10M: the store is a hash index so lookup is O(1),
-but materialising 10M needs multi-GB heap. The honest thing is to name the
-number actually taken.
+The complete session changes `feeFor` from `gross/100` to `gross/200`. It includes
+the initial context/dictionary, request, executed failing attempt, repair, actual
+execution responses and JSONL framing. Candidates are generated deterministically
+without model calls. Representative autonomous campaigns and model billing
+remain unmeasured.
 
-‡ Marginal, within a session. A cold encoding that ships the whole dictionary
-is 1.60×. The marginal figure is the one a context budget feels, because agents
-load a module once and rewrite subtrees of it many times.
+[Benchmark profiles and evidence](bench/v4/README.md) describe the workload,
+raw corpus, source/commit binding, tokenizer and environment metadata. Corpus
+ratios divide summed baseline counts by summed IR counts. The legacy estimator
+remains a labeled diagnostic API and does not establish acceptance.
+
+The legacy `npm run bench` exercises small local workloads. Its hash lookup
+sample does not qualify the required graph scale; sequential disjoint edits do
+not establish distributed concurrency; independent AST snapshot savings do not
+measure Git history compression. Re-run it for local observations. The default
+v4 profile keeps all unmeasured NFRs visible and enforcement exits nonzero until
+required targets pass with qualifying evidence.
 
 ---
 
@@ -242,8 +252,9 @@ load a module once and rewrite subtrees of it many times.
 The specification is not what it was when the build started. The substantive
 revisions are recorded as **Findings** in the PRD; the short version:
 
-- **Agent-IR's 4× is a marginal property.** A cold, self-contained stream
-  reaches 1.60×. The metric is now stated as tokens per unit change.
+- **The earlier 4× claim used an estimator.** Actual `cl100k_base` counts
+  yield 1.86× for complete warm messages on the ledger fixture. Dictionary and
+  session costs are now reported, and the original ≥4× target stays open.
 - **Hashing children as a flat list collides.** A `While` with one invariant and
   no variant, and one with no invariant and a variant, flatten identically.
   Children are hashed grouped by field.
@@ -299,7 +310,7 @@ src/synthesis/       The synthesis loop and a reference synthesizer
 src/examples/        The worked ledger example used throughout
 bench/nfr.bench.ts   The §6 measurements
 roadmap/             The roadmap as data, plus its graph analysis and renderer
-test/                160 tests, organized by tier
+test/                correctness and regression tests, organized by tier
 ```
 
 ## Licence

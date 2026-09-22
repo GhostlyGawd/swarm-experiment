@@ -71,3 +71,6 @@ export { AgentSession, FrameDecoder, LeaseManager, encodeFrame, type AgentReques
 
 // --- The worked example ------------------------------------------------------
 export { buildLedgerExample, ledgerCapabilities, ledgerTelemetry, ACCOUNT, CENTS } from './examples/ledger.ts';
+
+// Versioned execution envelopes; kept namespaced to preserve the v1 API.
+export * as fabric from './fabric/index.ts';

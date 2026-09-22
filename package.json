@@ -55,6 +55,10 @@
     "./projection": {
       "types": "./dist/projection/index.d.ts",
       "import": "./dist/projection/index.js"
+    },
+    "./fabric": {
+      "types": "./dist/fabric/index.d.ts",
+      "import": "./dist/fabric/index.js"
     }
   },
   "scripts": {
@@ -64,6 +68,9 @@
     "typecheck": "tsc -p tsconfig.check.json",
     "test": "node --test --experimental-strip-types \"test/**/*.test.ts\"",
     "bench": "node --experimental-strip-types bench/nfr.bench.ts",
+    "bench:record": "node --experimental-strip-types bench/nfr.bench.ts --record-only",
+    "bench:v4:measure": "node --experimental-strip-types bench/v4/cli.ts --measure",
+    "bench:v4:enforce": "node --experimental-strip-types bench/v4/cli.ts --enforce",
     "demo": "node --experimental-strip-types src/cli.ts demo",
     "roadmap": "node --experimental-strip-types roadmap/render.ts",
     "roadmap:check": "node --experimental-strip-types roadmap/render.ts --check",
@@ -75,6 +82,6 @@
     "typescript": "5.8.3"
   },
   "dependencies": {
-    "js-tiktoken": "^1.0.21"
+    "js-tiktoken": "1.0.21"
   }
 }

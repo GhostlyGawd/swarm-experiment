@@ -1,9 +1,9 @@
 /**
  * Token accounting.
  *
- * FR-1.2 states a token-reduction target, so the fabric needs a token metric it
- * can compute offline, deterministically and without a vendor tokenizer.
- * `estimateTokens` models byte-pair encoding as follows:
+ * Acceptance and context accounting use countTokens / measureWithTokenizer,
+ * backed by actual BPE tables. estimateTokens and measure retain the original
+ * heuristic as compatibility diagnostics only. That heuristic is:
  *
  *   • a maximal alphanumeric run (identifier, keyword or number) costs one
  *     token per four characters, rounded up, minimum one. Modern BPE
@@ -66,6 +66,7 @@ export interface SizeReport {
   readonly lines: number;
 }
 
+/** Legacy heuristic size diagnostic. Use measureWithTokenizer for token budgets. */
 export function measure(text: string): SizeReport {
   return {
     bytes: new TextEncoder().encode(text).length,

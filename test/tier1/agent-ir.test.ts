@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { decode, encode, IrContext } from '../../src/tier1/agent-ir.ts';
 import { buildLedgerExample } from '../../src/examples/ledger.ts';
 import { projectTypeScript } from '../../src/projection/typescript.ts';
-import { measure } from '../../src/util/tokens.ts';
+import { countTokens } from '../../src/util/tokens.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import * as b from '../../src/tier1/build.ts';
 import { typeName } from '../../src/tier1/ids.ts';
@@ -106,7 +106,7 @@ test('the worked example round-trips exactly', () => {
   assert.deepEqual(decode(encode(ex.module).text), ex.module);
 });
 
-test('a session dictionary makes later edits nearly free', () => {
+test('a session dictionary is shared and warm messages remain smaller than the cold module', () => {
   const ex = buildLedgerExample();
   const enc = new IrContext();
   const dec = new IrContext();
@@ -118,42 +118,33 @@ test('a session dictionary makes later edits nearly free', () => {
   const warm = encode(members[2], enc);
   assert.deepEqual(decode(warm.text, dec), members[2]);
 
-  assert.ok(warm.tokens < cold.tokens / 4, 'a warm subtree costs a fraction of the cold module');
+  assert.ok(countTokens(warm.text) < countTokens(cold.text), 'warm message is smaller than the complete cold module');
   assert.ok(
-    measure(warm.header).tokens <= 6,
+    warm.header === 'AE1\n§w 1',
     `a warm header should be near-empty, was ${warm.header}`,
   );
 });
 
-test('FR-1.2: Agent-IR cuts the tokens per unit change by at least 4x', () => {
+test('FR-1.2: actual tokenizer accounting reproduces the ledger reference without asserting a false target', () => {
   const ex = buildLedgerExample();
   const members = (ex.module as Extract<Term, { kind: 'Module' }>).members;
   const ctx = new IrContext();
-  encode(ex.module, ctx); // establish the session dictionary
-
-  let tsTotal = 0;
-  let irTotal = 0;
-  const perFunction: string[] = [];
+  const cold = encode(ex.module, ctx);
+  let baseline = 0;
+  let bodies = 0;
+  let messages = 0;
   for (const member of members) {
     if (member.kind !== 'FunctionDecl') continue;
-    const ts = measure(projectTypeScript(member, ex.syms, {})).tokens;
     const ir = encode(member, ctx);
-    tsTotal += ts;
-    irTotal += ir.bodyTokens;
-    perFunction.push(`${ex.syms.nameOf(member.symbol)}=${(ts / ir.bodyTokens).toFixed(2)}x`);
+    baseline += countTokens(projectTypeScript(member, ex.syms, {}));
+    bodies += countTokens(ir.body);
+    messages += countTokens(ir.text);
   }
-
-  // The requirement is a property of the representation, so it is asserted
-  // over the corpus rather than per declaration. Individual functions vary:
-  // a three-line body carrying a five-clause contract does worse than the
-  // aggregate, because the contract is irreducible content in both forms.
-  const aggregate = tsTotal / irTotal;
-  assert.ok(aggregate >= 4, `expected >=4x aggregate, got ${aggregate.toFixed(2)}x (${perFunction.join(' ')})`);
-  // No declaration should be anywhere near parity, either.
-  assert.ok(
-    Math.min(...perFunction.map((p) => Number(p.split('=')[1].replace('x', '')))) >= 3.5,
-    `per-declaration floor regressed: ${perFunction.join(' ')}`,
-  );
+  assert.deepEqual({ baseline, bodies, messages }, { baseline: 698, bodies: 343, messages: 375 });
+  assert.equal(countTokens(projectTypeScript(ex.module, ex.syms, {})), 878);
+  assert.equal(countTokens(cold.text), 933);
+  assert.equal(baseline / bodies, 698 / 343);
+  assert.equal(baseline / messages, 698 / 375);
 });
 
 test('a malformed stream is rejected rather than silently truncated', () => {

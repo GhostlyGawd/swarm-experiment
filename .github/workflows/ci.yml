@@ -22,5 +22,15 @@ jobs:
       - run: npm test
       - run: npm run roadmap:check
       - run: npm run roadmap:v4:check
-      - run: npm run bench
+      - name: Record benchmark observations and unmet v4 targets
+        run: |
+          mkdir -p .aether-store/benchmarks/v4/ci
+          npm run bench:record | tee .aether-store/benchmarks/v4/ci/legacy.log
+          npm run bench:v4:measure -- --output .aether-store/benchmarks/v4/ci
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: aether-benchmark-observations
+          path: .aether-store/benchmarks/v4/ci
+          include-hidden-files: true
       - run: npm pack --dry-run

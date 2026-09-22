@@ -313,6 +313,7 @@ for (const [milestone, previous] of [['baseline', null], ['v2', 'V4-M0'], ['v3',
 }
 
 export const PLAN: Plan = {
-  version: SPEC_VERSION, requirements, tasks,
+  version: SPEC_VERSION, requirements,
+  tasks: tasks.map(task => ['V4-F01', 'V4-F02', 'V4-F03'].includes(task.id) ? { ...task, status: 'in_progress' as const } : task),
   firstSlice: ['V4-F01', 'V4-F02', 'V4-F03', 'V4-F04', 'V4-F05', 'V4-F06', 'V4-F07', 'V4-F08'],
 };

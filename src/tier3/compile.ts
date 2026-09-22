@@ -42,7 +42,7 @@
  */
 
 import { children, type BinOp, type Param, type Term, type Ty } from '../tier1/ast.ts';
-import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
+import type { CapabilityName, NodeRef, SymbolId } from '../tier1/ids.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
 import { GraphStore } from '../tier1/store.ts';
 import { CapabilityEnvelope, type CapabilityRegistry, type RevocationList } from '../tier2/ocap.ts';
@@ -50,13 +50,14 @@ import { underlying } from '../tier2/typecheck.ts';
 import type { VerificationReport } from '../tier2/verify.ts';
 import type { ExecutionResult, Fault, FaultKind } from './runtime.ts';
 import { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
+import { copyHeap, snapshotHeap, restoreHeap, type HeapRecord, type ProductionSnapshot } from './heap-state.ts';
 
 // ---------------------------------------------------------------------------
 // compiled representation
 // ---------------------------------------------------------------------------
 
 /** A record in the production heap. A plain object, not a Map. */
-type HeapRecord = Record<string, Value>;
+export type { ProductionSnapshot } from './heap-state.ts';
 
 interface Frame {
   /** Locals, resolved to indices at compile time. */
@@ -150,6 +151,8 @@ export interface CompileOptions {
     args: readonly Value[],
     caller: SymbolId,
   ) => ExecutionResult;
+  /** Execute a local closure/task in its owning runtime's coherent state domain. */
+  readonly continuationHandler?: (owner: ProductionRuntime, execute: () => Value) => Value;
 }
 
 export interface TelemetrySample {
@@ -170,6 +173,9 @@ export interface ProductionSampling {
 
 export class ProductionRuntime {
   private readonly heap: HeapRecord[] = [{}]; // index 0 is never a valid address
+  private moduleRef!: NodeRef;
+  private activeCalls = 0;
+  private continuations: WeakRef<object>[] = [];
   private readonly compiled = new Map<SymbolId, CompiledFunction>();
   private readonly opts: CompileOptions;
   private readonly decisions: ClauseDecision[] = [];
@@ -189,6 +195,7 @@ export class ProductionRuntime {
    */
   static compile(module: Term, opts: CompileOptions): ProductionRuntime {
     const rt = new ProductionRuntime(opts);
+    rt.moduleRef = new GraphStore().intern(module);
     const declarations: Array<Extract<Term, { kind: 'FunctionDecl' }>> = [];
     const collect = (t: Term): void => {
       if (t.kind === 'FunctionDecl') {
@@ -238,9 +245,47 @@ export class ProductionRuntime {
   }
 
   readRecord(ref: Ref): ReadonlyMap<string, Value> {
+    if (!Number.isSafeInteger(ref.addr) || ref.addr < 1) throw new RangeError(`invalid record address @${ref.addr}`);
     const record = this.heap[ref.addr];
     if (!record) throw new RangeError(`no record at @${ref.addr}`);
     return new Map(Object.entries(record));
+  }
+
+  exportSnapshot(): ProductionSnapshot {
+    this.assertMigrationSafe();
+    return snapshotHeap(this.heap, this.moduleRef);
+  }
+
+  assertMigrationSafe(): void {
+    if (this.activeCalls) throw new Error('cannot snapshot active execution');
+    this.continuations = this.continuations.filter(ref => ref.deref() !== undefined);
+    if (this.continuations.length) throw new Error('live closures and tasks cannot be migrated');
+  }
+
+  private continueLocally(execute: () => Value): Value {
+    const guarded = () => {
+      this.activeCalls++;
+      try { return execute(); } finally { this.activeCalls--; }
+    };
+    return this.opts.continuationHandler ? this.opts.continuationHandler(this, guarded) : guarded();
+  }
+
+  importSnapshot(snapshot: ProductionSnapshot): void {
+    if (this.activeCalls) throw new Error('cannot import during active execution');
+    const heap = restoreHeap(snapshot, this.moduleRef); // validate before any mutation
+    this.replaceHeap(heap);
+  }
+
+  /** Synchronous in-process handoff; opaque values never cross a process boundary. */
+  synchronizeLocalHeap(source: ProductionRuntime): void {
+    if (source.moduleRef !== this.moduleRef) throw new TypeError('cannot synchronize different modules');
+    if (source !== this) this.replaceHeap(copyHeap(source.heap, true));
+  }
+
+  private replaceHeap(heap: readonly HeapRecord[]): void {
+    // Compiled expressions capture the array, so its identity must stay stable.
+    this.heap.length = 0;
+    for (const record of heap) this.heap.push(record);
   }
 
   /**
@@ -278,6 +323,7 @@ export class ProductionRuntime {
     const sampled = sampling !== undefined && (sampling.random?.() ?? Math.random()) < sampling.rate;
     const started = sampled ? process.hrtime.bigint() : 0n;
     let outcome: ExecutionResult;
+    this.activeCalls++;
     try {
       outcome = { ok: true, value: this.enter(fn, args), steps: 0 };
     } catch (e) {
@@ -286,6 +332,8 @@ export class ProductionRuntime {
       } else {
         throw e;
       }
+    } finally {
+      this.activeCalls--;
     }
     if (sampled) {
       sampling!.onSample({
@@ -704,15 +752,17 @@ export class ProductionRuntime {
         const capabilities = [...term.capabilities];
         return (frame) => {
           const captured = [...frame.s];
-          return {
+          const closure: Extract<Value, { closure: true }> = {
             closure: true,
             capabilities,
-            invoke: (args: readonly Value[]) => {
+            invoke: (args: readonly Value[]) => this.continueLocally(() => {
               const slots = [...captured];
               paramSlots.forEach((slot, index) => { slots[slot] = args[index] ?? null; });
               return body({ s: slots, o: frame.o, r: null });
-            },
+            }),
           };
+          this.continuations.push(new WeakRef(closure));
+          return closure;
         };
       }
       case 'Apply': {
@@ -800,13 +850,15 @@ export class ProductionRuntime {
           const captured = { s: [...frame.s], o: [...frame.o], r: frame.r };
           let settled = false;
           let value: Value = null;
-          return {
+          const task: Extract<Value, { task: true }> = {
             task: true,
-            run: () => {
+            run: () => this.continueLocally(() => {
               if (!settled) { value = body(captured); settled = true; }
               return value;
-            },
+            }),
           };
+          this.continuations.push(new WeakRef(task));
+          return task;
         };
       }
       case 'Await': {
@@ -896,8 +948,11 @@ export class ProductionRuntime {
     let target: CompiledFunction | undefined;
     return (args) => {
       target ??= this.compiled.get(symbol);
-      if (!target) throw new ProductionFault('unbound', `${this.name(symbol)} is not compiled`);
-      return this.enter(target, args);
+      if (target) return this.enter(target, args);
+      const remote = this.opts.callHandler?.(symbol, args, ctx.functionSymbol);
+      if (!remote) throw new ProductionFault('unbound', `${this.name(symbol)} is not compiled`);
+      if (!remote.ok) throw new ProductionFault(remote.fault.kind, remote.fault.message, remote.fault.label);
+      return remote.value;
     };
   }
 

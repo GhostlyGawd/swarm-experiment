@@ -11,15 +11,14 @@
  *
  *   2. **Names appear once per session.** In source text every occurrence of
  *      `receiverAccountBalance` is re-tokenized. Here identifiers live in a
- *      dictionary and each *use* is a fixed-width index. Token cost stops
- *      scaling with how descriptively code is named, which is what makes
- *      verbose, self-documenting naming free.
+ *      dictionary and each *use* is a fixed-width index. Long names therefore
+ *      do not recur in every body; the initial dictionary and later additions
+ *      still cost tokens.
  *
- *   3. **One opcode, one token.** Every opcode and its operands are packed
+ *   3. **Compact opcodes.** Every opcode and its operands are packed
  *      into a single alphanumeric run — indices are base-36 and fixed width,
- *      declared once per message. This matters more than it looks: a
- *      separator-heavy encoding like `C3,2` costs three BPE tokens where
- *      `C32` costs one, and a stream is mostly opcodes.
+ *      declared once per message. An opcode is a grammar token, not necessarily
+ *      one tokenizer token. Model BPE costs must be measured against complete messages.
  *
  * The encoding is total and reversible: `decode(encode(t)) ≡ t` for every term
  * the substrate can represent.
@@ -144,7 +143,7 @@ function poolByTag(pools: Pools): Record<SectionTag, Pool<string>> {
 export class IrContext {
   /** @internal */
   readonly pools: Pools = freshPools();
-  /** Cumulative dictionary cost paid so far, for reporting. */
+  /** Legacy heuristic dictionary diagnostic; not an API token count. */
   dictionaryTokens = 0;
 }
 
@@ -332,8 +331,9 @@ export interface AgentIr {
   /** Dictionary delta. Nearly empty once the peer holds the entries. */
   readonly header: string;
   readonly body: string;
+  /** Legacy heuristic estimate, not a tokenizer count. Use countTokens(text) for acceptance. */
   readonly tokens: number;
-  /** Tokens for the body alone — the marginal cost of one more edit. */
+  /** Legacy body-only estimate; excludes dictionary and message framing. */
   readonly bodyTokens: number;
   readonly bytes: number;
   readonly nodeCount: number;

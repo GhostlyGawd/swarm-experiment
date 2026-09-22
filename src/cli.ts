@@ -14,7 +14,7 @@ import { encode, IrContext } from './tier1/agent-ir.ts';
 import { merge3 } from './tier1/merge.ts';
 import * as b from './tier1/build.ts';
 import { SymbolSpace } from './tier1/symbols.ts';
-import { measure } from './util/tokens.ts';
+import { countTokens, measureWithTokenizer as measure } from './util/tokens.ts';
 import { TypeScriptProjector, projectTypeScript } from './projection/typescript.ts';
 import { parseTypeScript } from './projection/parse.ts';
 import { typecheck } from './tier2/typecheck.ts';
@@ -101,11 +101,11 @@ function cmdIr(bodyOnly: boolean): void {
   }
   console.log(ir.text);
   const ts = measure(projectTypeScript(module, syms, {}));
-  rule('token cost');
+  rule('token cost (cl100k_base)');
   console.log(`TypeScript projection : ${ts.tokens} tokens, ${ts.bytes} bytes`);
-  console.log(`Agent-IR (cold)       : ${ir.tokens} tokens, ${ir.bytes} bytes`);
-  console.log(`Agent-IR (body only)  : ${ir.bodyTokens} tokens`);
-  console.log(`Marginal reduction    : ${(ts.tokens / ir.bodyTokens).toFixed(2)}x`);
+  console.log(`Agent-IR (cold)       : ${countTokens(ir.text)} tokens, ${ir.bytes} bytes`);
+  console.log(`Agent-IR (body only)  : ${countTokens(ir.body)} tokens`);
+  console.log(`Cold message ratio    : ${(ts.tokens / countTokens(ir.text)).toFixed(2)}x`);
 }
 
 function cmdCheck(file?: string): void {
@@ -394,8 +394,8 @@ function cmdDemo(): void {
   const warm = encode(members(example.module)[2], ctx);
   const ts = measure(projectTypeScript(members(example.module)[2], example.syms, {}));
   console.log(warm.body);
-  console.log(`${ts.tokens} tokens as TypeScript → ${warm.bodyTokens} as Agent-IR ` +
-    `(${(ts.tokens / warm.bodyTokens).toFixed(2)}x)`);
+  console.log(`${ts.tokens} tokens as TypeScript → ${countTokens(warm.text)} as complete warm Agent-IR (cl100k_base) ` +
+    `(${(ts.tokens / countTokens(warm.text)).toFixed(2)}x)`);
 
   rule('4. verification');
   const env = environmentOf(example.module);

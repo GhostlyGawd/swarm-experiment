@@ -23,7 +23,7 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-F01](#v4-f01), [V4-F02](#v4-f02), [V4-F03](#v4-f03), [V4-R02](#v4-r02), [V4-R04](#v4-r04).
+**Ready now:** [V4-R02](#v4-r02), [V4-R04](#v4-r04).
 
 ## Milestones
 
@@ -38,9 +38,9 @@ The four research tasks can produce decisions early; the baseline release gate a
 
 | Task | Deliverable | Owner | Milestone | Status | Prerequisites |
 |---|---|---|---|---|---|
-| [V4-F01](#v4-f01) | Preserve state during local topology movement | runtime | baseline | planned | — |
-| [V4-F02](#v4-f02) | Replace estimated acceptance with reproducible measurements | measurement | baseline | planned | — |
-| [V4-F03](#v4-f03) | Implement versioned identities and canonical envelopes | substrate | baseline | planned | — |
+| [V4-F01](#v4-f01) | Preserve state during local topology movement | runtime | baseline | in_progress | — |
+| [V4-F02](#v4-f02) | Replace estimated acceptance with reproducible measurements | measurement | baseline | in_progress | — |
+| [V4-F03](#v4-f03) | Implement versioned identities and canonical envelopes | substrate | baseline | in_progress | — |
 | [V4-F04](#v4-f04) | Implement effect broker and replay contracts | runtime | baseline | planned | [V4-F03](#v4-f03) |
 | [V4-F05](#v4-f05) | Implement replication envelopes and delivery harness | distribution | baseline | planned | [V4-F03](#v4-f03) |
 | [V4-F06](#v4-f06) | Validate proof evidence against exact execution subjects | verification | baseline | planned | [V4-F03](#v4-f03) |
@@ -219,7 +219,7 @@ flowchart TD
 
 ### V4-F01
 
-**Preserve state during local topology movement** · implementation · baseline · owner: runtime · **planned**
+**Preserve state during local topology movement** · implementation · baseline · owner: runtime · **in_progress**
 
 Prerequisites: none.
 
@@ -236,7 +236,7 @@ Evidence: not yet produced.
 
 ### V4-F02
 
-**Replace estimated acceptance with reproducible measurements** · implementation · baseline · owner: measurement · **planned**
+**Replace estimated acceptance with reproducible measurements** · implementation · baseline · owner: measurement · **in_progress**
 
 Prerequisites: none.
 
@@ -254,7 +254,7 @@ Evidence: not yet produced.
 
 ### V4-F03
 
-**Implement versioned identities and canonical envelopes** · implementation · baseline · owner: substrate · **planned**
+**Implement versioned identities and canonical envelopes** · implementation · baseline · owner: substrate · **in_progress**
 
 Prerequisites: none.
 

@@ -114,6 +114,14 @@ export interface TopologyPlan {
   readonly recombinations: readonly string[];
   /** Constraints that prevented a merge the traffic would otherwise justify. */
   readonly blockedMerges: readonly string[];
+  /** Retained so live movement cannot discard the slicer's safety constraints. */
+  readonly constraints?: {
+    readonly cost: CostModel;
+    readonly isolate: readonly CapabilityName[];
+    readonly concurrencyGroups: readonly (readonly SymbolId[])[];
+    readonly functionMemory: readonly (readonly [SymbolId, number])[];
+    readonly edges: readonly EdgeTelemetry[];
+  };
 }
 
 /** Capability domains that cannot run at the edge. */
@@ -327,6 +335,12 @@ export function slice(
     monthlyCost,
     recombinations,
     blockedMerges,
+    constraints: {
+      cost: { ...cost }, isolate: [...isolate],
+      concurrencyGroups: (opts.concurrencyFindings ?? []).map(finding => [...finding.symbols]),
+      functionMemory: [...declarations.keys()].map(symbol => [symbol, memoryOf.get(symbol) ?? 16] as const),
+      edges: telemetry.edges.map(edge => ({ ...edge })),
+    },
   };
 }
 

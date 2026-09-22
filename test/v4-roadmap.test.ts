@@ -41,8 +41,9 @@ test('v4 first slice is ordered and closes its dependencies; waves respect every
   const positions = new Map(waves(PLAN).flatMap((wave, i) => wave.map(t => [t.id, i] as const)));
   assert.equal(positions.size, PLAN.tasks.length);
   for (const task of PLAN.tasks) for (const dep of task.deps) assert.ok(positions.get(dep)! < positions.get(task.id)!);
-  assert.ok(ready(PLAN).some(task => task.id === 'V4-F01'));
-  assert.ok(ready(PLAN).some(task => task.id === 'V4-F02'));
+  const initial = { ...PLAN, tasks: PLAN.tasks.map(task => ({ ...task, status: 'planned' as const })) };
+  assert.ok(ready(initial).some(task => task.id === 'V4-F01'));
+  assert.ok(ready(initial).some(task => task.id === 'V4-F02'));
 });
 
 test('v4 validator rejects cycles, dangling edges, unknown coverage and duplicate identities', () => {
