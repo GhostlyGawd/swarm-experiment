@@ -262,6 +262,11 @@ class VcBuilder {
       S.eq(left, S.add(S.mul(S.num(b), q), r)),
       S.lt(r, S.num(magnitude)),
       S.gt(r, S.num(-magnitude)),
+      // Truncation, not floor: the remainder takes the sign of the dividend.
+      // Without these two, `1 / 100 = 1` satisfies the axioms above and the
+      // solver invents counterexamples the runtime cannot reproduce.
+      S.or(S.lt(left, S.num(0)), S.ge(r, S.num(0))),
+      S.or(S.gt(left, S.num(0)), S.le(r, S.num(0))),
     );
     return want === 'quotient' ? q : r;
   }
@@ -280,10 +285,24 @@ class VcBuilder {
     if (contract.kind !== 'Contract') return value;
 
     // Bind the callee's parameters to the argument terms at this site.
+    //
+    // Binding the parameter *name* alone is not enough: the callee's contract
+    // speaks about `sender.balance`, and unless that whole path is mapped onto
+    // `payer.balance` the obligation is about a variable the caller has never
+    // heard of, and is trivially refutable. Record parameters therefore bind
+    // every nested field path, not just the root.
     const bindings = new Map<PlaceKey, S.SmtTerm>();
+    const bindPaths = (key: PlaceKey, ty: Ty, argExpr: Term): void => {
+      bindings.set(key, this.term(argExpr, path, old));
+      const base = underlying(ty);
+      if (base.t !== 'Record') return;
+      for (const [field, fieldTy] of base.fields) {
+        bindPaths(`${key}.${field}`, fieldTy, { kind: 'Field', object: argExpr, field });
+      }
+    };
     callee.params.forEach((p, i) => {
       const arg = expr.args[i];
-      if (arg) bindings.set(this.name(p.symbol), this.term(arg, path, old));
+      if (arg) bindPaths(this.name(p.symbol), p.ty, arg);
     });
     const callPath: Path = {
       store: new Map([...path.store, ...bindings]),

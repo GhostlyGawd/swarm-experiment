@@ -159,6 +159,12 @@ export function buildLedgerExample(seed = 'ledger-example'): LedgerExample {
       ensures: [
         b.clause(b.ge(b.result(), b.typed(CENTS, 0n)), 'non_negative_fee'),
         b.clause(b.le(b.result(), b.v(gross)), 'fee_within_gross'),
+        // Strictness matters to callers: `settle` nets the fee off the gross
+        // and then needs the remainder to be a positive transfer amount.
+        b.clause(
+          b.or(b.not(b.gt(b.v(gross), b.typed(CENTS, 0n))), b.lt(b.result(), b.v(gross))),
+          'fee_below_gross',
+        ),
       ],
     }),
     surfaces: [
@@ -208,12 +214,54 @@ export function buildLedgerExample(seed = 'ledger-example'): LedgerExample {
     ),
   });
 
+  // --- settle: the composite that gives the topology slicer call edges -----
+  const settle = syms.define('settle');
+  const payer = syms.define('payer');
+  const payee = syms.define('payee');
+  const gross2 = syms.define('grossAmount');
+  const fee = syms.define('fee');
+
+  const cachePolicy = syms.define('cachePolicy');
+  const settleDecl = b.fn({
+    symbol: settle,
+    params: [b.param(payer, ACCOUNT), b.param(payee, ACCOUNT), b.param(gross2, CENTS)],
+    returns: b.Unit,
+    capabilities: [CAP_LEDGER_APPEND],
+    purity: 'effectful',
+    provenance: transferProv,
+    surfaces: [
+      b.surface({
+        symbol: cachePolicy,
+        domain: { d: 'choice', options: ['lru', 'lfu', 'arc', 'none'] },
+        current: 'none',
+        objective: 'minimize_latency',
+      }),
+    ],
+    contract: b.contract({
+      requires: [
+        b.clause(b.ge(b.field(b.v(payer), 'balance'), b.v(gross2)), 'sufficient_funds'),
+        b.clause(b.gt(b.v(gross2), b.typed(CENTS, 0n)), 'positive_amount'),
+        b.clause(
+          b.ne(b.field(b.v(payer), 'id'), b.field(b.v(payee), 'id')),
+          'distinct_accounts',
+        ),
+      ],
+      modifies: [b.place(payer, 'balance'), b.place(payee, 'balance')],
+    }),
+    body: b.block(
+      b.let_(fee, CENTS, b.call(feeFor, b.v(gross2))),
+      b.exprStmt(b.call(transfer, b.v(payer), b.v(payee), b.sub(b.v(gross2), b.v(fee)))),
+      b.ret(b.unit()),
+    ),
+  });
+
   const members = [
     b.typeDecl(typeName('type:currency:cents'), CENTS, specProv),
     b.typeDecl(typeName('type:ledger:account'), ACCOUNT, specProv),
     transferDecl,
     feeDecl,
     accrueDecl,
+    settleDecl,
   ];
 
   const moduleTerm = b.module_({
@@ -232,6 +280,29 @@ export function buildLedgerExample(seed = 'ledger-example'): LedgerExample {
     symbols: {
       module: mod, transfer, sender, receiver, amount,
       feeFor, gross, batchSize, accrue, principal, periods, total, i,
+      settle, payer, payee, grossAmount: gross2, fee, cachePolicy,
     },
+  };
+}
+
+/**
+ * Production telemetry for the example, as the topology slicer would receive
+ * it. `settle` calls `feeFor` on every request and `transfer` on every request,
+ * so those edges are hot; `accrue` runs nightly and is barely connected.
+ */
+export function ledgerTelemetry(ex: LedgerExample) {
+  const s = ex.symbols;
+  return {
+    edges: [
+      { from: s.settle, to: s.feeFor, callsPerSecond: 4200, payloadBytes: 48 },
+      { from: s.settle, to: s.transfer, callsPerSecond: 4200, payloadBytes: 320 },
+      { from: s.accrue, to: s.feeFor, callsPerSecond: 0.02, payloadBytes: 48 },
+    ],
+    functions: [
+      { symbol: s.settle, selfMs: 0.4, memoryMb: 64 },
+      { symbol: s.transfer, selfMs: 1.8, memoryMb: 192 },
+      { symbol: s.feeFor, selfMs: 0.05, memoryMb: 24 },
+      { symbol: s.accrue, selfMs: 6.2, memoryMb: 48 },
+    ],
   };
 }

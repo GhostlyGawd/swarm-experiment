@@ -22,7 +22,7 @@ test('FR-3.2: the worked example passes its micro-world suite', () => {
     symbols: ex.syms,
     seed: 'suite',
   });
-  assert.equal(reports.length, 3);
+  assert.equal(reports.length, 4);
   for (const report of reports) {
     assert.ok(report.accepted, `${ex.syms.nameOf(report.symbol)}: ${JSON.stringify(report.failures)}`);
     assert.equal(report.compliance, 1);
