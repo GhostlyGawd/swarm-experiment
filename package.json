@@ -1,0 +1,33 @@
+{
+  "name": "aether",
+  "version": "0.1.0",
+  "description": "Project Aether \u2014 a unified, agent-native programming fabric and runtime substrate.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "bin": {
+    "aether": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./tier1": "./dist/tier1/index.js",
+    "./tier2": "./dist/tier2/index.js",
+    "./tier3": "./dist/tier3/index.js",
+    "./tier4": "./dist/tier4/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "test": "node --test --experimental-strip-types \"test/**/*.test.ts\"",
+    "bench": "node --experimental-strip-types bench/nfr.bench.ts",
+    "demo": "node --experimental-strip-types src/cli.ts demo",
+    "roadmap": "node --experimental-strip-types roadmap/render.ts",
+    "roadmap:check": "node --experimental-strip-types roadmap/render.ts --check"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "5.8.3"
+  }
+}
