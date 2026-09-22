@@ -15,7 +15,8 @@ bound in its non-functional section is measured rather than asserted.
 
 ```bash
 npm install
-npm test          # 139 tests
+npm test          # 160 tests
+npm run typecheck # src, tests, bench and roadmap
 npm run bench     # the §6 measurements
 npm run demo      # an end-to-end walkthrough of all four tiers
 ```
@@ -281,6 +282,7 @@ is the round-trip property in everyday use.
 
 ```
 docs/PRD.md          The specification
+docs/ROADMAP.md      Gap-closing roadmap, generated from and checked against roadmap/
 src/tier1/           Content addressing, merge, Agent-IR, provenance
 src/tier2/           Capabilities, type checking, SMT, verification, spec DSL
 src/tier3/           Runtime, production compiler, micro-worlds, generators
@@ -289,7 +291,8 @@ src/projection/      TypeScript projection and its parser
 src/synthesis/       The synthesis loop and a reference synthesizer
 src/examples/        The worked ledger example used throughout
 bench/nfr.bench.ts   The §6 measurements
-test/                139 tests, organized by tier
+roadmap/             The roadmap as data, plus its graph analysis and renderer
+test/                160 tests, organized by tier
 ```
 
 ## Licence

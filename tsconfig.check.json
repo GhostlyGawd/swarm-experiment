@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rewriteRelativeImportExtensions": false,
+    "rootDir": ".",
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "bench/**/*.ts",
+    "roadmap/**/*.ts"
+  ]
+}

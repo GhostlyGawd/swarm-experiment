@@ -20,8 +20,19 @@
 import type { Param, Ty } from '../tier1/ast.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import type { Rng } from '../util/rng.ts';
-import type { Runtime } from './runtime.ts';
-import type { Value } from './values.ts';
+import type { Ref, Value } from './values.ts';
+
+/**
+ * Anything a generated case can be materialised into.
+ *
+ * Deliberately the narrowest possible surface: a case needs to allocate
+ * records and nothing else. Typing this to the development `Runtime` would
+ * have excluded the production one for no reason, and the two are compared
+ * against each other on every generated case.
+ */
+export interface Allocator {
+  allocateRecord(ty: Ty, fields: Record<string, Value>): Ref;
+}
 
 /** A generated argument, independent of any runtime. */
 export type Plain =
@@ -119,7 +130,7 @@ export function generateCase(
 }
 
 /** Allocate a generated case into a runtime's heap. */
-export function materialise(args: readonly Plain[], rt: Runtime): Value[] {
+export function materialise(args: readonly Plain[], rt: Allocator): Value[] {
   const out: Value[] = [];
   for (const arg of args) {
     out.push(materialiseOne(arg, rt, out));
@@ -127,7 +138,7 @@ export function materialise(args: readonly Plain[], rt: Runtime): Value[] {
   return out;
 }
 
-function materialiseOne(arg: Plain, rt: Runtime, earlier: readonly Value[]): Value {
+function materialiseOne(arg: Plain, rt: Allocator, earlier: readonly Value[]): Value {
   switch (arg.k) {
     case 'int': return arg.v;
     case 'bool': return arg.v;

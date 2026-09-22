@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Runtime } from '../../src/tier3/runtime.ts';
+import { Runtime, type RuntimeOptions } from '../../src/tier3/runtime.ts';
 import { RevocationList } from '../../src/tier2/ocap.ts';
 import {
   ACCOUNT, CAP_LEDGER_APPEND, CENTS, buildLedgerExample,
@@ -11,7 +11,7 @@ import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import type { Value } from '../../src/tier3/values.ts';
 import type { Term } from '../../src/tier1/ast.ts';
 
-function setup(opts: Partial<Parameters<typeof Runtime.prototype.constructor>[0]> = {}) {
+function setup(opts: Partial<RuntimeOptions> = {}) {
   const ex = buildLedgerExample();
   const rt = new Runtime({ registry: ex.capabilities, symbols: ex.syms, trace: true, ...opts });
   rt.load(ex.module);

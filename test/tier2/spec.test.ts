@@ -33,8 +33,8 @@ function context(ex: ReturnType<typeof buildLedgerExample>) {
   if (table.kind === 'SymbolTable') for (const [sym, name] of table.entries) bindings.set(name, sym);
   const types = new Map([['Account', ACCOUNT], ['Cents', CENTS]]);
   const typeNames = new TypeNames();
-  typeNames.bind('Account', (ACCOUNT as { name: never }).name);
-  typeNames.bind('Cents', (CENTS as { name: never }).name);
+  if (ACCOUNT.t === 'Record') typeNames.bind('Account', ACCOUNT.name);
+  if (CENTS.t === 'Nominal') typeNames.bind('Cents', CENTS.name);
   return { symbols: ex.syms, bindings, types, typeNames };
 }
 
