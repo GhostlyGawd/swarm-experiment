@@ -1,0 +1,20 @@
+{
+  "task": "V4-T2-10",
+  "specVersion": "0.1.0",
+  "subjectCommit": "e10d6cd9c9668d8714383b731c8f30f16d6e5f77",
+  "recordedAt": "2026-09-22T22:37:11.283469+00:00",
+  "checks": [
+    {
+      "gate": "V4-T2-10/G1",
+      "result": "pass",
+      "method": "Clean source:429 tests, typecheck, build/pack, both roadmaps, installed-package proof production/checking/execution and frozen982-formula differential campaign. Independent consumers omit original solver/verifier/producer files. See REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/proof-e10d6cd/REVIEW.md"
+    },
+    {
+      "gate": "V4-T2-10/G2",
+      "result": "pass",
+      "method": "Clean source:429 tests, typecheck, build/pack, both roadmaps, installed-package proof production/checking/execution and frozen982-formula differential campaign. Independent consumers omit original solver/verifier/producer files. See REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/proof-e10d6cd/REVIEW.md"
+    }
+  ]
+}

@@ -24,13 +24,13 @@ cvc5 can emit LFSC proofs, but its documentation explicitly identifies outputs c
 
 T2-10 must next add structural rules, checked substitutions, propositional case coverage, induction/termination obligations, frame/separation rules, and independent AST-to-obligation derivation. Existing F06 regressions demonstrate that nested record aliasing can invalidate the old verifier's conclusions; wrapping those conclusions in a certificate would preserve the bug. Until a semantic fragment is independently covered, its portable result remains unsupported. A complete bundle must enumerate every required obligation, not merely every certificate the producer happened to supply.
 
-## Exact private statement
-
-### Portable implementation follow-up
+## Portable implementation follow-up
 
 The T2-10 implementation is now in `src/tier2/portable-obligations.ts`, the separate `portable-linear-kernel.ts` / `portable-formula-checker.ts`, and `portable-proof-checker.ts`. Proof producers are separate modules. Consumers independently reconstruct the exact AST/dependency/specification obligation set; they do not wrap the original verifier's reports. The declared initial fragment is pure unbounded Int/Bool code, formal contracts, acyclic calls, complete branch paths, assertions and inductive while/ranking rules. Multiplication requires a syntactically closed constant factor, and unsupported or malformed dead syntax also refuses admission.
 
 Independent review covers exact integer/propositional transformations and a frozen 1,000-formula differential corpus. Isolated consumer tests run with original solver, verifier and producer files absent. Closed-artifact compiler admission retains runtime checks and enforces scalar entry/result types. This implementation does not extend the calculus to heap/effect proofs, native lowering or the later proof-latency qualification. Verification status and exact source evidence remain in the tracker.
+
+## Exact private statement
 
 For public statement `S` and private witness `W`, the intended relation is:
 

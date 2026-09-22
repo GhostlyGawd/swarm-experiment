@@ -21,8 +21,9 @@ Branch: `aether/v4-implementation`. Planning checkpoint: `9f23a7b`. First implem
 - **R03 result:** actual bounded Groth16 proof rejects 14 altered/false claims; fresh verification samples 6.699/5.457/5.946 ms all miss 5 ms. Production setup and full-module attestation remain open.
 - **R04 result:** actual adapter train/save/reload and held-out gradient fixtures pass. Fresh boundary throughput 0.448–0.466M/sec misses 2M/sec. No full synthesis/efficiency claim.
 - **V4-T1-01 verified:** versioned durable AST storage, root compare-and-swap, leases, pending-promotion pins, bounded archives and coordinated collection. [Evidence](evidence/ast-3dfabca/REVIEW.md) binds clean commit `3dfabca`, 395 passing tests and initialization recovery at eight actual termination points.
-- **V4-T2-10 active:** independent AST obligation derivation and a separate exact-integer/propositional proof checker are being implemented. Unsupported theories remain unproved; no portable admission claim yet.
+- **V4-T2-10 verified:** independent scalar Hoare derivation, exact integer/propositional certificates and closed-artifact compiler admission. [Evidence](evidence/proof-e10d6cd/REVIEW.md) binds clean commit `e10d6cd`, 429 tests, isolated consumers without solver/producer files and the retained 98,200-valuation review. Unsupported theories and proof-latency qualification remain open.
 - **V4-T1-03 active:** signed causal intent, shared-node lineage, exact invariant fences and spec/policy invalidation are being integrated with strict production admission.
+- **V4-T3-01 active:** an explicit resumable runtime is being built with serialized nonempty frames, closure/task captures, heap identity and durable event/checkpoint state. A discovered reference-runtime Atomic return rollback bug was fixed and covered by a shared reference/production regression.
 - **V4-T1-06 active:** durable occurrence-tree replication and candidate materialization are being implemented with fractional indexing, deterministic moves and signed epoch/checkpoint stabilization.
 - **Native profile follow-up:** campaign 01 retained a 2.535 ms miss; campaign 02 refused to run after its source pin changed. Campaign 03 explicitly initialized an empty VM/vCPU before READY, then ran 1,000 fresh guests: max 167.375 µs, guest resident memory 65,536 bytes. This bounded scalar prototype passes the selected scope; full runtime/driver qualification remains open. A [clean source repeat](evidence/native-5bb4f1c/REVIEW.md) at `5bb4f1c` also passed all 1,000 guests: max 159.542 µs and 65,536 bytes, with every raw sample retained.
 
@@ -49,8 +50,8 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 
 ## Next executable actions
 
-1. Complete portable AST proof derivation, independent certificate checking, compiler admission and adversarial review.
-2. Checkpoint the fresh-guest campaign sources and preserve all outcomes, including source-pin refusal and earlier failure.
-3. Continue eligible v2 tasks, including portable certificates, resumable checkpoints and capability containment, while preserving all later scope.
+1. Complete strict lineage admission integration and independent review; verify current-policy/spec behavior, recovery and shared causes.
+2. Complete durable Tree-CRDT candidate projection and signed checkpoint stabilization, preserving all historical root/epoch protections.
+3. Implement and verify resumable execution with real frame/task checkpoints and broker-backed effects; continue remaining eligible v2 tasks.
 
-Goal-turn classification: progress — the baseline and durable AST persistence are verified. Portable certificates and native campaign evidence are progressing; full v4 remains open. No global blocker has been established.
+Goal-turn classification: progress — the baseline, durable AST persistence and portable scalar certificates are verified. Strict lineage, Tree-CRDT and resumable execution are progressing; full v4 remains open. No global blocker has been established.

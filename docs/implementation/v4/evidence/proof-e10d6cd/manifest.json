@@ -1,0 +1,117 @@
+{
+  "format": "aether.portable-proof-verification/1",
+  "subjectCommit": "e10d6cd9c9668d8714383b731c8f30f16d6e5f77",
+  "specVersion": "0.1.0",
+  "recordedAt": "2026-09-22T22:37:11.283469+00:00",
+  "workingTreeDirty": false,
+  "checks": [
+    {
+      "command": "npm test (includes build)",
+      "exitCode": 0,
+      "artifact": "tests.log"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "artifact": "typecheck.log"
+    },
+    {
+      "command": "npm run roadmap:check",
+      "exitCode": 0,
+      "artifact": "roadmap.log"
+    },
+    {
+      "command": "npm run roadmap:v4:check",
+      "exitCode": 0,
+      "artifact": "roadmap-v4.log"
+    },
+    {
+      "command": "portable-formula-review.ts <evidence>/differential-review.json",
+      "exitCode": 0,
+      "artifact": "differential-review.log"
+    },
+    {
+      "command": "npm pack --json (includes build)",
+      "exitCode": 0,
+      "artifact": "package.json"
+    },
+    {
+      "command": "npm install <local package> --ignore-scripts",
+      "exitCode": 0,
+      "artifact": "package-install.log"
+    },
+    {
+      "command": "node package-smoke.mjs",
+      "exitCode": 0,
+      "artifact": "package-smoke.log"
+    }
+  ],
+  "scope": "Declared pure scalar certificate calculus and actual admission. No proof-latency, native-lowering or full-v4 qualification.",
+  "artifacts": [
+    {
+      "path": "V4-T2-10.json",
+      "sha256": "af574ede6a97ca03c60235c8ed1b2ae5abde07321616b9c61a1be282062b567e",
+      "bytes": 994
+    },
+    {
+      "path": "differential-review.json",
+      "sha256": "fc7c4f1788b3f6f567f1ebbd93a374abfe628ba46f76e14bb6eb78dcc174bac2",
+      "bytes": 106668
+    },
+    {
+      "path": "differential-review.log",
+      "sha256": "33176d4e852e3437a9f0c53c0f9bfc6385b1c01082da4dbd550a184827fbfa0f",
+      "bytes": 275
+    },
+    {
+      "path": "ghostlygawd-aether-0.1.0.tgz",
+      "sha256": "944ef25c5e8da687981afae58be3de282f69518c09726561bdbcc8edd6283fd6",
+      "bytes": 456105
+    },
+    {
+      "path": "package-build.log",
+      "sha256": "4825b511365fc48ef7963dcb5e5ccacbb7e496423fd598eee7b62facda8c1a92",
+      "bytes": 113
+    },
+    {
+      "path": "package-install.log",
+      "sha256": "968992131d40cc8aa02a9719d91cbeae39f6e5e2619aada78aef5bc155533405",
+      "bytes": 27
+    },
+    {
+      "path": "package-smoke.log",
+      "sha256": "9ba2a37453ec587091165aecdd4cf16fdec56012d0f1ac07cf2ee4bf68327e51",
+      "bytes": 138
+    },
+    {
+      "path": "package-smoke.mjs",
+      "sha256": "61a26f71651984c575b29b55708ef51387bf377df4b7f41189c24ade1f96e2b0",
+      "bytes": 2204
+    },
+    {
+      "path": "package.json",
+      "sha256": "2ac27b22368b342212e9707fd4f7d6b43953b05b75f8c9c2e50f773a3c068579",
+      "bytes": 25581
+    },
+    {
+      "path": "roadmap-v4.log",
+      "sha256": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+      "bytes": 182
+    },
+    {
+      "path": "roadmap.log",
+      "sha256": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+      "bytes": 135
+    },
+    {
+      "path": "tests.log",
+      "sha256": "9b15cd71d9084f409fab123a5fbf3d9d1160cbe207814e58861c3c4cca104a3d",
+      "bytes": 40284
+    },
+    {
+      "path": "typecheck.log",
+      "sha256": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a",
+      "bytes": 69
+    }
+  ]
+}

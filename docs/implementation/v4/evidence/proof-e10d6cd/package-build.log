@@ -1,0 +1,8 @@
+
+> @ghostlygawd/aether@0.1.0 prepack
+> npm run build
+
+
+> @ghostlygawd/aether@0.1.0 build
+> tsc -p tsconfig.json
+

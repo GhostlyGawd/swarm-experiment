@@ -6,7 +6,7 @@ Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) f
 
 > This is implementation status. Publishing the specification does not complete runtime work. A verified task needs evidence for every gate; functional delivery does not imply that the release NFR/KPI gates passed.
 
-**14/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
+**15/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
 
 ## First implementation slice
 
@@ -23,14 +23,14 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-T1-02](#v4-t1-02), [V4-T1-04](#v4-t1-04), [V4-T2-04](#v4-t2-04), [V4-T3-01](#v4-t3-01).
+**Ready now:** [V4-T1-02](#v4-t1-02), [V4-T1-04](#v4-t1-04), [V4-T2-04](#v4-t2-04).
 
 ## Milestones
 
 | Milestone | Verified | Total | Release gate |
 |---|---:|---:|---|
 | baseline | 13 | 13 | [V4-M0](#v4-m0) |
-| v2 | 1 | 20 | [V4-M2](#v4-m2) |
+| v2 | 2 | 20 | [V4-M2](#v4-m2) |
 | v3 | 0 | 14 | [V4-M3](#v4-m3) |
 | v4 | 0 | 15 | [V4-M4](#v4-m4) |
 
@@ -70,10 +70,10 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-T2-07](#v4-t2-07) | State lens synthesis | persistence | v2 | planned | [V4-F07](#v4-f07), [V4-T2-01](#v4-t2-01), [V4-T2-10](#v4-t2-10) |
 | [V4-T2-08](#v4-t2-08) | Minimal distinguishing examples | synthesis | v2 | planned | [V4-T2-01](#v4-t2-01), [V4-T1-09](#v4-t1-09) |
 | [V4-T2-09](#v4-t2-09) | Zero-knowledge module attestation | verification | v4 | planned | [V4-R03](#v4-r03), [V4-T2-10](#v4-t2-10), [V4-T1-08](#v4-t1-08) |
-| [V4-T2-10](#v4-t2-10) | Portable AST proof certificates | verification | v2 | in_progress | [V4-R03](#v4-r03), [V4-F06](#v4-f06) |
+| [V4-T2-10](#v4-t2-10) | Portable AST proof certificates | verification | v2 | verified | [V4-R03](#v4-r03), [V4-F06](#v4-f06) |
 | [V4-T2-11](#v4-t2-11) | Metamorphic relation synthesis | verification | v3 | planned | [V4-T2-03](#v4-t2-03), [V4-T3-03](#v4-t3-03) |
 | [V4-T2-12](#v4-t2-12) | Multimodal intent anchors | language | v3 | planned | [V4-T2-08](#v4-t2-08), [V4-T3-08](#v4-t3-08) |
-| [V4-T3-01](#v4-t3-01) | Reversible execution and resumable checkpoints | runtime | v2 | planned | [V4-F07](#v4-f07) |
+| [V4-T3-01](#v4-t3-01) | Reversible execution and resumable checkpoints | runtime | v2 | in_progress | [V4-F07](#v4-f07) |
 | [V4-T3-02](#v4-t3-02) | MCTS over copy-on-write heaps | synthesis | v3 | planned | [V4-T3-01](#v4-t3-01), [V4-T2-05](#v4-t2-05), [V4-T3-03](#v4-t3-03), [V4-F08](#v4-f08) |
 | [V4-T3-03](#v4-t3-03) | Living micro-world campaigns | verification | v2 | planned | [V4-F04](#v4-f04), [V4-T3-01](#v4-t3-01), [V4-R04](#v4-r04) |
 | [V4-T3-04](#v4-t3-04) | Historical counterfactual replay | runtime | v2 | planned | [V4-T3-01](#v4-t3-01), [V4-T3-03](#v4-t3-03) |
@@ -713,7 +713,7 @@ Evidence: not yet produced.
 
 ### V4-T2-10
 
-**Portable AST proof certificates** · implementation · v2 · owner: verification · **in_progress**
+**Portable AST proof certificates** · implementation · v2 · owner: verification · **verified**
 
 Prerequisites: [V4-R03](#v4-r03), [V4-F06](#v4-f06).
 
@@ -724,7 +724,7 @@ Acceptance gates:
 - **V4-T2-10/G1** — A consumer without the original solver validates a certificate against exact AST/contract/dependency identities.
 - **V4-T2-10/G2** — Malformed, oversized, stale and semantically false certificates fail; unsupported theories remain unproved.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/proof-e10d6cd/V4-T2-10.json).
 
 ### V4-T2-11
 
@@ -758,7 +758,7 @@ Evidence: not yet produced.
 
 ### V4-T3-01
 
-**Reversible execution and resumable checkpoints** · implementation · v2 · owner: runtime · **planned**
+**Reversible execution and resumable checkpoints** · implementation · v2 · owner: runtime · **in_progress**
 
 Prerequisites: [V4-F07](#v4-f07).
 

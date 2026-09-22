@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { build as b, SymbolSpace, GraphStore } from '@ghostlygawd/aether/tier1';
+import { domainDigest } from '@ghostlygawd/aether/fabric';
+import { checkPortableCertificate, encodePortableCertificate, decodePortableCertificate } from '@ghostlygawd/aether/proof';
+import { generatePortableCertificate } from '@ghostlygawd/aether/proof/producer';
+import { ProductionRuntime, CapabilityRegistry } from '@ghostlygawd/aether';
+const symbols=new SymbolSpace('installed-proof'),entry=symbols.define('increment'),x=symbols.define('x');
+const module=b.module_({symbol:symbols.define('module'),members:[b.fn({symbol:entry,params:[b.param(x,b.Int)],returns:b.Int,contract:b.contract({requires:[b.clause(b.ge(b.v(x),b.int(0)),'nonnegative')],ensures:[b.clause(b.eq(b.result(),b.add(b.old(b.v(x)),b.int(1))),'increment')]}),body:b.ret(b.add(b.v(x),b.int(1)))})],symbolTable:symbols.table()});
+const specification='Pure increment of nonnegative integers.',digest=name=>domainDigest('aether.package-proof/1',name);
+const manifest={format:'aether.execution/1',astRoot:new GraphStore().intern(module),specRoot:domainDigest('aether.specification/1',specification),dependencies:[],semanticsVersion:'aether-reference/1',compilerDigest:digest('compiler'),target:{abiVersion:'scalar/1',profileDigest:digest('profile'),artifactDigest:digest('artifact')},capabilityPolicyDigest:digest('pure'),evidencePolicyDigest:digest('proof')};
+const context={manifest,expectedManifest:manifest,specification};
+const certificate=generatePortableCertificate(module,context);assert.ok(certificate);
+const bytes=encodePortableCertificate(certificate),vetted=checkPortableCertificate(module,decodePortableCertificate(bytes),context);
+const runtime=ProductionRuntime.compile(module,{registry:new CapabilityRegistry(),portableEvidence:{vetted,expectedManifest:manifest}});
+const result=runtime.call(entry,[41n]);assert.equal(result.ok,true);assert.equal(result.value,42n);
+assert.equal(runtime.call(entry,[-1n]).ok,false);
+console.log(JSON.stringify({packageProofProducer:true,packageIndependentChecker:true,compiledResult:String(result.value),preconditionPreserved:true,certificateBytes:bytes.length}));
