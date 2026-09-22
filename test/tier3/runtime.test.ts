@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Runtime, type RuntimeOptions } from '../../src/tier3/runtime.ts';
+import { ProductionRuntime } from '../../src/tier3/compile.ts';
 import { RevocationList } from '../../src/tier2/ocap.ts';
 import {
   ACCOUNT, CAP_LEDGER_APPEND, CENTS, buildLedgerExample,
@@ -21,6 +22,25 @@ function setup(opts: Partial<RuntimeOptions> = {}) {
 }
 
 const sym = (ex: ReturnType<typeof buildLedgerExample>, name: string) => ex.symbols[name];
+
+test('normal return commits atomic heap updates in both runtimes while faults restore them', () => {
+  const symbols = new SymbolSpace('atomic-return'), account = symbols.define('account'), success = symbols.define('success'), failure = symbols.define('failure');
+  const balance = b.field(b.v(account), 'balance');
+  const fn = (symbol: typeof success, fails: boolean) => b.fn({ symbol, params: [b.param(account, ACCOUNT)], returns: CENTS, purity: 'effectful',
+    contract: b.contract({ modifies: [b.place(account, 'balance')], ensures: [b.clause(b.eq(b.result(), b.add(b.old(balance), b.int(1))), 'committed return')] }),
+    body: b.atomic(b.block(b.assign(b.place(account, 'balance'), b.add(balance, b.int(1))), ...(fails ? [b.assert_(b.bool(false), 'abort')] : []), b.ret(balance))),
+  });
+  const module = b.module_({ symbol: symbols.define('module'), members: [fn(success, false), fn(failure, true)], symbolTable: symbols.table() });
+  const registry = new CapabilityRegistry(), reference = new Runtime({ registry }); reference.load(module);
+  const production = ProductionRuntime.compile(module, { registry, policy: 'enforce' });
+  for (const runtime of [reference, production]) {
+    const record = runtime.allocateRecord(ACCOUNT, { id: 'atomic', balance: 10n });
+    const returned = runtime.call(success, [record]); assert.equal(returned.ok, true); if (returned.ok) assert.equal(returned.value, 11n);
+    assert.equal(runtime.readRecord(record).get('balance'), 11n);
+    const failed = runtime.call(failure, [record]); assert.equal(failed.ok, false); if (!failed.ok) assert.equal(failed.fault.kind, 'assertion');
+    assert.equal(runtime.readRecord(record).get('balance'), 11n);
+  }
+});
 
 test('the worked example executes and satisfies its contract', () => {
   const { ex, rt, acct } = setup();

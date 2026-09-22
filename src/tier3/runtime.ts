@@ -512,7 +512,7 @@ export class Runtime {
         try {
           this.exec(stmt.body, frame);
         } catch (error) {
-          this.restore(checkpoint);
+          if (!(error instanceof ReturnSignal)) this.restore(checkpoint);
           throw error;
         }
         return;
