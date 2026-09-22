@@ -66,7 +66,9 @@
     "bench": "node --experimental-strip-types bench/nfr.bench.ts",
     "demo": "node --experimental-strip-types src/cli.ts demo",
     "roadmap": "node --experimental-strip-types roadmap/render.ts",
-    "roadmap:check": "node --experimental-strip-types roadmap/render.ts --check"
+    "roadmap:check": "node --experimental-strip-types roadmap/render.ts --check",
+    "roadmap:v4": "node --experimental-strip-types roadmap/v4/render.ts",
+    "roadmap:v4:check": "node --experimental-strip-types roadmap/v4/render.ts --check"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

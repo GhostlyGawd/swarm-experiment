@@ -13,6 +13,13 @@ diagram.
 reference implementation: every requirement it states is implemented, and every
 bound in its non-functional section is measured rather than asserted.
 
+The v4 extension is planned in the versioned
+**[implementation specification](docs/implementation/v4/SPEC.md)** and
+**[dependency tracker](docs/implementation/v4/TRACKER.md)**. The
+[readiness review](docs/V4-READINESS-REVIEW.md) records the current baseline's
+limits, including state preservation during movement and estimator-based token
+claims. Run `npm run roadmap:v4:check` to validate the v4 plan and its evidence.
+
 ```bash
 npm install
 npm test          # 160 tests
