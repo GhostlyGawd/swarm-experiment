@@ -115,7 +115,7 @@ export interface RuntimeOptions {
   readonly symbols?: SymbolSpace;
   readonly revocations?: RevocationList;
   /** Implementations of the capabilities in scope. */
-  readonly effects?: ReadonlyMap<CapabilityName, (args: readonly Value[]) => Value>;
+  readonly effects?: ReadonlyMap<CapabilityName, (args: readonly Value[], from?: SymbolId) => Value>;
   readonly effectRouter?: RuntimeEffectRouter;
   /**
    * Bound on a single top-level call, not on the runtime's lifetime. A
@@ -351,7 +351,7 @@ export class Runtime {
   allocateRecord(ty: Ty, fields: Record<string, Value>): Ref {
     const base = underlying(ty);
     if (base.t !== 'Record') throw new TypeError(`${ty.t} is not a record type`);
-    return this.allocate(base.fields.map(([name]) => [name, fields[name] ?? null] as const));
+    return this.allocate(base.fields.map(([name]) => [name, Object.hasOwn(fields, name) ? fields[name] ?? null : null] as const));
   }
 
   readRecord(ref: Ref): ReadonlyMap<string, Value> {
@@ -893,7 +893,7 @@ export class Runtime {
     const handler = this.opts.effects?.get(expr.capability);
     if (!handler && !this.opts.effectRouter) return null;
     try {
-      return this.opts.effectRouter ? this.opts.effectRouter.invoke(expr.capability, args) : handler!(args);
+      return this.opts.effectRouter ? this.opts.effectRouter.invoke(expr.capability, args) : handler!(args, frame.decl.symbol);
     } catch (e) {
       if (e instanceof AetherFault) throw e;
       if (e instanceof EffectInvocationError && e.outcome.state === 'indeterminate') {

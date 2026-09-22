@@ -63,6 +63,37 @@ Compilation verifies the unforgeable local evidence brand, manifest and report s
 
 The wrapper rejects demonstrated model gaps: nested mutable aliasing, unenforced ownership assumptions, hidden mutations in unsupported constructs, truncated exploration and incomplete obligations. Modeled flat-record ledger transitions and formally handled loops are exercised by tests. Unsupported cases require stronger verification/model support, not removal of the admission guard. A portable certificate checker is still a separate implementation task.
 
+## Process state and recovery
+
+`ProcessHost` from the root package or `@ghostlygawd/aether/tier4` runs topology units in actual Node child processes. Its public arguments, results and snapshots use C1 tagged values and logical references. Open it with the exact module/manifest, capability registry, topology plan, private durable directory and trusted service configuration. `issueTokens(symbol)` supplies scoped call grants; `call(symbol, args, { operationId, tokens })` requires them on direct and cross-unit entry.
+
+Use a stable, unique operation ID for each logical call or allocation. Retries with identical payloads retrieve the recorded outcome; changing the payload under an existing ID is rejected. `allocateRecord` checks field types and returns a reference scoped to the heap and ownership epoch. A local numeric address is never a public cross-process reference. Stored references must use the current epoch after movement; do not reuse a stale reference as write authority.
+
+`move(symbol, targetUnit, { migrationId, expectedGeneration })` records a transition, prepares new workers and publishes one canonical state generation. Startup recovers the durable migration decision. Migration does not transfer arbitrary suspended JavaScript frames. Calls, allocations and moves serialize within one complete snapshot domain, including nested calls across units. This baseline is local multiprocess execution; cross-machine replication and independently concurrent record ownership remain later work.
+
+An interrupted call can return `indeterminate`. Keep its original ID and journal. `recoverOperation` requires a fresh trusted recovery authorization callback and either:
+
+- `abort-before-effects`: establish from durable history that no effect boundary was entered, then record the abort.
+- `isolated-replay`: reproduce the operation using its recorded/reconciled outcomes, without live effect dispatch, and validate the resulting state before publication.
+
+Provide a broker-backed `effectRouterFactory` whose execution identity is the stable boundary ID supplied by ProcessHost. Reconcile unresolved external effects through their original adapter before replay. Neither timeout nor process death establishes noncommit. Recovery never accepts an arbitrary caller-supplied success snapshot.
+
+The process channel authenticates bounded frames to a worker session, roles, sequence and execution scope. The parent bootstrap secret is supplied through a dedicated inherited descriptor. Parent death terminates workers, including running loops. Keep journal directories and trusted services private; these local process controls do not constitute the full v4 hostile-code containment boundary.
+
+## Exact-root process deployment
+
+`PromotionCoordinator` is exported by `@ghostlygawd/aether/fabric`. `ProcessDeployment` and its artifact/migration/effect-plan helpers are exported by the root package and tier4. The deployment object is both the execution gate and the coordinator's actual process driver.
+
+Initialize a trusted genesis artifact, coordinator and reloadable factory map. Factories provide the current sealer, revocation state, effect router and recovery authority; functions and secrets are not serialized into artifacts. Register candidate artifacts with their complete module, evidence context, evidence and topology. Registration recomputes evidence and binds the durable artifact to its full configuration.
+
+Create the migration plan from the current snapshot and candidate artifact digest, and the effect plan from its factory and policy identity. Approvals must sign the exact proposal, expected production parent, candidate manifest, evidence and plans under the current governor/membership/policy context. Combined edits require evidence for their resulting root. The baseline authorization adapter uses authenticated local governors; the heterogeneous Byzantine quorum is a separate task.
+
+Execute application calls through `ProcessDeployment` so its shared durable gate covers promotion. Preparation freezes execution across deployment instances, seeds candidate workers from the bound source snapshot and preserves invocation/allocation receipts across versions. This implementation permits compatible schemas only; schema-changing state lenses and full evolutionary shadow execution remain later tasks.
+
+If activation fails after the coordinator commits, serving stays blocked. Reopen with the same directories and trusted factories, then use coordinator recovery with the deployment driver. Recovery follows the durable commit/abort decision. It does not serve the old root after a committed target transition. A rollback is a newly authorized promotion from the current parent to an earlier artifact, carrying current state and a new generation.
+
+Retain the coordinator, deployment, prepared-artifact, ProcessHost and effect journals together. Do not manually remove pending receipts or rewrite generations to clear a failure. Keep process startup paths available in the built package; `npm run build` emits the worker entry alongside the public API.
+
 ## Verification and benchmarks
 
 ```sh

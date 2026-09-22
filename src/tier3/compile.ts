@@ -135,8 +135,10 @@ export interface CompileOptions {
   readonly registry: CapabilityRegistry;
   readonly symbols?: SymbolSpace;
   readonly revocations?: RevocationList;
-  readonly effects?: ReadonlyMap<CapabilityName, (args: readonly Value[]) => Value>;
+  readonly effects?: ReadonlyMap<CapabilityName, (args: readonly Value[], from?: SymbolId) => Value>;
   readonly effectRouter?: RuntimeEffectRouter;
+  /** Host liveness/fuel guard; false stops execution at entry or loop backedges. */
+  readonly executionGuard?: () => boolean;
   /** Verification results, keyed by function symbol. Required for elision. */
   readonly verification?: ReadonlyMap<SymbolId, VerificationReport>;
   /** v4 admission: expectedManifest must come from the host's current build/policy context. */
@@ -183,6 +185,7 @@ export class ProductionRuntime {
   private readonly heap: HeapRecord[] = [{}]; // index 0 is never a valid address
   private moduleRef!: NodeRef;
   private activeCalls = 0;
+  private boundaryDepth = 0;
   private continuations: WeakRef<object>[] = [];
   private readonly compiled = new Map<SymbolId, CompiledFunction>();
   private readonly opts: CompileOptions;
@@ -259,8 +262,8 @@ export class ProductionRuntime {
   allocateRecord(ty: Ty, fields: Record<string, Value>): Ref {
     const base = underlying(ty);
     if (base.t !== 'Record') throw new TypeError(`${ty.t} is not a record type`);
-    const record: HeapRecord = {};
-    for (const [name] of base.fields) record[name] = fields[name] ?? null;
+    const record: HeapRecord = Object.create(null);
+    for (const [name] of base.fields) record[name] = Object.hasOwn(fields, name) ? fields[name] ?? null : null;
     this.heap.push(record);
     return { addr: this.heap.length - 1 };
   }
@@ -286,7 +289,7 @@ export class ProductionRuntime {
   private continueLocally(execute: () => Value): Value {
     const guarded = () => {
       this.activeCalls++;
-      try { return execute(); } finally { this.activeCalls--; }
+      try { this.checkExecutionGuard(); return execute(); } finally { this.activeCalls--; }
     };
     return this.opts.continuationHandler ? this.opts.continuationHandler(this, guarded) : guarded();
   }
@@ -295,6 +298,20 @@ export class ProductionRuntime {
     if (this.activeCalls) throw new Error('cannot import during active execution');
     const heap = restoreHeap(snapshot, this.moduleRef); // validate before any mutation
     this.replaceHeap(heap);
+  }
+
+  /** Heap-only transfer at a suspended host callback; this never migrates frames. */
+  exportBoundarySnapshot(): ProductionSnapshot {
+    if (!this.boundaryDepth) throw new Error('state transfer requires a suspended host boundary');
+    return snapshotHeap(this.heap, this.moduleRef);
+  }
+  importBoundarySnapshot(snapshot: ProductionSnapshot): void {
+    if (!this.boundaryDepth) throw new Error('state transfer requires a suspended host boundary');
+    this.replaceHeap(restoreHeap(snapshot, this.moduleRef));
+  }
+  private atBoundary<T>(execute: () => T): T {
+    this.boundaryDepth++;
+    try { return execute(); } finally { this.boundaryDepth--; }
   }
 
   /** Synchronous in-process handoff; opaque values never cross a process boundary. */
@@ -375,6 +392,7 @@ export class ProductionRuntime {
   }
 
   private enter(fn: CompiledFunction, args: readonly Value[]): Value {
+    this.checkExecutionGuard();
     const slots = new Array<Value>(fn.slots).fill(null);
     for (let i = 0; i < fn.params.length; i++) slots[i] = args[i] ?? null;
     const frame: Frame = { s: slots, o: [], r: null };
@@ -398,6 +416,10 @@ export class ProductionRuntime {
       }
     }
     return returned;
+  }
+
+  private checkExecutionGuard(): void {
+    if (this.opts.executionGuard && !this.opts.executionGuard()) throw new ProductionFault('step_budget', 'host execution guard stopped the computation');
   }
 
   // --- compilation ---------------------------------------------------------
@@ -687,7 +709,7 @@ export class ProductionRuntime {
         const ty = term.ty;
         const fields = term.fields.map(([n, v]) => [n, this.expr(v, ctx)] as const);
         return (f) => {
-          const values: Record<string, Value> = {};
+          const values: Record<string, Value> = Object.create(null);
           for (const [n, fn] of fields) values[n] = fn(f);
           return this.allocateRecord(ty, values);
         };
@@ -859,6 +881,7 @@ export class ProductionRuntime {
             throw new ProductionFault('type_error', 'forall bounds must be integers');
           }
           for (let value = lower; value < upper; value++) {
+            this.checkExecutionGuard();
             frame.s[slot] = value;
             if (body(frame) !== true) return false;
           }
@@ -904,7 +927,7 @@ export class ProductionRuntime {
           target ??= this.compiled.get(callee);
           const values = args.map((a) => a(f));
           if (target) return this.enter(target, values);
-          const remote = this.opts.callHandler?.(callee, values, ctx.functionSymbol);
+          const remote = this.opts.callHandler ? this.atBoundary(() => this.opts.callHandler!(callee, values, ctx.functionSymbol)) : undefined;
           if (!remote) throw new ProductionFault('unbound', `${this.name(callee)} is not compiled`);
           if (!remote.ok) throw new ProductionFault(remote.fault.kind, remote.fault.message, remote.fault.label, remote.fault.recoveryId);
           return remote.value;
@@ -937,7 +960,7 @@ export class ProductionRuntime {
           const values = args.map((a) => a(f));
           if (!handler && !this.opts.effectRouter) return null;
           try {
-            return this.opts.effectRouter ? this.opts.effectRouter.invoke(capability, values) : handler!(values);
+            return this.atBoundary(() => this.opts.effectRouter ? this.opts.effectRouter.invoke(capability, values) : handler!(values, ctx.functionSymbol));
           } catch (e) {
             if (e instanceof ProductionFault) throw e;
             if (e instanceof EffectInvocationError && e.outcome.state === 'indeterminate') {
@@ -973,7 +996,7 @@ export class ProductionRuntime {
     return (args) => {
       target ??= this.compiled.get(symbol);
       if (target) return this.enter(target, args);
-      const remote = this.opts.callHandler?.(symbol, args, ctx.functionSymbol);
+      const remote = this.opts.callHandler ? this.atBoundary(() => this.opts.callHandler!(symbol, args, ctx.functionSymbol)) : undefined;
       if (!remote) throw new ProductionFault('unbound', `${this.name(symbol)} is not compiled`);
       if (!remote.ok) throw new ProductionFault(remote.fault.kind, remote.fault.message, remote.fault.label, remote.fault.recoveryId);
       return remote.value;
@@ -1052,6 +1075,7 @@ export class ProductionRuntime {
         const body = this.stmt(term.body, ctx);
         return (f) => {
           while (asBool(cond(f))) {
+            this.checkExecutionGuard();
             const out = body(f);
             if (out !== FALLTHROUGH) return out;
           }
@@ -1196,7 +1220,7 @@ function readField(heap: readonly HeapRecord[], owner: Value, field: string): Va
     throw new ProductionFault('type_error', `cannot read .${field} of a non-record`);
   }
   const record = heap[owner.addr];
-  if (!record || !(field in record)) {
+  if (!record || !Object.hasOwn(record, field)) {
     throw new ProductionFault('type_error', `no field ${field} at @${owner.addr}`);
   }
   return record[field];

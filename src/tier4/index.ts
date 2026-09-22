@@ -13,3 +13,6 @@ export {
   type DistributedFault, type DistributedFaultKind, type DistributedResult,
   type TopologyHostOptions, type WireRequest,
 } from './host.ts';
+export { ProcessChannel, ProcessChannelError, type ProcessChannelInit, type ProcessChannelOptions, type ProcessCallRequest, type ProcessCallResult, type ProcessEffectRequest } from './process-channel.ts';
+export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessEffectContext, type ProcessHostPhase } from './process-host.ts';
+export { ProcessDeployment, processArtifactDigest, processArtifactContext, processMigrationPlan, processEffectPlan, type ProcessArtifactInput, type ProcessArtifactV1, type ProcessDeploymentOptions, type ProcessHostServices } from './process-deployment.ts';

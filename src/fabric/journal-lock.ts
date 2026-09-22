@@ -67,7 +67,7 @@ export class JournalLock {
     this.publishLockRecord(this.ticketName(ticket.sequence, true), { format: `${this.domain}-release/1`, sequence: ticket.sequence, token: ticket.token });
     if (!this.released(ticket)) throw new Error('lock ticket release failed');
   }
-  run<T>(run: () => T, waitMs = 0): T {
+  private reserve(): LockTicket {
     let ticket: LockTicket;
     for (;;) {
       const tickets = this.tickets();
@@ -75,6 +75,10 @@ export class JournalLock {
       ticket = { format: `${this.domain}-ticket/1`, sequence: tickets.length + 1, token: randomUUID(), pid: process.pid };
       if (this.publishLockRecord(this.ticketName(ticket.sequence), ticket, () => this.fault?.('before-ticket-publish'))) break;
     }
+    return ticket;
+  }
+  run<T>(run: () => T, waitMs = 0): T {
+    const ticket = this.reserve();
     try {
       this.fault?.('after-ticket-publish');
       const deadline = Date.now() + waitMs;
@@ -84,6 +88,23 @@ export class JournalLock {
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
       }
       return run();
+    } finally {
+      this.fault?.('before-ticket-release'); this.release(ticket); this.fault?.('after-ticket-release');
+    }
+  }
+  /** Keep the ownership ticket through awaited IPC; never block the event loop while queued. */
+  async runAsync<T>(run: () => Promise<T>, waitMs = 5_000): Promise<T> {
+    if (!Number.isSafeInteger(waitMs) || waitMs < 0) throw new RangeError('invalid journal lock wait');
+    const ticket = this.reserve();
+    try {
+      this.fault?.('after-ticket-publish');
+      const deadline = Date.now() + waitMs;
+      while (this.tickets().some(previous => previous.sequence < ticket.sequence && !this.released(previous))) {
+        if (Date.now() >= deadline) throw new Error(this.busyError);
+        this.recoverDeadWriter(false);
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+      return await run();
     } finally {
       this.fault?.('before-ticket-release'); this.release(ticket); this.fault?.('after-ticket-release');
     }

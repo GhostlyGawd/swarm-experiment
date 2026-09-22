@@ -6,6 +6,7 @@ import { typeName } from '../../src/tier1/ids.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { CapabilityRegistry, RevocationList } from '../../src/tier2/ocap.ts';
 import { ProductionRuntime } from '../../src/tier3/compile.ts';
+import { Runtime } from '../../src/tier3/runtime.ts';
 import type { ProductionSnapshot } from '../../src/tier3/heap-state.ts';
 import type { Ref, Value } from '../../src/tier3/values.ts';
 import { ACCOUNT, buildLedgerExample, CAP_LEDGER_APPEND, ledgerTelemetry } from '../../src/examples/ledger.ts';
@@ -246,4 +247,28 @@ test('V4-F01/G2: host movement retains nested cyclic and aliased state used by o
   assert.deepEqual(host.readRecord(first).get('links'), [first, second, second]);
   assert.deepEqual(host.readRecord(second).get('links'), [first]);
   assert.equal(host.allocateRecord(ACCOUNT, { id: 'later', balance: 0n }).addr, 5);
+});
+
+test('F07 state transfer treats JavaScript prototype names as ordinary record fields', () => {
+  const syms = new SymbolSpace('reserved-record-fields');
+  const maker = syms.define('maker'), reader = syms.define('reader'), object = syms.define('object');
+  const record: Ty = { t: 'Record', name: typeName('type:test:reserved'), fields: [['__proto__', b.Int], ['constructor', b.Int]] };
+  const members = [
+    b.fn({ symbol: maker, returns: record, body: b.block(b.ret(b.record(record, Object.fromEntries([['__proto__', b.int(7)], ['constructor', b.int(8)]])))) }),
+    b.fn({ symbol: reader, params: [b.param(object, record)], returns: b.Int,
+      body: b.block(b.ret(b.add(b.field(b.v(object), '__proto__'), b.field(b.v(object), 'constructor')))) }),
+  ];
+  const module = b.module_({ symbol: syms.define('module'), members, symbolTable: syms.table() });
+  const registry = new CapabilityRegistry();
+  for (const runtime of [new Runtime({ registry }).load(module), ProductionRuntime.compile(module, { registry })]) {
+    const made = runtime.call(maker, []);
+    assert.ok(made.ok);
+    const result = runtime.call(reader, [made.value]);
+    assert.equal(result.ok && result.value, 15n);
+  }
+  const host = new TopologyHost(module, slice(module, { functions: [], edges: [] }, { shape: 'containers' }), { registry });
+  const made = host.call(maker, []); assert.ok(made.ok);
+  host.move(maker, host.unitFor(reader)!);
+  assert.equal(host.readRecord(made.value as Ref).get('__proto__'), 7n);
+  assert.equal(host.call(reader, [made.value]).ok, true);
 });

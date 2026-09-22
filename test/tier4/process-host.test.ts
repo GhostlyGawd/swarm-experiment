@@ -1,0 +1,474 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, openSync, fsyncSync, closeSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawn, spawnSync } from 'node:child_process';
+import { buildLedgerExample, ACCOUNT, CAP_LEDGER_APPEND } from '../../src/examples/ledger.ts';
+import { CapabilitySealer, CapabilityRegistry, RevocationList } from '../../src/tier2/ocap.ts';
+import { createEvidenceManifest } from '../../src/fabric/evidence.ts';
+import { domainDigest } from '../../src/fabric/identity.ts';
+import { DurableEffectBroker, type EffectAdapter } from '../../src/fabric/effects.ts';
+import type { TaggedValueV1, LogicalRefV1 } from '../../src/fabric/encoding.ts';
+import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
+import { ProcessHost, PROCESS_INVOKE, type ProcessHostOptions, type ProcessEffectContext } from '../../src/tier4/process-host.ts';
+import type { TopologyPlan } from '../../src/tier4/topology.ts';
+import type { Term, Ty } from '../../src/tier1/ast.ts';
+import type { CapabilityName } from '../../src/tier1/ids.ts';
+import { typeName } from '../../src/tier1/ids.ts';
+import { SymbolSpace } from '../../src/tier1/symbols.ts';
+import * as b from '../../src/tier1/build.ts';
+
+const integer = (value: bigint | number): TaggedValueV1 => ({ tag: 'int', value: String(value) });
+const text = (value: string): TaggedValueV1 => ({ tag: 'string', value });
+const reference = (value: LogicalRefV1): TaggedValueV1 => ({ tag: 'ref', value });
+const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+function manifest(module: Term, registry: CapabilityRegistry) {
+  const digest = (value: string) => domainDigest('aether.process-host-test/1', value);
+  return createEvidenceManifest({ module, registry, specification: 'Durable process-host test behavior.', semanticsVersion: 'reference/1', compilerDigest: digest('compiler'), capabilityPolicyDigest: digest('policy'), target: { abiVersion: 'process/1', profileDigest: digest('profile'), artifactDigest: digest('artifact') } });
+}
+function factory(directory: string, manifestValue: ReturnType<typeof manifest>, capability: CapabilityName, sink: EffectAdapter) {
+  return (context: ProcessEffectContext) => {
+    const effectDirectory = join(directory, 'effects', domainDigest('aether.effect-directory/1', context.operationId).split(':').at(-1)!);
+    const live = new DurableEffectBroker({ directory: effectDirectory, clockDomain: 'test-clock/1', clock: () => 100n, authorize: () => true });
+    const broker = context.mode === 'live' ? live : new DurableEffectBroker({ directory: effectDirectory, mode: 'replay', clockDomain: 'test-clock/1', clock: () => 100n, authorize: () => false, replayEvents: live.events() });
+    return new BrokerEffectRouter({ broker, manifest: manifestValue, executionId: context.operationId, policyEpoch: '1', deadline: '1000', adapters: new Map([[capability, sink]]), grant: () => 'grant:process-test' });
+  };
+}
+function fixture() {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-process-host-'));
+  const ex = buildLedgerExample('process-host-ledger');
+  const plan: TopologyPlan = { shape: 'containers', units: [
+    { id: 'a', members: [ex.symbols.transfer], capabilities: [CAP_LEDGER_APPEND], placement: 'container', memoryMb: 16 },
+    { id: 'b', members: [ex.symbols.feeFor, ex.symbols.settle, ex.symbols.accrue], capabilities: [CAP_LEDGER_APPEND], placement: 'container', memoryMb: 48 },
+  ], crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+  const manifestValue = manifest(ex.module, ex.capabilities), revocations = new RevocationList();
+  let calls = 0;
+  const sink: EffectAdapter = { id: 'ledger-sink/1', semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true }, execute: () => { calls++; return { tag: 'null' }; }, reconcile: () => ({ state: 'unknown' }) };
+  const options: ProcessHostOptions = { directory, module: ex.module, manifest: manifestValue, plan, registry: ex.capabilities, sealer: new CapabilitySealer(new Uint8Array(32).fill(7), () => 100), revocations, effectRouterFactory: factory(directory, manifestValue, CAP_LEDGER_APPEND, sink), authorizeRecovery: () => true };
+  return { directory, ex, options, revocations, calls: () => calls, cleanup: () => rmSync(directory, { recursive: true, force: true }) };
+}
+function balances(snapshot: Awaited<ReturnType<ProcessHost['snapshot']>>): string[] {
+  return snapshot.records.map(record => {
+    const value = record.fields.find(([name]) => name === 'balance')?.[1];
+    return value?.tag === 'int' ? value.value : '?';
+  });
+}
+
+test('F07 coordinator: actual ledger workers preserve state, exact receipts, allocator and migration epochs', async () => {
+  const f = fixture(); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open(f.options);
+    const pids = Object.values(host.workerPids); assert.equal(new Set(pids).size, 2); assert.ok(pids.every(pid => pid !== process.pid));
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice', unit: 'a' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob', unit: 'b' });
+    const args = [reference(alice), reference(bob), integer(10)];
+    const result = await host.call(f.ex.symbols.transfer, args, { operationId: 'transfer-1', tokens: host.issueTokens(f.ex.symbols.transfer) });
+    assert.equal(result.state, 'completed'); if (result.state === 'completed') assert.equal(result.execution.ok, true);
+    assert.deepEqual(balances(await host.snapshot()), ['90', '10']); assert.equal(f.calls(), 1);
+    assert.deepEqual(await host.call(f.ex.symbols.transfer, args, { operationId: 'transfer-1', tokens: host.issueTokens(f.ex.symbols.transfer) }), result); assert.equal(f.calls(), 1);
+    const oldTokens = host.issueTokens(f.ex.symbols.transfer);
+    const moved = await host.move(f.ex.symbols.transfer, 'b', { migrationId: 'move-1', expectedGeneration: '1' });
+    assert.equal(moved.units.length, 1); assert.equal(host.generation, '2'); assert.equal(Object.keys(host.workerPids).length, 1);
+    const snapshot = await host.snapshot(); assert.deepEqual(balances(snapshot), ['90', '10']);
+    assert.ok(snapshot.ownership.every(owner => owner.unit === 'b' && owner.epoch === '2'));
+    await assert.rejects(host.call(f.ex.symbols.transfer, args, { operationId: 'stale-token', tokens: oldTokens }), /authority/);
+    await assert.rejects(host.call(f.ex.symbols.transfer, args, { operationId: 'stale-reference', tokens: host.issueTokens(f.ex.symbols.transfer) }), /stale/);
+    const nextArgs = [reference({ ...alice, ownerEpoch: '2' }), reference({ ...bob, ownerEpoch: '2' }), integer(5)];
+    assert.equal((await host.call(f.ex.symbols.transfer, nextArgs, { operationId: 'transfer-2', tokens: host.issueTokens(f.ex.symbols.transfer) })).state, 'completed');
+    assert.deepEqual(balances(await host.snapshot()), ['85', '15']);
+    const third = await host.allocateRecord(ACCOUNT, { id: text('third'), balance: integer(1) }, { operationId: 'third' }); assert.equal(third.objectId, '3');
+    const beforeClose = await host.snapshot(); await host.close();
+    host = await ProcessHost.open(f.options); assert.deepEqual(await host.snapshot(), beforeClose);
+    assert.ok(Object.values(host.workerPids).every(pid => !pids.includes(pid)));
+    assert.equal((await host.call(f.ex.symbols.transfer, nextArgs, { operationId: 'transfer-2', tokens: host.issueTokens(f.ex.symbols.transfer) })).state, 'completed'); assert.equal(f.calls(), 2);
+    await assert.rejects(host.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'pure-unsealed', tokens: [] }), /invoke/);
+    f.revocations.revoke(PROCESS_INVOKE, { by: 'test' });
+    await assert.rejects(host.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'pure-revoked', tokens: host.issueTokens(f.ex.symbols.feeFor) }), /revoked/);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('F07 coordinator: nested A→B→A passes current heap at every call/effect and preserves aliases', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-process-nested-'));
+  let host: ProcessHost | undefined;
+  try {
+    const syms = new SymbolSpace('process-host-nested'), main = syms.define('main'), remote = syms.define('remote'), read = syms.define('read'), account = syms.define('account'), saved = syms.define('saved');
+    const registry = new CapabilityRegistry(), tick = registry.declare('cap:test:tick', { arity: 1, description: 'Counter observation.' }).name;
+    const box: Ty = { t: 'Record', name: typeName('type:test:box'), fields: [['count', b.Int]] }, value = b.field(b.v(account), 'count');
+    const module = b.module_({ symbol: syms.define('module'), symbolTable: syms.table(), members: [
+      b.fn({ symbol: main, params: [b.param(account, box)], returns: b.Int, capabilities: [tick], body: b.block(b.assign(b.place(account, 'count'), b.add(value, b.int(1))), b.ret(b.call(remote, b.v(account)))) }),
+      b.fn({ symbol: remote, params: [b.param(account, box)], returns: b.Int, capabilities: [tick], body: b.block(b.let_(saved, b.Int, b.call(read, b.v(account))), b.exprStmt(b.invoke(tick, b.v(saved))), b.assign(b.place(account, 'count'), b.add(value, b.int(10))), b.ret(value)) }),
+      b.fn({ symbol: read, params: [b.param(account, box)], returns: b.Int, body: b.block(b.ret(value)) }),
+    ] });
+    const plan: TopologyPlan = { shape: 'containers', units: [{ id: 'a', members: [main, read], capabilities: [tick], placement: 'container', memoryMb: 1 }, { id: 'b', members: [remote], capabilities: [tick], placement: 'container', memoryMb: 1 }], crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+    const manifestValue = manifest(module, registry), observed: string[] = [];
+    const sink: EffectAdapter = { id: 'tick-sink/1', semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true }, execute: request => { if (request.payload.tag === 'sequence') observed.push((request.payload.items[1] as { value: string }).value); return { tag: 'null' }; }, reconcile: () => ({ state: 'unknown' }) };
+    host = await ProcessHost.open({ directory, module, manifest: manifestValue, plan, registry, sealer: new CapabilitySealer(), effectRouterFactory: factory(directory, manifestValue, tick, sink) });
+    const ref = await host.allocateRecord(box, { count: integer(0) }, { operationId: 'box', unit: 'a' });
+    const aliasType: Ty = { t: 'Record', name: typeName('type:test:aliases'), fields: [['left', box], ['right', box]] };
+    await host.allocateRecord(aliasType, { left: reference(ref), right: reference(ref) }, { operationId: 'aliases', unit: 'b' });
+    const first = await host.call(main, [reference(ref)], { operationId: 'main-1', tokens: host.issueTokens(main) });
+    assert.equal(first.state, 'completed'); if (first.state === 'completed') assert.deepEqual(plain(first.execution), { ok: true, value: integer(11), steps: 0 });
+    assert.deepEqual(observed, ['1']);
+    const snapshot = await host.snapshot(); assert.deepEqual(plain(snapshot.records[1].fields.map(([, value]) => value)), plain([reference(ref), reference(ref)]));
+    const second = await host.call(main, [reference(ref)], { operationId: 'main-2', tokens: host.issueTokens(main) });
+    if (second.state === 'completed') assert.deepEqual(plain(second.execution), { ok: true, value: integer(22), steps: 0 }); else assert.fail(second.reason);
+    assert.deepEqual(observed, ['1', '12']);
+  } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('F07 coordinator: migration failures obey the durable commit decision and retain both snapshots', async () => {
+  for (const phase of ['migration-prepared', 'migration-committed'] as const) {
+    const f = fixture(); let host: ProcessHost | undefined;
+    try {
+      host = await ProcessHost.open({ ...f.options, onPhase: current => { if (current === phase) throw new Error(`injected ${phase}`); } });
+      await host.allocateRecord(ACCOUNT, { id: text('balance'), balance: integer(90) }, { operationId: 'account', unit: 'a' });
+      await assert.rejects(host.move(f.ex.symbols.transfer, 'b', { migrationId: 'move-fault' }), /injected/);
+      assert.equal(host.generation, phase === 'migration-prepared' ? '1' : '2');
+      await host.close(); host = await ProcessHost.open(f.options);
+      const snapshot = await host.snapshot(); assert.deepEqual(balances(snapshot), ['90']);
+      assert.equal(snapshot.ownership[0].epoch, phase === 'migration-prepared' ? '1' : '2');
+      const journal = JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8'));
+      assert.ok(journal.snapshots.length >= 3);
+      assert.equal(journal.migrations[0].state, phase === 'migration-prepared' ? 'aborted' : 'finalized');
+    } finally { await host?.close(); f.cleanup(); }
+  }
+});
+
+test('F07 coordinator: uncertain calls block migration and only privileged no-effect abort can clear them', async () => {
+  const f = fixture(); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open({ ...f.options, onPhase: phase => { if (phase === 'call-intent') throw new Error('interrupted before execution'); } });
+    const result = await host.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'interrupted', tokens: host.issueTokens(f.ex.symbols.feeFor) });
+    assert.equal(result.state, 'indeterminate');
+    await assert.rejects(host.move(f.ex.symbols.transfer, 'b', { migrationId: 'blocked' }), /indeterminate/);
+    const retry = await host.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'interrupted', tokens: host.issueTokens(f.ex.symbols.feeFor) }); assert.equal(retry.state, 'indeterminate');
+    await host.close();
+    host = await ProcessHost.open({ ...f.options, authorizeRecovery: () => false });
+    await assert.rejects(host.recoverOperation('interrupted', { strategy: 'abort-before-effects' }), /authorization/);
+    await host.close(); host = await ProcessHost.open(f.options);
+    assert.equal((await host.recoverOperation('interrupted', { strategy: 'abort-before-effects' })).state, 'aborted');
+    assert.deepEqual(host.status().unresolved, []);
+    assert.equal(f.calls(), 0);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+function coordinatorCommand(f: ReturnType<typeof fixture>, mode: 'call' | 'move', phase: string): string[] {
+  const script = `
+    import { ProcessHost } from ${JSON.stringify(new URL('../../src/tier4/process-host.ts', import.meta.url).href)};
+    import { buildLedgerExample, CAP_LEDGER_APPEND } from ${JSON.stringify(new URL('../../src/examples/ledger.ts', import.meta.url).href)};
+    import { CapabilitySealer } from ${JSON.stringify(new URL('../../src/tier2/ocap.ts', import.meta.url).href)};
+    import { DurableEffectBroker } from ${JSON.stringify(new URL('../../src/fabric/effects.ts', import.meta.url).href)};
+    import { BrokerEffectRouter } from ${JSON.stringify(new URL('../../src/tier3/effects.ts', import.meta.url).href)};
+    import { domainDigest } from ${JSON.stringify(new URL('../../src/fabric/identity.ts', import.meta.url).href)};
+    import { openSync, writeFileSync, fsyncSync, closeSync } from 'node:fs';
+    import { join } from 'node:path';
+    const [directory, serializedManifest, serializedPlan, mode, phase]=process.argv.slice(1);
+    const ex=buildLedgerExample('process-host-ledger'), manifest=JSON.parse(serializedManifest), plan=JSON.parse(serializedPlan);
+    const sink={id:'durable-ledger-sink/1',semantics:{readOnly:false,atomicIdempotency:false,transactional:false,reconciliation:true},
+      execute(request) {const fd=openSync(join(directory,'sink-commits'),'a');writeFileSync(fd,request.executionId+'\\n');fsyncSync(fd);closeSync(fd);return {tag:'null'};},
+      reconcile:()=>({state:'unknown'})};
+    const host=await ProcessHost.open({directory,module:ex.module,manifest,plan,registry:ex.capabilities,sealer:new CapabilitySealer(new Uint8Array(32).fill(7),()=>100),
+      onPhase:point=>{if(point===phase) process.kill(process.pid,'SIGKILL');},
+      effectRouterFactory:context=>{
+        const effectDirectory=join(directory,'effects',domainDigest('aether.effect-directory/1',context.operationId).split(':').at(-1));
+        const broker=new DurableEffectBroker({directory:effectDirectory,clockDomain:'test-clock/1',clock:()=>100n,authorize:()=>true,
+          beforePersist:event=>{if(phase==='sink-before-receipt'&&event.state==='committed')process.kill(process.pid,'SIGKILL');}});
+        return new BrokerEffectRouter({broker,manifest,executionId:context.operationId,policyEpoch:'1',deadline:'1000',adapters:new Map([[CAP_LEDGER_APPEND,sink]]),grant:()=> 'grant:process-test'});
+      }});
+    if(mode==='move') await host.move(ex.symbols.transfer,'b',{migrationId:'killed-move'});
+    else {
+      const snapshot=await host.snapshot();
+      const ref=id=>({tag:'ref',value:{heapId:snapshot.heapId,objectId:id,ownerEpoch:host.generation}});
+      await host.call(ex.symbols.transfer,[ref('1'),ref('2'),{tag:'int',value:'10'}],{operationId:'crash-transfer',tokens:host.issueTokens(ex.symbols.transfer)});
+    }
+    await host.close();
+  `;
+  return ['--experimental-strip-types', '--input-type=module', '-e', script, f.directory, JSON.stringify(f.options.manifest), JSON.stringify(f.options.plan), mode, phase];
+}
+function crashingCoordinator(f: ReturnType<typeof fixture>, mode: 'call' | 'move', phase: string) {
+  return spawnSync(process.execPath, coordinatorCommand(f, mode, phase), { encoding: 'utf8', timeout: 15000 });
+}
+
+test('F07 coordinator: actual parent death at every migration boundary preserves the decision on same-ID retry', async () => {
+  for (const phase of ['migration-requested', 'migration-prepared', 'migration-before-commit', 'migration-committed', 'migration-finalized'] as const) {
+    const f = fixture(); let host: ProcessHost | undefined;
+    try {
+      host = await ProcessHost.open(f.options);
+      await host.allocateRecord(ACCOUNT, { id: text('retained'), balance: integer(90) }, { operationId: 'seed', unit: 'a' });
+      await host.close(); host = undefined;
+      const child = crashingCoordinator(f, 'move', phase); assert.equal(child.signal, 'SIGKILL', child.stderr);
+      host = await ProcessHost.open(f.options);
+      const committed = phase === 'migration-committed' || phase === 'migration-finalized';
+      assert.equal(host.generation, committed ? '2' : '1', phase);
+      const recovered = await host.snapshot(), pids = host.workerPids;
+      assert.deepEqual(balances(recovered), ['90'], phase);
+      assert.equal(recovered.ownership[0].epoch, committed ? '2' : '1', phase);
+      assert.equal(recovered.ownership[0].unit, committed ? 'b' : 'a', phase);
+      assert.equal(host.status().migrations[0].state, committed ? 'finalized' : 'aborted', phase);
+      const beforeRetry = JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8'));
+      if (committed) {
+        const retried = await host.move(f.ex.symbols.transfer, 'b', { migrationId: 'killed-move' });
+        assert.deepEqual(retried, host.plan, phase);
+      } else {
+        await assert.rejects(host.move(f.ex.symbols.transfer, 'b', { migrationId: 'killed-move' }), /migration aborted/, phase);
+      }
+      assert.equal(host.generation, committed ? '2' : '1', `${phase}: retry changed generation`);
+      assert.deepEqual(await host.snapshot(), recovered, `${phase}: retry changed logical state`);
+      assert.deepEqual(host.workerPids, pids, `${phase}: retry replaced workers`);
+      const afterRetry = JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8'));
+      assert.equal(afterRetry.migrations.length, 1, `${phase}: retry duplicated migration`);
+      assert.deepEqual(afterRetry.heads, beforeRetry.heads, `${phase}: retry duplicated state publication`);
+      assert.deepEqual(afterRetry.snapshots, beforeRetry.snapshots, `${phase}: retry changed retained snapshots`);
+    } finally { await host?.close(); f.cleanup(); }
+  }
+});
+
+test('F07 coordinator: actual parent death after sink commit requires real receipt reconciliation and isolated replay', async () => {
+  for (const phase of ['sink-before-receipt', 'effect-recorded'] as const) {
+    const f = fixture(); let host: ProcessHost | undefined;
+    try {
+      host = await ProcessHost.open(f.options);
+      const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice', unit: 'a' });
+      const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob', unit: 'b' });
+      await host.close(); host = undefined;
+      const child = crashingCoordinator(f, 'call', phase); assert.equal(child.signal, 'SIGKILL', child.stderr);
+      assert.equal(readFileSync(join(f.directory, 'sink-commits'), 'utf8').trim().split('\n').length, 1);
+      let liveCalls = 0;
+      const sink: EffectAdapter = { id: 'durable-ledger-sink/1', semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true }, execute: () => { liveCalls++; throw new Error('recovery must not redispatch'); }, reconcile: request => {
+        const recorded = readFileSync(join(f.directory, 'sink-commits'), 'utf8').trim().split('\n');
+        return recorded.includes(request.executionId) ? { state: 'committed', value: { tag: 'null' } } : { state: 'unknown' };
+      } };
+      const recoveryOptions = { ...f.options, effectRouterFactory: factory(f.directory, f.options.manifest, CAP_LEDGER_APPEND, sink) };
+      host = await ProcessHost.open(recoveryOptions);
+      assert.deepEqual(host.status().unresolved, ['crash-transfer']);
+      assert.deepEqual(balances(await host.snapshot()), ['100', '0']);
+      await assert.rejects(host.recoverOperation('crash-transfer', { strategy: 'abort-before-effects' }), /cannot abort/);
+      const args = [reference(alice), reference(bob), integer(10)];
+      assert.equal((await host.call(f.ex.symbols.transfer, args, { operationId: 'crash-transfer', tokens: host.issueTokens(f.ex.symbols.transfer) })).state, 'indeterminate');
+      if (phase === 'sink-before-receipt') {
+        assert.equal((await host.recoverOperation('crash-transfer')).state, 'indeterminate');
+        const effectId = JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8')).calls[0].effects[0].id as string;
+        const directory = join(f.directory, 'effects', domainDigest('aether.effect-directory/1', effectId).split(':').at(-1)!);
+        const broker = new DurableEffectBroker({ directory, clockDomain: 'test-clock/1', clock: () => 100n, authorize: () => true });
+        broker.recoverDeadWriter();
+        assert.equal(broker.reconcile(broker.events()[0].request, sink).state, 'committed');
+      }
+      const recovered = await host.recoverOperation('crash-transfer');
+      assert.equal(recovered.state, 'completed'); if (recovered.state === 'completed') assert.equal(recovered.execution.ok, true);
+      assert.deepEqual(balances(await host.snapshot()), ['90', '10']);
+      assert.equal(liveCalls, 0);
+      assert.equal(readFileSync(join(f.directory, 'sink-commits'), 'utf8').trim().split('\n').length, 1);
+      const journal = JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8')); assert.equal(journal.calls[0].recovery.strategy, 'isolated-replay');
+    } finally { await host?.close(); f.cleanup(); }
+  }
+});
+
+test('F07 coordinator: concurrent host instances serialize a shared canonical heap', async () => {
+  const f = fixture(); let first: ProcessHost | undefined, second: ProcessHost | undefined;
+  try {
+    first = await ProcessHost.open(f.options); second = await ProcessHost.open(f.options);
+    const alice = await first.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await first.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const args = [reference(alice), reference(bob), integer(10)];
+    const results = await Promise.all([first.call(f.ex.symbols.transfer, args, { operationId: 'one', tokens: first.issueTokens(f.ex.symbols.transfer) }), second.call(f.ex.symbols.transfer, args, { operationId: 'two', tokens: second.issueTokens(f.ex.symbols.transfer) })]);
+    assert.ok(results.every(result => result.state === 'completed' && result.execution.ok));
+    assert.deepEqual(balances(await first.snapshot()), ['80', '20']); assert.equal(f.calls(), 2);
+    assert.equal(new Set([...Object.values(first.workerPids), ...Object.values(second.workerPids)]).size, 4);
+  } finally { await first?.close(); await second?.close(); f.cleanup(); }
+});
+
+test('F07 coordinator: seeded cyclic/shared logical references survive a real-worker migration from generation zero', async () => {
+  const f = fixture(); let original: ProcessHost | undefined, host: ProcessHost | undefined;
+  const directory = join(f.directory, 'seeded-deployment');
+  try {
+    original = await ProcessHost.open(f.options);
+    const first = await original.allocateRecord(ACCOUNT, { id: text('cycle'), balance: integer(100) }, { operationId: 'cycle', unit: 'a' });
+    const second = await original.allocateRecord(ACCOUNT, { id: text('other'), balance: integer(0) }, { operationId: 'other', unit: 'b' });
+    const seed = plain(await original.snapshot()); await original.close(); original = undefined;
+    const refs = [first, second].map(ref => ({ ...ref, ownerEpoch: '0' }));
+    const snapshot = { ...seed, ownership: seed.ownership.map(owner => ({ ...owner, epoch: '0' })), records: seed.records.map((record, index) => ({ ...record, fields: [...record.fields, ['links', { tag: 'sequence' as const, items: [reference(refs[index]), { tag: 'result' as const, variant: 'ok' as const, value: reference(refs[0]) }] }]] as Array<readonly [string, TaggedValueV1]> })) };
+    const options = { ...f.options, directory, initialGeneration: '0', initialSnapshot: snapshot };
+    host = await ProcessHost.open(options);
+    assert.equal(host.generation, '0');
+    const result = await host.call(f.ex.symbols.transfer, refs.map(reference).concat(integer(10)), { operationId: 'seeded-transfer', tokens: host.issueTokens(f.ex.symbols.transfer) });
+    assert.equal(result.state, 'completed');
+    await host.move(f.ex.symbols.transfer, 'b', { migrationId: 'seeded-move' });
+    const moved = await host.snapshot(); assert.deepEqual(balances(moved), ['90', '10']);
+    const links = moved.records[0].fields.find(([name]) => name === 'links')![1];
+    assert.deepEqual(plain(links), { tag: 'sequence', items: [reference({ ...first, ownerEpoch: '1' }), { tag: 'result', variant: 'ok', value: reference({ ...first, ownerEpoch: '1' }) }] });
+    assert.ok(moved.ownership.every(owner => owner.unit === 'b' && owner.epoch === '1'));
+    const pids = host.workerPids;
+    await host.move(f.ex.symbols.transfer, 'b', { migrationId: 'same-unit' });
+    assert.deepEqual(host.workerPids, pids); assert.equal(host.generation, '1');
+    await assert.rejects(host.move(f.ex.symbols.accrue, 'b', { migrationId: 'same-unit' }), /identity_conflict/);
+    await host.close(); host = await ProcessHost.open(options); assert.deepEqual(plain(await host.snapshot()), plain(moved));
+    await host.close(); host = undefined;
+    await assert.rejects(ProcessHost.open({ ...options, initialSnapshot: { ...snapshot, eventCursor: '1' } }), /configuration mismatch/);
+  } finally { await original?.close(); await host?.close(); f.cleanup(); }
+});
+
+test('F07 coordinator: effect dispatch rechecks invocation expiry and journal corruption cannot invent outcomes', async () => {
+  const f = fixture(); let host: ProcessHost | undefined;
+  try {
+    let time = 100;
+    host = await ProcessHost.open({ ...f.options, sealer: new CapabilitySealer(new Uint8Array(32).fill(7), () => time), onPhase: phase => { if (phase === 'effect-requested') time = 100000; } });
+    const first = await host.allocateRecord(ACCOUNT, { id: text('first'), balance: integer(100) }, { operationId: 'first' });
+    const second = await host.allocateRecord(ACCOUNT, { id: text('second'), balance: integer(0) }, { operationId: 'second' });
+    const result = await host.call(f.ex.symbols.transfer, [reference(first), reference(second), integer(10)], { operationId: 'expiry', tokens: host.issueTokens(f.ex.symbols.transfer) });
+    assert.equal(result.state, 'indeterminate'); assert.equal(f.calls(), 0);
+    const file = join(f.directory, 'host.json'), original = readFileSync(file, 'utf8');
+    const journal = JSON.parse(original); journal.calls[0].effects[0].state = 'committed'; journal.calls[0].effects[0].value = { tag: 'null' };
+    writeFileSync(file, JSON.stringify(journal));
+    await assert.rejects(host.snapshot(), /effect intent\/outcome/);
+    writeFileSync(file, original);
+    await host.close(); host = undefined;
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('F07 coordinator: two actual parent processes retry one operation without a duplicate sink commit', async () => {
+  const f = fixture(); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open(f.options);
+    await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    await host.close(); host = undefined;
+    const parents = new Set<number>();
+    const run = () => new Promise<void>((resolve, reject) => {
+      const child = spawn(process.execPath, coordinatorCommand(f, 'call', 'never'));
+      if (child.pid) parents.add(child.pid);
+      let error = ''; child.stderr.on('data', chunk => { error += String(chunk); }); child.stdout.resume();
+      const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('coordinator retry timed out')); }, 15000);
+      child.on('error', failure => { clearTimeout(timer); reject(failure); });
+      child.on('close', code => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error(error)); });
+    });
+    await Promise.all([run(), run()]); assert.equal(parents.size, 2);
+    host = await ProcessHost.open(f.options);
+    assert.deepEqual(balances(await host.snapshot()), ['90', '10']);
+    assert.equal(readFileSync(join(f.directory, 'sink-commits'), 'utf8').trim().split('\n').length, 1);
+    const journal = JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8'));
+    assert.equal(journal.calls.length, 1); assert.equal(journal.calls[0].state, 'completed');
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('F07 coordinator: an actual worker timeout remains indeterminate until privileged safe abort', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-host-timeout-'));
+  let host: ProcessHost | undefined;
+  try {
+    const syms = new SymbolSpace('host-timeout'), spin = syms.define('spin'), registry = new CapabilityRegistry();
+    const module = b.module_({ symbol: syms.define('module'), symbolTable: syms.table(), members: [b.fn({ symbol: spin, returns: b.Int, body: b.block(b.while_(b.bool(true), b.block()), b.ret(b.int(0))) })] });
+    const plan: TopologyPlan = { shape: 'containers', units: [{ id: 'spin', members: [spin], capabilities: [], placement: 'container', memoryMb: 1 }], crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+    host = await ProcessHost.open({ directory, module, manifest: manifest(module, registry), plan, registry, sealer: new CapabilitySealer(), timeoutMs: 1000, authorizeRecovery: () => true });
+    const pid = Object.values(host.workerPids)[0];
+    const result = await host.call(spin, [], { operationId: 'spin', tokens: host.issueTokens(spin) });
+    assert.equal(result.state, 'indeterminate');
+    assert.throws(() => process.kill(pid, 0), error => (error as NodeJS.ErrnoException).code === 'ESRCH');
+    assert.equal((await host.call(spin, [], { operationId: 'spin', tokens: host.issueTokens(spin) })).state, 'indeterminate');
+    assert.deepEqual(host.workerPids, {});
+    assert.equal((await host.recoverOperation('spin', { strategy: 'abort-before-effects' })).state, 'aborted');
+    assert.deepEqual(host.status().unresolved, []);
+  } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('F07 coordinator: mutable caller objects cannot change queued intent or authorized recovery strategy', async () => {
+  const f = fixture(); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open(f.options);
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const args = [reference(alice), reference(bob), integer(10)];
+    const pending = host.call(f.ex.symbols.transfer, args, { operationId: 'immutable-intent', tokens: host.issueTokens(f.ex.symbols.transfer) });
+    args[2] = integer(50);
+    assert.equal((await pending).state, 'completed'); assert.deepEqual(balances(await host.snapshot()), ['90', '10']);
+    await host.close();
+    host = await ProcessHost.open({ ...f.options, onPhase: phase => { if (phase === 'call-intent') throw new Error('hold pure operation'); }, authorizeRecovery: (_id, strategy) => strategy === 'isolated-replay' });
+    assert.equal((await host.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'recover-immutable', tokens: host.issueTokens(f.ex.symbols.feeFor) })).state, 'indeterminate');
+    const strategy: { strategy: 'isolated-replay' | 'abort-before-effects' } = { strategy: 'isolated-replay' };
+    const recovery = host.recoverOperation('recover-immutable', strategy); strategy.strategy = 'abort-before-effects';
+    assert.equal((await recovery).state, 'completed');
+    const journal = JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8'));
+    assert.equal(journal.calls.find((call: { operationId: string }) => call.operationId === 'recover-immutable').recovery.strategy, 'isolated-replay');
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('F07 coordinator: caller operation IDs cannot collide with another call boundary path', async () => {
+  const f = fixture(); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open(f.options);
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const args = [reference(alice), reference(bob), integer(10)];
+    const nested = await host.call(f.ex.symbols.settle, args, { operationId: 'x', tokens: host.issueTokens(f.ex.symbols.settle) });
+    const direct = await host.call(f.ex.symbols.transfer, args, { operationId: 'x/call-0', tokens: host.issueTokens(f.ex.symbols.transfer) });
+    assert.equal(nested.state, 'completed'); assert.equal(direct.state, 'completed');
+    assert.equal(f.calls(), 2); assert.deepEqual(balances(await host.snapshot()), ['80', '20']);
+    const journal = JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8'));
+    assert.notEqual(journal.calls[0].effects[0].id, journal.calls[1].effects[0].id);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('F07 coordinator: revoked recovery authorization cannot publish a safe abort or replay result', async () => {
+  const f = fixture(); let host: ProcessHost | undefined;
+  try {
+    let allowed = true, revokeAtCommit = false;
+    host = await ProcessHost.open({ ...f.options, authorizeRecovery: () => allowed, onPhase: phase => {
+      if (phase === 'call-intent') throw new Error('hold execution');
+      if (phase === 'call-before-commit' && revokeAtCommit) allowed = false;
+    } });
+    await host.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'held', tokens: host.issueTokens(f.ex.symbols.feeFor) });
+    const pending = host.recoverOperation('held', { strategy: 'abort-before-effects' }); allowed = false;
+    await assert.rejects(pending, /recovery_authorization_denied/);
+    assert.deepEqual(host.status().unresolved, ['held']);
+    allowed = true; revokeAtCommit = true;
+    assert.equal((await host.recoverOperation('held')).state, 'indeterminate');
+    assert.deepEqual(host.status().unresolved, ['held']);
+    const journal = JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8'));
+    assert.equal(journal.heads.length, 1);
+    allowed = true; revokeAtCommit = false;
+    assert.equal((await host.recoverOperation('held')).state, 'completed');
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('F07 coordinator: current state is bound to retained transition receipts, including against old snapshot substitution', async () => {
+  const f = fixture(); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open(f.options);
+    await host.allocateRecord(ACCOUNT, { id: text('account'), balance: integer(100) }, { operationId: 'account' });
+    const file = join(f.directory, 'host.json'), original = readFileSync(file, 'utf8');
+    const corrupt = JSON.parse(original); corrupt.snapshot.records[0].fields.find(([name]: [string, unknown]) => name === 'balance')[1].value = '999';
+    writeFileSync(file, JSON.stringify(corrupt)); await assert.rejects(host.snapshot(), /state head/);
+    const old = JSON.parse(original); old.snapshot = old.snapshots[0].snapshot;
+    writeFileSync(file, JSON.stringify(old)); await assert.rejects(host.snapshot(), /state head/);
+    const truncated = JSON.parse(original); truncated.snapshot = truncated.snapshots[0].snapshot; truncated.heads.pop();
+    writeFileSync(file, JSON.stringify(truncated)); await assert.rejects(host.snapshot(), /published state transition/);
+    writeFileSync(file, original); assert.deepEqual(balances(await host.snapshot()), ['100']);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('F07 coordinator: real workers enforce declared argument/result types and sound scalar generics', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-process-types-')); let host: ProcessHost | undefined;
+  try {
+    const syms = new SymbolSpace('host-types'), id = syms.define('id'), generic = syms.define('generic'), wrongResult = syms.define('wrongResult'), x = syms.define('x');
+    const registry = new CapabilityRegistry(), effect = registry.declare('cap:test:value', { arity: 0, description: 'Deliberately wrong Unit adapter.' }).name;
+    const module = b.module_({ symbol: syms.define('module'), symbolTable: syms.table(), members: [
+      b.fn({ symbol: id, params: [b.param(x, b.Int)], returns: b.Int, contract: b.contract({}), body: b.block(b.ret(b.v(x))) }),
+      b.fn({ symbol: generic, typeParams: ['T'], params: [b.param(x, { t: 'TypeVar', name: 'T' })], returns: { t: 'TypeVar', name: 'T' }, body: b.block(b.ret(b.v(x))) }),
+      b.fn({ symbol: wrongResult, returns: b.Unit, capabilities: [effect], body: b.block(b.ret(b.invoke(effect))) }),
+    ] });
+    const plan: TopologyPlan = { shape: 'containers', units: [{ id: 'types', members: [id, generic, wrongResult], capabilities: [effect], placement: 'container', memoryMb: 1 }], crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+    const manifestValue = manifest(module, registry);
+    const sink: EffectAdapter = { id: 'wrong-unit-adapter/1', semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true }, execute: () => integer(42), reconcile: () => ({ state: 'unknown' }) };
+    host = await ProcessHost.open({ directory, module, manifest: manifestValue, registry, plan, sealer: new CapabilitySealer(), effectRouterFactory: factory(directory, manifestValue, effect, sink) });
+    await assert.rejects(host.call(id, [text('wrong-type')], { operationId: 'bad-type', tokens: host.issueTokens(id) }), /type|integer/i);
+    await assert.rejects(host.call(id, [], { operationId: 'bad-arity', tokens: host.issueTokens(id) }), /arity/);
+    assert.equal(host.operationResult('bad-type'), null);
+    const box: Ty = { t: 'Record', name: typeName('type:test:typed_box'), fields: [['count', b.Int]] };
+    await assert.rejects(host.allocateRecord(box, { count: text('wrong-type') }, { operationId: 'bad-record' }), /type|integer/i);
+    const value = { tag: 'sequence' as const, items: [integer(1), integer(2)] };
+    const inferred = await host.call(generic, [value], { operationId: 'generic-sequence', tokens: host.issueTokens(generic) });
+    assert.equal(inferred.state, 'completed'); if (inferred.state === 'completed' && inferred.execution.ok) assert.deepEqual(plain(inferred.execution.value), value); else assert.fail('generic identity failed');
+    const invalidReturn = await host.call(wrongResult, [], { operationId: 'bad-return', tokens: host.issueTokens(wrongResult) });
+    assert.equal(invalidReturn.state, 'indeterminate');
+    assert.deepEqual(host.status().unresolved, ['bad-return']);
+  } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
+});

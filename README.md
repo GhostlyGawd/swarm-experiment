@@ -14,7 +14,7 @@ contains its reference implementation and the foundations for v4. The readiness
 review and versioned evidence tracker identify implementation gaps and unmet
 performance targets.
 
-The v4 extension is planned in the versioned
+The v4 extension is being implemented against the versioned
 **[implementation specification](docs/implementation/v4/SPEC.md)** and
 **[dependency tracker](docs/implementation/v4/TRACKER.md)**. The
 [readiness review](docs/V4-READINESS-REVIEW.md) records the current baseline's

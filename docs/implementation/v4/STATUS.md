@@ -19,6 +19,8 @@ Branch: `aether/v4-implementation`. Planning checkpoint: `9f23a7b`. First implem
 - **R02 result:** 1,345 native/reference cases pass. Fresh-process guest bracket maximum 5.401 ms does not qualify the approved running-controller boundary; 65,536-byte bounded guest meets the guest-only memory scope. Full runtime/driver qualification and 50 ns maximum remain open.
 - **R03 result:** actual bounded Groth16 proof rejects 14 altered/false claims; fresh verification samples 6.699/5.457/5.946 ms all miss 5 ms. Production setup and full-module attestation remain open.
 - **R04 result:** actual adapter train/save/reload and held-out gradient fixtures pass. Fresh boundary throughput 0.448–0.466M/sec misses 2M/sec. No full synthesis/efficiency claim.
+- **V4-T1-01 active:** versioned durable AST storage, root compare-and-swap, leases, pending-promotion pins, archive validation and coordinated garbage collection are being implemented against verified F03 identities.
+- **Native profile follow-up:** a preregistered 1,000-fresh-guest campaign is being implemented for the approved running-controller boundary. Historical measurements remain unchanged.
 
 Exact-commit evidence is in [foundations-4a9b077](evidence/foundations-4a9b077/REVIEW.md). A detached verification checkout passed 242 tests, typechecking and both roadmap checks. Clean pinned-dependency benchmark measurement exited 0; release enforcement correctly exited 1 with 17 unsatisfied required rows.
 
