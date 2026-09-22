@@ -20,9 +20,9 @@ Branch: `aether/v4-implementation`. Planning checkpoint: `9f23a7b`. First implem
 - **R02 result:** 1,345 native/reference cases pass. Fresh-process guest bracket maximum 5.401 ms does not qualify the approved running-controller boundary; 65,536-byte bounded guest meets the guest-only memory scope. Full runtime/driver qualification and 50 ns maximum remain open.
 - **R03 result:** actual bounded Groth16 proof rejects 14 altered/false claims; fresh verification samples 6.699/5.457/5.946 ms all miss 5 ms. Production setup and full-module attestation remain open.
 - **R04 result:** actual adapter train/save/reload and held-out gradient fixtures pass. Fresh boundary throughput 0.448–0.466M/sec misses 2M/sec. No full synthesis/efficiency claim.
-- **V4-T1-01 active:** versioned durable AST storage, root compare-and-swap, leases, pending-promotion pins, archive validation and coordinated garbage collection are being implemented against verified F03 identities.
+- **V4-T1-01 verified:** versioned durable AST storage, root compare-and-swap, leases, pending-promotion pins, bounded archives and coordinated collection. [Evidence](evidence/ast-3dfabca/REVIEW.md) binds clean commit `3dfabca`, 395 passing tests and initialization recovery at eight actual termination points.
 - **V4-T2-10 active:** independent AST obligation derivation and a separate exact-integer/propositional proof checker are being implemented. Unsupported theories remain unproved; no portable admission claim yet.
-- **Native profile follow-up:** a preregistered 1,000-fresh-guest campaign is being implemented for the approved running-controller boundary. Historical measurements remain unchanged.
+- **Native profile follow-up:** campaign 01 retained a 2.535 ms miss; campaign 02 refused to run after its source pin changed. Campaign 03 explicitly initialized an empty VM/vCPU before READY, then ran 1,000 fresh guests: max 167.375 µs, guest resident memory 65,536 bytes. This bounded scalar prototype passes the selected scope; full runtime/driver qualification remains open. Raw campaign evidence is being finalized.
 
 Exact-commit evidence is in [foundations-4a9b077](evidence/foundations-4a9b077/REVIEW.md). A detached verification checkout passed 242 tests, typechecking and both roadmap checks. Clean pinned-dependency benchmark measurement exited 0; release enforcement correctly exited 1 with 17 unsatisfied required rows.
 
@@ -47,8 +47,8 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 
 ## Next executable actions
 
-1. Complete and independently review V4-T1-01 durable AST persistence; verify it at an exact source checkpoint.
-2. Measure the preregistered running-controller native campaign under the approved D07 profile; retain every raw sample and any miss.
+1. Complete portable AST proof derivation, independent certificate checking, compiler admission and adversarial review.
+2. Checkpoint the fresh-guest campaign sources and preserve all outcomes, including source-pin refusal and earlier failure.
 3. Continue eligible v2 tasks, including portable certificates, resumable checkpoints and capability containment, while preserving all later scope.
 
-Goal-turn classification: progress — the baseline milestone is verified. Durable AST persistence and native boundary measurements are underway; full v4 remains open. No global blocker has been established.
+Goal-turn classification: progress — the baseline and durable AST persistence are verified. Portable certificates and native campaign evidence are progressing; full v4 remains open. No global blocker has been established.

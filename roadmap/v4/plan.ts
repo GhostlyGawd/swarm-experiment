@@ -324,6 +324,8 @@ export const PLAN: Plan = {
           ? { ...task, status: 'verified' as const, evidence: `docs/implementation/v4/evidence/process-4129dfc/${task.id}.json` }
           : task.id === 'V4-M0'
             ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/baseline-4129dfc/V4-M0.json' }
-            : ['V4-T1-01', 'V4-T2-10'].includes(task.id) ? { ...task, status: 'in_progress' as const } : task),
+            : task.id === 'V4-T1-01'
+              ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/ast-3dfabca/V4-T1-01.json' }
+              : task.id === 'V4-T2-10' ? { ...task, status: 'in_progress' as const } : task),
   firstSlice: ['V4-F01', 'V4-F02', 'V4-F03', 'V4-F04', 'V4-F05', 'V4-F06', 'V4-F07', 'V4-F08'],
 };

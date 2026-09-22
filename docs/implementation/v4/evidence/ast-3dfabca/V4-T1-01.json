@@ -1,0 +1,20 @@
+{
+  "task": "V4-T1-01",
+  "specVersion": "0.1.0",
+  "subjectCommit": "3dfabcae63d42ff9382570d576fa6cedb7131b17",
+  "recordedAt": "2026-09-22T22:09:38.540778+00:00",
+  "checks": [
+    {
+      "gate": "V4-T1-01/G1",
+      "result": "pass",
+      "method": "Clean detached checkout:395 tests including38 durable-store cases, typechecking, build and both roadmap checks. Independent review and gate details in REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/ast-3dfabca/REVIEW.md"
+    },
+    {
+      "gate": "V4-T1-01/G2",
+      "result": "pass",
+      "method": "Clean detached checkout:395 tests including38 durable-store cases, typechecking, build and both roadmap checks. Independent review and gate details in REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/ast-3dfabca/REVIEW.md"
+    }
+  ]
+}
