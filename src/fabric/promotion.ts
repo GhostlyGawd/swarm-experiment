@@ -1,4 +1,5 @@
-/** Durable baseline admission with a local Ed25519 governor. This is not BFT consensus. */
+/** Durable exact-root admission. New journals require signed causal lineage;
+ * legacy governor-only admission is an explicit persisted compatibility profile. */
 import { createPrivateKey, createPublicKey, randomUUID, sign, verify, type KeyObject } from 'node:crypto';
 import { closeSync, existsSync, fsyncSync, linkSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -7,6 +8,7 @@ import { decodeCanonical, decimal, encodeCanonical, encodingLimits, exactObject,
 import { domainDigest, executionManifestDigest, validateDigest, validateExecutionManifest, type Digest, type ExecutionManifestV1 } from './identity.ts';
 import { validateEvidence, type EvidenceContext, type LocalEvidenceV1, type VettedEvidence } from './evidence.ts';
 import { JournalLock } from './journal-lock.ts';
+import { LineageAdmissionError, validateStrictLineageAdmission, type StrictLineageAdmission } from '../tier1/causal-lineage.ts';
 
 export interface PromotionProposalV1 {
   readonly format: 'aether.promotion/1'; readonly repositoryId: string;
@@ -47,8 +49,9 @@ export interface PromotionRecordV1 {
   readonly audit: readonly { readonly event: string; readonly at: string }[];
   readonly failure: string | null;
 }
-interface PromotionJournalV1 {
-  readonly format: 'aether.production-journal/1'; readonly repositoryId: string;
+export type PromotionAdmissionProfile = 'strict-lineage-v1' | 'baseline-governor-v1';
+interface PromotionJournalV2 {
+  readonly format: 'aether.production-journal/2'; readonly profile: PromotionAdmissionProfile; readonly repositoryId: string;
   readonly genesisManifest: Digest; readonly activeManifest: Digest; readonly generation: string;
   readonly records: readonly PromotionRecordV1[];
 }
@@ -64,6 +67,16 @@ export interface PromotionCoordinatorOptions {
   readonly governorKey: (governorId: string, membershipEpoch: string) => KeyObject | string | undefined;
   readonly clock?: () => bigint; readonly limits?: Partial<EncodingLimits>;
   readonly fault?: (point: PromotionFaultPoint) => void;
+  /** New journals default to mandatory signed causal lineage. */
+  readonly profile?: PromotionAdmissionProfile;
+  readonly lineage?: StrictLineageAdmission;
+  /** Explicitly adopt a validated unprofiled v1 journal as governor-only history. */
+  readonly legacyJournalMigration?: 'adopt-baseline-v1';
+}
+export class StrictLineageServingError extends Error {
+  readonly code = 'strict_lineage_unavailable';
+  readonly manifest: Digest;
+  constructor(manifest: Digest, message: string) { super(message); this.name = 'StrictLineageServingError'; this.manifest = manifest; }
 }
 export interface PromotionInput {
   readonly proposal: PromotionProposalV1; readonly approval: GovernorApprovalV1;
@@ -134,18 +147,38 @@ export class PromotionCoordinator {
   private readonly limits:EncodingLimits;
   private readonly file:string;
   private readonly lock:JournalLock;
+  readonly admissionProfile:PromotionAdmissionProfile;
+  private readonly lineage?:StrictLineageAdmission;
   constructor(options:PromotionCoordinatorOptions){
     identifier(options.repositoryId);validateDigest(options.genesisManifest,'aether.execution/1');
-    this.options=options;this.limits=encodingLimits(options.limits);ensureDurableDirectory(options.directory);
+    this.admissionProfile=options.profile??'strict-lineage-v1';
+    if(!['strict-lineage-v1','baseline-governor-v1'].includes(this.admissionProfile))throw new TypeError('unknown production admission profile');
+    if(this.admissionProfile==='strict-lineage-v1'){validateStrictLineageAdmission(options.lineage,options.repositoryId);this.lineage=options.lineage;}
+    else if(options.lineage)throw new TypeError('baseline profile cannot silently enable lineage admission');
+    if(options.legacyJournalMigration!==undefined&&(options.legacyJournalMigration!=='adopt-baseline-v1'||this.admissionProfile!=='baseline-governor-v1'))throw new TypeError('legacy history can only be explicitly adopted as baseline');
+    this.options={...options};this.limits=encodingLimits(options.limits);ensureDurableDirectory(options.directory);
     this.file=join(options.directory,'production.json');this.lock=new JournalLock({directory:join(options.directory,'promotion-lock-tickets'),limits:this.limits});
-    if(!existsSync(this.file))initialize(this.file,options.directory,encodeCanonical({format:'aether.production-journal/1',repositoryId:options.repositoryId,genesisManifest:options.genesisManifest,activeManifest:options.genesisManifest,generation:'0',records:[]},this.limits));
-    this.read();
+    this.lock.run(()=>{
+      if(!existsSync(this.file)){
+        this.assertLineageCurrent(options.genesisManifest);
+        initialize(this.file,options.directory,encodeCanonical({format:'aether.production-journal/2',profile:this.admissionProfile,repositoryId:options.repositoryId,genesisManifest:options.genesisManifest,activeManifest:options.genesisManifest,generation:'0',records:[]},this.limits));
+      }else{
+        if(statSync(this.file).size>this.limits.maxFrameBytes)throw new RangeError('promotion journal byte limit');
+        const existing=decodeCanonical(readFileSync(this.file),this.limits) as {format?:unknown};
+        if(existing?.format==='aether.production-journal/1'){
+          if(options.legacyJournalMigration!=='adopt-baseline-v1')throw new Error('unprofiled production history requires explicit baseline migration');
+          // Full identity, signature, audit and head validation precedes the only upgrade write.
+          this.write(this.read(true));
+        }
+      }
+      this.read();
+    },10000);
   }
   private now():string {const t=this.options.clock?.()??BigInt(Date.now());if(typeof t!=='bigint'||t<0n)throw new TypeError('invalid promotion clock');return t.toString();}
-  private read():PromotionJournalV1 {
+  private read(legacy=false):PromotionJournalV2 {
     if(statSync(this.file).size>this.limits.maxFrameBytes)throw new RangeError('promotion journal byte limit');
-    const j=exactObject(decodeCanonical(readFileSync(this.file),this.limits),['format','repositoryId','genesisManifest','activeManifest','generation','records']);
-    if(j.format!=='aether.production-journal/1'||j.repositoryId!==this.options.repositoryId||j.genesisManifest!==this.options.genesisManifest||!Array.isArray(j.records))throw new TypeError('production journal identity mismatch');
+    const j=exactObject(decodeCanonical(readFileSync(this.file),this.limits),['format',...(legacy?[]:['profile']),'repositoryId','genesisManifest','activeManifest','generation','records']);
+    if(j.format!==(legacy?'aether.production-journal/1':'aether.production-journal/2')||(!legacy&&j.profile!==this.admissionProfile)||j.repositoryId!==this.options.repositoryId||j.genesisManifest!==this.options.genesisManifest||!Array.isArray(j.records))throw new TypeError('production journal identity/profile mismatch');
     let head=this.options.genesisManifest,generation=0n,pending=false;const ids=new Set<string>();
     for(const record of j.records){
       const r=exactObject(record,['format','binding','approval','phase','prepareStarted','activated','handle','audit','failure']);
@@ -182,16 +215,16 @@ export class PromotionCoordinator {
       else pending=r.phase!=='rejected'&&r.phase!=='aborted';
     }
     if(j.activeManifest!==head||j.generation!==String(generation))throw new TypeError('production head does not match committed history');
-    return j as unknown as PromotionJournalV1;
+    return (legacy?{...j,format:'aether.production-journal/2',profile:'baseline-governor-v1'}:j) as unknown as PromotionJournalV2;
   }
-  private write(journal:PromotionJournalV1):void {atomicWrite(this.file,Buffer.from(encodeCanonical(journal,this.limits)).toString('utf8'));sync(this.options.directory);}
-  private record(j:PromotionJournalV1,r:PromotionRecordV1,event:string,patch:Partial<PromotionRecordV1>={},at=this.now()):PromotionJournalV1 {
+  private write(journal:PromotionJournalV2):void {atomicWrite(this.file,Buffer.from(encodeCanonical(journal,this.limits)).toString('utf8'));sync(this.options.directory);}
+  private record(j:PromotionJournalV2,r:PromotionRecordV1,event:string,patch:Partial<PromotionRecordV1>={},at=this.now()):PromotionJournalV2 {
     const next={...r,...patch,audit:[...r.audit,{event,at}]};
     const records=j.records.map(old=>old.binding.proposalDigest===r.binding.proposalDigest?next:old);
     const committed=next.phase==='active';
     const out={...j,records,...(committed?{activeManifest:next.binding.proposal.candidateManifest,generation:next.binding.generation}:{})};this.write(out);return out;
   }
-  private current(j:PromotionJournalV1,proposal:PromotionProposalV1,approval:GovernorApprovalV1):void {
+  private current(j:PromotionJournalV2,proposal:PromotionProposalV1,approval:GovernorApprovalV1):void {
     const now=this.now();
     const key=this.options.governorKey(approval.governorId,proposal.membershipEpoch);
     const authority=this.options.authority();
@@ -209,7 +242,16 @@ export class PromotionCoordinator {
     const j=this.read();const unfinished=j.records.find(r=>r.phase==='active'&&!r.activated||!['active','rejected','aborted'].includes(r.phase));
     return {committedManifest:j.activeManifest,generation:j.generation,activationPending:j.records.some(r=>r.phase==='active'&&!r.activated),pendingProposal:unfinished?.binding.proposalDigest??null};
   }
-  servingManifest():Digest {const state=this.state();if(state.activationPending)throw new Error('committed target awaiting activation; serving is blocked');return state.committedManifest;}
+  assertLineageCurrent(manifest:Digest):void {
+    validateDigest(manifest,'aether.execution/1');
+    if(!this.lineage)return;
+    try{this.lineage.assertCurrent(manifest);}catch(error){
+      if(!(error instanceof LineageAdmissionError))throw error;
+      throw new StrictLineageServingError(manifest,`strict lineage blocks serving ${manifest}: ${error.message}`);
+    }
+  }
+  servingManifest():Digest {const state=this.state();if(state.activationPending)throw new Error('committed target awaiting activation; serving is blocked');this.assertLineageCurrent(state.committedManifest);return state.committedManifest;}
+  servingReady():boolean {const state=this.state();if(state.activationPending)return false;try{this.assertLineageCurrent(state.committedManifest);return true;}catch(error){if(error instanceof StrictLineageServingError)return false;throw error;}}
   history():readonly PromotionRecordV1[]{return freeze(clone(this.read().records));}
   recoverDeadWriter():void{this.lock.recoverDeadWriter();}
   async promote(input:PromotionInput,driver:PromotionDriver):Promise<ProductionAdmissionState>{
@@ -219,7 +261,7 @@ export class PromotionCoordinator {
     if(executionManifestDigest(manifest)!==proposal.candidateManifest||evidenceBundleDigest(input.evidence)!==proposal.evidenceBundleDigest||migrationPlanDigest(input.migrationPlan)!==proposal.migrationPlanDigest||effectPlanDigest(input.effectPlan)!==proposal.effectPlanDigest)throw new TypeError('promotion input binding mismatch');
     return this.lock.runAsync(async()=>{
       let journal=this.read();const id=promotionDigest(proposal),existing=journal.records.find(r=>r.binding.proposalDigest===id);
-      if(existing){if(existing.phase==='active'&&existing.activated)return this.state();throw new Error('promotion already recorded; recover pending work or submit a new proposal');}
+      if(existing){if(existing.phase==='active'&&existing.activated){this.assertLineageCurrent(journal.activeManifest);return this.state();}throw new Error('promotion already recorded; recover pending work or submit a new proposal');}
       if(this.state().pendingProposal!==null)throw new Error('pending promotion requires recovery');
       // Refuse a stale parent before appending a record that cannot belong to this history.
       if(proposal.expectedParent!==journal.activeManifest)throw new Error('stale promotion parent');
@@ -230,6 +272,7 @@ export class PromotionCoordinator {
         this.options.fault?.('after-candidate');
         let vetted=validateEvidence(input.evidence,input.context);
         if(vetted.manifestDigest!==proposal.candidateManifest)throw new TypeError('candidate evidence subject mismatch');
+        const admit=async(checkpoint:()=>void):Promise<ProductionAdmissionState>=>{
         journal=this.record(journal,record,'validated',{phase:'validated'});record=journal.records.at(-1)!;this.options.fault?.('after-validated');
         this.current(journal,proposal,approval);
         journal=this.record(journal,record,'authorized',{phase:'authorized'});record=journal.records.at(-1)!;this.options.fault?.('after-authorized');
@@ -242,10 +285,13 @@ export class PromotionCoordinator {
         if(vetted.manifestDigest!==proposal.candidateManifest||evidenceBundleDigest(input.evidence)!==proposal.evidenceBundleDigest)throw new TypeError('candidate changed during preparation');
         journal=this.read();record=journal.records.find(r=>r.binding.proposalDigest===id)!;
         const commitTime=this.now();this.current(journal,proposal,approval);
+        checkpoint();
         journal=this.record(journal,record,'commit',{phase:'active'},commitTime);record=journal.records.at(-1)!;this.options.fault?.('after-commit');
         await driver.activate(binding,record.handle!);
         journal=this.record(journal,record,'activation-complete',{activated:true});this.options.fault?.('after-activation');
         return this.state();
+        };
+        return this.lineage?await this.lineage.withAdmission(binding,vetted,admit):await admit(()=>{});
       }catch(error){
         // Inspect durable authority; an exception after atomic rename is not proof of noncommit.
         journal=this.read();record=journal.records.find(r=>r.binding.proposalDigest===id)!;
@@ -259,11 +305,12 @@ export class PromotionCoordinator {
   async recover(driver:PromotionDriver):Promise<ProductionAdmissionState>{
     return this.lock.runAsync(async()=>{
       let journal=this.read();const record=journal.records.find(r=>r.phase==='active'&&!r.activated||!['active','rejected','aborted'].includes(r.phase));
-      if(!record)return this.state();
+      const readiness=():ProductionAdmissionState=>{const state=this.state();try{this.assertLineageCurrent(state.committedManifest);}catch(error){if(error instanceof StrictLineageServingError)throw new StrictLineageServingError(error.manifest,`recovery followed the durable decision; serving remains blocked: ${error.message}`);throw error;}return state;};
+      if(!record)return readiness();
       const commit=record.phase==='active';
       if(commit||record.prepareStarted)await driver.recover(freeze(clone(record.binding)),record.handle===null?null:freeze(clone(record.handle)),commit?'commit':'abort');
       journal=this.record(journal,record,commit?'recovery-activation-complete':'recovery-abort',commit?{activated:true}:{phase:'aborted',failure:'recovered before durable commit'});
-      return this.state();
+      return readiness();
     });
   }
 }

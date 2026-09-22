@@ -108,7 +108,7 @@ The process channel authenticates bounded frames to a worker session, roles, seq
 
 `PromotionCoordinator` is exported by `@ghostlygawd/aether/fabric`. `ProcessDeployment` and its artifact/migration/effect-plan helpers are exported by the root package and tier4. The deployment object is both the execution gate and the coordinator's actual process driver.
 
-Initialize a trusted genesis artifact, coordinator and reloadable factory map. Factories provide the current sealer, revocation state, effect router and recovery authority; functions and secrets are not serialized into artifacts. Register candidate artifacts with their complete module, evidence context, evidence and topology. Registration recomputes evidence and binds the durable artifact to its full configuration.
+Initialize signed lineage for the trusted genesis artifact, then create the coordinator and reloadable factory map. The default coordinator profile is `strict-lineage-v1`, requiring a branded `CausalLineageLedger.admissionAdapter()`. Factories provide the current sealer, revocation state, effect router and recovery authority; functions and secrets are not serialized into artifacts. Register candidate artifacts with their complete module, evidence context, evidence and topology. Registration recomputes evidence and binds the durable artifact to its full configuration.
 
 Create the migration plan from the current snapshot and candidate artifact digest, and the effect plan from its factory and policy identity. Approvals must sign the exact proposal, expected production parent, candidate manifest, evidence and plans under the current governor/membership/policy context. Combined edits require evidence for their resulting root. The baseline authorization adapter uses authenticated local governors; the heterogeneous Byzantine quorum is a separate task.
 
@@ -117,6 +117,22 @@ Execute application calls through `ProcessDeployment` so its shared durable gate
 If activation fails after the coordinator commits, serving stays blocked. Reopen with the same directories and trusted factories, then use coordinator recovery with the deployment driver. Recovery follows the durable commit/abort decision. It does not serve the old root after a committed target transition. A rollback is a newly authorized promotion from the current parent to an earlier artifact, carrying current state and a new generation.
 
 Retain the coordinator, deployment, prepared-artifact, ProcessHost and effect journals together. Do not manually remove pending receipts or rewrite generations to clear a failure. Keep process startup paths available in the built package; `npm run build` emits the worker entry alongside the public API.
+
+### Signed lineage and strict currentness
+
+`CausalLineageLedger` stores signed specification revisions, signed intents and admitted evidence beside unchanged v1 AST objects. Provide a `DurableGraphStore`, repository ID, current author policy and independently enrolled historical Ed25519 keys. Author lists must be valid arrays of unique identities. Retain historical public keys for audit verification.
+
+Store the source AST/contract nodes before publishing a signed specification. `fenceRequirement(declaration)` pins its signature, input preconditions, modified locations and formal postconditions. Use `specification(parentIntents, specReferences)` to derive the exact specification string for the evidence context. Mint/validate evidence, then sign the intent including its exact evidence-bundle digest, record it and call `admitArtifact`. A signed intent alone cannot discharge a fence.
+
+The ledger preserves all declared parent causes and shared-node links. Specification revisions invalidate dependent artifact contexts transitively; a new signed reconciliation can select current revisions while retaining historical causes. Replacement cannot silently strengthen a precondition, remove a protected function or drop required postconditions to obtain a vacuous proof.
+
+Strict promotion holds the coordinator, lineage, deployment and host locks in that order, then takes the AST-store lock when needed. It rechecks lineage immediately before durable commit. Spec/policy invalidation blocks serving and subsequent live effect/commit boundaries. `status().servingReady` is distinct from stored activation readiness; malformed journals or authority responses remain errors.
+
+After a committed activation failure, recovery installs the durable target. If its lineage is stale, serving stays blocked while administrative `snapshotForPromotion()` and explicitly authorized historical recovery allow a signed repair. Historical recovery consumes recorded outcomes without live effects. Retrieving an old invocation receipt also requires its original capabilities to remain covered by the current declaration and the capability-policy digest to remain unchanged; a denied receipt is retained and never redispatched.
+
+### Explicit baseline compatibility
+
+New coordinator/deployment journals use version 2 and persist their admission profile. The earlier governor-only behavior requires explicit `profile: 'baseline-governor-v1'`; it is a compatibility mode with no full lineage claim. A v1 coordinator journal requires `legacyJournalMigration: 'adopt-baseline-v1'`, and its deployment requires `legacyProfileMigration: 'adopt-baseline-v1'`. Both validate original identity/history before a locked durable upgrade. Reopening with another profile is rejected; baseline history is never silently reinterpreted as strict lineage history.
 
 ## Verification and benchmarks
 

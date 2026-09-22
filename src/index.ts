@@ -13,6 +13,7 @@ export { canonicalBytes, canonicalText, type Canonical } from './tier1/canonical
 export { Blake3, blake3, blake3Hex, bytesToHex } from './tier1/blake3.ts';
 export { GraphStore, alphaNormalize, hashNode, structuralKeyOf, type Step, type StoreStats } from './tier1/store.ts';
 export { DurableGraphStore, type DurableGraphStoreOptions, type DurableStoreLimits, type DurableRootHead, type DurableRootState, type PendingAstPromotion, type DurableStoreFault, type DurableCollectionResult } from './tier1/durable-store.ts';
+export { CausalLineageLedger, LineageAdmissionError, signSpecRevision, signIntent, specRevisionDigest, intentDigest, fenceRequirement, validateStrictLineageAdmission, type CausalLineageOptions, type LineageAuthority, type SpecReference, type FenceRequirement, type SpecRevisionBody, type SignedSpecRevision, type IntentBody, type SignedIntent, type ArtifactLineageRecord, type LineageInvalidation, type StrictLineageAdmission } from './tier1/causal-lineage.ts';
 export { AetherRepository, type CommitOptions, type CommitRecord, type FsckIssue, type GarbageCollectionResult, type Packfile } from './tier1/repository.ts';
 export { ModuleResolver, type ResolvedModule } from './tier1/modules.ts';
 export { merge3, type MergeConflict, type MergeResult } from './tier1/merge.ts';

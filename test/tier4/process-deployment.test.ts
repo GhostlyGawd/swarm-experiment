@@ -77,7 +77,7 @@ function fixture() {
   ], crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] });
   const original = context(), originalEvidence = mintLocalEvidence(original), genesisManifest = executionManifestDigest(originalEvidence.manifest);
   const authority = { repositoryId: 'deployment-test', membershipEpoch: '1', policyEpoch: '1', eligibleGovernors: ['governor'] };
-  const coordinatorOptions: PromotionCoordinatorOptions = { directory: join(directory, 'coordinator'), repositoryId: authority.repositoryId, genesisManifest, authority: () => authority, governorKey: () => keys.publicKey, clock: () => 100n };
+  const coordinatorOptions: PromotionCoordinatorOptions = { profile: 'baseline-governor-v1', directory: join(directory, 'coordinator'), repositoryId: authority.repositoryId, genesisManifest, authority: () => authority, governorKey: () => keys.publicKey, clock: () => 100n };
   const coordinator = new PromotionCoordinator(coordinatorOptions);
   const options: ProcessDeploymentOptions = { directory: join(directory, 'driver'), coordinator, factories: new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => hostFactory(directory, artifact)]]), genesis: { context: original, evidence: originalEvidence, plan: plan(), factoryId: 'ledger-services/1' } };
   const rows = (): any[] => existsSync(join(directory, 'ledger.json')) ? JSON.parse(readFileSync(join(directory, 'ledger.json'), 'utf8')) : [];
@@ -215,7 +215,7 @@ function crashPromotion(f: ReturnType<typeof fixture>, input: PromotionInput, ph
     import {ProcessDeployment,processArtifactContext} from ${JSON.stringify(new URL('../../src/tier4/process-deployment.ts', import.meta.url).href)};
     const hostFactory=${hostFactory.toString()};
     const [directory,inputFile,publicKeyFile,genesis,phase]=process.argv.slice(1);
-    const coordinator=new PromotionCoordinator({directory:join(directory,'coordinator'),repositoryId:'deployment-test',genesisManifest:genesis,
+    const coordinator=new PromotionCoordinator({profile:'baseline-governor-v1',directory:join(directory,'coordinator'),repositoryId:'deployment-test',genesisManifest:genesis,
       authority:()=>({repositoryId:'deployment-test',membershipEpoch:'1',policyEpoch:'1',eligibleGovernors:['governor']}),governorKey:()=>createPublicKey(readFileSync(publicKeyFile)),clock:()=>100n,
       fault:point=>{if(point===phase)process.kill(process.pid,'SIGKILL');}});
     let deployment;
@@ -405,4 +405,43 @@ test('F08 review: repeated manifest activation rejects historical ABA handles wi
     await deployment.activate(current.binding, current.handle!);
     assert.deepEqual(deployment.status(), before); assert.equal(f.rows().length, 0);
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('deployment cached receipts retain historical capability authority when a later declaration weakens', async () => {
+  const f=fixture();let deployment:ProcessDeployment|undefined;
+  try {
+    const base=f.original.module as Extract<Term,{kind:'Module'}>;
+    const module:Term={...base,members:base.members.filter(member=>member.kind!=='FunctionDecl'||member.symbol===f.ex.symbols.feeFor)};
+    const current={...f.original,module}, historical={...current,module:{...module,members:module.members.map(member=>member.kind==='FunctionDecl'?{...member,purity:'effectful' as const,capabilities:[CAP_LEDGER_APPEND]}:member)}};
+    const evidence=mintLocalEvidence(historical);
+    const coordinator=new PromotionCoordinator({...f.coordinatorOptions,directory:join(f.directory,'historical-coordinator'),genesisManifest:executionManifestDigest(evidence.manifest)});
+    const plan:TopologyPlan={...f.plan(),units:[{id:'a',members:[f.ex.symbols.feeFor],capabilities:[CAP_LEDGER_APPEND],placement:'container',memoryMb:32}]};
+    deployment=await ProcessDeployment.open({...f.options,coordinator,genesis:{context:historical,evidence,plan,factoryId:'ledger-services/1'}});
+    const first=await deployment.call(f.ex.symbols.feeFor,[integer(100)],{operationId:'protected-result',tokens:deployment.issueTokens(f.ex.symbols.feeFor)});
+    assert.equal(first.state,'completed');
+    const next=mintLocalEvidence(current),artifact=deployment.registerArtifact({context:current,evidence:next,plan:{...plan,units:plan.units.map(unit=>({...unit,capabilities:[]}))},factoryId:'ledger-services/1'});
+    const migrationPlan=processMigrationPlan(await deployment.snapshot(),artifact),effectPlan=processEffectPlan('ledger-services/1',next.manifest.capabilityPolicyDigest);
+    const proposal={format:'aether.promotion/1' as const,repositoryId:f.authority.repositoryId,expectedParent:coordinator.state().committedManifest,candidateManifest:executionManifestDigest(next.manifest),evidenceBundleDigest:evidenceBundleDigest(next),migrationPlanDigest:migrationPlanDigest(migrationPlan),effectPlanDigest:effectPlanDigest(effectPlan),membershipEpoch:'1',policyEpoch:'1',expiresAt:'1000'};
+    await deployment.promote({proposal,approval:approvePromotion(proposal,'governor',f.keys.privateKey),evidence:next,context:current,migrationPlan,effectPlan});
+    const before=readFileSync(join(f.options.directory,'deployment.json'),'utf8');
+    await assert.rejects(deployment.call(f.ex.symbols.feeFor,[integer(100)],{operationId:'protected-result',tokens:deployment.issueTokens(f.ex.symbols.feeFor)}),/historical invocation requires authority/);
+    assert.equal(readFileSync(join(f.options.directory,'deployment.json'),'utf8'),before,'historical receipt retained without redispatch');
+    const fresh=await deployment.call(f.ex.symbols.feeFor,[integer(100)],{operationId:'current-result',tokens:deployment.issueTokens(f.ex.symbols.feeFor)});
+    assert.equal(fresh.state,'completed');assert.equal(fresh.generation,'1');
+  } finally {await deployment?.close();rmSync(f.directory,{recursive:true,force:true});}
+});
+
+test('deployment legacy profile adoption is explicit and preserves durable receipts', async () => {
+  const f=fixture();let deployment:ProcessDeployment|undefined;
+  try {
+    deployment=await ProcessDeployment.open(f.options);await accounts(deployment);
+    await deployment.call(f.ex.symbols.feeFor,[integer(100)],{operationId:'legacy-result',tokens:deployment.issueTokens(f.ex.symbols.feeFor)});
+    await deployment.close();deployment=undefined;
+    const file=join(f.options.directory,'deployment.json'), state=JSON.parse(readFileSync(file,'utf8'));
+    const legacy={...state,format:'aether.process-deployment/1'};delete legacy.admissionProfile;
+    writeFileSync(file,JSON.stringify(legacy));const original=readFileSync(file,'utf8');
+    await assert.rejects(ProcessDeployment.open({...f.options,genesis:undefined}),/explicit baseline migration/);assert.equal(readFileSync(file,'utf8'),original);
+    deployment=await ProcessDeployment.open({...f.options,genesis:undefined,legacyProfileMigration:'adopt-baseline-v1'});
+    assert.deepEqual(JSON.parse(readFileSync(file,'utf8')),state);assert.equal(deployment.status().servingReady,true);
+  } finally {await deployment?.close();rmSync(f.directory,{recursive:true,force:true});}
 });

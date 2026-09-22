@@ -8,6 +8,8 @@ import { spawnSync } from 'node:child_process';
 import * as b from '../../src/tier1/build.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
+import { DurableGraphStore } from '../../src/tier1/durable-store.ts';
+import { CausalLineageLedger } from '../../src/tier1/causal-lineage.ts';
 import { createEvidenceManifest,mintLocalEvidence,type EvidenceContext } from '../../src/fabric/evidence.ts';
 import { domainDigest,executionManifestDigest } from '../../src/fabric/identity.ts';
 import { PromotionCoordinator,approvePromotion,createPromotionHandle,effectPlanDigest,evidenceBundleDigest,migrationPlanDigest,type PromotionBindingV1,type PreparedPromotionHandleV1,type PromotionDriver,type PromotionInput,type PromotionCoordinatorOptions } from '../../src/fabric/promotion.ts';
@@ -45,7 +47,7 @@ function fixture(){
   const directory=temporary(),keys=generateKeyPairSync('ed25519');
   const genesis=executionManifestDigest(createEvidenceManifest(context()));
   const authority={repositoryId:'repository:promotion',membershipEpoch:'1',policyEpoch:'1',eligibleGovernors:['governor:local']};
-  const options:PromotionCoordinatorOptions={directory:join(directory,'coordinator'),repositoryId:authority.repositoryId,genesisManifest:genesis,authority:()=>authority,governorKey:()=>keys.publicKey,clock:()=>100n};
+  const options:PromotionCoordinatorOptions={profile:'baseline-governor-v1',directory:join(directory,'coordinator'),repositoryId:authority.repositoryId,genesisManifest:genesis,authority:()=>authority,governorKey:()=>keys.publicKey,clock:()=>100n};
   function input(left=8,right=10,patch:Partial<PromotionInput>={}):PromotionInput{
     const ctx=context(left,right),evidence=mintLocalEvidence(ctx);const plan:TaggedValueV1={tag:'null'};
     const proposal={format:'aether.promotion/1' as const,repositoryId:authority.repositoryId,expectedParent:genesis,candidateManifest:executionManifestDigest(evidence.manifest),evidenceBundleDigest:evidenceBundleDigest(evidence),migrationPlanDigest:migrationPlanDigest(plan),effectPlanDigest:effectPlanDigest(plan),membershipEpoch:'1',policyEpoch:'1',expiresAt:'1000'};
@@ -157,7 +159,7 @@ test('F08 core: real process death at each durable phase recovers before/after t
       const [directory,keyPath,phase]=process.argv.slice(1);const privateKey=createPrivateKey(readFileSync(keyPath));const publicKey=createPublicKey(privateKey);
       const genesis=executionManifestDigest(createEvidenceManifest(context()));const ctx=context(8,10),evidence=mintLocalEvidence(ctx),plan={tag:'null'};
       const proposal={format:'aether.promotion/1',repositoryId:'repository:promotion',expectedParent:genesis,candidateManifest:executionManifestDigest(evidence.manifest),evidenceBundleDigest:evidenceBundleDigest(evidence),migrationPlanDigest:migrationPlanDigest(plan),effectPlanDigest:effectPlanDigest(plan),membershipEpoch:'1',policyEpoch:'1',expiresAt:'1000'};
-      const coordinator=new PromotionCoordinator({directory:join(directory,'coordinator'),repositoryId:'repository:promotion',genesisManifest:genesis,authority:()=>({repositoryId:'repository:promotion',membershipEpoch:'1',policyEpoch:'1',eligibleGovernors:['governor:local']}),governorKey:()=>publicKey,clock:()=>100n,fault:point=>{if(point===phase)process.kill(process.pid,'SIGKILL');}});
+      const coordinator=new PromotionCoordinator({profile:'baseline-governor-v1',directory:join(directory,'coordinator'),repositoryId:'repository:promotion',genesisManifest:genesis,authority:()=>({repositoryId:'repository:promotion',membershipEpoch:'1',policyEpoch:'1',eligibleGovernors:['governor:local']}),governorKey:()=>publicKey,clock:()=>100n,fault:point=>{if(point===phase)process.kill(process.pid,'SIGKILL');}});
       await coordinator.promote({proposal,approval:approvePromotion(proposal,'governor:local',privateKey),evidence,context:ctx,migrationPlan:plan,effectPlan:plan},new FileDriver(join(directory,'driver'),genesis));
     `;
     const child=spawnSync(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,f.directory,keyPath,phase],{encoding:'utf8'});
@@ -167,5 +169,49 @@ test('F08 core: real process death at each durable phase recovers before/after t
     assert.equal(coordinator.state().committedManifest,committed?f.input().proposal.candidateManifest:f.genesis);
     assert.equal(coordinator.state().activationPending,false);assert.equal(coordinator.state().pendingProposal,null);
     assert.equal(JSON.parse(readFileSync(join(f.directory,'driver','serving.json'),'utf8')).manifest,coordinator.servingManifest());
+  }
+});
+
+test('admission profiles: strict lineage is the default and baseline is explicit and durable',()=>{
+  const f=fixture();
+  assert.throws(()=>new PromotionCoordinator({...f.options,profile:undefined}),/lineage/i);
+  const fake={profile:'aether.strict-lineage-admission/1',assertCurrent:()=>{},withAdmission:async(_binding:unknown,_evidence:unknown,operation:(checkpoint:()=>void)=>Promise<unknown>)=>operation(()=>{})};
+  assert.throws(()=>new PromotionCoordinator({...f.options,profile:undefined,lineage:fake as never}),/lineage/i);
+  assert.equal(existsSync(join(f.options.directory,'production.json')),false);
+  const baseline=new PromotionCoordinator(f.options);
+  assert.equal(baseline.admissionProfile,'baseline-governor-v1');
+  const path=join(f.options.directory,'production.json'),before=readFileSync(path,'utf8');
+  const stored=JSON.parse(before);assert.equal(stored.format,'aether.production-journal/2');assert.equal(stored.profile,'baseline-governor-v1');
+  const store=new DurableGraphStore({directory:join(f.directory,'ast')});
+  const ledger=new CausalLineageLedger({directory:join(f.directory,'lineage'),repositoryId:f.authority.repositoryId,store,authority:()=>({policyEpoch:'1',eligibleAuthors:['author']}),authorKey:()=>f.keys.publicKey});
+  assert.throws(()=>new PromotionCoordinator({...f.options,profile:'strict-lineage-v1',lineage:ledger.admissionAdapter()}),/profile mismatch/);
+  assert.equal(readFileSync(path,'utf8'),before);
+  assert.throws(()=>new PromotionCoordinator({...f.options,directory:join(f.directory,'unsigned-strict'),profile:'strict-lineage-v1',lineage:ledger.admissionAdapter()}),/signed intent/);
+});
+
+test('admission profiles: explicit legacy adoption validates and preserves exact signed history',async()=>{
+  const f=fixture(),baseline=new PromotionCoordinator(f.options);await baseline.promote(f.input(),f.driver);
+  const path=join(f.options.directory,'production.json'),v2=JSON.parse(readFileSync(path,'utf8'));
+  const {profile:_profile,...legacy}=v2;legacy.format='aether.production-journal/1';
+  const bytes=JSON.stringify(legacy);writeFileSync(path,bytes);
+  assert.throws(()=>new PromotionCoordinator(f.options),/explicit baseline migration/);assert.equal(readFileSync(path,'utf8'),bytes);
+  const migrated=new PromotionCoordinator({...f.options,legacyJournalMigration:'adopt-baseline-v1'});
+  const upgraded=JSON.parse(readFileSync(path,'utf8'));
+  assert.equal(upgraded.profile,'baseline-governor-v1');assert.equal(upgraded.format,'aether.production-journal/2');
+  assert.deepEqual(upgraded.records,legacy.records);assert.equal(upgraded.activeManifest,legacy.activeManifest);assert.equal(upgraded.generation,legacy.generation);
+  assert.equal(migrated.servingManifest(),legacy.activeManifest);
+});
+
+test('admission profiles: malformed legacy identity or approval refuses migration without rewriting bytes',async()=>{
+  const f=fixture(),baseline=new PromotionCoordinator(f.options);await baseline.promote(f.input(),f.driver);
+  const path=join(f.options.directory,'production.json'),v2=JSON.parse(readFileSync(path,'utf8'));
+  for(const corrupt of ['identity','signature','history']){
+    const {profile:_profile,...legacy}=JSON.parse(JSON.stringify(v2));legacy.format='aether.production-journal/1';
+    if(corrupt==='identity')legacy.repositoryId='another-repository';
+    if(corrupt==='signature')legacy.records[0].approval.signature=Buffer.alloc(64,3).toString('base64');
+    if(corrupt==='history')legacy.records[0].audit=legacy.records[0].audit.filter((event:{event:string})=>event.event!=='authorized');
+    const bytes=JSON.stringify(legacy);writeFileSync(path,bytes);
+    assert.throws(()=>new PromotionCoordinator({...f.options,legacyJournalMigration:'adopt-baseline-v1'}));
+    assert.equal(readFileSync(path,'utf8'),bytes);
   }
 });

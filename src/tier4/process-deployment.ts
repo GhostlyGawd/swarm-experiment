@@ -12,7 +12,7 @@ import { domainDigest, executionManifestDigest, validateDigest, type Digest, typ
 import { DEFAULT_EVIDENCE_POLICY, validateEvidence, validateVettedEvidence, type EvidenceContext, type EvidencePolicyV1, type LocalEvidenceV1, type VettedEvidence } from '../fabric/evidence.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
 import { runtimeSnapshotDigest, validateRuntimeSnapshot, type RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
-import { createPromotionHandle, evidenceBundleDigest, type PromotionBindingV1, type PromotionCoordinator, type PromotionDriver, type PromotionInput, type PreparedPromotionHandleV1, type ProductionAdmissionState } from '../fabric/promotion.ts';
+import { createPromotionHandle, evidenceBundleDigest, type PromotionAdmissionProfile, type PromotionBindingV1, type PromotionCoordinator, type PromotionDriver, type PromotionInput, type PreparedPromotionHandleV1, type ProductionAdmissionState } from '../fabric/promotion.ts';
 import { ProcessHost, type ProcessHostCallResult, type ProcessHostOptions } from './process-host.ts';
 import { validateProcessAllocation, validateProcessArguments } from './process-type-validation.ts';
 import type { TopologyPlan } from './topology.ts';
@@ -47,6 +47,7 @@ export interface ProcessDeploymentOptions {
   readonly lockWaitMs?: number;
   readonly phase?: (phase: 'prepared' | 'before-activation' | 'activated' | 'aborted', detail: Readonly<{ proposalDigest: Digest; workerPids: Readonly<Record<string, number>> }>) => void;
   readonly invocationPhase?: (phase: 'after-intent' | 'after-host-result' | 'after-receipt', detail: Readonly<{ operationId: string; workerPids: Readonly<Record<string, number>> }>) => void;
+  readonly legacyProfileMigration?: 'adopt-baseline-v1';
 }
 interface DeploymentReference {
   readonly id: string;
@@ -55,7 +56,8 @@ interface DeploymentReference {
   readonly generation: string;
 }
 interface DeploymentState {
-  readonly format: 'aether.process-deployment/1';
+  readonly format: 'aether.process-deployment/2';
+  readonly admissionProfile: PromotionAdmissionProfile;
   readonly genesisManifest: Digest;
   readonly active: DeploymentReference;
   readonly readiness: 'ready' | 'preparing' | 'prepared';
@@ -207,6 +209,7 @@ export class ProcessDeployment implements PromotionDriver {
   private readonly stateFile: string;
   private readonly hosts = new Map<string, ProcessHost>();
   private lease: Lease | null = null;
+  private historicalRecovery: string | null = null;
   private closed = false;
   private constructor(options: ProcessDeploymentOptions) {
     this.options = options; ensureDirectory(options.directory);
@@ -220,6 +223,11 @@ export class ProcessDeployment implements PromotionDriver {
     const deployment = new ProcessDeployment(options);
     try {
       await deployment.gate.runAsync(async () => {
+        if(options.legacyProfileMigration!==undefined&&(options.legacyProfileMigration!=='adopt-baseline-v1'||options.coordinator.admissionProfile!=='baseline-governor-v1'))throw new TypeError('legacy deployment can only be explicitly adopted as baseline');
+        if(existsSync(deployment.stateFile)&&(load(deployment.stateFile) as {format?:unknown}).format==='aether.process-deployment/1'){
+          if(options.legacyProfileMigration!=='adopt-baseline-v1')throw new Error('unprofiled deployment history requires explicit baseline migration');
+          save(deployment.stateFile,deployment.readState(true));
+        }
         if (!existsSync(deployment.stateFile)) {
           if (!options.genesis) throw new Error('trusted genesis artifact is required');
           const artifact = deployment.persistArtifact(makeArtifact(options.genesis));
@@ -227,11 +235,11 @@ export class ProcessDeployment implements PromotionDriver {
           if (admission.committedManifest !== manifest || admission.generation !== '0' || admission.pendingProposal !== null) throw new Error('genesis does not match production admission');
           const reference: DeploymentReference = { id: 'genesis', manifest, artifactDigest: processArtifactDigest(artifact), generation: '0' };
           deployment.writePrepared({ format: 'aether.process-deployment-prepared/1', binding: null, reference, source: null, sourceSnapshotDigest: null, seed: null });
-          save(deployment.stateFile, { format: 'aether.process-deployment/1', genesisManifest: manifest, active: reference, readiness: 'ready', pendingProposal: null, invocations: [], allocations: [] });
+          save(deployment.stateFile, { format: 'aether.process-deployment/2', admissionProfile: options.coordinator.admissionProfile, genesisManifest: manifest, active: reference, readiness: 'ready', pendingProposal: null, invocations: [], allocations: [] });
         }
         const state = deployment.readState();
         // Pending decisions are recovered explicitly, never by booting the old target.
-        if (state.readiness === 'ready' && !options.coordinator.state().activationPending) {
+        if (state.readiness === 'ready' && options.coordinator.servingReady()) {
           deployment.assertServing(state); await deployment.hostFor(state.active);
         }
       }, options.lockWaitMs ?? 5000);
@@ -277,10 +285,10 @@ export class ProcessDeployment implements PromotionDriver {
     }
     return value as unknown as PreparedRecord;
   }
-  private readState(): DeploymentState {
-    const value = exactObject(load(this.stateFile), ['format', 'genesisManifest', 'active', 'readiness', 'pendingProposal', 'invocations', 'allocations']);
+  private readState(legacy=false): DeploymentState {
+    const value = exactObject(load(this.stateFile), ['format', ...(legacy?[]:['admissionProfile']), 'genesisManifest', 'active', 'readiness', 'pendingProposal', 'invocations', 'allocations']);
     validateReference(value.active); validateDigest(value.genesisManifest, 'aether.execution/1');
-    if (value.format !== 'aether.process-deployment/1' || !['ready', 'preparing', 'prepared'].includes(value.readiness as string) || (value.readiness === 'ready') !== (value.pendingProposal === null)) throw new TypeError('invalid deployment readiness');
+    if (value.format !== (legacy?'aether.process-deployment/1':'aether.process-deployment/2') || (!legacy&&value.admissionProfile!==this.options.coordinator.admissionProfile) || !['ready', 'preparing', 'prepared'].includes(value.readiness as string) || (value.readiness === 'ready') !== (value.pendingProposal === null)) throw new TypeError('invalid deployment readiness/profile');
     if (value.pendingProposal !== null) validateDigest(value.pendingProposal, 'aether.promotion/1');
     if (!Array.isArray(value.invocations)) throw new TypeError('missing durable invocation registry');
     const history = this.options.coordinator.history();
@@ -322,16 +330,24 @@ export class ProcessDeployment implements PromotionDriver {
         if (allocation.result.heapId !== row.heapId || allocation.result.ownerEpoch !== target.generation) throw new TypeError('allocation receipt scope mismatch');
       }
     }
-    return value as unknown as DeploymentState;
+    return (legacy?{...value,format:'aether.process-deployment/2',admissionProfile:'baseline-governor-v1'}:value) as unknown as DeploymentState;
+  }
+  private assertCommittedSource(state=this.readState()):void {
+    if(this.closed)throw new Error('deployment is closed');
+    const admission=this.options.coordinator.state();
+    if(admission.activationPending||state.readiness!=='ready'||state.active.manifest!==admission.committedManifest||state.active.generation!==admission.generation)throw new Error('deployment source is frozen or does not match committed target');
   }
   private assertServing(state = this.readState()): void {
-    if (this.closed) throw new Error('deployment is closed');
+    if(this.closed)throw new Error('deployment is closed');
     const manifest = this.options.coordinator.servingManifest(), admission = this.options.coordinator.state();
+    this.assertCommittedSource(state);
     if (state.readiness !== 'ready' || state.active.manifest !== manifest || state.active.generation !== admission.generation) throw new Error('deployment serving is frozen or does not match committed target');
   }
   servingManifest(): Digest { const state = this.readState(); this.assertServing(state); return state.active.manifest; }
-  status(): { readiness: DeploymentState['readiness']; activeManifest: Digest; generation: string; workerPids: Readonly<Record<string, number>> } {
-    const state = this.readState(); return { readiness: state.readiness, activeManifest: state.active.manifest, generation: state.active.generation, workerPids: this.hosts.get(state.active.id)?.workerPids ?? {} };
+  status(): { readiness: DeploymentState['readiness']; servingReady:boolean; activeManifest: Digest; generation: string; workerPids: Readonly<Record<string, number>> } {
+    const state = this.readState(),admission=this.options.coordinator.state();
+    const servingReady=!this.closed&&this.options.coordinator.servingReady()&&state.readiness==='ready'&&state.active.manifest===admission.committedManifest&&state.active.generation===admission.generation;
+    return { readiness: state.readiness, servingReady, activeManifest: state.active.manifest, generation: state.active.generation, workerPids: this.hosts.get(state.active.id)?.workerPids ?? {} };
   }
   private async hostFor(reference: DeploymentReference): Promise<ProcessHost> {
     if (this.closed) throw new Error('deployment is closed');
@@ -341,7 +357,11 @@ export class ProcessDeployment implements PromotionDriver {
     const context = processArtifactContext(artifact), factory = this.options.factories.get(artifact.factoryId)!;
     const services = factory(artifact);
     ensureDirectory(join(this.directory(reference.id), 'host'));
-    const host = await ProcessHost.open({ ...services, directory: join(this.directory(reference.id), 'host'), module: context.module, manifest: artifact.manifest,
+    const host = await ProcessHost.open({ ...services, onPhase:(phase,detail)=>{
+      if(this.historicalRecovery!==reference.id)this.options.coordinator.assertLineageCurrent(reference.manifest);
+      services.onPhase?.(phase,detail);
+      if(this.historicalRecovery!==reference.id)this.options.coordinator.assertLineageCurrent(reference.manifest);
+    }, directory: join(this.directory(reference.id), 'host'), module: context.module, manifest: artifact.manifest,
       registry: context.registry, plan: JSON.parse(artifact.plan), initialGeneration: reference.generation, initialSnapshot: record.seed ?? undefined });
     if (this.closed) { await host.close(); throw new Error('deployment closed during worker preparation'); }
     this.hosts.set(reference.id, host); return host;
@@ -352,6 +372,9 @@ export class ProcessDeployment implements PromotionDriver {
     return host.issueTokens(symbol, ttlMs);
   }
   async snapshot(): Promise<RuntimeSnapshotV1> { return this.gate.runAsync(async () => { const state = this.readState(); this.assertServing(state); return (await this.hostFor(state.active)).snapshot(); }, this.options.lockWaitMs ?? 5000); }
+  /** Administrative evidence capture, never code execution. Allows a newly
+   * signed repair to replace a quiescent artifact invalidated by a specification. */
+  async snapshotForPromotion():Promise<RuntimeSnapshotV1>{return this.gate.runAsync(async()=>{const state=this.readState();this.assertCommittedSource(state);if(state.invocations.some(item=>item.phase==='pending')||state.allocations.some(item=>item.result===null))throw new Error('unresolved source execution prevents promotion snapshot');return(await this.hostFor(state.active)).snapshot();},this.options.lockWaitMs??5000);}
   async allocateRecord(ty: Ty, fields: Readonly<Record<string, TaggedValueV1>>, options: { operationId: string; unit?: string }): Promise<LogicalRefV1> {
     identifier(options.operationId); ty = freeze(copy(ty)); fields = freeze(copy(fields)); options = Object.freeze({ ...options });
     if (underlying(ty).t !== 'Record') throw new TypeError('allocation requires a record type');
@@ -400,6 +423,11 @@ export class ProcessDeployment implements PromotionDriver {
       const old = state.invocations.find(invocation => invocation.operationId === options.operationId);
       if (old) {
         if (old.requestDigest !== requestDigest) throw new Error('deployment invocation identity conflict');
+        const historical=this.readArtifact(old.deployment.manifest),current=this.readArtifact(state.active.manifest);
+        const declaration=(artifact:ProcessArtifactV1)=>[...walk(processArtifactContext(artifact).module)].find((node):node is Extract<Term,{kind:'FunctionDecl'}>=>node.kind==='FunctionDecl'&&node.symbol===symbol);
+        const before=declaration(historical),after=declaration(current);
+        if(!before||!after||historical.manifest.capabilityPolicyDigest!==current.manifest.capabilityPolicyDigest||before.capabilities.some(cap=>!after.capabilities.includes(cap)))throw new Error('historical invocation requires authority unavailable in the current declaration/policy; durable receipt retained without redispatch');
+        this.assertServing();
         host.authorizeInvocation(symbol, options.tokens);
         return copy(old.result ?? { state: 'indeterminate', operationId: old.operationId, generation: old.deployment.generation, unit: old.unit, reason: 'durable invocation has no completed receipt; recover original deployment' });
       }
@@ -424,11 +452,12 @@ export class ProcessDeployment implements PromotionDriver {
         this.options.invocationPhase?.('after-host-result', { operationId: options.operationId, workerPids: host.workerPids });
         this.recordInvocation({ ...invocation, result, phase: result.state === 'indeterminate' ? 'pending' : 'settled' });
         this.options.invocationPhase?.('after-receipt', { operationId: options.operationId, workerPids: host.workerPids });
+        if(result.state==='completed')this.assertServing();
         host.authorizeInvocation(symbol, options.tokens);
         return result;
       } catch (error) {
         const durable = this.readState().invocations.find(record => record.operationId === invocation.operationId)!;
-        if (durable.phase === 'settled' && durable.result) { host.authorizeInvocation(symbol, options.tokens); return copy(durable.result); }
+        if (durable.phase === 'settled' && durable.result) { if(durable.result.state==='completed')this.assertServing();host.authorizeInvocation(symbol, options.tokens); return copy(durable.result); }
         this.recordInvocation({ ...invocation, result: { state: 'indeterminate', operationId: invocation.operationId, generation: invocation.deployment.generation, unit: invocation.unit, reason: 'inner execution outcome requires original-deployment recovery' } });
         throw error;
       }
@@ -440,12 +469,12 @@ export class ProcessDeployment implements PromotionDriver {
     if (!['isolated-replay', 'abort-before-effects'].includes(strategy)) throw new TypeError('unknown deployment recovery strategy');
     const request = Object.freeze({ strategy });
     return this.gate.runAsync(async () => {
-      const state = this.readState(); this.assertServing(state);
+      const state = this.readState(); this.assertCommittedSource(state);
       const invocation = state.invocations.find(invocation => invocation.operationId === operationId);
       if (!invocation) throw new Error('unknown deployment invocation');
       const artifact = this.readArtifact(invocation.deployment.manifest);
       const authorize = (): void => {
-        this.assertServing();
+        this.assertCommittedSource();
         const services = this.options.factories.get(artifact.factoryId)?.(artifact);
         if (!services?.authorizeRecovery?.(operationId, strategy)) throw new Error('deployment recovery authorization denied');
       };
@@ -458,7 +487,10 @@ export class ProcessDeployment implements PromotionDriver {
       if (host.operationResult(operationId) === null) {
         if (strategy !== 'abort-before-effects') throw new Error('no inner host intent; explicit authorized abort-before-effects is required');
         result = { state: 'aborted', operationId, generation: invocation.deployment.generation, unit: invocation.unit, reason: 'authorized abort: durable host journal confirms no execution intent was created' };
-      } else result = await host.recoverOperation(operationId, request);
+      } else {
+        this.historicalRecovery=invocation.deployment.id;
+        try{result=await host.recoverOperation(operationId,request);}finally{this.historicalRecovery=null;}
+      }
       authorize();
       this.recordInvocation({ ...invocation, result, phase: result.state === 'indeterminate' ? 'pending' : 'settled' });
       return result;
@@ -494,7 +526,7 @@ export class ProcessDeployment implements PromotionDriver {
   async prepare(binding: PromotionBindingV1, evidence: VettedEvidence): Promise<PreparedPromotionHandleV1> {
     this.assertBinding(binding, 'prepare'); validateVettedEvidence(evidence, binding.manifest);
     await this.hold(binding.proposalDigest);
-    const state = this.readState(); this.assertServing(state);
+    const state = this.readState(); this.assertCommittedSource(state);
     if (state.active.manifest !== binding.proposal.expectedParent || String(BigInt(state.active.generation) + 1n) !== binding.generation) throw new Error('stale source deployment generation');
     const candidate = this.readArtifact(binding.proposal.candidateManifest), source = this.readArtifact(state.active.manifest);
     if (!equal(candidate.manifest, binding.manifest) || evidenceBundleDigest(candidate.evidence) !== binding.proposal.evidenceBundleDigest) throw new Error('candidate registry evidence does not match approval');
