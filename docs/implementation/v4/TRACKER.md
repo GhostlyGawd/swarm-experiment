@@ -23,7 +23,7 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-T2-06](#v4-t2-06).
+**Ready now:** none.
 
 ## Milestones
 
@@ -66,7 +66,7 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-T2-03](#v4-t2-03) | Invariant CEGIS | verification | v2 | planned | [V4-F06](#v4-f06), [V4-T2-01](#v4-t2-01) |
 | [V4-T2-04](#v4-t2-04) | Object-capability containment | security | v2 | in_progress | [V4-F04](#v4-f04), [V4-F07](#v4-f07) |
 | [V4-T2-05](#v4-t2-05) | Economic resource types | runtime | v2 | planned | [V4-F04](#v4-f04), [V4-T2-04](#v4-t2-04) |
-| [V4-T2-06](#v4-t2-06) | Heterogeneous Byzantine promotion quorum | governance | v2 | planned | [V4-R01](#v4-r01), [V4-F08](#v4-f08), [V4-T1-06](#v4-t1-06), [V4-T2-10](#v4-t2-10) |
+| [V4-T2-06](#v4-t2-06) | Heterogeneous Byzantine promotion quorum | governance | v2 | in_progress | [V4-R01](#v4-r01), [V4-F08](#v4-f08), [V4-T1-06](#v4-t1-06), [V4-T2-10](#v4-t2-10) |
 | [V4-T2-07](#v4-t2-07) | State lens synthesis | persistence | v2 | planned | [V4-F07](#v4-f07), [V4-T2-01](#v4-t2-01), [V4-T2-10](#v4-t2-10) |
 | [V4-T2-08](#v4-t2-08) | Minimal distinguishing examples | synthesis | v2 | planned | [V4-T2-01](#v4-t2-01), [V4-T1-09](#v4-t1-09) |
 | [V4-T2-09](#v4-t2-09) | Zero-knowledge module attestation | verification | v4 | planned | [V4-R03](#v4-r03), [V4-T2-10](#v4-t2-10), [V4-T1-08](#v4-t1-08) |
@@ -653,7 +653,7 @@ Evidence: not yet produced.
 
 ### V4-T2-06
 
-**Heterogeneous Byzantine promotion quorum** · implementation · v2 · owner: governance · **planned**
+**Heterogeneous Byzantine promotion quorum** · implementation · v2 · owner: governance · **in_progress**
 
 Prerequisites: [V4-R01](#v4-r01), [V4-F08](#v4-f08), [V4-T1-06](#v4-t1-06), [V4-T2-10](#v4-t2-10).
 

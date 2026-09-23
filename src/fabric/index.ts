@@ -5,3 +5,4 @@ export * from './effects.ts';
 export * from './replication.ts';
 export * from './evidence.ts';
 export * from './promotion.ts';
+export * from './quorum-crypto.ts';
