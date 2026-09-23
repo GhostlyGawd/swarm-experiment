@@ -262,7 +262,7 @@ async function processMatrix() {
     const nestedTokens = host.issueScopedTokens(ex.symbols.settle);
     const nestedResult = await host.call(ex.symbols.settle, args, { operationId: 'process-nested-valid', tokens: nestedTokens });
     record({ id: 'process/cross-process/positive', boundary: 'ProcessHost.call nested A-B', attack: 'valid',
-      expected: 'allow-one-sink-changed-heap', observed: nestedResult.state,
+      expected: 'allow-one-sink-changed-heap', observed: nestedResult.state === 'completed' && nestedResult.execution.ok ? 'completed' : JSON.stringify(nestedResult),
       denied: false, sinkBefore: nestedSink, sinkAfter: calls, heapBefore: nestedBefore, heapAfter: await heap() });
     const afterPositive = await heap();
     epochs.revoke(PROCESS_INVOKE, []);
@@ -465,7 +465,8 @@ async function deploymentMatrix() {
     const freshTokens = deployment.issueScopedTokens(setter);
     const response = await deployment.call(setter, args, { operationId: 'deploy-valid', tokens: freshTokens });
     record({ id: 'deployment/direct/positive', boundary: 'ProcessDeployment.call', attack: 'valid',
-      expected: 'allow-zero-sink-changed-heap', observed: response.state, denied: false,
+      expected: 'allow-zero-sink-changed-heap',
+      observed: response.state === 'completed' && response.execution.ok ? 'completed' : JSON.stringify(response), denied: false,
       sinkBefore: 0, sinkAfter: 0, heapBefore: before, heapAfter: await heap() });
     const afterPositive = await heap(); epochs.revoke(PROCESS_INVOKE, []);
     try { const replay = await deployment.call(setter, args, { operationId: 'deploy-valid', tokens: freshTokens }); observed = replay.state; denied = false; }

@@ -82,6 +82,27 @@ for (const row of report.cases) {
     assert.equal(row.denied, true, row.id + ' allowed an attack: ' + row.observed);
     assert.equal(row.sinkDelta, 0, row.id + ' reached a live sink');
     assert.equal(row.heapChanged, false, row.id + ' published heap state');
+    if (row.id.startsWith('topology/direct/')) {
+      assert.equal(row.observed, 'authority', row.id);
+    } else if (row.id.startsWith('topology/')) {
+      assert.match(row.observed, /authority_denied/, row.id);
+    } else if (row.id.endsWith('/denial-persistence') || row.id.endsWith('/reopen') || row.id.includes('/reopen-after-')) {
+      assert.equal(row.observed, 'unchanged', row.id);
+    } else if (row.id === 'process/effect-grant/narrowed') {
+      const result = JSON.parse(row.observed);
+      assert.equal(result.state, 'completed', row.id);
+      assert.equal(result.execution?.ok, false, row.id);
+      assert.match(result.execution.fault?.message, /authority_denied/, row.id);
+    } else if (row.id === 'process/effect/revoked-before-sink'
+      || row.id === 'process/cross-process/revoked-at-boundary'
+      || row.id === 'process/final-publication/revoked') {
+      const result = JSON.parse(row.observed);
+      assert.equal(result.state, 'indeterminate', row.id);
+      if (row.id !== 'process/effect/revoked-before-sink') assert.match(result.reason, /authority_denied/, row.id);
+      else assert.match(result.reason, /effect_indeterminate/, row.id);
+    } else {
+      assert.match(row.observed, /authority_denied|capability grant identity mismatch/, row.id);
+    }
   }
 }
 console.log(JSON.stringify({ verified: report.cases.length, commit: report.commit,
