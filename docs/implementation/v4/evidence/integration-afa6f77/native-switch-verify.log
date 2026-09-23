@@ -1,0 +1,524 @@
+{
+  "cases": [
+    {
+      "index": 0,
+      "input": {
+        "mode": "primary",
+        "alias": true,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      "native": {
+        "tier": 1,
+        "code": 0,
+        "value": 11,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            11
+          ],
+          [
+            2,
+            888
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 1,
+        "code": 0,
+        "value": 11,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            11
+          ],
+          [
+            2,
+            888
+          ]
+        ]
+      }
+    },
+    {
+      "index": 1,
+      "input": {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      "native": {
+        "tier": 2,
+        "code": 0,
+        "value": 11,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            11
+          ],
+          [
+            2,
+            888
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 2,
+        "code": 0,
+        "value": 11,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            11
+          ],
+          [
+            2,
+            888
+          ]
+        ]
+      }
+    },
+    {
+      "index": 2,
+      "input": {
+        "mode": "abort",
+        "alias": true,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      "native": {
+        "tier": 3,
+        "code": 1,
+        "value": 0,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 2,
+        "records": [
+          [
+            1,
+            10
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 3,
+        "code": 1,
+        "value": 0,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 2,
+        "records": [
+          [
+            1,
+            10
+          ]
+        ]
+      }
+    },
+    {
+      "index": 3,
+      "input": {
+        "mode": "primary",
+        "alias": false,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      "native": {
+        "tier": 3,
+        "code": 1,
+        "value": 0,
+        "left": 1,
+        "right": 2,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            10
+          ],
+          [
+            2,
+            110
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 3,
+        "code": 1,
+        "value": 0,
+        "left": 1,
+        "right": 2,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            10
+          ],
+          [
+            2,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "index": 4,
+      "input": {
+        "mode": "fallback",
+        "alias": false,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      "native": {
+        "tier": 3,
+        "code": 1,
+        "value": 0,
+        "left": 1,
+        "right": 2,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            10
+          ],
+          [
+            2,
+            110
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 3,
+        "code": 1,
+        "value": 0,
+        "left": 1,
+        "right": 2,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            10
+          ],
+          [
+            2,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "index": 5,
+      "input": {
+        "mode": "abort",
+        "alias": false,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      "native": {
+        "tier": 3,
+        "code": 1,
+        "value": 0,
+        "left": 1,
+        "right": 2,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            10
+          ],
+          [
+            2,
+            110
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 3,
+        "code": 1,
+        "value": 0,
+        "left": 1,
+        "right": 2,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            10
+          ],
+          [
+            2,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "index": 6,
+      "input": {
+        "mode": "fallback",
+        "alias": true,
+        "initial": -7,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      "native": {
+        "tier": 2,
+        "code": 0,
+        "value": -6,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            -6
+          ],
+          [
+            2,
+            888
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 2,
+        "code": 0,
+        "value": -6,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            -6
+          ],
+          [
+            2,
+            888
+          ]
+        ]
+      }
+    },
+    {
+      "index": 7,
+      "input": {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 99,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      "native": {
+        "tier": 2,
+        "code": 0,
+        "value": 100,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            100
+          ],
+          [
+            2,
+            888
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 2,
+        "code": 0,
+        "value": 100,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            100
+          ],
+          [
+            2,
+            888
+          ]
+        ]
+      }
+    },
+    {
+      "index": 8,
+      "input": {
+        "mode": "primary",
+        "alias": true,
+        "initial": 0,
+        "grant2": false,
+        "revokeAtFault": false
+      },
+      "native": {
+        "tier": 1,
+        "code": 0,
+        "value": 1,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            888
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 1,
+        "code": 0,
+        "value": 1,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 3,
+        "records": [
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            888
+          ]
+        ]
+      }
+    },
+    {
+      "index": 9,
+      "input": {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 0,
+        "grant2": false,
+        "revokeAtFault": false
+      },
+      "native": {
+        "tier": 3,
+        "code": 2,
+        "value": 0,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 2,
+        "records": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 3,
+        "code": 2,
+        "value": 0,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 2,
+        "records": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "index": 10,
+      "input": {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 0,
+        "grant2": true,
+        "revokeAtFault": true
+      },
+      "native": {
+        "tier": 3,
+        "code": 2,
+        "value": 0,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 2,
+        "records": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 3,
+        "code": 2,
+        "value": 0,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 2,
+        "records": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "index": 11,
+      "input": {
+        "mode": "abort",
+        "alias": true,
+        "initial": 0,
+        "grant2": true,
+        "revokeAtFault": true
+      },
+      "native": {
+        "tier": 3,
+        "code": 2,
+        "value": 0,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 2,
+        "records": [
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "reference": {
+        "tier": 3,
+        "code": 2,
+        "value": 0,
+        "left": 1,
+        "right": 1,
+        "nextObjectId": 2,
+        "records": [
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    }
+  ]
+}

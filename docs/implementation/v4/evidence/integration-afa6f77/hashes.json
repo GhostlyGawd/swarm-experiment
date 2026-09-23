@@ -1,0 +1,14 @@
+{
+  "bench-enforce.log": "fc127d06cffe311787bd4a11cc76666df84baa738723f5d1872f5f6c79bdd096",
+  "bench-verify.log": "dc4766dba7b12fa230d9c5c4f09cce31dcbd3a1290ffdad848ce754eaf826f9f",
+  "benchmark-manifest.json": "e2afceb26ed493deadf4fbd4af2a2cd6a9535c001f696954e09aba3659549ae0",
+  "benchmark-samples.json": "eb006c52c054e7b5a44542cb8a54fd34a91b56f0308e718eec881e3d9e6d35ba",
+  "frost-differential.log": "3a60cbd3052678a79346d901be0a88711d4257349a896a58c31f2cd3b2a9e0d2",
+  "full-test.log": "ea3e85bde44e93abe65437425af4a8bf09ffc8f0f5c3301881ea1cd162138d59",
+  "native-switch-verify.log": "aaa1388d55ba7c6a61713b0ac4e2bcb942a4b3f6de21a42a164f4322505ac261",
+  "packed-native-check.log": "40f0f0a437931f63e9f8e060c732b54a3f5298e066e270b428ebba6252a86bf2",
+  "ristretto-tests.log": "d4ef094b5c20cfd7b3fc0dd9c9b4e212f40010291b29fc945da0dfa4500d8ee5",
+  "roadmap-check.log": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+  "roadmap-v4-check.log": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+  "typecheck.log": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a"
+}
