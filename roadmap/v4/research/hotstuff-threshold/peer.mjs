@@ -1,0 +1,66 @@
+import assert from 'node:assert/strict';
+import { createPrivateKey } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createInterface } from 'node:readline';
+import { DurableQuorumNode } from '../../../../src/fabric/quorum-node.ts';
+import { quorumRosterDigest } from '../../../../src/fabric/quorum-crypto.ts';
+import { promotionDigest } from '../../../../src/fabric/promotion.ts';
+import { encodeCanonical } from '../../../../src/fabric/encoding.ts';
+import { Rpc,read,persist,same,sha,helper,groupDigest,proofDigest,transitionDigest,transitionProposal,normalProposal,validateTransition,validateContext,validateProof,verifyHandoff,authenticate,validateEpochQuorum } from './protocol.mjs';
+
+const cfg=JSON.parse(readFileSync(process.argv[2],'utf8'));assert.equal(sha(readFileSync(cfg.binary)),cfg.binarySha256);
+const rosterId=quorumRosterDigest(cfg.roster),member=cfg.roster.validators[cfg.index],key=createPrivateKey(cfg.privateKey);
+let handoffId=null;if(!cfg.bootstrap){handoffId=verifyHandoff(cfg.binary,cfg.handoff,cfg.anchors);assert.equal(quorumRosterDigest(cfg.handoff.descriptor.toRoster),rosterId);assert.equal(cfg.genesisManifest,cfg.handoff.descriptor.genesisManifest);}
+const crypto=await Rpc.start(cfg.binary,[cfg.custodyConfig],{env:{...process.env,...(cfg.custodyFault?{AETHER_CUSTODY_FAULT:cfg.custodyFault}:{AETHER_CUSTODY_FAULT:''})}});
+const cryptoConfig=JSON.parse(readFileSync(cfg.custodyConfig,'utf8'));validateContext(cryptoConfig.context,cfg.roster);
+const metaPath=join(cfg.directory,'metadata.json'),clockPath=join(cfg.directory,'clock.json'),activePath=join(cfg.directory,'active.json');
+let meta=read(metaPath,{handoffs:{},proofs:{}}),clock=BigInt(read(clockPath,{now:'0'}).now);
+const node=new DurableQuorumNode({directory:join(cfg.directory,'hotstuff'),roster:cfg.roster,validatorId:member.id,privateKey:key,genesisManifest:cfg.genesisManifest,clockDomain:'hotstuff-threshold-simulation/1',clock:()=>clock,initialTimeoutNs:10n,maxEvents:2048,validateProposal:proposal=>{
+  if(BigInt(proposal.expiresAt)<=clock)return false;
+  return same(proposal,normalProposal(cfg.roster,proposal.expectedParent,proposal.candidateManifest))||!!meta.handoffs[promotionDigest(proposal)]&&same(proposal,transitionProposal(meta.handoffs[promotionDigest(proposal)],cfg.roster));
+}});
+const custodyStatus=()=>crypto.call({op:'Status'});
+async function group(){const status=await custodyStatus();assert.ok(status.public_package,'DKG public group unavailable');return{context:cryptoConfig.context,publicPackage:status.public_package};}
+function enabled(protocol,custody){return Boolean(custody.ready&&!custody.retired&&(cfg.bootstrap||read(activePath,null))&&!protocol.decisions.some(decision=>meta.handoffs[decision.certificate.body.proposal]));}
+async function active(){assert.ok(enabled(node.status(),await custodyStatus()),'research epoch is staged, transitioning or retired');}
+function register(proposal,transition){const existing=meta.handoffs[promotionDigest(proposal)];transition??=existing;if(transition){validateTransition(transition,cfg.roster);assert.ok(same(proposal,transitionProposal(transition,cfg.roster)));if(existing)assert.ok(same(existing,transition));meta.handoffs[promotionDigest(proposal)]=transition;persist(metaPath,meta);}else assert.ok(same(proposal,normalProposal(cfg.roster,proposal.expectedParent,proposal.candidateManifest)),'unknown synthetic proposal policy');return transition;}
+async function checkProof(qc,value){const proof=value??meta.proofs[qc.id];assert.ok(proof,'threshold proof is required');validateProof(proof,cfg.roster,qc);const result=await crypto.call({op:'Verify',proof});assert.equal(result.verified,true);meta.proofs[qc.id]=proof;persist(metaPath,meta);return proof;}
+const signed=payload=>authenticate(payload,member.id,key);
+async function handle(command){
+  switch(command.op){
+    case 'status':{const protocol=node.status(),custody=await custodyStatus();return{node:protocol,custody,roster:rosterId,active:enabled(protocol,custody),pid:process.pid,custodyPid:crypto.child.pid};}
+    case 'clock':assert.ok(BigInt(command.now)>=clock);clock=BigInt(command.now);persist(clockPath,{now:String(clock)});return{now:String(clock)};
+    case 'timeout':await active();node.timeout(command.view);return node.status();
+    case 'dkg':assert.ok(['Start','Send','Part2','Part3'].includes(command.command.op));return crypto.call(command.command);
+    case 'blocks':node.ingestBlocks(command.blocks);return null;
+    case 'new-view':await active();{const report=node.newView();return{report,proof:report.body.highQC?meta.proofs[report.body.highQC.id]:null};}
+    case 'receive-new-view':await active();if(command.report.body.highQC)await checkProof(command.report.body.highQC,command.proof);node.receiveNewView(command.report);return null;
+    case 'propose':await active();register(command.proposal,command.transition);{const message=node.propose(command.proposal);if(command.transition)assert.equal(message.body.block.parent,command.transition.previousBlock);return{message,proof:message.body.highQC?meta.proofs[message.body.highQC.id]:null,transition:command.transition??null};}
+    case 'prepare':await active();if(command.message.body.highQC)await checkProof(command.message.body.highQC,command.proof);{const transition=register(command.message.body.block.proposal,command.transition);if(transition)assert.equal(command.message.body.block.parent,transition.previousBlock);return node.receivePrepare(command.message);}
+    case 'phase-message':await active();await checkProof(command.qc,command.proof);return node.phaseMessage(command.phase,command.qc);
+    case 'phase':await active();await checkProof(command.message.body.qc,command.proof);if(command.message.body.phase==='precommit')return node.receivePrecommit(command.message);if(command.message.body.phase==='commit')return node.receiveCommit(command.message);if(command.message.body.phase==='decide')return node.receiveDecide(command.message);throw new Error('unsupported phase');
+    case 'reserve':await active();{const authorization=node.outbox().find(value=>value.body?.format==='aether.quorum-vote/1'&&same(value,command.authorization));assert.ok(authorization,'vote authorization is not in the durable honest outbox');const current=await group();const publicKey=command.groupPublicKey;const message=Buffer.from(encodeCanonical({format:'aether.hotstuff-custody-subject/1',context:current.context,group_public_key:publicKey,vote:authorization.body})).toString('hex');const reserved=await crypto.call({op:'Reserve',nonce:command.nonce,message,authorization});return{...reserved,message};}
+    case 'sign':await active();return crypto.call({op:'Sign',nonce:command.nonce,package:command.package});
+    case 'check-proof':return checkProof(command.proof.qc,command.proof);
+    case 'ready':assert.ok(!cfg.bootstrap);{const current=await group();return signed({domain:'aether.research-epoch-ready/1',roster:rosterId,group:groupDigest(current),handoff:handoffId,genesis:cfg.genesisManifest});}
+    case 'retire':{
+      const current=await group(),bundle=command.bundle;const id=verifyHandoff(cfg.binary,bundle,{oldRoster:rosterId,oldGroup:groupDigest(current)});register(transitionProposal(bundle.descriptor,cfg.roster),bundle.descriptor);await checkProof(bundle.commitProof.qc,bundle.commitProof);
+      const payload={domain:'aether.research-epoch-retirement/1',fromRoster:rosterId,toRoster:quorumRosterDigest(bundle.descriptor.toRoster),handoff:id,commit:proofDigest(bundle.commitProof),genesis:bundle.descriptor.genesisManifest};const decision=sha(encodeCanonical(payload));await crypto.call({op:'Retire',decision});const receipt=signed(payload);persist(join(cfg.directory,'retirement.json'),receipt);return receipt;
+    }
+    case 'activate':{
+      assert.ok(!cfg.bootstrap);const id=verifyHandoff(cfg.binary,command.bundle,cfg.anchors);assert.equal(id,handoffId);const current=await group();const retirement={domain:'aether.research-epoch-retirement/1',fromRoster:cfg.anchors.oldRoster,toRoster:rosterId,handoff:id,commit:proofDigest(command.bundle.commitProof),genesis:cfg.genesisManifest};
+      validateEpochQuorum(command.retirements,command.bundle.oldRoster,retirement);validateEpochQuorum(command.readiness,cfg.roster,{domain:'aether.research-epoch-ready/1',roster:rosterId,group:groupDigest(current),handoff:id,genesis:cfg.genesisManifest});
+      const activation={format:'aether.research-epoch-activation/1',handoff:id,roster:rosterId,group:groupDigest(current),retirements:command.retirements,readiness:command.readiness};const prior=read(activePath,null);if(prior)assert.ok(same(prior,activation));else persist(activePath,activation);if(!prior&&cfg.peerFault==='after-activation-publish')process.kill(process.pid,'SIGKILL');return signed({domain:'aether.research-epoch-active/1',handoff:id,roster:rosterId,group:groupDigest(current)});
+    }
+    default:throw new Error('unknown research peer command');
+  }
+}
+// A missing sidecar is not an empty approval history. Re-establish every
+// committed special-command interpretation and the highest safety proofs
+// before announcing readiness after restart.
+const recovered=node.status();
+for(const decision of recovered.decisions)for(const block of decision.blocks){if(!same(block.proposal,normalProposal(cfg.roster,block.proposal.expectedParent,block.proposal.candidateManifest))){const descriptor=meta.handoffs[promotionDigest(block.proposal)];assert.ok(descriptor,'missing committed transition metadata');validateTransition(descriptor,cfg.roster);assert.ok(same(block.proposal,transitionProposal(descriptor,cfg.roster)));assert.equal(block.parent,descriptor.previousBlock);}}
+for(const qc of [recovered.highQC,recovered.lockedQC])if(qc){assert.ok(meta.proofs[qc.id],'missing durable threshold proof metadata');await checkProof(qc);}
+process.stdout.write(JSON.stringify({ready:true,participant:cfg.index+1,roster:rosterId,address:crypto.ready.ready,pid:process.pid,custodyPid:crypto.child.pid})+'\n');
+let serial=Promise.resolve();createInterface({input:process.stdin}).on('line',line=>{serial=serial.then(async()=>{try{assert.ok(line.length<=512*1024);const value=await handle(JSON.parse(line));process.stdout.write(JSON.stringify({ok:true,value})+'\n');}catch(error){process.stdout.write(JSON.stringify({ok:false,error:String(error.message??error)})+'\n');}});}).on('close',()=>{serial.finally(async()=>{await crypto.close();process.exit(0);});});
