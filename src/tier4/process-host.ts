@@ -9,6 +9,7 @@ import { capability, type CapabilityName, type NodeRef, type SymbolId } from '..
 import { CapabilityRegistry, CapabilitySealer, RevocationList, type CapabilityToken } from '../tier2/ocap.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { ProductionRuntime } from '../tier3/compile.ts';
+import type { EffectEventV1 } from '../fabric/effects.ts';
 import { EffectInvocationError, type RuntimeEffectRouter } from '../tier3/effects.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
 import type { Value } from '../tier3/values.ts';
@@ -20,6 +21,10 @@ import { ProcessChannel, encodeProcessExecution, decodeProcessExecution, type Pr
 import { encodeProcessValue, decodeProcessValue, fromWireSnapshot, toWireSnapshot, processBoundaryId, type ProcessScope } from './process-values.ts';
 import { TopologyHost } from './host.ts';
 import { callGraph, DEFAULT_COST_MODEL, type TopologyPlan } from './topology.ts';
+import { compileResumableProgram, type ResumableProgram } from '../tier3/resumable-program.ts';
+import { validateExecutedCheckpoint } from '../tier3/resumable-runtime.ts';
+import { checkpointDigest, type ResumableSnapshot } from '../tier3/resumable-state.ts';
+import { validateProcessCheckpointBinding, processCheckpointBindingDigest, processCheckpointReceiptDigest, validateCheckpointExtension, assertBaseProjection, projectProcessCheckpoint, processReferenceFromCheckpoint, writeProcessCheckpoint, readProcessCheckpoint, retainedProcessCheckpointExists, writeCheckpointEffectAudit, readCheckpointEffectAudit, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointAuthorization, type ProcessCheckpointAction } from './process-checkpoint-contract.ts';
 import { validateProcessArguments, validateProcessResult, validateProcessAllocation } from './process-type-validation.ts';
 
 export const PROCESS_INVOKE = capability('cap:process:invoke');
@@ -69,14 +74,15 @@ interface AllocationRecord {
 }
 interface StateHead {
   sequence: string; parent: Digest | null; generation: string; planDigest: Digest; snapshotDigest: Digest;
-  cause: { kind: 'initial' | 'allocation' | 'call' | 'migration' | 'abort'; operationId: string; subjectDigest: Digest }; digest: Digest;
+  cause: { kind: 'initial' | 'allocation' | 'call' | 'migration' | 'abort' | 'checkpoint'; operationId: string; subjectDigest: Digest }; digest: Digest;
 }
 interface HostJournal {
-  format: 'aether.process-host/1'; configuration: Digest; generation: string; plan: string;
+  format: 'aether.process-host/1' | 'aether.process-host/2'; configuration: Digest; generation: string; plan: string;
   snapshot: RuntimeSnapshotV1; calls: CallRecord[]; migrations: MigrationRecord[];
   allocations: AllocationRecord[];
   snapshots: Array<{ digest: Digest; snapshot: RuntimeSnapshotV1 }>;
   heads: StateHead[];
+  checkpointLeases?: ProcessCheckpointLease[]; checkpointReceipts?: ProcessCheckpointReceipt[];
 }
 export type ProcessHostCallResult =
   | { state: 'completed'; operationId: string; generation: string; unit: string; execution: WireExecution }
@@ -92,7 +98,7 @@ export interface ProcessEffectContext {
   readonly mode: 'live' | 'replay';
   readonly snapshot: RuntimeSnapshotV1;
 }
-export type ProcessHostPhase = 'call-intent' | 'boundary' | 'effect-requested' | 'effect-recorded' | 'call-before-commit' | 'call-committed' | 'migration-requested' | 'migration-prepared' | 'migration-before-commit' | 'migration-committed' | 'migration-finalized';
+export type ProcessHostPhase = 'call-intent' | 'boundary' | 'effect-requested' | 'effect-recorded' | 'call-before-commit' | 'call-committed' | 'migration-requested' | 'migration-prepared' | 'migration-before-commit' | 'migration-committed' | 'migration-finalized' | 'checkpoint-started' | 'checkpoint-saved' | 'checkpoint-before-commit' | 'checkpoint-committed' | 'checkpoint-aborted';
 export interface ProcessHostOptions {
   readonly directory: string;
   readonly module: Term;
@@ -102,6 +108,8 @@ export interface ProcessHostOptions {
   readonly sealer: CapabilitySealer;
   readonly revocations?: RevocationList;
   readonly effectRouterFactory?: (context: ProcessEffectContext) => RuntimeEffectRouter;
+  /** Privileged adoption/resumption of exact checkpoint state. No implicit authority from checkpoint bytes. */
+  readonly authorizeCheckpoint?: (request: ProcessCheckpointAuthorization) => boolean;
   readonly authorizeRecovery?: (operationId: string, strategy: 'isolated-replay' | 'abort-before-effects') => boolean;
   /** Caller must authorize any same-schema manifest/epoch rebinding before opening a new deployment directory. */
   readonly initialSnapshot?: RuntimeSnapshotV1;
@@ -110,6 +118,12 @@ export interface ProcessHostOptions {
   readonly lockWaitMs?: number;
   readonly maxWorkers?: number;
   readonly onPhase?: (phase: ProcessHostPhase, detail: Readonly<{ operationId: string; generation: string }>) => void;
+}
+export interface ProcessCheckpointAccess {
+  readonly binding: ProcessCheckpointBinding; readonly program: ResumableProgram; readonly before: RuntimeSnapshotV1; readonly checkpoint: ResumableSnapshot;
+  readonly assertAuthority: () => void; readonly save: (snapshot: ResumableSnapshot) => void;
+  readonly commit: (snapshot: ResumableSnapshot, effectAudit: readonly EffectEventV1[]) => ProcessCheckpointReceipt;
+  readonly abort: () => void;
 }
 interface Frame { operationId: string; symbol: SymbolId; unit: string; nextBoundary: number }
 interface Active {
@@ -166,6 +180,7 @@ export class ProcessHost {
   private workersGeneration: string | null = null;
   private active: Active | null = null;
   private closed = false;
+  private checkpointProgramCache: ResumableProgram | null = null;
 
   private constructor(options: ProcessHostOptions) {
     this.options = { ...options, plan: JSON.parse(planBytes(options.plan)) as TopologyPlan, initialSnapshot: options.initialSnapshot ? copy(options.initialSnapshot) : undefined };
@@ -288,7 +303,7 @@ export class ProcessHost {
     identifier(operationId);
     options = Object.freeze({ strategy: options.strategy });
     if (!['isolated-replay', 'abort-before-effects'].includes(options.strategy)) throw new Error('unknown recovery strategy');
-    if (!this.options.authorizeRecovery?.(operationId, options.strategy)) throw new Error('recovery_authorization_denied');
+    if (this.options.authorizeRecovery?.(operationId, options.strategy) !== true) throw new Error('recovery_authorization_denied');
     return this.lock.runAsync(async () => {
       this.assertOpen(); const journal = this.read(), call = journal.calls.find(call => call.operationId === operationId);
       this.requireRecoveryAuthorization(operationId, options.strategy);
@@ -365,6 +380,105 @@ export class ProcessHost {
         throw error;
       }
     }, this.options.lockWaitMs ?? 5000);
+  }
+  /** Acquire a durable exclusive state lease. Ordinary process writes remain
+   * blocked across coordinator death until this exact lease commits or aborts. */
+  async beginCheckpoint(base: ResumableSnapshot, initial: ResumableSnapshot, options: { operationId: string; symbol: SymbolId; tokens: readonly CapabilityToken[]; expectedSnapshot: Digest; expectedGeneration: string }): Promise<ProcessCheckpointBinding> {
+    identifier(options.operationId); const tokens = freeze(copy([...options.tokens]));
+    const program = this.checkpointProgram(); validateCheckpointExtension(base, initial, program);
+    if (initial.core.effectCursor !== '0' || initial.core.state === 'blocked' || base.core.effectCursor !== '0') throw new Error('new checkpoint ownership requires a pre-effect source');
+    return this.lock.runAsync(async () => {
+      this.assertOpen(); const journal = this.read(), plan = JSON.parse(journal.plan) as TopologyPlan;
+      // This backend is one execution unit. It must not bypass placement or
+      // isolation by interpreting a multi-unit plan in the controller process.
+      if (plan.units.length !== 1) throw new Error('resumable process bridge requires a single execution unit');
+      const unit = this.unitIn(plan, options.symbol); if (!unit) throw new Error('unknown checkpoint entry');
+      const prior = journal.checkpointLeases?.find(item => item.binding.operationId === options.operationId);
+      if (prior) { if (prior.binding.baseCheckpoint !== checkpointDigest(base) || prior.binding.initialCheckpoint !== checkpointDigest(initial) || prior.binding.symbol !== options.symbol) throw new Error('checkpoint operation identity conflict'); this.checkpointAuthority('begin', prior.binding, tokens); return copy(prior.binding); }
+      this.assertReady(journal);
+      if (journal.calls.some(item => item.operationId === options.operationId) || journal.allocations.some(item => item.operationId === options.operationId)) throw new Error('checkpoint operation ID already used');
+      if (journal.generation !== options.expectedGeneration || runtimeSnapshotDigest(journal.snapshot) !== options.expectedSnapshot) throw new Error('stale checkpoint ownership base');
+      assertBaseProjection(base, journal.snapshot, journal.generation, unit); projectProcessCheckpoint(initial, journal.snapshot, journal.generation, unit);
+      if (!['running', 'completed'].includes(initial.core.state)) throw new Error('checkpoint adoption requires a running or completed invocation');
+      const lastStart = [...initial.events].reverse().find(event => event.op === 'start');
+      if (!lastStart || lastStart.code !== `function:${options.symbol}` || base.core.frames[0] && base.core.frames[0].code !== `function:${options.symbol}`) throw new Error('checkpoint source invocation is not authorized');
+      const first = initial.core.frames[0];
+      if (first && first.code !== `function:${options.symbol}`) throw new Error('checkpoint entry does not match invocation authority');
+      const starts = initial.events.slice(base.events.length).filter(event => event.op === 'start');
+      if (starts.length > 1 || starts.some(event => event.code !== `function:${options.symbol}`)) throw new Error('checkpoint contains a different top-level invocation');
+      const body: Omit<ProcessCheckpointBinding, 'id'> = { format: 'aether.process-checkpoint-binding/1', operationId: options.operationId, symbol: options.symbol, configuration: this.configuration, generation: journal.generation, unit, processHead: journal.heads.at(-1)!.digest, beforeSnapshot: runtimeSnapshotDigest(journal.snapshot), baseCheckpoint: checkpointDigest(base), initialCheckpoint: checkpointDigest(initial), program: program.digest, executionId: initial.core.executionId };
+      const binding = { ...body, id: processCheckpointBindingDigest(body) };
+      this.checkpointAuthority('begin', binding, tokens);
+      writeProcessCheckpoint(this.options.directory, base, program); writeProcessCheckpoint(this.options.directory, initial, program);
+      journal.format = 'aether.process-host/2'; journal.checkpointLeases ??= []; journal.checkpointReceipts ??= [];
+      journal.checkpointLeases.push({ binding, state: 'active', latestCheckpoint: binding.initialCheckpoint, checkpoints: [binding.initialCheckpoint], receipt: null });
+      this.checkpointAuthority('begin', binding, tokens); this.persist(journal); this.phase('checkpoint-started', binding.operationId, binding.generation); return copy(binding);
+    }, this.options.lockWaitMs ?? 5000);
+  }
+  async readCheckpoint(bindingId: Digest): Promise<ResumableSnapshot> {
+    return this.lock.runAsync(async () => { const lease = this.read().checkpointLeases?.find(item => item.binding.id === bindingId); if (!lease) throw new Error('unknown checkpoint lease'); return readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, this.checkpointProgram()); }, this.options.lockWaitMs ?? 5000);
+  }
+  async checkpointReference(bindingId: Digest, reference: LogicalRefV1, tokens: readonly CapabilityToken[]): Promise<LogicalRefV1> {
+    return this.lock.runAsync(async () => {
+      this.assertOpen(); const journal = this.read(), lease = journal.checkpointLeases?.find(item => item.binding.id === bindingId);
+      if (!lease || lease.state !== 'committed') throw new Error('checkpoint state has not been published');
+      if (journal.generation !== lease.binding.generation) throw new Error('checkpoint reference mapping is stale after ownership movement');
+      this.checkpointAuthority('commit', lease.binding, tokens);
+      const source = readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, this.checkpointProgram());
+      const result = processReferenceFromCheckpoint(reference, source, journal.generation);
+      if (!journal.snapshot.records.some(record => record.objectId === result.objectId)) throw new Error('published checkpoint object is missing'); return result;
+    }, this.options.lockWaitMs ?? 5000);
+  }
+  checkpointReceipt(bindingId: Digest, tokens: readonly CapabilityToken[]): ProcessCheckpointReceipt | null {
+    this.assertOpen(); const journal = this.read(), lease = journal.checkpointLeases?.find(item => item.binding.id === bindingId);
+    if (!lease) throw new Error('unknown checkpoint lease'); this.checkpointAuthority('commit', lease.binding, tokens);
+    return lease.state === 'committed' ? freeze(copy(journal.checkpointReceipts!.find(receipt => receipt.id === lease.receipt)!)) : null;
+  }
+  checkpointStatus(bindingId: Digest): Readonly<ProcessCheckpointLease> {
+    const lease = this.read().checkpointLeases?.find(item => item.binding.id === bindingId); if (!lease) throw new Error('unknown checkpoint lease'); return freeze(copy(lease));
+  }
+  /** Trusted backend transaction. The policy hook remains mandatory; fresh
+   * invocation grants are additionally required for run/commit. The callback
+   * cannot observe another writer between checkpoint and heap publication. */
+  async withCheckpoint<T>(bindingId: Digest, action: Exclude<ProcessCheckpointAction, 'begin'>, tokens: readonly CapabilityToken[], operation: (access: ProcessCheckpointAccess) => Promise<T>): Promise<T> {
+    tokens = freeze(copy([...tokens]));
+    return this.lock.runAsync(async () => {
+      this.assertOpen(); const journal = this.read(), lease = journal.checkpointLeases?.find(item => item.binding.id === bindingId);
+      if (!lease) throw new Error('unknown checkpoint lease');
+      const assertAuthority = (): void => { this.assertOpen(); this.checkpointAuthority(action, lease.binding, tokens); if (lease.state !== 'active') throw new Error(`checkpoint lease is ${lease.state}`); if (journal.generation !== lease.binding.generation || journal.heads.at(-1)!.digest !== lease.binding.processHead || runtimeSnapshotDigest(journal.snapshot) !== lease.binding.beforeSnapshot) throw new Error('checkpoint lease lost its production ownership'); };
+      assertAuthority(); const program = this.checkpointProgram();
+      const before = copy(journal.snapshot), base = readProcessCheckpoint(this.options.directory, lease.binding.baseCheckpoint, program);
+      const executionOrigin = lease.latestCheckpoint;
+      const save = (snapshot: ResumableSnapshot): void => {
+        assertAuthority();
+        if (checkpointDigest(snapshot) !== lease.latestCheckpoint) validateExecutedCheckpoint(snapshot, executionOrigin, program.digest); const latest = readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, program); validateCheckpointExtension(latest, snapshot, program); validateCheckpointExtension(base, snapshot, program);
+        const additions = snapshot.events.slice(latest.events.length);
+        if (additions.some(event => event.op === 'start' || event.code === 'host' && !(action === 'reconcile' && event.op === 'retry-reconciled-effect'))) throw new Error('leased continuation cannot inject a new invocation or debugger mutation');
+        projectProcessCheckpoint(snapshot, before, lease.binding.generation, lease.binding.unit);
+        const digest = writeProcessCheckpoint(this.options.directory, snapshot, program); assertAuthority();
+        if (digest !== lease.latestCheckpoint) { lease.latestCheckpoint = digest; lease.checkpoints.push(digest); this.persist(journal); this.phase('checkpoint-saved', lease.binding.operationId, lease.binding.generation); }
+      };
+      const access: ProcessCheckpointAccess = {
+        binding: freeze(copy(lease.binding)), program, before, checkpoint: readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, program), assertAuthority, save,
+        commit: (snapshot, effectAudit) => {
+          if (action !== 'commit') throw new Error('checkpoint commit requires explicit publication action');
+          save(snapshot); assertAuthority();
+          if (snapshot.core.state !== 'completed' || snapshot.core.frames.length || snapshot.core.fault !== null) throw new Error('only completed resolved execution can publish production state');
+          const audit = writeCheckpointEffectAudit(this.options.directory, snapshot, effectAudit); const after = projectProcessCheckpoint(snapshot, before, lease.binding.generation, lease.binding.unit); this.validateSnapshot(after, journal.generation, JSON.parse(journal.plan) as TopologyPlan);
+          const body: Omit<ProcessCheckpointReceipt, 'id'> = { format: 'aether.process-checkpoint-receipt/1', binding: lease.binding.id, checkpoint: lease.latestCheckpoint, beforeSnapshot: lease.binding.beforeSnapshot, afterSnapshot: runtimeSnapshotDigest(after), effectAudit: audit, eventHead: snapshot.eventHead, eventCursor: snapshot.eventCursor };
+          const receipt = { ...body, id: processCheckpointReceiptDigest(body) };
+          this.phase('checkpoint-before-commit', lease.binding.operationId, lease.binding.generation); assertAuthority(); journal.snapshot = after; this.retain(journal, after); lease.state = 'committed'; lease.receipt = receipt.id; journal.checkpointReceipts!.push(receipt);
+          this.appendHead(journal, { kind: 'checkpoint', operationId: lease.binding.operationId, subjectDigest: receipt.id }); this.persist(journal); this.phase('checkpoint-committed', lease.binding.operationId, lease.binding.generation); return freeze(copy(receipt));
+        },
+        abort: () => { if (action !== 'abort') throw new Error('checkpoint abort requires explicit recovery action'); assertAuthority(); const latest = readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, program); if (latest.core.effectCursor !== '0') throw new Error('cannot abort a checkpoint with terminal external effects'); lease.state = 'aborted'; this.persist(journal); this.phase('checkpoint-aborted', lease.binding.operationId, lease.binding.generation); },
+      };
+      return operation(access);
+    }, this.options.lockWaitMs ?? 5000);
+  }
+  private checkpointProgram(): ResumableProgram { return this.checkpointProgramCache ??= compileResumableProgram(this.module, { manifest: this.manifest, registry: this.registry }); }
+  private checkpointAuthority(action: ProcessCheckpointAction, binding: ProcessCheckpointBinding, tokens: readonly CapabilityToken[]): void {
+    if (this.options.authorizeCheckpoint?.({ action, binding: freeze(copy(binding)) }) !== true) throw new Error('checkpoint_authorization_denied');
+    if (action === 'begin' || action === 'run' || action === 'commit') this.authorize(binding.symbol, binding.unit, binding.generation, tokens);
   }
   async close(): Promise<void> { this.closed = true; if (this.active) this.active.cancelled = true; await this.stopWorkers(); }
 
@@ -493,7 +607,7 @@ export class ProcessHost {
     if (this.active !== active || active.cancelled || this.closed) throw new Error('process operation is no longer authoritative');
     if (active.mode === 'replay') this.requireRecoveryAuthorization(active.call.operationId, 'isolated-replay');
   }
-  private requireRecoveryAuthorization(operationId: string, strategy: 'isolated-replay' | 'abort-before-effects'): void { if (!this.options.authorizeRecovery?.(operationId, strategy)) throw new Error('recovery_authorization_denied'); }
+  private requireRecoveryAuthorization(operationId: string, strategy: 'isolated-replay' | 'abort-before-effects'): void { if (this.options.authorizeRecovery?.(operationId, strategy) !== true) throw new Error('recovery_authorization_denied'); }
   private phase(phase: ProcessHostPhase, operationId: string, generation: string): void { this.options.onPhase?.(phase, Object.freeze({ operationId, generation })); }
   private tokenScope(unit: string, generation: string, symbol: SymbolId): string { return domainDigest('aether.process-grant-scope/1', { configuration: this.configuration, generation, unit, symbol }); }
   private authorize(symbol: SymbolId, unit: string, generation: string, tokens: readonly CapabilityToken[]): void {
@@ -543,6 +657,7 @@ export class ProcessHost {
     if (snapshot.ownership.some(owner => !plan.units.some(unit => unit.id === owner.unit))) throw new Error('snapshot ownership references a removed unit');
   }
   private assertReady(journal: HostJournal): void {
+    if (journal.checkpointLeases?.some(lease => lease.state === 'active')) throw new Error('state domain held by an active resumable checkpoint lease');
     if (journal.calls.some(call => call.state === 'running' || call.state === 'indeterminate')) throw new Error('state domain blocked by an indeterminate operation');
     if (journal.migrations.some(migration => ['requested', 'prepared', 'committed'].includes(migration.state))) throw new Error('migration recovery must finish before another state transition');
   }
@@ -561,8 +676,11 @@ export class ProcessHost {
   }
   private read(): HostJournal {
     if (statSync(this.file).size > 8 * 1024 * 1024) throw new Error('process journal size limit');
-    const journal = exactObject(decodeCanonical(readFileSync(this.file)), ['format', 'configuration', 'generation', 'plan', 'snapshot', 'calls', 'migrations', 'allocations', 'snapshots', 'heads']) as unknown as HostJournal;
-    if (journal.format !== 'aether.process-host/1' || journal.configuration !== this.configuration) throw new Error('process journal configuration mismatch');
+    const decoded = decodeCanonical(readFileSync(this.file));
+    const keys = ['format', 'configuration', 'generation', 'plan', 'snapshot', 'calls', 'migrations', 'allocations', 'snapshots', 'heads'];
+    if ((decoded as { format?: string }).format === 'aether.process-host/2') keys.push('checkpointLeases', 'checkpointReceipts');
+    const journal = exactObject(decoded, keys) as unknown as HostJournal;
+    if (!['aether.process-host/1', 'aether.process-host/2'].includes(journal.format) || journal.configuration !== this.configuration) throw new Error('process journal configuration mismatch');
     decimal(journal.generation); if (typeof journal.plan !== 'string') throw new Error('invalid stored topology');
     const plan = JSON.parse(journal.plan) as TopologyPlan; this.validatePlan(plan); this.validateSnapshot(journal.snapshot, journal.generation, plan);
     if (![journal.calls, journal.migrations, journal.allocations, journal.snapshots, journal.heads].every(Array.isArray)) throw new Error('invalid process journal arrays');
@@ -669,6 +787,36 @@ export class ProcessHost {
       const expected: RuntimeSnapshotV1 = { ...before, nextObjectId: String(BigInt(before.nextObjectId) + 1n), records: [...before.records, { objectId: ref.objectId, fields: ty.fields.map(([name]) => [name, allocation.fields[name] ?? { tag: 'null' } as TaggedValueV1] as const).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0) }], ownership: [...before.ownership, { objectId: ref.objectId, unit: allocation.unit, epoch: ref.ownerEpoch }] };
       if (runtimeSnapshotDigest(expected) !== allocation.afterSnapshotDigest) throw new Error('allocation changed existing logical data');
     }
+    if (journal.format === 'aether.process-host/2') {
+      if (!Array.isArray(journal.checkpointLeases) || !Array.isArray(journal.checkpointReceipts)) throw new Error('invalid checkpoint journal extension');
+      const bindings = new Set<string>(), receipts = new Set<string>(); let active = 0;
+      const program = this.checkpointProgram();
+      for (const lease of journal.checkpointLeases) {
+        exactObject(lease, ['binding', 'state', 'latestCheckpoint', 'checkpoints', 'receipt']); validateProcessCheckpointBinding(lease.binding);
+        if (bindings.has(lease.binding.id) || operations.has(lease.binding.operationId) || lease.binding.configuration !== this.configuration || lease.binding.program !== program.digest || !['active', 'committed', 'aborted'].includes(lease.state) || !Array.isArray(lease.checkpoints) || !lease.checkpoints.length || lease.checkpoints[0] !== lease.binding.initialCheckpoint || lease.checkpoints.at(-1) !== lease.latestCheckpoint) throw new Error('corrupt checkpoint lease');
+        bindings.add(lease.binding.id); operations.add(lease.binding.operationId);
+        const base = readProcessCheckpoint(this.options.directory, lease.binding.baseCheckpoint, program), initial = readProcessCheckpoint(this.options.directory, lease.binding.initialCheckpoint, program), before = retained.get(lease.binding.beforeSnapshot), historicalPlan = generationPlans.get(lease.binding.generation);
+        if (!before || !historicalPlan || historicalPlan.units.length !== 1 || this.unitIn(historicalPlan, lease.binding.symbol) !== lease.binding.unit || initial.core.executionId !== lease.binding.executionId || initial.core.effectCursor !== '0') throw new Error('checkpoint lease lacks a valid ownership base');
+        assertBaseProjection(base, before, lease.binding.generation, lease.binding.unit); validateCheckpointExtension(base, initial, program);
+        if (new Set(lease.checkpoints).size !== lease.checkpoints.length || lease.checkpoints.some(digest => !retainedProcessCheckpointExists(this.options.directory, digest))) throw new Error('missing or duplicate retained checkpoint');
+        const previousCheckpoint = lease.latestCheckpoint === lease.binding.initialCheckpoint ? initial : readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, program);
+        validateCheckpointExtension(base, previousCheckpoint, program); validateCheckpointExtension(initial, previousCheckpoint, program);
+        projectProcessCheckpoint(previousCheckpoint, before, lease.binding.generation, lease.binding.unit);
+        if (lease.state === 'active') { active++; if (lease.receipt !== null || lease.binding.generation !== journal.generation || lease.binding.beforeSnapshot !== runtimeSnapshotDigest(journal.snapshot) || lease.binding.processHead !== journal.heads.at(-1)?.digest) throw new Error('active checkpoint lease is stale'); }
+        if (lease.state === 'aborted' && (lease.receipt !== null || previousCheckpoint.core.effectCursor !== '0')) throw new Error('invalid checkpoint abort');
+        if (lease.state === 'committed' && (lease.receipt === null || previousCheckpoint.core.state !== 'completed' || previousCheckpoint.core.frames.length || previousCheckpoint.core.fault !== null)) throw new Error('invalid checkpoint completion');
+      }
+      if (active > 1) throw new Error('multiple checkpoint owners');
+      for (const receipt of journal.checkpointReceipts) {
+        exactObject(receipt, ['format', 'id', 'binding', 'checkpoint', 'beforeSnapshot', 'afterSnapshot', 'effectAudit', 'eventHead', 'eventCursor']);
+        const { id, ...body } = receipt, lease = journal.checkpointLeases.find(lease => lease.binding.id === receipt.binding);
+        if (receipt.format !== 'aether.process-checkpoint-receipt/1' || processCheckpointReceiptDigest(body) !== id || receipts.has(id) || !lease || lease.state !== 'committed' || lease.receipt !== id || lease.latestCheckpoint !== receipt.checkpoint || lease.binding.beforeSnapshot !== receipt.beforeSnapshot) throw new Error('corrupt checkpoint publication receipt');
+        validateDigest(receipt.effectAudit); const snapshot = readProcessCheckpoint(this.options.directory, receipt.checkpoint, program), before = retained.get(receipt.beforeSnapshot);
+        readCheckpointEffectAudit(this.options.directory, receipt.effectAudit, snapshot);
+        if (!before || receipt.afterSnapshot !== runtimeSnapshotDigest(projectProcessCheckpoint(snapshot, before, lease.binding.generation, lease.binding.unit)) || receipt.eventHead !== snapshot.eventHead || receipt.eventCursor !== snapshot.eventCursor) throw new Error('checkpoint receipt lost its exact state/event binding'); receipts.add(id);
+      }
+      if (journal.checkpointLeases.some(lease => lease.state === 'committed' && !receipts.has(lease.receipt!))) throw new Error('checkpoint lease lacks publication receipt');
+    }
     if (!journal.heads.length) throw new Error('process state has no durable head');
     let previous: StateHead | null = null;
     const causes = new Set<string>();
@@ -693,6 +841,9 @@ export class ProcessHost {
         } else if (head.cause.kind === 'abort') {
           const call = journal.calls.find(record => record.operationId === head.cause.operationId);
           if (!call || call.state !== 'aborted' || head.cause.subjectDigest !== call.recovery?.evidenceDigest || head.snapshotDigest !== runtimeSnapshotDigest(call.before) || previous.snapshotDigest !== runtimeSnapshotDigest(call.before) || head.generation !== call.generation) throw new Error('state head does not match authorized abort');
+        } else if (head.cause.kind === 'checkpoint') {
+          const receipt = journal.checkpointReceipts?.find(receipt => receipt.id === head.cause.subjectDigest), lease = journal.checkpointLeases?.find(lease => lease.binding.operationId === head.cause.operationId);
+          if (!receipt || !lease || receipt.binding !== lease.binding.id || lease.state !== 'committed' || previous.digest !== lease.binding.processHead || previous.snapshotDigest !== receipt.beforeSnapshot || head.snapshotDigest !== receipt.afterSnapshot || head.generation !== lease.binding.generation) throw new Error('state head does not match checkpoint receipt');
         } else if (head.cause.kind === 'migration') {
           const migration = journal.migrations.find(record => record.migrationId === head.cause.operationId);
           if (!migration || !['committed', 'finalized'].includes(migration.state) || migration.fromGeneration === migration.toGeneration || head.cause.subjectDigest !== migration.decisionDigest || head.snapshotDigest !== runtimeSnapshotDigest(migration.after!) || previous.snapshotDigest !== runtimeSnapshotDigest(migration.before) || head.generation !== migration.toGeneration || previous.generation !== migration.fromGeneration || head.planDigest !== domainDigest('aether.process-plan/1', migration.afterPlan) || previous.planDigest !== domainDigest('aether.process-plan/1', migration.beforePlan)) throw new Error('state head does not match migration decision');
@@ -704,6 +855,7 @@ export class ProcessHost {
     for (const allocation of journal.allocations) if (!causes.has(JSON.stringify(['allocation', allocation.operationId]))) throw new Error('allocation lacks a published state transition');
     for (const call of journal.calls) if ((call.state === 'completed' || call.state === 'aborted') && !causes.has(JSON.stringify([call.state === 'completed' ? 'call' : 'abort', call.operationId]))) throw new Error('terminal call lacks a published state transition');
     for (const migration of journal.migrations) if (['committed', 'finalized'].includes(migration.state) && migration.toGeneration !== migration.fromGeneration && !causes.has(JSON.stringify(['migration', migration.migrationId]))) throw new Error('migration lacks a published state transition');
+    for (const lease of journal.checkpointLeases ?? []) if (lease.state === 'committed' && !causes.has(JSON.stringify(['checkpoint', lease.binding.operationId]))) throw new Error('checkpoint lacks published state transition');
     return journal;
   }
 }

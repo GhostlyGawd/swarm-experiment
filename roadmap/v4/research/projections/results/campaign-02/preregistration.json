@@ -1,0 +1,55 @@
+{
+  "format": "aether.projection-token-campaign/1",
+  "createdAt": "2026-09-23T01:59:06.292Z",
+  "tokenizers": [
+    "cl100k_base",
+    "o200k_base"
+  ],
+  "workloads": [
+    "scalar-math",
+    "loop-contract",
+    "external-effect",
+    "fixed-lazy"
+  ],
+  "session": "one original complete module and two complete-module replacements; every message includes framing/dictionary overhead",
+  "densityGoal": 4,
+  "scope": "Small authored scalar corpus, no representative-production or release density qualification. Legacy TS review syntax is a diagnostic baseline; native v2 metadata/runtime overhead is reported separately.",
+  "sources": [
+    {
+      "path": "src/tier1/agent-ir-v2.ts",
+      "sha256": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671"
+    },
+    {
+      "path": "src/tier1/agent-ir.ts",
+      "sha256": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b"
+    },
+    {
+      "path": "src/projection/executable.ts",
+      "sha256": "f8a369e33652e64770ff37351e1a40d793e84e3c3dfbc751f35dd6f6ea675152"
+    },
+    {
+      "path": "src/projection/executable-runtime.ts",
+      "sha256": "b18d782e5b45b264112fd5cc1f4f585aa71e1765ff96e4db59b81f1af6f7cca6"
+    },
+    {
+      "path": "src/projection/typescript.ts",
+      "sha256": "952e790f7da01ab12dd2fa0a247c7ac1699e106462c70fe388fe9923e592594a"
+    },
+    {
+      "path": "src/util/tokens.ts",
+      "sha256": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus.ts",
+      "sha256": "1ba712e5dabe13991272f0075f6ac485c1c1a543804628e94aecd852a8d87304"
+    },
+    {
+      "path": "roadmap/v4/research/projections/measure.mjs",
+      "sha256": "b9c14ea2f47e0317f7f586f4a6f8e438f693e2388bf64d732d31461b91faf1f9"
+    },
+    {
+      "path": "roadmap/v4/research/projections/Cargo.lock",
+      "sha256": "d04dcb5467cd0c7a1252561be05befdc2cadd456fd285506c04225ea7ec1d58e"
+    }
+  ]
+}

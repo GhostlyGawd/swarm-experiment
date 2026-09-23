@@ -1,0 +1,198 @@
+/** Runtime support for the explicit scalar projection profile. No AST/IR is
+ * interpreted here: generated host function bodies execute all control flow. */
+export type ExecutableTarget = 'typescript' | 'python' | 'rust';
+export const RUST_PROJECTION_CARGO = `[package]\nname = "aether-projection-fixture"\nversion = "0.0.0"\nedition = "2021"\n[dependencies]\nnum-bigint-dig = "=0.8.4"\nnum-traits = "=0.2.19"\nserde_json = "=1.0.151"\n`;
+const ts = `export type V = bigint | boolean | string | null;
+export class Context {
+  frames: string[][] = []; steps = 0;
+  grants:string[]; effects:(cap:string,args:V[])=>V; limit:number;
+  constructor(grants: string[] = [], effects: (cap:string,args:V[])=>V = () => { throw Error('missing_effect'); }, limit=100000) {this.grants=grants;this.effects=effects;this.limit=limit;this.authority();}
+  authority():void{if(!Array.isArray(this.grants)||new Set(this.grants).size!==this.grants.length||this.grants.some(c=>typeof c!=='string'||!/^cap:[a-z0-9_]+:[a-z0-9_]+$/.test(c))||!Number.isSafeInteger(this.limit)||this.limit<1||this.limit>100000)throw Error('host_profile');}
+  tick():void { this.authority();if(++this.steps>this.limit)throw Error('step_budget'); }
+  function(caps:string[],body:(ctx:Context)=>V):V { this.tick(); if(caps.some(c=>!this.grants.includes(c)||(this.frames.length&&!this.frames.at(-1)!.includes(c))))throw Error('capability_denied');this.frames.push(caps);try{return body(this);}finally{this.frames.pop();} }
+  invoke(cap:string,args:V[]):V {this.tick();if(!this.grants.includes(cap)||!this.frames.at(-1)?.includes(cap))throw Error('capability_denied');const value=this.effects(cap,args);if(value!==null)throw Error('effect_type');return value;}
+}
+export const ae_int=(v:string):V=>{if(!/^(0|-?[1-9][0-9]*)$/.test(v))throw Error('integer');return BigInt(v);};
+export const ae_bool=(v:boolean):V=>v;
+export const ae_str=(v:string):V=>v;
+export const ae_unit=():V=>null;
+export const ae_num=(v:V):bigint=>{if(typeof v!=='bigint')throw Error('type_error');return v;};
+export const ae_truth=(v:V):boolean=>{if(typeof v!=='boolean')throw Error('type_error');return v;};
+export const ae_arity=(args:V[],n:number):void=>{if(args.length!==n)throw Error('arity');};
+export function ae_bind(text:string,v:V):V {const check=(t:any):void=>{if(t.t==='Nominal')return check(t.repr);if(t.t==='Owned')return check(t.inner);if(t.t==='IntN'){const n=ae_num(v),bits=BigInt(t.bits),min=t.signed?-(1n<<(bits-1n)):0n,max=t.signed?(1n<<(bits-1n))-1n:(1n<<bits)-1n;if(n<min||n>max)throw Error('type_error');return;}if(typeof v!==({Int:'bigint',Bool:'boolean',Str:'string'} as any)[t.t]&&!(t.t==='Unit'&&v===null))throw Error('type_error');};check(JSON.parse(text));return v;}
+export const ae_lit=ae_bind;
+export const ae_old=(v:V):V=>v;
+export const ae_discard=(_v:V):void=>{};
+export const ae_assert=(v:V,label:string):void=>{if(!ae_truth(v))throw Error('assertion:'+label);};
+export const ae_clause=(v:V,label:string,_rigor:string):void=>ae_assert(v,label);
+export const ae_surface=(text:string):V=>{const x=JSON.parse(text).current;return typeof x==='string'?x:BigInt(x.$aether_bigint);};
+export const ae_add=(a:V,b:V):V=>ae_num(a)+ae_num(b);
+export const ae_sub=(a:V,b:V):V=>ae_num(a)-ae_num(b);
+export const ae_mul=(a:V,b:V):V=>ae_num(a)*ae_num(b);
+export const ae_div=(a:V,b:V):V=>{if(ae_num(b)===0n)throw Error('division_by_zero');return ae_num(a)/ae_num(b);};
+export const ae_mod=(a:V,b:V):V=>{if(ae_num(b)===0n)throw Error('division_by_zero');return ae_num(a)%ae_num(b);};
+export const ae_lt=(a:V,b:V):V=>ae_num(a)<ae_num(b);
+export const ae_le=(a:V,b:V):V=>ae_num(a)<=ae_num(b);
+export const ae_gt=(a:V,b:V):V=>ae_num(a)>ae_num(b);
+export const ae_ge=(a:V,b:V):V=>ae_num(a)>=ae_num(b);
+export const ae_eq=(a:V,b:V):V=>a===b;
+export const ae_ne=(a:V,b:V):V=>a!==b;
+export const ae_neg=(v:V):V=>-ae_num(v);
+export const ae_not=(v:V):V=>!ae_truth(v);
+export const ae_concat=(a:V,b:V):V=>{if(typeof a!=='string'||typeof b!=='string')throw Error('type_error');return a+b;};
+export const ae_and=(a:()=>V,b:()=>V):V=>ae_truth(a())?b():false;
+export const ae_or=(a:()=>V,b:()=>V):V=>ae_truth(a())?true:b();
+export const ae_cond=(a:()=>V,b:()=>V,c:()=>V):V=>ae_truth(a())?b():c();
+export const ae_call=(ctx:Context,fn:(ctx:Context,args:V[])=>V,args:V[]):V=>fn(ctx,args);
+export const ae_invoke=(ctx:Context,cap:string,args:V[]):V=>ctx.invoke(cap,args);
+export function ae_forall(ctx:Context,start:V,end:V,body:(value:V)=>V):V{for(let i=ae_num(start);i<ae_num(end);i++){ctx.tick();if(!ae_truth(body(i)))return false;}return true;}
+export function ae_fixed(op:string,text:string,a:V,b?:V):V{const t=JSON.parse(text),n=ae_num(op==='cast'?a:({add:ae_add,sub:ae_sub,mul:ae_mul,div:ae_div,mod:ae_mod} as any)[op](a,b));const w=1n<<BigInt(t.bits),min=t.signed?-(w/2n):0n,max=t.signed?w/2n-1n:w-1n;if(n>=min&&n<=max)return n;if(t.overflow==='trap')throw Error('overflow');if(t.overflow==='saturate')return n<min?min:max;return ((n-min)%w+w)%w+min;}
+export const ae_json=(v:V):string=>JSON.stringify(v===null?{tag:'null'}:typeof v==='bigint'?{tag:'int',value:String(v)}:typeof v==='boolean'?{tag:'bool',value:v}:{tag:'string',value:v});
+`;
+const py = `import json
+from contextlib import contextmanager
+class Context:
+    def __init__(self, grants=(), effects=None, limit=100000):
+        if type(grants) not in (list,tuple,set) or any(type(c) is not str for c in grants) or len(set(grants))!=len(grants): raise RuntimeError('host_profile')
+        self.grants=set(grants); self.effects=effects; self.limit=limit; self.steps=0; self.frames=[]
+    def tick(self):
+        if type(self.limit) is not int or not 1<=self.limit<=100000: raise RuntimeError('host_profile')
+        self.steps+=1
+        if self.steps>self.limit: raise RuntimeError('step_budget')
+    @contextmanager
+    def function(self,caps):
+        self.tick()
+        if any(c not in self.grants or (self.frames and c not in self.frames[-1]) for c in caps): raise RuntimeError('capability_denied')
+        self.frames.append(caps)
+        try: yield self
+        finally: self.frames.pop()
+    @contextmanager
+    def scope(self): yield self
+    def invoke(self,cap,args):
+        self.tick()
+        if cap not in self.grants or not self.frames or cap not in self.frames[-1]: raise RuntimeError('capability_denied')
+        if self.effects is None: raise RuntimeError('missing_effect')
+        result=self.effects(cap,args)
+        if result is not None: raise RuntimeError('effect_type')
+        return result
+
+def ae_int(v):
+    import re
+    if not re.fullmatch(r'0|-?[1-9][0-9]*',v): raise RuntimeError('integer')
+    return int(v)
+def ae_bool(v): return v
+def ae_str(v): return v
+def ae_unit(): return None
+def ae_num(v):
+    if type(v) is not int: raise RuntimeError('type_error')
+    return v
+def ae_truth(v):
+    if type(v) is not bool: raise RuntimeError('type_error')
+    return v
+def ae_arity(args,n):
+    if len(args)!=n: raise RuntimeError('arity')
+def ae_bind(text,v):
+    def check(t):
+        if t['t']=='Nominal': return check(t['repr'])
+        if t['t']=='Owned': return check(t['inner'])
+        if t['t']=='IntN':
+            n=ae_num(v); w=1<<t['bits']; low=-(w//2) if t['signed'] else 0; high=w//2-1 if t['signed'] else w-1
+            if not low<=n<=high: raise RuntimeError('type_error')
+            return
+        if type(v) is not {'Int':int,'Bool':bool,'Str':str,'Unit':type(None)}[t['t']]: raise RuntimeError('type_error')
+    check(json.loads(text)); return v
+ae_lit=ae_bind
+def ae_old(v): return v
+def ae_discard(v): pass
+def ae_assert(v,label):
+    if not ae_truth(v): raise RuntimeError('assertion:'+label)
+def ae_clause(v,label,rigor): ae_assert(v,label)
+def ae_surface(text):
+    x=json.loads(text)['current']; return x if type(x) is str else int(x['$aether_bigint'])
+def ae_add(a,b): return ae_num(a)+ae_num(b)
+def ae_sub(a,b): return ae_num(a)-ae_num(b)
+def ae_mul(a,b): return ae_num(a)*ae_num(b)
+def ae_div(a,b):
+    x=ae_num(a); y=ae_num(b)
+    if y==0: raise RuntimeError('division_by_zero')
+    return (abs(x)//abs(y)) * (-1 if (x<0)!=(y<0) else 1)
+def ae_mod(a,b): return ae_num(a)-ae_div(a,b)*ae_num(b)
+def ae_lt(a,b): return ae_num(a)<ae_num(b)
+def ae_le(a,b): return ae_num(a)<=ae_num(b)
+def ae_gt(a,b): return ae_num(a)>ae_num(b)
+def ae_ge(a,b): return ae_num(a)>=ae_num(b)
+def ae_eq(a,b): return type(a) is type(b) and a==b
+def ae_ne(a,b): return not ae_eq(a,b)
+def ae_neg(v): return -ae_num(v)
+def ae_not(v): return not ae_truth(v)
+def ae_concat(a,b):
+    if type(a) is not str or type(b) is not str: raise RuntimeError('type_error')
+    return a+b
+def ae_and(a,b): return b() if ae_truth(a()) else False
+def ae_or(a,b): return True if ae_truth(a()) else b()
+def ae_cond(a,b,c): return b() if ae_truth(a()) else c()
+def ae_call(ctx,fn,args): return fn(ctx,args)
+def ae_invoke(ctx,cap,args): return ctx.invoke(cap,args)
+def ae_forall(ctx,start,end,body):
+    for i in range(ae_num(start),ae_num(end)):
+        ctx.tick()
+        if not ae_truth(body(i)): return False
+    return True
+def ae_fixed(op,text,a,b=None):
+    t=json.loads(text); n=ae_num(a) if op=='cast' else {'add':ae_add,'sub':ae_sub,'mul':ae_mul,'div':ae_div,'mod':ae_mod}[op](a,b)
+    w=1<<t['bits']; low=-(w//2) if t['signed'] else 0; high=w//2-1 if t['signed'] else w-1
+    if low<=n<=high: return n
+    if t['overflow']=='trap': raise RuntimeError('overflow')
+    if t['overflow']=='saturate': return max(low,min(high,n))
+    return (n-low)%w+low
+def ae_json(v): return json.dumps({'tag':'null'} if v is None else {'tag':'int','value':str(v)} if type(v) is int else {'tag':'bool','value':v} if type(v) is bool else {'tag':'string','value':v})
+`;
+const rs = `use num_bigint_dig::BigInt;
+use num_traits::{Zero,One};
+use serde_json::Value as J;
+#[derive(Clone,Debug,PartialEq)] pub enum Value { Int(BigInt), Bool(bool), Str(String), Unit }
+pub struct Context {pub grants:Vec<String>, pub frames:Vec<Vec<String>>, pub steps:usize, pub limit:usize,pub effects:fn(&str,Vec<Value>)->Value}
+impl Context {
+ pub fn new(grants:Vec<String>,effects:fn(&str,Vec<Value>)->Value)->Self{Self{grants,frames:vec![],steps:0,limit:100000,effects}}
+ pub fn tick(&mut self){if self.limit<1||self.limit>100000{panic!("host_profile")}self.steps+=1;if self.steps>self.limit{panic!("step_budget")}}
+ pub fn function<F:FnOnce(&mut Self)->Value>(&mut self,caps:&[&str],body:F)->Value{self.tick();if caps.iter().any(|c|!self.grants.iter().any(|g|g==c)||self.frames.last().is_some_and(|f|!f.iter().any(|g|g==c))){panic!("capability_denied")}self.frames.push(caps.iter().map(|s|s.to_string()).collect());let out=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||body(self)));self.frames.pop();match out{Ok(v)=>v,Err(e)=>std::panic::resume_unwind(e)}}
+ pub fn invoke(&mut self,cap:&str,args:Vec<Value>)->Value{self.tick();if !self.grants.iter().any(|g|g==cap)||!self.frames.last().is_some_and(|f|f.iter().any(|g|g==cap)){panic!("capability_denied")}let v=(self.effects)(cap,args);if v!=Value::Unit{panic!("effect_type")}v}
+}
+pub fn ae_int(s:&str)->Value{Value::Int(s.parse().expect("integer"))}
+pub fn ae_bool(v:bool)->Value{Value::Bool(v)}
+pub fn ae_str(v:&str)->Value{Value::Str(v.to_string())}
+pub fn ae_unit()->Value{Value::Unit}
+pub fn ae_num(v:Value)->BigInt{if let Value::Int(n)=v{n}else{panic!("type_error")}}
+pub fn ae_truth(v:Value)->bool{if let Value::Bool(b)=v{b}else{panic!("type_error")}}
+pub fn ae_arity(args:&[Value],n:usize){if args.len()!=n{panic!("arity")}}
+pub fn ae_bind(text:&str,v:Value)->Value{fn check(t:&J,v:&Value){match t["t"].as_str().unwrap(){"Nominal"=>check(&t["repr"],v),"Owned"=>check(&t["inner"],v),"IntN"=>{let n=ae_num(v.clone());let w=BigInt::one()<<t["bits"].as_u64().unwrap() as usize;let low=if t["signed"]==true{-(&w/2u32)}else{BigInt::zero()};let high=if t["signed"]==true{&w/2u32-1}else{&w-1};if n<low||n>high{panic!("type_error")}},"Int"=>if !matches!(v,Value::Int(_)){panic!("type_error")},"Bool"=>if !matches!(v,Value::Bool(_)){panic!("type_error")},"Str"=>if !matches!(v,Value::Str(_)){panic!("type_error")},"Unit"=>if *v!=Value::Unit{panic!("type_error")},_=>panic!("type_error")}}check(&serde_json::from_str::<J>(text).unwrap(),&v);v}
+pub fn ae_lit(t:&str,v:Value)->Value{ae_bind(t,v)}
+pub fn ae_old(v:Value)->Value{v}
+pub fn ae_discard(_:Value){}
+pub fn ae_assert(v:Value,label:&str){if !ae_truth(v){panic!("assertion:{}",label)}}
+pub fn ae_clause(v:Value,label:&str,_rigor:&str){ae_assert(v,label)}
+pub fn ae_surface(text:&str)->Value{let t: J=serde_json::from_str(text).unwrap();if let Some(s)=t["current"].as_str(){ae_str(s)}else{ae_int(t["current"]["$aether_bigint"].as_str().unwrap())}}
+pub fn ae_add(a:Value,b:Value)->Value{Value::Int(ae_num(a)+ae_num(b))}
+pub fn ae_sub(a:Value,b:Value)->Value{Value::Int(ae_num(a)-ae_num(b))}
+pub fn ae_mul(a:Value,b:Value)->Value{Value::Int(ae_num(a)*ae_num(b))}
+pub fn ae_div(a:Value,b:Value)->Value{let x=ae_num(a);let y=ae_num(b);if y.is_zero(){panic!("division_by_zero")}Value::Int(x/y)}
+pub fn ae_mod(a:Value,b:Value)->Value{let x=ae_num(a);let y=ae_num(b);if y.is_zero(){panic!("division_by_zero")}Value::Int(x%y)}
+pub fn ae_lt(a:Value,b:Value)->Value{ae_bool(ae_num(a)<ae_num(b))}
+pub fn ae_le(a:Value,b:Value)->Value{ae_bool(ae_num(a)<=ae_num(b))}
+pub fn ae_gt(a:Value,b:Value)->Value{ae_bool(ae_num(a)>ae_num(b))}
+pub fn ae_ge(a:Value,b:Value)->Value{ae_bool(ae_num(a)>=ae_num(b))}
+pub fn ae_eq(a:Value,b:Value)->Value{ae_bool(a==b)}
+pub fn ae_ne(a:Value,b:Value)->Value{ae_bool(a!=b)}
+pub fn ae_neg(a:Value)->Value{Value::Int(-ae_num(a))}
+pub fn ae_not(a:Value)->Value{ae_bool(!ae_truth(a))}
+pub fn ae_concat(a:Value,b:Value)->Value{if let (Value::Str(a),Value::Str(b))=(a,b){Value::Str(a+&b)}else{panic!("type_error")}}
+macro_rules! ae_and {($a:expr,$b:expr)=>{if ae_truth($a){$b}else{ae_bool(false)}}}
+macro_rules! ae_or {($a:expr,$b:expr)=>{if ae_truth($a){ae_bool(true)}else{$b}}}
+macro_rules! ae_cond {($a:expr,$b:expr,$c:expr)=>{if ae_truth($a){$b}else{$c}}}
+macro_rules! ae_call {($ctx:expr,$f:ident,[$($a:expr),*])=>{{let arguments=vec![$($a),*];$f($ctx,arguments)}}}
+macro_rules! ae_invoke {($ctx:expr,$cap:expr,[$($a:expr),*])=>{{let arguments=vec![$($a),*];$ctx.invoke($cap,arguments)}}}
+macro_rules! ae_forall {($ctx:expr,$start:expr,$end:expr,$name:ident,$body:expr)=>{{let mut cursor=ae_num($start);let end=ae_num($end);let mut answer=true;while cursor<end{$ctx.tick();let $name=Value::Int(cursor.clone());if !ae_truth($body){answer=false;break;}cursor+=1;}ae_bool(answer)}}}
+pub fn ae_fixed(op:&str,text:&str,a:Value,b:Option<Value>)->Value{let t:J=serde_json::from_str(text).unwrap();let n=ae_num(match op{"cast"=>a,"add"=>ae_add(a,b.unwrap()),"sub"=>ae_sub(a,b.unwrap()),"mul"=>ae_mul(a,b.unwrap()),"div"=>ae_div(a,b.unwrap()),"mod"=>ae_mod(a,b.unwrap()),_=>panic!("operator")});let w=BigInt::one()<<t["bits"].as_u64().unwrap() as usize;let low=if t["signed"]==true{-(&w/2u32)}else{BigInt::zero()};let high=if t["signed"]==true{&w/2u32-1}else{&w-1};if n>=low&&n<=high{return Value::Int(n)}match t["overflow"].as_str().unwrap(){"trap"=>panic!("overflow"),"saturate"=>Value::Int(if n<low{low}else{high}),_=>Value::Int(((&n-&low)%&w+&w)%&w+&low)}}
+pub fn ae_json(v:&Value)->String{match v{Value::Unit=>serde_json::json!({"tag":"null"}),Value::Int(n)=>serde_json::json!({"tag":"int","value":n.to_string()}),Value::Bool(b)=>serde_json::json!({"tag":"bool","value":b}),Value::Str(s)=>serde_json::json!({"tag":"string","value":s})}.to_string()}
+`;
+export function executableRuntime(target:ExecutableTarget):string{return target==='typescript'?ts:target==='python'?py:rs;}

@@ -1,0 +1,215 @@
+/** Explicit scalar projection profile. The visible host bodies, clauses and
+ * control flow are parsed; metadata contains no expression or statement tree. */
+import { linkGroups, walk, scalarPayload, type Term, type Ty, type BinOp, type NodeKind } from '../tier1/ast.ts';
+import { SymbolSpace } from '../tier1/symbols.ts';
+import type { SymbolId } from '../tier1/ids.ts';
+import { encodeStored, decodeStored } from '../tier1/persistence.ts';
+import { encodeAgentIrBinary } from '../tier1/agent-ir-v2.ts';
+import { typecheck } from '../tier2/typecheck.ts';
+import { CapabilityRegistry } from '../tier2/ocap.ts';
+import { exactObject, validString } from '../fabric/encoding.ts';
+import { executableRuntime, type ExecutableTarget } from './executable-runtime.ts';
+export { executableRuntime, RUST_PROJECTION_CARGO, type ExecutableTarget } from './executable-runtime.ts';
+const KINDS: readonly NodeKind[] = Object.freeze(['Module','SymbolTable','TypeDecl','FunctionDecl','Contract','Clause','Surface','Lit','Var','Bin','Un','Cond','Call','Invoke','Old','ResultRef','Place','Let','Assign','If','While','Return','Assert','ExprStmt','Block','Yield','IntCast','FixedBin','ForAll']);
+export const EXECUTABLE_PROJECTION_PROFILE = Object.freeze({ format:'aether.executable-projection/2', semantics:'aether-reference-scalar/1', kinds:KINDS, types:['Int','Bool','Str','Unit','IntN','Nominal','Owned'], integerSemantics:'arbitrary-precision-truncate-toward-zero', runtimeContracts:'requires-ensures-assert; loop annotations retained', maxSourceBytes:2*1024*1024, maxNodes:4096 });
+interface Header {format:typeof EXECUTABLE_PROJECTION_PROFILE.format;target:ExecutableTarget;module:Record<string,unknown>;symbols:Extract<Term,{kind:'SymbolTable'}>;aliases:[SymbolId,string][]}
+const meta=(v:unknown)=>encodeStored(v).replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029'), parseMeta=<T>(v:string)=>decodeStored<T>(v);
+function q(value:string,target?:ExecutableTarget):string {
+  if(target!=='rust')return JSON.stringify(value).replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+  let out='"';for(const c of value){if(c==='"')out+='\\"';else if(c==='\\')out+='\\\\';else if(c==='\n')out+='\\n';else if(c==='\r')out+='\\r';else if(c==='\t')out+='\\t';else if(c.codePointAt(0)!<32||c.codePointAt(0)===127||c.codePointAt(0)===0x2028||c.codePointAt(0)===0x2029)out+='\\u{'+c.codePointAt(0)!.toString(16)+'}';else out+=c;}return out+'"';
+}
+function readQuoted(token:string):string {
+  if(token[0]!=='"'||token.at(-1)!=='"')throw new SyntaxError('invalid quoted source');let out='';
+  for(let i=1;i<token.length-1;i++){const c=token[i];if(c!=='\\'){if(c==='\n'||c==='\r')throw new SyntaxError('multiline quoted source');out+=c;continue;}const next=token[++i];const simple:Record<string,string>={n:'\n',r:'\r',t:'\t',b:'\b',f:'\f','0':'\0','"':'"','\\':'\\','/':'/'};if(Object.hasOwn(simple,next)){out+=simple[next];continue;}if(next!=='u')throw new SyntaxError('unknown string escape');if(token[i+1]==='{'){const end=token.indexOf('}',i+2),hex=token.slice(i+2,end);if(end<0||! /^[0-9a-fA-F]{1,6}$/.test(hex)||parseInt(hex,16)>0x10ffff)throw new SyntaxError('invalid Unicode escape');out+=String.fromCodePoint(parseInt(hex,16));i=end;}else{const hex=token.slice(i+1,i+5);if(!/^[0-9a-fA-F]{4}$/.test(hex))throw new SyntaxError('invalid Unicode escape');out+=String.fromCharCode(parseInt(hex,16));i+=4;}}
+  validString(out);return out;
+}
+
+const comment=(target:ExecutableTarget)=>target==='python'?'#':'//';
+function scalarType(ty:Ty):void {if(ty.t==='Nominal')return scalarType(ty.repr);if(ty.t==='Owned')return scalarType(ty.inner);if(!['Int','Bool','Str','Unit','IntN'].includes(ty.t))throw new TypeError(`unsupported scalar projection type ${ty.t}`);if(ty.t==='IntN'&&(![8,16,32,64].includes(ty.bits)||!['wrap','trap','saturate'].includes(ty.overflow)))throw new TypeError('invalid fixed integer type');}
+function validate(module:Term):asserts module is Extract<Term,{kind:'Module'}>{
+  encodeAgentIrBinary(module);
+  if(module.kind!=='Module'||module.symbolTable.kind!=='SymbolTable'||module.members.some(m=>!['FunctionDecl','TypeDecl'].includes(m.kind)))throw new TypeError('scalar projection requires a module of function/type declarations');
+  const arities=new Map<string,number>();let count=0;
+  for(const node of walk(module)){
+    if(++count>EXECUTABLE_PROJECTION_PROFILE.maxNodes)throw new RangeError('projection node bound');if(!KINDS.includes(node.kind))throw new TypeError(`unsupported scalar projection node ${node.kind}`);
+    for(const group of linkGroups(node))for(const child of group.links)if(child.kind==='Place'&&!((node.kind==='Assign'&&group.field==='target')||(node.kind==='Contract'&&group.field==='modifies')))throw new TypeError('scalar Place is supported only as assignment target or modifies metadata');
+    if(node.kind==='Old'&&[...walk(node.expr)].some(n=>n.kind==='ForAll'))throw new TypeError('old expressions with nested binders require a later projection profile');
+    if('ty'in node)scalarType(node.ty);if('returns'in node)scalarType(node.returns);if('params'in node)node.params.forEach(p=>scalarType(p.ty));
+    if(node.kind==='Place'&&node.path.length||node.kind==='Assign'&&(node.target.kind!=='Place'||node.target.path.length))throw new TypeError('scalar projection supports local assignment only');
+    if(node.kind==='FunctionDecl'&&node.typeParams.length)throw new TypeError('generic projections require a later profile');
+    if(node.kind==='Invoke'){const previous=arities.get(node.capability);if(previous!==undefined&&previous!==node.args.length)throw new TypeError('inconsistent effect arity');arities.set(node.capability,node.args.length);}
+  }
+  for(const fn of module.members){if(fn.kind!=='FunctionDecl')continue;if(fn.body===null)throw new TypeError('scalar executable profile requires synthesized bodies');const bound=new Set<string>();const bind=(s:string)=>{if(bound.has(s))throw new TypeError('scalar profile requires distinct binder identities within each function');bound.add(s);};fn.params.forEach(p=>bind(p.symbol));fn.surfaces.forEach(s=>{if(s.kind!=='Surface')throw new TypeError('invalid surface');bind(s.symbol);});if(fn.body)for(const n of walk(fn.body))if(n.kind==='Let')bind(n.symbol);if(fn.contract)for(const n of walk(fn.contract))if(n.kind==='Invoke'||n.kind==='Call')throw new TypeError('scalar contract profile excludes effectful or indirect calls');}
+  const registry=new CapabilityRegistry();for(const[cap,arity]of arities)registry.declare(cap as never,{arity,description:'explicit projected effect'});
+  const checked=typecheck(module,{registry});if(!checked.ok)throw new TypeError(`projection typecheck failed: ${checked.diagnostics.map(d=>d.code).join(',')}`);
+}
+function headerFor(module:Extract<Term,{kind:'Module'}>,symbols:SymbolSpace,target:ExecutableTarget):Header{
+  const ids=new Set<SymbolId>();for(const node of walk(module)){if('symbol'in node)ids.add(node.symbol);if('callee'in node)ids.add(node.callee);if('params'in node)node.params.forEach(p=>ids.add(p.symbol));}
+  const table=module.symbolTable as Extract<Term,{kind:'SymbolTable'}>;table.entries.forEach(([s])=>ids.add(s));
+  return{format:EXECUTABLE_PROJECTION_PROFILE.format,target,module:{...scalarPayload(module)},symbols:table,aliases:[...ids].sort().map((id,i)=>[id,`v_${symbols.nameOf(id).replace(/[^a-zA-Z0-9_]/g,'_').slice(0,40)}_${i}`])};
+}
+class Emitter {
+  readonly lines:string[]=[];readonly names:Map<string,string>;readonly target:ExecutableTarget;readonly marker:string;
+  constructor(readonlyHeader:Header){this.names=new Map(readonlyHeader.aliases);this.target=readonlyHeader.target;this.marker=comment(this.target);}
+  name(s:string):string{const name=this.names.get(s);if(!name)throw new TypeError('missing native symbol alias');return name;}
+  line(text:string,depth=0):void{this.lines.push('    '.repeat(depth)+text);}
+  q(value:string):string{return q(value,this.target);}
+  semi(text:string):string{return text+(this.target==='python'?'':';');}
+  call(name:string,args:string[],lazy=false):string{return `${name}${this.target==='rust'&&lazy?'!':''}(${args.join(', ')})`;}
+  thunk(expr:string):string{return this.target==='python'?`lambda: ${expr}`:this.target==='typescript'?`() => ${expr}`:expr;}
+  expr(t:Term,old=false):string{
+    const e=(n:Term)=>this.expr(n,old),call=(name:string,...args:string[])=>this.call(name,args);
+    switch(t.kind){
+      case'Lit':{const raw=typeof t.value==='bigint'?call('ae_int',this.q(String(t.value))):typeof t.value==='boolean'?call('ae_bool',this.target==='python'?(t.value?'True':'False'):String(t.value)):typeof t.value==='string'?call('ae_str',this.q(t.value)):call('ae_unit');const natural=typeof t.value==='bigint'?'Int':typeof t.value==='boolean'?'Bool':typeof t.value==='string'?'Str':'Unit';return t.ty.t===natural?raw:call('ae_lit',this.q(meta(t.ty)),raw);}
+      case'Var':return `${old?'old_':''}${this.name(t.symbol)}${this.target==='rust'?'.clone()':''}`;
+      case'Place':return `${old?'old_':''}${this.name(t.symbol)}${this.target==='rust'?'.clone()':''}`;
+      case'Bin':return this.call(`ae_${t.op}`,['and','or'].includes(t.op)?[this.thunk(e(t.left)),this.thunk(e(t.right))]:[e(t.left),e(t.right)],['and','or'].includes(t.op));
+      case'Un':return call(`ae_${t.op}`,e(t.operand));
+      case'Cond':return this.call('ae_cond',[t.cond,t.then,t.otherwise].map(n=>this.thunk(e(n))),true);
+      case'Call':return this.call('ae_call',['ctx',this.name(t.callee),`[${t.args.map(e).join(', ')}]`],true);
+      case'Invoke':return this.call('ae_invoke',['ctx',this.q(t.capability),`[${t.args.map(e).join(', ')}]`],true);
+      case'Old':return call('ae_old',this.expr(t.expr,true));
+      case'ResultRef':return `ae_result${this.target==='rust'?'.clone()':''}`;
+      case'IntCast':return call('ae_fixed',this.q('cast'),this.q(meta(t.ty)),e(t.value),...(this.target==='rust'?['None']:[]));
+      case'FixedBin':return call('ae_fixed',this.q(t.op),this.q(meta(t.ty)),e(t.left),this.target==='rust'?`Some(${e(t.right)})`:e(t.right));
+      case'ForAll':{const name=this.name(t.symbol);return this.call('ae_forall',['ctx',e(t.start),e(t.end),...(this.target==='rust'?[name,e(t.body)]:[this.target==='python'?`lambda ${name}: ${e(t.body)}`:`(${name}: V) => ${e(t.body)}`])],true);}
+      default:throw new TypeError(`unsupported expression ${t.kind}`);
+    }
+  }
+  stmt(t:Term,d:number):void{
+    const line=(s:string)=>this.line(this.semi(s),d),open=(s:string)=>this.line(this.target==='python'?s+':':s+' {',d),close=()=>{if(this.target!=='python')this.line('}',d);};
+    switch(t.kind){
+      case'Block':this.line(this.target==='python'?'with ctx.scope():':'{',d);if(!t.stmts.length&&this.target==='python')this.line('pass',d+1);t.stmts.forEach(s=>this.stmt(s,d+1));close();return;
+      case'Let':line(`${this.target==='typescript'?'let ':this.target==='rust'?'let mut ':''}${this.name(t.symbol)} = ae_bind(${this.q(meta(t.ty))}, ${this.expr(t.init)})`);return;
+      case'Assign':line(`${this.name((t.target as Extract<Term,{kind:'Place'}>).symbol)} = ${this.expr(t.value)}`);return;
+      case'Return':line(`return ${this.expr(t.value)}`);return;
+      case'ExprStmt':line(`ae_discard(${this.expr(t.expr)})`);return;
+      case'Assert':line(`ae_assert(${this.expr(t.expr)}, ${this.q(t.label)})`);return;
+      case'Yield':line('ctx.tick()');return;
+      case'If':open(`if ${this.target==='typescript'?'(':''}ae_truth(${this.expr(t.cond)})${this.target==='typescript'?')':''}`);this.stmt(t.then,d+1);close();if(t.otherwise){open('else');this.stmt(t.otherwise,d+1);close();}return;
+      case'While':t.invariants.forEach(n=>this.line(`${this.marker} @invariant ${this.expr(n)}`,d));if(t.variant)this.line(`${this.marker} @variant ${this.expr(t.variant)}`,d);open(`while ${this.target==='typescript'?'(':''}ae_truth(${this.expr(t.cond)})${this.target==='typescript'?')':''}`);this.line(this.semi('ctx.tick()'),d+1);this.stmt(t.body,d+1);close();return;
+      default:throw new TypeError(`unsupported statement ${t.kind}`);
+    }
+  }
+  fn(fn:Extract<Term,{kind:'FunctionDecl'}>):void{
+    this.line(`${this.marker} @aether-function ${meta(scalarPayload(fn))}`);const name=this.name(fn.symbol),caps=JSON.stringify(fn.capabilities);
+    if(this.target==='python'){this.line(`def ${name}(ctx, args):`);this.line(`with ctx.function(${caps}):`,1);}
+    else if(this.target==='rust'){this.line(`pub fn ${name}(ctx: &mut Context, args: Vec<Value>) -> Value {`);this.line(`ctx.function(&${caps}, |ctx| {`,1);}
+    else{this.line(`export function ${name}(ctx: Context, args: V[]): V {`);this.line(`return ctx.function(${caps}, (ctx) => {`,1);}
+    const d=2;this.line(this.semi(`ae_arity(${this.target==='rust'?'&':''}args, ${fn.params.length})`),d);
+    fn.params.forEach((p,i)=>{const n=this.name(p.symbol);this.line(this.semi(`${this.target==='python'?'':this.target==='rust'?'let mut ':'let '}${n} = ae_bind(${this.q(meta(p.ty))}, args[${i}]${this.target==='rust'?'.clone()':''})`),d);this.line(this.semi(`${this.target==='python'?'':this.target==='rust'?'let ':'const '}old_${n} = ${n}${this.target==='rust'?'.clone()':''}`),d);});
+    this.line(`${this.marker} @aether-surfaces`,d);fn.surfaces.forEach(s=>{if(s.kind!=='Surface')throw new Error('surface');this.line(this.semi(`${this.target==='python'?'':this.target==='rust'?'let mut ':'let '}${this.name(s.symbol)} = ae_surface(${this.q(meta(s))})`),d);this.line(this.semi(`${this.target==='python'?'':this.target==='rust'?'let ':'const '}old_${this.name(s.symbol)} = ${this.name(s.symbol)}${this.target==='rust'?'.clone()':''}`),d);});
+    this.line(`${this.marker} @aether-contract ${fn.contract===null?'null':'present'}`,d);
+    const contract=fn.contract as Extract<Term,{kind:'Contract'}>|null;
+    this.line(`${this.marker} @aether-requires`,d);contract?.requires.forEach(c=>{if(c.kind!=='Clause')throw new Error('clause');this.line(this.semi(`ae_clause(${this.expr(c.expr)}, ${this.q(c.label)}, ${this.q(c.rigor)})`),d);});
+    contract?.modifies.forEach(p=>this.line(`${this.marker} @modifies ${meta(p)}`,d));
+    if(this.target==='python'){this.line('def ae_body():',d);const names=[...fn.params.map(p=>this.name(p.symbol)),...fn.surfaces.map(s=>this.name((s as Extract<Term,{kind:'Surface'}>).symbol))];if(names.length)this.line(`nonlocal ${names.join(', ')}`,d+1);}
+    else this.line(this.target==='rust'?'let ae_result = (|| -> Value {':'const ae_result = (() : V => {',d);
+    this.line(`${this.marker} @aether-body ${fn.body===null?'null':'present'}`,d+1);if(fn.body)this.stmt(fn.body,d+1);
+    this.line(`${this.marker} @aether-body-end`,d+1);
+    this.line(this.target==='rust'?'ae_unit()':this.semi('return ae_unit()'),d+1);
+    if(this.target==='python')this.line('ae_result = ae_body()',d);else this.line('})();',d);
+    this.line(`${this.marker} @aether-ensures`,d);contract?.ensures.forEach(c=>{if(c.kind!=='Clause')throw new Error('clause');this.line(this.semi(`ae_clause(${this.expr(c.expr)}, ${this.q(c.label)}, ${this.q(c.rigor)})`),d);});
+    this.line(`${this.marker} @aether-ensures-end`,d);const result=`ae_bind(${this.q(meta(fn.returns))}, ae_result)`;this.line(this.target==='rust'?result:this.semi(`return ${result}`),d);
+    if(this.target!=='python'){this.line(this.target==='rust'?'})':'});',1);this.line('}');}
+    this.line(`${this.marker} @aether-function-end`);this.line('');
+  }
+}
+const imports=(t:ExecutableTarget)=>t==='python'?'from aether_runtime import *':t==='rust'?'include!("aether_runtime.rs");':`import { Context, type V, ae_int, ae_bool, ae_str, ae_unit, ae_bind, ae_lit, ae_old, ae_discard, ae_assert, ae_clause, ae_surface, ae_add, ae_sub, ae_mul, ae_div, ae_mod, ae_lt, ae_le, ae_gt, ae_ge, ae_eq, ae_ne, ae_neg, ae_not, ae_concat, ae_and, ae_or, ae_cond, ae_call, ae_invoke, ae_forall, ae_fixed, ae_truth, ae_arity } from "./aether_runtime.ts";`;
+function emit(module:Extract<Term,{kind:'Module'}>,header:Header):string{const e=new Emitter(header);e.line(`${e.marker} @aether-projection/2 ${meta(header)}`);e.line(imports(header.target));e.line('');module.members.forEach((n,i)=>{if(n.kind==='TypeDecl')e.line(header.target==='rust'?`const type_d${i}: &str = ${q(meta(n),header.target)};`:header.target==='typescript'?`const type_d${i} = ${q(meta(n),header.target)};`:`type_d${i} = ${q(meta(n),header.target)}`);else e.fn(n as Extract<Term,{kind:'FunctionDecl'}>);});return e.lines.join('\n')+'\n';}
+export function projectExecutable(module:Term,symbols:SymbolSpace,target:ExecutableTarget):string{if(!['typescript','python','rust'].includes(target))throw new TypeError('unsupported target');validate(module);const source=emit(module,headerFor(module,symbols,target));if(Buffer.byteLength(source)>EXECUTABLE_PROJECTION_PROFILE.maxSourceBytes)throw new RangeError('projection byte limit');return source;}
+export interface ExecutableBundle {readonly target:ExecutableTarget;readonly source:string;readonly runtime:string;readonly aliases:ReadonlyMap<SymbolId,string>}
+export function executableBundle(module:Term,symbols:SymbolSpace,target:ExecutableTarget):ExecutableBundle{const source=projectExecutable(module,symbols,target),header=parseMeta<Header>(source.split('\n')[0].slice((comment(target)+' @aether-projection/2 ').length));return{target,source,runtime:executableRuntime(target),aliases:new Map(header.aliases)};}
+
+type H = {kind:'id';value:string}|{kind:'str';value:string}|{kind:'bool';value:boolean}|{kind:'array';items:H[]}|{kind:'call';name:string;args:H[]}|{kind:'lambda';params:string[];body:H};
+function lex(text:string):string[]{const result:string[]=[];for(let i=0;i<text.length;){if(/\s/.test(text[i])){i++;continue;}if(text[i]==='"'){let j=i+1;while(j<text.length){if(text[j]==='\\'){j+=2;continue;}if(text[j++]==='"')break;}const token=text.slice(i,j);readQuoted(token);result.push(token);i=j;continue;}const id=/^[A-Za-z_][A-Za-z_0-9]*/.exec(text.slice(i));if(id){result.push(id[0]);i+=id[0].length;continue;}if(text.startsWith('=>',i)){result.push('=>');i+=2;continue;}if('()[],:.!'.includes(text[i])){result.push(text[i++]);continue;}throw new SyntaxError(`unsupported projection expression token ${text.slice(i,i+20)}`);}if(result.length>50000)throw new RangeError('projection expression token bound');let depth=0;for(const token of result){if(token==='('||token==='['){if(++depth>64)throw new RangeError('projection expression depth');}else if(token===')'||token===']'){if(--depth<0)throw new SyntaxError('unbalanced expression');}}if(depth)throw new SyntaxError('unbalanced expression');return result;}
+function syntax(text:string):H{
+  const tokens=lex(text);let p=0;const need=(token:string)=>{if(tokens[p++]!==token)throw new SyntaxError(`expected ${token}`);};
+  const read=():H=>{let result:H;const token=tokens[p++];if(token===undefined)throw new SyntaxError('missing expression');
+    if(token==='lambda'){const params:string[]=[];while(tokens[p]!==':'){if(params.length)need(',');const name=tokens[p++];if(!name||!/^[A-Za-z_]/.test(name))throw new SyntaxError('lambda binder');params.push(name);}need(':');return{kind:'lambda',params,body:read()};}
+    if(token==='('){const params:string[]=[];while(tokens[p]!==')'){if(params.length)need(',');const name=tokens[p++];if(!name||!/^[A-Za-z_]/.test(name))throw new SyntaxError('lambda binder');params.push(name);if(tokens[p]===':'){need(':');need('V');}}need(')');need('=>');return{kind:'lambda',params,body:read()};}
+    if(token==='['){const items:H[]=[];while(tokens[p]!==']'){if(items.length)need(',');items.push(read());}need(']');return{kind:'array',items};}
+    if(token.startsWith('"'))result={kind:'str',value:readQuoted(token)};
+    else if(['true','false','True','False'].includes(token))result={kind:'bool',value:token==='true'||token==='True'};
+    else{if(!/^[A-Za-z_][A-Za-z_0-9]*$/.test(token))throw new SyntaxError('invalid expression identifier');result={kind:'id',value:token};}
+    if(tokens[p]==='!')p++;
+    if(tokens[p]==='('){if(result.kind!=='id')throw new SyntaxError('invalid callee');need('(');const args:H[]=[];while(tokens[p]!==')'){if(args.length)need(',');args.push(read());}need(')');result={kind:'call',name:result.value,args};}
+    if(tokens[p]==='.'){need('.');need('clone');need('(');need(')');if(result.kind!=='id')throw new SyntaxError('only bound values may be cloned');}
+    return result;};const result=read();if(p!==tokens.length)throw new SyntaxError('trailing expression syntax');return result;
+}
+class Reverse {
+  readonly ids:Map<string,SymbolId>; readonly header:Header;
+  constructor(header:Header){this.header=header;this.ids=new Map(header.aliases.map(([id,name])=>[name,id]));}
+  symbol(name:string):SymbolId{const id=this.ids.get(name);if(!id)throw new SyntaxError(`unknown projection binding ${name}`);return id;}
+  expr(h:H,old=false):Term{
+    const str=(v:H):string=>{if(v?.kind!=='str')throw new SyntaxError('string metadata expected');return v.value;};
+    const ex=(v:H)=>this.expr(v,old);
+    if(h.kind==='id'){if(h.value==='ae_result')return{kind:'ResultRef'};const name=h.value;if(old){if(!name.startsWith('old_'))throw new SyntaxError('old expression must use captured bindings');return{kind:'Var',symbol:this.symbol(name.slice(4))};}if(name.startsWith('old_'))throw new SyntaxError('entry capture outside old expression');return{kind:'Var',symbol:this.symbol(name)};}
+    if(h.kind!=='call')throw new SyntaxError('projected expression helper expected');const a=h.args,name=h.name;
+    const arity=(n:number)=>{if(a.length!==n)throw new SyntaxError(`arity of ${name}`);};
+    const lazy=(v:H)=>{if(this.header.target==='rust')return ex(v);if(v.kind!=='lambda'||v.params.length)throw new SyntaxError('lazy expression expected');return ex(v.body);};
+    if(name==='ae_int'){arity(1);const value=str(a[0]);if(!/^(0|-?[1-9][0-9]*)$/.test(value))throw new SyntaxError('canonical integer expected');return{kind:'Lit',ty:{t:'Int'},value:BigInt(value)};}
+    if(name==='ae_bool'){arity(1);if(a[0].kind!=='bool')throw new SyntaxError('boolean literal');return{kind:'Lit',ty:{t:'Bool'},value:a[0].value};}
+    if(name==='ae_str'){arity(1);return{kind:'Lit',ty:{t:'Str'},value:str(a[0])};}
+    if(name==='ae_unit'){arity(0);return{kind:'Lit',ty:{t:'Unit'},value:null};}
+    if(name==='ae_lit'){arity(2);const literal=ex(a[1]);if(literal.kind!=='Lit')throw new SyntaxError('typed literal needs literal');return{...literal,ty:parseMeta<Ty>(str(a[0]))};}
+    if(name==='ae_old'){arity(1);return{kind:'Old',expr:this.expr(a[0],true)};}
+    if(name==='ae_neg'||name==='ae_not'){arity(1);return{kind:'Un',op:name==='ae_neg'?'neg':'not',operand:ex(a[0])};}
+    if(['add','sub','mul','div','mod','eq','ne','lt','le','gt','ge','concat','and','or'].some(op=>name===`ae_${op}`)){arity(2);const op=name.slice(3) as BinOp;return{kind:'Bin',op,left:['and','or'].includes(op)?lazy(a[0]):ex(a[0]),right:['and','or'].includes(op)?lazy(a[1]):ex(a[1])};}
+    if(name==='ae_cond'){arity(3);return{kind:'Cond',cond:lazy(a[0]),then:lazy(a[1]),otherwise:lazy(a[2])};}
+    if(name==='ae_call'||name==='ae_invoke'){arity(3);if(a[0].kind!=='id'||a[0].value!=='ctx'||a[2].kind!=='array')throw new SyntaxError('invalid call envelope');if(name==='ae_call'){if(a[1].kind!=='id')throw new SyntaxError('callee identifier');return{kind:'Call',callee:this.symbol(a[1].value),args:a[2].items.map(ex)};}return{kind:'Invoke',capability:str(a[1]) as never,args:a[2].items.map(ex)};}
+    if(name==='ae_fixed'){const op=str(a[0]),ty=parseMeta<Ty>(str(a[1]));if(ty.t!=='IntN')throw new SyntaxError('fixed operation type');if(op==='cast'){arity(this.header.target==='rust'?4:3);if(this.header.target==='rust'&&(a[3].kind!=='id'||a[3].value!=='None'))throw new SyntaxError('cast option');return{kind:'IntCast',ty,value:ex(a[2])};}arity(4);if(!['add','sub','mul','div','mod'].includes(op))throw new SyntaxError('fixed operator');let right=a[3];if(this.header.target==='rust'){if(right.kind!=='call'||right.name!=='Some'||right.args.length!==1)throw new SyntaxError('fixed option');right=right.args[0];}return{kind:'FixedBin',op:op as 'add',ty,left:ex(a[2]),right:ex(right)};}
+    if(name==='ae_forall'){arity(this.header.target==='rust'?5:4);if(a[0].kind!=='id'||a[0].value!=='ctx')throw new SyntaxError('quantifier context');let binder:string,body:H;if(this.header.target==='rust'){if(a[3].kind!=='id')throw new SyntaxError('quantifier binder');binder=a[3].value;body=a[4];}else{if(a[3].kind!=='lambda'||a[3].params.length!==1)throw new SyntaxError('quantifier lambda');binder=a[3].params[0];body=a[3].body;}return{kind:'ForAll',symbol:this.symbol(binder),start:ex(a[1]),end:ex(a[2]),body:ex(body)};}
+    throw new SyntaxError(`unsupported projection helper ${name}`);
+  }
+  expression(text:string):Term{return this.expr(syntax(text));}
+  body(lines:string[]):Term{
+    const rows=lines.filter(line=>line.trim()).map(line=>{if(line.includes('\t')||/^ */.exec(line)![0].length%4)throw new SyntaxError('projection indentation');return{d:/^ */.exec(line)![0].length/4,text:line.trim()};});let i=0;const target=this.header.target,mark=comment(target),strip=(s:string)=>s.replace(/;$/,'');
+    const close=(d:number)=>{if(target!=='python'){if(rows[i]?.d!==d||rows[i]?.text!=='}')throw new SyntaxError('missing block terminator');i++;}};
+    const one=(d:number):Term=>{if(d>64)throw new RangeError('projection statement depth');if(rows[i]?.d!==d)throw new SyntaxError('unexpected statement indentation');const invariants:Term[]=[];let variant:Term|null=null;while(rows[i]?.text.startsWith(mark+' @invariant ')||rows[i]?.text.startsWith(mark+' @variant ')){const row=rows[i++];if(row.text.startsWith(mark+' @invariant '))invariants.push(this.expression(row.text.slice((mark+' @invariant ').length)));else{if(variant)throw new SyntaxError('duplicate variant');variant=this.expression(row.text.slice((mark+' @variant ').length));}}
+      const row=rows[i++];if(!row||row.d!==d)throw new SyntaxError('missing statement');const s=strip(row.text);
+      if(invariants.length||variant){if(!s.startsWith('while '))throw new SyntaxError('loop annotation outside loop');}
+      if(s==='{'||s==='with ctx.scope():'){const stmts:Term[]=[];if(target==='python'&&rows[i]?.d===d+1&&rows[i]?.text==='pass')i++;else while(rows[i]?.d===d+1)stmts.push(one(d+1));close(d);return{kind:'Block',stmts};}
+      if(s.startsWith('if ')||s.startsWith('while ')){const loop=s.startsWith('while '),start=loop?'while ':'if ',suffix=target==='python'?':':' {',wrapped=s.slice(start.length,-suffix.length),condition=target==='typescript'?wrapped.slice(1,-1):wrapped;if(!s.endsWith(suffix))throw new SyntaxError('invalid control flow syntax');const h=syntax(condition);if(h.kind!=='call'||h.name!=='ae_truth'||h.args.length!==1)throw new SyntaxError('typed condition expected');if(loop){if(rows[i]?.d!==d+1||strip(rows[i]?.text)!=='ctx.tick()')throw new SyntaxError('missing loop budget check');i++;const body=one(d+1);close(d);return{kind:'While',cond:this.expr(h.args[0]),invariants,variant,body};}const then=one(d+1);close(d);let otherwise:Term|null=null;if(rows[i]?.d===d&&rows[i]?.text===(target==='python'?'else:':'else {')){i++;otherwise=one(d+1);close(d);}return{kind:'If',cond:this.expr(h.args[0]),then,otherwise};}
+      if(s.startsWith('return '))return{kind:'Return',value:this.expression(s.slice(7))};
+      if(s==='ctx.tick()')return{kind:'Yield'};
+      const assigned=/^(?:(let(?: mut)?) )?([A-Za-z_][A-Za-z_0-9]*) = (.+)$/.exec(s);
+      if(assigned){const symbol=this.symbol(assigned[2]),h=syntax(assigned[3]);if(h.kind==='call'&&h.name==='ae_bind'){if(h.args.length!==2||h.args[0].kind!=='str'||target!=='python'&&!assigned[1])throw new SyntaxError('typed local declaration expected');return{kind:'Let',symbol,ty:parseMeta<Ty>(h.args[0].value),init:this.expr(h.args[1])};}if(assigned[1])throw new SyntaxError('typed initializer required');return{kind:'Assign',target:{kind:'Place',symbol,path:[]},value:this.expr(h)};}
+      const h=syntax(s);if(h.kind==='call'&&h.name==='ae_discard'&&h.args.length===1)return{kind:'ExprStmt',expr:this.expr(h.args[0])};if(h.kind==='call'&&h.name==='ae_assert'&&h.args.length===2&&h.args[1].kind==='str')return{kind:'Assert',expr:this.expr(h.args[0]),label:h.args[1].value};throw new SyntaxError('unsupported native statement');
+    };if(!rows.length)throw new SyntaxError('missing body');const result=one(rows[0].d);if(i!==rows.length)throw new SyntaxError('extra statements outside body');return result;
+  }
+}
+function normalized(source:string,target:ExecutableTarget):string {
+  return source.split('\n').filter(line=>line.trim()).map(line=>{
+    let result=target==='python'?/^ */.exec(line)![0]:'',quoted=false,escape=false;const text=line.trim();
+    for(let i=0;i<text.length;i++){const c=text[i];if(quoted){result+=c;if(escape)escape=false;else if(c==='\\')escape=true;else if(c==='"')quoted=false;continue;}if(c==='"'){quoted=true;result+=c;continue;}if(/\s/.test(c)){let next=i+1;while(next<text.length&&/\s/.test(text[next]))next++;if(/[A-Za-z_0-9$]/.test(result.at(-1)??'')&&/[A-Za-z_0-9$]/.test(text[next]??''))result+=' ';i=next-1;continue;}result+=c;}
+    if(quoted)throw new SyntaxError('unterminated quoted source');return result;
+  }).join('\n');
+}
+export function parseExecutable(source:string,target:ExecutableTarget):Term{
+  if(!['typescript','python','rust'].includes(target))throw new TypeError('unsupported target');
+  validString(source);if(/[\r\u2028\u2029]/.test(source))throw new SyntaxError('projection requires LF source and escaped line separators');if(Buffer.byteLength(source)>EXECUTABLE_PROJECTION_PROFILE.maxSourceBytes)throw new RangeError('projection byte limit');const lines=source.split('\n'),mark=comment(target),prefix=mark+' @aether-projection/2 ';if(!lines[0]?.startsWith(prefix))throw new SyntaxError('missing executable projection header');const header=parseMeta<Header>(lines[0].slice(prefix.length));exactObject(header,['format','target','module','symbols','aliases']);if(header.format!==EXECUTABLE_PROJECTION_PROFILE.format||header.target!==target||!Array.isArray(header.aliases))throw new SyntaxError('projection profile mismatch');exactObject(header.module,['kind','symbol','provenance']);if(header.module.kind!=='Module'||header.symbols.kind!=='SymbolTable')throw new SyntaxError('invalid projection module metadata');const ids=new Set<string>(),aliases=new Set<string>();for(const pair of header.aliases){if(!Array.isArray(pair)||pair.length!==2||typeof pair[0]!=='string'||typeof pair[1]!=='string'||!/^v_[A-Za-z_0-9]+$/.test(pair[1])||ids.has(pair[0])||aliases.has(pair[1]))throw new SyntaxError('invalid symbol aliases');ids.add(pair[0]);aliases.add(pair[1]);}
+  const reverse=new Reverse(header),members:Term[]=[];let cursor=2;
+  const marker=(name:string)=>mark+' @aether-'+name;
+  while(cursor<lines.length){const line=lines[cursor].trim();if(!line){cursor++;continue;}
+    const type=/^(?:const )?type_d[0-9]+(?:: &str)? = (".*");?$/.exec(line);if(type){const value=parseMeta<Term>(readQuoted(type[1]));if(value.kind!=='TypeDecl')throw new SyntaxError('invalid declared type metadata');members.push(value);cursor++;continue;}
+    if(!line.startsWith(marker('function')+' '))throw new SyntaxError('unsupported source outside function');const attributes=parseMeta<Record<string,unknown>>(line.slice((marker('function')+' ').length));exactObject(attributes,['kind','symbol','typeParams','params','returns','capabilities','purity','provenance']);if(attributes.kind!=='FunctionDecl')throw new SyntaxError('function metadata');
+    const end=lines.findIndex((l,i)=>i>cursor&&l.trim()===marker('function-end'));if(end<0)throw new SyntaxError('missing function end');const chunk=lines.slice(cursor+1,end);
+    const locate=(name:string)=>{const matches=chunk.map((l,i)=>l.trim()===marker(name)?i:-1).filter(i=>i>=0);if(matches.length!==1)throw new SyntaxError('missing/duplicate '+name);return matches[0];};
+    const surfacesAt=locate('surfaces'),requiresAt=locate('requires'),ensuresAt=locate('ensures'),ensuresEnd=locate('ensures-end'),bodyEnd=locate('body-end');
+    const contracts=chunk.filter(l=>l.trim().startsWith(marker('contract')+' '));if(contracts.length!==1||!['null','present'].includes(contracts[0].trim().slice((marker('contract')+' ').length)))throw new SyntaxError('contract presence');const contractPresent=contracts[0].trim().endsWith(' present');const contractAt=chunk.indexOf(contracts[0]);
+    const surfaces:Term[]=[];for(const row of chunk.slice(surfacesAt+1,contractAt)){if(!row.trim())continue;const match=/^(?:(?:let(?: mut)?|const) )?[A-Za-z_][A-Za-z_0-9]* = ae_surface\((".*")\);?$/.exec(row.trim());if(match){const s=parseMeta<Term>(readQuoted(match[1]));if(s.kind!=='Surface')throw new SyntaxError('surface metadata');surfaces.push(s);}else if(!/^\s*(?:let |const )?old_v_/.test(row))throw new SyntaxError('invalid surface source');}
+    const bodyMarkers=chunk.map((l,i)=>l.trim().startsWith(marker('body')+' ')?i:-1).filter(i=>i>=0);if(bodyMarkers.length!==1)throw new SyntaxError('body presence');const bodyAt=bodyMarkers[0],bodyPresence=chunk[bodyAt].trim().slice((marker('body')+' ').length);if(!['present','null'].includes(bodyPresence))throw new SyntaxError('invalid body marker');const body=bodyPresence==='null'?null:reverse.body(chunk.slice(bodyAt+1,bodyEnd));
+    const clauses=(rows:string[]):Term[]=>rows.filter(l=>l.trim().startsWith('ae_clause(')).map(l=>{const h=syntax(l.trim().replace(/;$/,''));if(h.kind!=='call'||h.args.length!==3||h.args[1].kind!=='str'||h.args[2].kind!=='str'||!['formal','property'].includes(h.args[2].value))throw new SyntaxError('clause signature');return{kind:'Clause',expr:reverse.expr(h.args[0]),label:h.args[1].value,rigor:h.args[2].value as 'formal'};});
+    const modifies=chunk.slice(requiresAt+1,bodyAt).filter(l=>l.trim().startsWith(mark+' @modifies ')).map(l=>parseMeta<Term>(l.trim().slice((mark+' @modifies ').length)));
+    const requires=clauses(chunk.slice(requiresAt+1,bodyAt)),ensures=clauses(chunk.slice(ensuresAt+1,ensuresEnd));if(!contractPresent&&(requires.length||ensures.length||modifies.length))throw new SyntaxError('clauses attached to absent contract');
+    members.push({...attributes,body,surfaces,contract:contractPresent?{kind:'Contract',requires,ensures,modifies}:null} as unknown as Term);cursor=end+1;
+  }
+  const module={...header.module,members,symbolTable:header.symbols} as unknown as Term;validate(module);if(normalized(emit(module,header),target)!==normalized(source,target))throw new SyntaxError('unsupported or altered native scaffolding; no visible code is ignored');return module;
+}
+export const projectTypeScriptV2=(module:Term,symbols:SymbolSpace)=>projectExecutable(module,symbols,'typescript');
+export const projectPythonV2=(module:Term,symbols:SymbolSpace)=>projectExecutable(module,symbols,'python');
+export const projectRustV2=(module:Term,symbols:SymbolSpace)=>projectExecutable(module,symbols,'rust');
+export const parseTypeScriptV2=(source:string)=>parseExecutable(source,'typescript');
+export const parsePythonV2=(source:string)=>parseExecutable(source,'python');
+export const parseRustV2=(source:string)=>parseExecutable(source,'rust');

@@ -429,6 +429,22 @@ test('F07 coordinator: revoked recovery authorization cannot publish a safe abor
   } finally { await host?.close(); f.cleanup(); }
 });
 
+test('asynchronous recovery policy cannot publish an abort or replay', async () => {
+  const f = fixture(); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open({ ...f.options,
+      onPhase: phase => { if (phase === 'call-intent') throw new Error('hold execution'); },
+      authorizeRecovery: (() => Promise.resolve(true)) as unknown as NonNullable<ProcessHostOptions['authorizeRecovery']>,
+    });
+    assert.equal((await host.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'async-policy', tokens: host.issueTokens(f.ex.symbols.feeFor) })).state, 'indeterminate');
+    const before = await host.snapshot();
+    await assert.rejects(host.recoverOperation('async-policy', { strategy: 'abort-before-effects' }), /recovery_authorization_denied/);
+    await assert.rejects(host.recoverOperation('async-policy'), /recovery_authorization_denied/);
+    assert.deepEqual(await host.snapshot(), before);
+    assert.deepEqual(host.status().unresolved, ['async-policy']);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
 test('F07 coordinator: current state is bound to retained transition receipts, including against old snapshot substitution', async () => {
   const f = fixture(); let host: ProcessHost | undefined;
   try {

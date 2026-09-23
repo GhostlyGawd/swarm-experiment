@@ -141,6 +141,22 @@ test('failed host allocations/corrections and precommit exceptions leave no unjo
   assert.equal(runtime.run().state, 'completed');
 });
 
+test('asynchronous correction policy cannot authorize local or heap mutations', () => {
+  const f = pendingFixture(), runtime = new ResumableRuntime(f.module, { ...f.options,
+    authorizeCorrection: (() => Promise.resolve(true)) as unknown as NonNullable<ResumableRuntimeOptions['authorizeCorrection']> });
+  const type: Ty = { t: 'Record', name: typeName('type:test:correction_denial'), fields: [['value', b.Int]] };
+  const reference = runtime.allocateRecord(type, { value: 7n }), before = runtime.snapshot();
+  assert.throws(() => runtime.correctRecord(reference, 'value', 8n), /did not authorize/);
+  assert.deepEqual(runtime.snapshot(), before);
+  runtime.start(f.entry, [1n]);
+  if (f.module.kind !== 'Module') throw new Error('missing fixture module');
+  const frame = runtime.inspect().frames[0], declaration = f.module.members.find(member => member.kind === 'FunctionDecl' && member.symbol === f.entry);
+  if (!declaration || declaration.kind !== 'FunctionDecl') throw new Error('missing fixture entry');
+  const started = runtime.snapshot();
+  assert.throws(() => runtime.correctLocal(frame.id, declaration.params[0].symbol, 9n), /did not authorize/);
+  assert.deepEqual(runtime.snapshot(), started);
+});
+
 test('fresh-process replay preserves allocation identity while divergence rejects a held future handle', () => {
   const symbols = new SymbolSpace('resumable-fresh-identity'), entry = symbols.define('entry');
   const f = fixture([fn({ symbol: entry, returns: b.Int, body: b.ret(b.int(1)) })], symbols), runtime = f.runtime();

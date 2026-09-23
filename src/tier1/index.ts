@@ -6,6 +6,7 @@ export { GraphStore, alphaNormalize, hashNode, structuralKeyOf, type Step, type 
 export { DurableGraphStore, type DurableGraphStoreOptions, type DurableStoreLimits, type DurableRootHead, type DurableRootState, type PendingAstPromotion, type DurableStoreFault, type DurableCollectionResult } from './durable-store.ts';
 export { CausalLineageLedger, LineageAdmissionError, signSpecRevision, signIntent, specRevisionDigest, intentDigest, fenceRequirement, validateStrictLineageAdmission, type CausalLineageOptions, type LineageAuthority, type SpecReference, type FenceRequirement, type SpecRevisionBody, type SignedSpecRevision, type IntentBody, type SignedIntent, type ArtifactLineageRecord, type LineageInvalidation, type StrictLineageAdmission } from './causal-lineage.ts';
 export { CognitiveBlackboard, type BlackboardItem, type BlackboardAcl, type BlackboardPolicy, type BlackboardEntry, type BlackboardView, type CognitiveBlackboardOptions } from './cognitive-blackboard.ts';
+export { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, type SemanticGcOptions, type SemanticGcPolicy, type SemanticGcProposal, type SemanticRetention, type SemanticRetentionKind } from './semantic-gc.ts';
 export { DurableTreeWorkspace, type TreeWorkspaceOptions, type TreePlacement, type TreeMutation, type TreeFence, type TreeCheckpoint, type TreeCheckpointAck, type TreeCheckpointCertificate } from './tree-workspace.ts';
 export { allocateFractionalPosition, compareFractionalPositions, parseFractionalPosition } from './fractional-position.ts';
 export { projectOccurrences, occurrenceIdForInsert, type OccurrenceNode, type OccurrenceProjection, type TreeDiagnostic } from './occurrence-tree.ts';
@@ -19,3 +20,4 @@ export { SymbolSpace } from './symbols.ts';
 export * from './provenance.ts';
 export { IrContext, decode, encode, type AgentIr } from './agent-ir.ts';
 export * as build from './build.ts';
+export { encodeAgentIrBinary, decodeAgentIrBinary, encodeAgentIrModel, decodeAgentIrModel, AGENT_IR_V2_LIMITS } from './agent-ir-v2.ts';

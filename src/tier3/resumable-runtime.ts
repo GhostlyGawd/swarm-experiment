@@ -11,6 +11,13 @@ import { validateMachineArguments, validateMachineResult, instantiateMachineType
 import { compileResumableProgram, type ResumableCode, type ResumableProgram } from './resumable-program.ts';
 import { MAX_MACHINE_EVENTS, MACHINE_LIMITS, checkpointDigest, emptyEventHead, eventDigest, machineClone, machineDigest, validateMachineCore, validateMachineValue, validateResumableSnapshot, type MachineCore, type MachineValue, type MachineFrame, type MachineEnvironment, type MachineCapture, type MachineEvent, type MachineSection, type ResumableSnapshot } from './resumable-state.ts';
 
+const executionSnapshots = new WeakMap<object, { digest: Digest; origin: Digest; program: Digest }>();
+/** Checkpoint-controller capability: JSON copies carry data, not evidence that
+ * this engine advanced from the controller's current durable checkpoint. */
+export function validateExecutedCheckpoint(snapshot: ResumableSnapshot, origin: Digest, program: Digest): void {
+  const stamp = executionSnapshots.get(snapshot);
+  if (!stamp || stamp.origin !== origin || stamp.program !== program || stamp.digest !== checkpointDigest(snapshot)) throw new TypeError('checkpoint was not produced by the authorized resumed execution');
+}
 export interface ResumableRef extends Ref { readonly heapId: string; readonly ownerEpoch: string }
 export interface ResumableEffects {
   readonly broker: DurableEffectBroker;
@@ -54,6 +61,7 @@ export class ResumableRuntime {
   private mutating = false;
   private eventEffect: MachineEvent['effect'] = null;
   private readonly checkpointBytes: number;
+  private restoredOrigin: Digest;
   constructor(module: Term, options: ResumableRuntimeOptions) {
     this.program = compileResumableProgram(module, options); this.options = options;
     this.checkpointBytes = options.maxCheckpointBytes ?? MACHINE_LIMITS.maxFrameBytes;
@@ -69,6 +77,7 @@ export class ResumableRuntime {
       records: [], environments: [], heaps: [], sequences: [], results: [], closures: [], tasks: [], frames: [], atomics: [],
     };
     validateMachineCore(this.core, this.program);
+    this.restoredOrigin = checkpointDigest({ format: 'aether.resumable-state/1', core: this.core, eventCursor: '0', eventHead: emptyEventHead(), events: [] });
   }
   private next(field: 'nextRecord' | 'nextEnvironment' | 'nextHeapVersion' | 'nextSequence' | 'nextResult' | 'nextClosure' | 'nextTask' | 'nextFrame'): string { const id = this.core[field]; this.core[field] = String(BigInt(id) + 1n); return id; }
   private code(frame: MachineFrame): ResumableCode { const code = this.codes.get(frame.code); if (!code) throw new TypeError('missing bound bytecode'); return code; }
@@ -382,7 +391,8 @@ export class ResumableRuntime {
     if (this.executing) throw new Error('checkpoint requires an instruction safe point');
     const snapshot: ResumableSnapshot = { format: 'aether.resumable-state/1', core: machineClone(this.core), eventCursor: String(this.events.length), eventHead: this.events.length ? eventDigest(this.events.at(-1)!) : emptyEventHead(), events: machineClone(this.events) };
     encodeCanonical(snapshot, { ...MACHINE_LIMITS, maxFrameBytes: this.checkpointBytes, maxDecompressedBytes: this.checkpointBytes });
-    validateResumableSnapshot(snapshot, this.program); return snapshot;
+    validateResumableSnapshot(snapshot, this.program);
+    executionSnapshots.set(snapshot, { digest: checkpointDigest(snapshot), origin: this.restoredOrigin, program: this.program.digest }); return snapshot;
   }
   restore(snapshot: ResumableSnapshot, expectedDigest: Digest): void {
     if (this.executing) throw new Error('restore requires a safe point');
@@ -396,7 +406,7 @@ export class ResumableRuntime {
       if (snapshot.core.isolatedEffects.length && this.options.effects.broker.recordedEventCount !== snapshot.core.effectPrefix.length) throw new TypeError('isolated checkpoint recorded trace changed');
       this.options.effects.broker.restoreIsolatedState({ prefix: snapshot.core.effectPrefix, bufferedIntents: snapshot.core.isolatedEffects.filter(item => item.outcome.state === 'rejected' && item.outcome.code === 'isolated_intent_buffered').map(item => item.request) });
     }
-    this.core = machineClone(snapshot.core); this.events = machineClone(snapshot.events);
+    this.core = machineClone(snapshot.core); this.events = machineClone(snapshot.events); this.restoredOrigin = expectedDigest;
   }
   rewind(steps: number): void {
     if (this.executing || !Number.isSafeInteger(steps) || steps < 0 || steps > this.events.length) throw new RangeError('invalid rewind distance');
@@ -410,14 +420,14 @@ export class ResumableRuntime {
     this.checkAuthority(); this.hostMutation('retry-reconciled-effect', () => { this.core.state = 'running'; this.core.fault = null; });
   }
   correctLocal(frameId: string, symbol: SymbolId, value: Value): void {
-    const snapshot = this.snapshot(); if (!this.options.authorizeCorrection?.(snapshot)) throw new Error('host did not authorize state correction');
+    const snapshot = this.snapshot(); if (this.options.authorizeCorrection?.(snapshot) !== true) throw new Error('host did not authorize state correction');
     this.hostMutation('correction', () => {
       const frame = this.core.frames.find(item => item.id === frameId); if (!frame) throw new TypeError('unknown corrected frame');
       this.lookup(frame, symbol, false); this.set(frame, symbol, this.importValue(value));
     });
   }
   correctRecord(reference: Ref, field: string, value: Value): void {
-    const snapshot = this.snapshot(); if (!this.options.authorizeCorrection?.(snapshot)) throw new Error('host did not authorize state correction');
+    const snapshot = this.snapshot(); if (this.options.authorizeCorrection?.(snapshot) !== true) throw new Error('host did not authorize state correction');
     this.hostMutation('correction', () => {
       const row = this.record(this.hostReference(reference)), entry = row.fields.find(([name]) => name === field);
       if (!entry) throw new TypeError('unknown corrected field'); entry[1] = this.importValue(value); row.version = String(BigInt(row.version) + 1n);

@@ -14,6 +14,7 @@ export { GraphStore, alphaNormalize, hashNode, structuralKeyOf, type Step, type 
 export { DurableGraphStore, type DurableGraphStoreOptions, type DurableStoreLimits, type DurableRootHead, type DurableRootState, type PendingAstPromotion, type DurableStoreFault, type DurableCollectionResult } from './tier1/durable-store.ts';
 export { CausalLineageLedger, LineageAdmissionError, signSpecRevision, signIntent, specRevisionDigest, intentDigest, fenceRequirement, validateStrictLineageAdmission, type CausalLineageOptions, type LineageAuthority, type SpecReference, type FenceRequirement, type SpecRevisionBody, type SignedSpecRevision, type IntentBody, type SignedIntent, type ArtifactLineageRecord, type LineageInvalidation, type StrictLineageAdmission } from './tier1/causal-lineage.ts';
 export { CognitiveBlackboard, type BlackboardItem, type BlackboardAcl, type BlackboardPolicy, type BlackboardEntry, type BlackboardView, type CognitiveBlackboardOptions } from './tier1/cognitive-blackboard.ts';
+export { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, type SemanticGcOptions, type SemanticGcPolicy, type SemanticGcProposal, type SemanticRetention, type SemanticRetentionKind } from './tier1/semantic-gc.ts';
 export { DurableTreeWorkspace, type TreeWorkspaceOptions, type TreePlacement, type TreeMutation, type TreeFence, type TreeCheckpoint, type TreeCheckpointAck, type TreeCheckpointCertificate } from './tier1/tree-workspace.ts';
 export { allocateFractionalPosition, compareFractionalPositions, parseFractionalPosition } from './tier1/fractional-position.ts';
 export { projectOccurrences, occurrenceIdForInsert, type OccurrenceNode, type OccurrenceProjection, type TreeDiagnostic } from './tier1/occurrence-tree.ts';
@@ -91,5 +92,9 @@ export { buildLedgerExample, ledgerCapabilities, ledgerTelemetry, ACCOUNT, CENTS
 // Versioned execution envelopes; kept namespaced to preserve the v1 API.
 export * as fabric from './fabric/index.ts';
 export { BrokerEffectRouter, EffectInvocationError, type RuntimeEffectRouter, type RuntimeEffectRouterOptions } from './tier3/effects.ts';
-export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessEffectContext } from './tier4/process-host.ts';
+export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessEffectContext, type ProcessCheckpointAccess } from './tier4/process-host.ts';
+export { ProcessResumableSession, type ProcessResumableOptions, type ProcessResumableEffectsContext } from './tier4/process-resumable.ts';
+export { seedProcessCheckpoint, seededProcessReference, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointSeed, type ProcessCheckpointAuthorization, type ProcessCheckpointAction } from './tier4/process-checkpoint-contract.ts';
 export { ProcessDeployment, processArtifactContext, processArtifactDigest, processMigrationPlan, processEffectPlan, type ProcessArtifactInput, type ProcessDeploymentOptions } from './tier4/process-deployment.ts';
+export { encodeAgentIrBinary, decodeAgentIrBinary, encodeAgentIrModel, decodeAgentIrModel, AGENT_IR_V2_LIMITS } from './tier1/agent-ir-v2.ts';
+export { EXECUTABLE_PROJECTION_PROFILE, projectExecutable, parseExecutable, executableBundle, executableRuntime, projectTypeScriptV2, parseTypeScriptV2, projectPythonV2, parsePythonV2, projectRustV2, parseRustV2, RUST_PROJECTION_CARGO, type ExecutableTarget, type ExecutableBundle } from './projection/executable.ts';
