@@ -32,6 +32,8 @@ export * as build from './tier1/build.ts';
 export { checkPortableCertificate, encodePortableCertificate, decodePortableCertificate, validateCheckedPortableCertificate, type PortableCertificateV1, type CheckedPortableCertificate, type PortableDerivationOptions } from './tier2/portable-proof-checker.ts';
 export { generatePortableCertificate } from './tier2/portable-proof-producer.ts';
 export * from './tier2/ocap.ts';
+export { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2, type GrantBodyV2, type GrantRequestV2, type GrantAuthorityOptions } from './tier2/scoped-grants.ts';
+export { DurableGrantEpochs, type GrantEpochOptions } from './tier2/grant-epochs.ts';
 export { ProofCache, type ProofCacheStats } from './tier2/proof-cache.ts';
 export { verifyIncremental, type IncrementalVerificationResult } from './tier2/incremental.ts';
 export { TypeChecker, typecheck, tyEqual, tyToString, underlying, type CheckResult, type Diagnostic } from './tier2/typecheck.ts';

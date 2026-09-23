@@ -10,6 +10,8 @@ The user resumed the build after the pushed stopping point. **19 of 62 tracked t
 - **V4-T1-09 verified:** a durable typed cognitive blackboard attaches claim, hypothesis, decision, delegation and verified-evidence sidecars to an exact admitted AST node. Its [acceptance evidence](evidence/blackboard-870b438/REVIEW.md) binds clean source `870b438` and 540 passing tests. Restart discovery, signed-lineage invalidation, ACLs, bounded retention and stable executable hashes pass the declared gates. Host identity, creation authority, verifier and clock remain explicit trust boundaries.
 - **V4-T3-01 still active:** the resumable backend and effect reconciliation pass their existing focused tests. The production ProcessHost ownership bridge and exact-source gate closure are under implementation.
 - **V4-T1-02 still active:** the binary/model codec is present; native target projections/parsers and executable fixture validation are under implementation.
+- **V4-T2-04 active:** a versioned audience/resource-bound grant contract now has focused forged, stale-policy, expiry, delegation and revocation tests. Runtime boundary integration and complete direct/closure/process/effect campaigns remain open.
+- **V4-T1-05 active:** a bounded semantic GC proposal/proof profile is being implemented; no GC task gate is claimed yet.
 
 ## Historical requested stopping point — 2026-09-22
 

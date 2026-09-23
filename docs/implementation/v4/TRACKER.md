@@ -23,7 +23,7 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-T2-04](#v4-t2-04), [V4-T2-06](#v4-t2-06).
+**Ready now:** [V4-T2-06](#v4-t2-06).
 
 ## Milestones
 
@@ -64,7 +64,7 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-T2-01](#v4-t2-01) | Executable cross-layer specifications | language | v2 | planned | [V4-T1-02](#v4-t1-02), [V4-T1-03](#v4-t1-03) |
 | [V4-T2-02](#v4-t2-02) | Contract-first autonomous repair | runtime | v2 | planned | [V4-T2-01](#v4-t2-01), [V4-F04](#v4-f04), [V4-F06](#v4-f06), [V4-F08](#v4-f08), [V4-T3-07](#v4-t3-07) |
 | [V4-T2-03](#v4-t2-03) | Invariant CEGIS | verification | v2 | planned | [V4-F06](#v4-f06), [V4-T2-01](#v4-t2-01) |
-| [V4-T2-04](#v4-t2-04) | Object-capability containment | security | v2 | planned | [V4-F04](#v4-f04), [V4-F07](#v4-f07) |
+| [V4-T2-04](#v4-t2-04) | Object-capability containment | security | v2 | in_progress | [V4-F04](#v4-f04), [V4-F07](#v4-f07) |
 | [V4-T2-05](#v4-t2-05) | Economic resource types | runtime | v2 | planned | [V4-F04](#v4-f04), [V4-T2-04](#v4-t2-04) |
 | [V4-T2-06](#v4-t2-06) | Heterogeneous Byzantine promotion quorum | governance | v2 | planned | [V4-R01](#v4-r01), [V4-F08](#v4-f08), [V4-T1-06](#v4-t1-06), [V4-T2-10](#v4-t2-10) |
 | [V4-T2-07](#v4-t2-07) | State lens synthesis | persistence | v2 | planned | [V4-F07](#v4-f07), [V4-T2-01](#v4-t2-01), [V4-T2-10](#v4-t2-10) |
@@ -623,7 +623,7 @@ Evidence: not yet produced.
 
 ### V4-T2-04
 
-**Object-capability containment** · implementation · v2 · owner: security · **planned**
+**Object-capability containment** · implementation · v2 · owner: security · **in_progress**
 
 Prerequisites: [V4-F04](#v4-f04), [V4-F07](#v4-f07).
 
