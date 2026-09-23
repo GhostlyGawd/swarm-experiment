@@ -14,7 +14,7 @@ import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, ty
 import { underlying } from '../tier2/typecheck.ts';
 import { ProductionRuntime } from '../tier3/compile.ts';
 import { effectPayloadDigest, type EffectEventV1, type EffectRequestV1 } from '../fabric/effects.ts';
-import { EffectInvocationError, brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerInvoke, brokerPinTrustedClock, brokerReconcileLast, brokerReconcileRecorded, brokerMode, type RuntimeEffectRouter } from '../tier3/effects.ts';
+import { EffectInvocationError, brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerInvoke, brokerPinTrustedClock, brokerReconcileLast, brokerReconcileRecorded, brokerInspectRecorded, brokerMode, type RuntimeEffectRouter } from '../tier3/effects.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
 import type { Value } from '../tier3/values.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
@@ -373,6 +373,7 @@ export class ProcessHost {
         policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
         capability: rule.capability, grantRef });
     }
+    for (const call of journal.calls) this.assertV4TerminalEffects(journal, call);
   }
   /** Stable identity for a durable supervisor sharing this host's state. */
   fallbackIdentity(): Readonly<{ configuration: Digest; manifest: Digest; storage: string }> {
@@ -411,13 +412,14 @@ export class ProcessHost {
     const journal = this.read(); return { unresolved: journal.calls.filter(call => call.state === 'running' || call.state === 'indeterminate').map(call => call.operationId), migrations: journal.migrations.map(migration => ({ migrationId: migration.migrationId, state: migration.state })) };
   }
   operationResult(operationId: string): ProcessHostCallResult | null {
-    this.assertOpen(); identifier(operationId); const call = this.read().calls.find(call => call.operationId === operationId);
-    return call ? this.result(call) : null;
+    this.assertOpen(); identifier(operationId); const journal = this.read(), call = journal.calls.find(call => call.operationId === operationId);
+    return call ? this.result(call, journal) : null;
   }
   operationEffectDisposition(operationId: string): ProcessOperationEffectDisposition | null {
     this.assertOpen(); identifier(operationId);
-    const call = this.read().calls.find(item => item.operationId === operationId);
+    const journal = this.read(), call = journal.calls.find(item => item.operationId === operationId);
     if (!call) return null;
+    this.assertV4TerminalEffects(journal, call);
     const effects = Object.freeze(call.effects.map(effect => Object.freeze({ id: effect.id, state: effect.state, requestDigest: effect.requestDigest, outcomeDigest: effect.outcomeDigest })));
     const safeToAbortBeforeEffects = effects.every(effect => ['requested', 'rejected', 'aborted'].includes(effect.state));
     const body = { operationId, state: call.state, effects };
@@ -463,7 +465,7 @@ export class ProcessHost {
       const tokens = freeze(copy([...options.tokens]));
       const requestDigest = domainDigest('aether.process-call/1', { manifest: executionManifestDigest(this.manifest), symbol, args });
       const old = journal.calls.find(call => call.operationId === options.operationId);
-      if (old) { if (old.requestDigest !== requestDigest) throw new Error('call_identity_conflict'); return this.result(old); }
+      if (old) { if (old.requestDigest !== requestDigest) throw new Error('call_identity_conflict'); return this.result(old, journal); }
       this.assertReady(journal);
       if ((options.expectedGeneration !== undefined && journal.generation !== options.expectedGeneration)
         || (options.expectedSnapshot !== undefined && runtimeSnapshotDigest(journal.snapshot) !== options.expectedSnapshot))
@@ -486,7 +488,7 @@ export class ProcessHost {
       this.assertOpen(); const journal = this.read(), call = journal.calls.find(call => call.operationId === operationId);
       this.requireRecoveryAuthorization(operationId, options.strategy);
       if (!call) throw new Error('unknown operation');
-      if (call.state === 'completed' || call.state === 'aborted') return this.result(call);
+      if (call.state === 'completed' || call.state === 'aborted') return this.result(call, journal);
       if (call.generation !== journal.generation) throw new Error('cannot replay across a changed ownership generation');
       await this.stopWorkers();
       this.requireRecoveryAuthorization(operationId, options.strategy);
@@ -495,7 +497,7 @@ export class ProcessHost {
         call.state = 'aborted'; call.failure = 'authorized abort before any possible external effect commit';
         call.recovery = { strategy: options.strategy, evidenceDigest: domainDigest('aether.process-recovery/1', { operationId, before: runtimeSnapshotDigest(call.before), effects: call.effects }) };
         this.requireRecoveryAuthorization(operationId, options.strategy);
-        journal.snapshot = copy(call.before); this.appendHead(journal, { kind: 'abort', operationId, subjectDigest: call.recovery.evidenceDigest }); this.persist(journal); return this.result(call);
+        journal.snapshot = copy(call.before); this.appendHead(journal, { kind: 'abort', operationId, subjectDigest: call.recovery.evidenceDigest }); this.persist(journal); return this.result(call, journal);
       }
       if (options.strategy === 'abort-readonly-wasm') {
         const policy = this.signedEffectResourcePolicy;
@@ -512,11 +514,11 @@ export class ProcessHost {
         call.state = 'aborted'; call.failure = 'authorized read-only Wasm abort; external guest effects are excluded by signed policy';
         call.recovery = { strategy: options.strategy, evidenceDigest };
         journal.snapshot = copy(call.before); this.appendHead(journal, { kind: 'abort', operationId, subjectDigest: evidenceDigest }); this.persist(journal);
-        return this.result(call);
+        return this.result(call, journal);
       }
       if (options.strategy !== 'isolated-replay') throw new Error('unknown recovery strategy');
       if (this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4'
-        && !this.reconcileV4Call(journal, call)) return this.result(call);
+        && !this.reconcileV4Call(journal, call)) return this.result(call, journal);
       await this.ensureWorkers(journal);
       const result = await this.execute(journal, call, 'replay');
       if (result.state === 'completed') {
@@ -746,14 +748,14 @@ export class ProcessHost {
       call.executionDigest = callOutcomeDigest(call);
       journal.snapshot = copy(published); this.retain(journal, journal.snapshot); this.appendHead(journal, { kind: 'call', operationId: call.operationId, subjectDigest: call.executionDigest! }); this.persist(journal);
       this.phase('call-committed', call.operationId, journal.generation);
-      return this.result(call);
+      return this.result(call, journal);
     } catch (error) {
       active.cancelled = true; await this.stopWorkers();
       // Re-read the atomic decision rather than undoing a completed call after
       // an acknowledgment/observer failure.
       const durable = this.read(), saved = durable.calls.find(item => item.operationId === call.operationId)!;
       if (saved.state !== 'completed') { saved.state = 'indeterminate'; saved.failure = String(error); this.persist(durable); }
-      return this.result(saved);
+      return this.result(saved, durable);
     } finally { if (this.active === active) this.active = null; }
   }
   private async invoke(active: Active, symbol: SymbolId, args: readonly Value[], operationId: string): Promise<ProcessCallResult> {
@@ -817,37 +819,61 @@ export class ProcessHost {
       }));
     return router;
   }
+  /** Reconstruct the exact historical broker subject without asking for a
+   * current dispatch grant. Router construction is followed only by a
+   * nonvirtual, read-only broker inspection or authorized reconciliation. */
+  private v4RecordedEffect(journal: HostJournal, call: CallRecord, effect: EffectRecord):
+    { router: RuntimeEffectRouter; request: EffectRequestV1 } {
+    const policy = this.signedEffectResourcePolicy;
+    if (policy?.format !== 'aether.signed-effect-resource-policy/4' || !this.options.effectRouterFactory)
+      throw new TypeError('isolated Wasm recorded effect requires signed v4 policy and factory');
+    const rule = policy.body.rules.find(item => item.capability === effect.capability);
+    const retained = journal.snapshots.find(item => item.digest === effect.snapshotDigest)?.snapshot;
+    if (!rule || !retained || effect.args.length !== 1 || effect.args[0].tag !== 'int')
+      throw new TypeError('unavailable exact Wasm effect history');
+    const grantRef = domainDigest('aether.process-effect-grant-ref/1', {
+      configuration: this.configuration, operationId: effect.id, capability: effect.capability, policyEpoch: policy.body.policyEpoch,
+    });
+    const router = this.options.effectRouterFactory(freeze({ operationId: effect.id, rootOperationId: call.operationId,
+      unit: effect.unit, generation: call.generation, manifest: copy(this.manifest), capability: effect.capability,
+      mode: 'live' as const, snapshot: copy(retained), policyEpoch: policy.body.policyEpoch,
+      deadline: rule.deadline, clockDomain: rule.clockDomain, grantRef }));
+    if (brokerMode(router) !== 'live') throw new TypeError('recorded Wasm broker mode mismatch');
+    brokerBind(router, this.manifest.astRoot as NodeRef);
+    assertEffectResourceAdapterV4(policy, effect.capability, { ...brokerAdapterIdentity(router, effect.capability),
+      artifactCapability: brokerWasmAdapterCapability(router, effect.capability) });
+    brokerAttestContext(router, { executionId: effect.id, manifestDigest: executionManifestDigest(this.manifest),
+      mode: 'live', policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
+      capability: effect.capability, grantRef });
+    const payload: TaggedValueV1 = { tag: 'sequence', items: [{ tag: 'string', value: effect.capability }, ...copy(effect.args)] };
+    const request: EffectRequestV1 = { format: 'aether.effect/1', executionId: effect.id, effectId: 'operation-0',
+      branchId: null, executionManifest: executionManifestDigest(this.manifest), capabilityGrantRef: grantRef,
+      policyEpoch: policy.body.policyEpoch, payloadDigest: effectPayloadDigest(payload), payload,
+      budgetReservationId: null, deadline: rule.deadline };
+    return { router, request };
+  }
+  private assertV4TerminalEffects(journal: HostJournal, call: CallRecord): void {
+    if (this.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/4') return;
+    for (const effect of call.effects) {
+      if (!['committed', 'rejected', 'aborted'].includes(effect.state)) continue;
+      const { router, request } = this.v4RecordedEffect(journal, call, effect);
+      const outcome = brokerInspectRecorded(router, effect.capability, request);
+      if (!outcome || outcome.state !== effect.state
+        || outcome.state === 'committed' && !equal(outcome.value, effect.value)
+        || (outcome.state === 'rejected' || outcome.state === 'aborted') && outcome.code !== effect.code)
+        throw new Error('host_effect_broker_mismatch: cached effect lacks an exact broker outcome');
+    }
+  }
   private reconcileV4Call(journal: HostJournal, call: CallRecord): boolean {
     const policy = this.signedEffectResourcePolicy;
     if (policy?.format !== 'aether.signed-effect-resource-policy/4' || !this.options.effectRouterFactory)
       throw new TypeError('isolated Wasm reconciliation requires signed v4 policy and factory');
+    this.assertV4TerminalEffects(journal, call);
     for (const effect of call.effects) {
       if (effect.state !== 'dispatching' && effect.state !== 'indeterminate') continue;
       try {
         this.requireRecoveryAuthorization(call.operationId, 'isolated-replay');
-        const rule = policy.body.rules.find(item => item.capability === effect.capability);
-        const retained = journal.snapshots.find(item => item.digest === effect.snapshotDigest)?.snapshot;
-        if (!rule || !retained || effect.args.length !== 1 || effect.args[0].tag !== 'int')
-          throw new TypeError('unavailable exact Wasm effect history');
-        const grantRef = domainDigest('aether.process-effect-grant-ref/1', {
-          configuration: this.configuration, operationId: effect.id, capability: effect.capability, policyEpoch: policy.body.policyEpoch,
-        });
-        const router = this.options.effectRouterFactory(freeze({ operationId: effect.id, rootOperationId: call.operationId,
-          unit: effect.unit, generation: call.generation, manifest: copy(this.manifest), capability: effect.capability,
-          mode: 'live' as const, snapshot: copy(retained), policyEpoch: policy.body.policyEpoch,
-          deadline: rule.deadline, clockDomain: rule.clockDomain, grantRef }));
-        if (brokerMode(router) !== 'live') throw new TypeError('Wasm recovery broker mode mismatch');
-        brokerBind(router, this.manifest.astRoot as NodeRef);
-        assertEffectResourceAdapterV4(policy, effect.capability, { ...brokerAdapterIdentity(router, effect.capability),
-          artifactCapability: brokerWasmAdapterCapability(router, effect.capability) });
-        brokerAttestContext(router, { executionId: effect.id, manifestDigest: executionManifestDigest(this.manifest),
-          mode: 'live', policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
-          capability: effect.capability, grantRef });
-        const payload: TaggedValueV1 = { tag: 'sequence', items: [{ tag: 'string', value: effect.capability }, ...copy(effect.args)] };
-        const request: EffectRequestV1 = { format: 'aether.effect/1', executionId: effect.id, effectId: 'operation-0',
-          branchId: null, executionManifest: executionManifestDigest(this.manifest), capabilityGrantRef: grantRef,
-          policyEpoch: policy.body.policyEpoch, payloadDigest: effectPayloadDigest(payload), payload,
-          budgetReservationId: null, deadline: rule.deadline };
+        const { router, request } = this.v4RecordedEffect(journal, call, effect);
         const outcome = brokerReconcileRecorded(router, effect.capability, request);
         if (outcome.state === 'indeterminate') return false;
         this.requireRecoveryAuthorization(call.operationId, 'isolated-replay');
@@ -887,8 +913,14 @@ export class ProcessHost {
     let effect = active.call.effects.find(effect => effect.id === id);
     if (effect && effect.requestDigest !== requestDigest) throw new EffectInvocationError({ state: 'indeterminate', recoveryId: 'process_replay_mismatch' });
     if (active.mode === 'replay' && !effect) throw new EffectInvocationError({ state: 'indeterminate', recoveryId: 'process_missing_effect_history' });
-    if (effect?.state === 'committed') return { value: decodeProcessValue(effect.value!, this.scope(active.journal, unit), active.snapshot), snapshot: active.snapshot };
-    if (effect?.state === 'rejected' || effect?.state === 'aborted') throw new EffectInvocationError({ state: effect.state, code: effect.code! });
+    if (effect?.state === 'committed') {
+      this.assertV4TerminalEffects(active.journal, active.call);
+      return { value: decodeProcessValue(effect.value!, this.scope(active.journal, unit), active.snapshot), snapshot: active.snapshot };
+    }
+    if (effect?.state === 'rejected' || effect?.state === 'aborted') {
+      this.assertV4TerminalEffects(active.journal, active.call);
+      throw new EffectInvocationError({ state: effect.state, code: effect.code! });
+    }
     const v4 = this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4';
     let preparedRouter: RuntimeEffectRouter | null = null;
     if (v4 && active.mode === 'live' && !effect) {
@@ -1088,7 +1120,8 @@ export class ProcessHost {
     if (journal.calls.some(call => call.state === 'running' || call.state === 'indeterminate')) throw new Error('state domain blocked by an indeterminate operation');
     if (journal.migrations.some(migration => ['requested', 'prepared', 'committed'].includes(migration.state))) throw new Error('migration recovery must finish before another state transition');
   }
-  private result(call: CallRecord): ProcessHostCallResult {
+  private result(call: CallRecord, journal: HostJournal): ProcessHostCallResult {
+    this.assertV4TerminalEffects(journal, call);
     if (call.state === 'completed') return freeze(copy({ state: 'completed', operationId: call.operationId, generation: call.generation, unit: call.unit, execution: call.execution! }));
     return { state: call.state === 'aborted' ? 'aborted' : 'indeterminate', operationId: call.operationId, generation: call.generation, unit: call.unit, reason: call.failure ?? 'operation outcome not known' };
   }

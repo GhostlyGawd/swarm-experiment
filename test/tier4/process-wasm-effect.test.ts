@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as b from '../../src/tier1/build.ts';
@@ -15,6 +15,8 @@ import { createEffectSignerAnchor } from '../../src/tier2/effect-signer-anchor.t
 import { effectResourcePolicyDigestV4, signEffectResourcePolicyV4, assertEffectResourceAdapterV4, type EffectResourcePolicyBodyV4 } from '../../src/tier2/effect-resource-policy.ts';
 import { createEvidenceManifest } from '../../src/fabric/evidence.ts';
 import { DurableEffectBroker, effectAdapterDigest, type EffectAdapter } from '../../src/fabric/effects.ts';
+import { createEffectJournalWitness, type EffectJournalWitness, type WitnessHead } from '../../src/fabric/effect-journal-witness.ts';
+import { encodeCanonical } from '../../src/fabric/encoding.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
 import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
 import { ProcessHost, type ProcessHostOptions } from '../../src/tier4/process-host.ts';
@@ -71,6 +73,23 @@ test('anchored V4 ProcessHost runs exact isolated Wasm through a real worker and
     const plan: TopologyPlan = { shape: 'containers', units: [{ id: 'worker', members: [entry, entryRef], capabilities: [CAP], placement: 'container', memoryMb: 16 }],
       crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
     let active: EffectAdapter = approved, lastBroker: DurableEffectBroker | undefined, allowReconciliation = true, allowAbort = true;
+    const witnesses = new Map<string, { witness: EffectJournalWitness; head: WitnessHead }>();
+    const witnessFor = (operationId: string): EffectJournalWitness => {
+      let item = witnesses.get(operationId);
+      if (!item) {
+        item = { witness: null as unknown as EffectJournalWitness, head: { revision: '0', journal: null } };
+        const state = item;
+        item.witness = createEffectJournalWitness({ authorityId: 'operator:wasm-test', repositoryId: grants.repositoryId,
+          deploymentId: operationId, clockDomain: body.rules[0].clockDomain,
+          read: () => state.head, advance(expectedRevision, journal) {
+            assert.equal(state.head.revision, expectedRevision);
+            state.head = { revision: String(BigInt(expectedRevision) + 1n), journal };
+            return state.head;
+          } });
+        witnesses.set(operationId, item);
+      }
+      return item.witness;
+    };
     let failBeforeCommit = false;
     let routeFault: 'execution' | 'manifest' | 'epoch' | 'deadline' | 'clock' | 'grant' | null = null;
     let refuseGenerationOne = false;
@@ -83,9 +102,9 @@ test('anchored V4 ProcessHost runs exact isolated Wasm through a real worker and
         const path = join(directory, 'effects', domainDigest('aether.process-wasm-directory/1', context.operationId).split(':').at(-1)!);
         const clockDomain = routeFault === 'clock' ? 'wrong-clock/1' : context.clockDomain!;
         const live = new DurableEffectBroker({ directory: path, clockDomain, clock: () => 100n,
-          authorize: () => true, authorizeReconciliation: () => allowReconciliation });
+          authorize: () => true, authorizeReconciliation: () => allowReconciliation, witness: witnessFor(context.operationId) });
         const broker = context.mode === 'live' ? live : new DurableEffectBroker({ directory: path, mode: 'replay', clockDomain,
-          clock: () => 100n, authorize: () => false, replayEvents: live.events() });
+          clock: () => 100n, authorize: () => false, replayEvents: live.events(), witness: witnessFor(context.operationId) });
         if (context.mode === 'live') lastBroker = live;
         return new BrokerEffectRouter({ broker,
           manifest: routeFault === 'manifest' ? { ...manifest, target: { ...manifest.target, artifactDigest: digest('wrong-artifact') } } : manifest,
@@ -109,6 +128,24 @@ test('anchored V4 ProcessHost runs exact isolated Wasm through a real worker and
     const event = lastBroker?.events()[0];
     assert.equal(event?.outcome?.state, 'committed');
     if (event?.outcome?.state === 'committed') assert.deepEqual(JSON.parse(JSON.stringify(event.outcome.value)), { tag: 'int', value: '42' });
+    // Derive the directory from the exact execution ID recorded by the broker.
+    const retainedId = event!.request.executionId;
+    const file = join(directory, 'effects', domainDigest('aether.process-wasm-directory/1', retainedId).split(':').at(-1)!, 'effects-v2.json');
+    const validBytes = readFileSync(file, 'utf8'), altered = JSON.parse(validBytes);
+    altered.records[0].outcome.value.value = '999';
+    altered.records[0].outcome.receiptDigest = domainDigest('aether.effect-receipt/1', {
+      requestDigest: altered.records[0].requestDigest, adapterId: altered.records[0].adapterId,
+      adapterSemanticsDigest: altered.records[0].adapterSemanticsDigest,
+      observedAt: altered.records[0].observedAt, value: altered.records[0].outcome.value });
+    writeFileSync(file, encodeCanonical(altered));
+    assert.throws(() => host!.operationResult('approved-wasm'), /diverges from witness/);
+    assert.throws(() => host!.operationEffectDisposition('approved-wasm'), /diverges from witness/);
+    await assert.rejects(host.call(entry, [{ tag: 'int', value: '41' }], { operationId: 'approved-wasm', tokens: tokens() }), /diverges from witness/);
+    writeFileSync(file, validBytes);
+    unlinkSync(file);
+    assert.equal(host.operationResult('approved-wasm')?.state, 'completed', 'witness restores a deleted local copy');
+    assert.equal(readFileSync(file, 'utf8'), validBytes);
+    assert.equal((await host.call(entry, [{ tag: 'int', value: '41' }], { operationId: 'approved-wasm', tokens: tokens() })).state, 'completed');
     const count = lastBroker?.events().length;
     const allocated = await host.allocateRecord(record, { value: { tag: 'int', value: '1' } }, { operationId: 'record-input' });
     const wrongShape = await host.call(entryRef, [{ tag: 'ref', value: allocated }], { operationId: 'ref-input',
@@ -153,6 +190,14 @@ test('anchored V4 ProcessHost runs exact isolated Wasm through a real worker and
     assert.equal(committedGuest.state, 'indeterminate');
     const disposition = host.operationEffectDisposition(host.status().unresolved[0]);
     assert.equal(disposition?.effects[0]?.state, 'committed');
+    const recoveryEffectId = disposition!.effects[0].id;
+    const recoveryFile = join(directory, 'effects', domainDigest('aether.process-wasm-directory/1', recoveryEffectId).split(':').at(-1)!, 'effects-v2.json');
+    const recoveryBytes = readFileSync(recoveryFile, 'utf8'), forgedRecovery = JSON.parse(recoveryBytes);
+    forgedRecovery.records[0].outcome.value.value = '700';
+    writeFileSync(recoveryFile, encodeCanonical(forgedRecovery));
+    await assert.rejects(host.recoverOperation('guest-before-call-commit', { strategy: 'isolated-replay' }), /diverges from witness/);
+    assert.deepEqual(host.status().unresolved, ['guest-before-call-commit']);
+    writeFileSync(recoveryFile, recoveryBytes);
     const terminal = await host.recoverOperation('guest-before-call-commit', { strategy: 'abort-readonly-wasm' });
     assert.equal(terminal.state, 'aborted');
     assert.equal(host.status().unresolved.length, 0);
@@ -172,6 +217,9 @@ test('anchored V4 ProcessHost runs exact isolated Wasm through a real worker and
     assert.equal(count, 1);
     active = approved;
     await host.close(); host = undefined;
+    writeFileSync(file, encodeCanonical(altered));
+    await assert.rejects(ProcessHost.open(options), /diverges from witness/, 'reopen must verify cached effect history before serving');
+    writeFileSync(file, validBytes);
     refuseGenerationOne = true;
     await assert.rejects(ProcessHost.open(options), /isolated Wasm adapter artifact is outside signed resource policy v4/);
     refuseGenerationOne = false;

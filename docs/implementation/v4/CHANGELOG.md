@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Signed Wasm host-cache broker comparison — 2026-09-23
+
+- Signed V4 Wasm ProcessHost now reconstructs the exact historical broker request and compares terminal effects through a nonvirtual, read-only broker inspection path. It applies on reopen, same-ID retries, public cached result/disposition reads, worker replay and recovery. Missing or mismatched broker outcomes refuse cached publication.
+- A real worker fixture uses witnessed V2 journals and demonstrates fail-closed forged-local-journal reads on retry, recovery and reopen, plus restoration after local deletion. In-memory witness custody and the factory's broker selection are still trusted; no T2-04 or NFR-16 gate closes.
+
 ## Opt-in witnessed effect journal — 2026-09-23
 
 - Added `aether.effect-journal/2` with a separately supplied complete-journal witness and a revision on every transition. Witness CAS precedes local publication and sink entry; reopen restores missing/older local bytes and refuses divergent same-revision bytes or witness rollback during the anchor lifetime. V1 histories remain explicit and byte-preserved.

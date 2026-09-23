@@ -358,6 +358,20 @@ export class DurableEffectBroker {
     if (!event || event.requestDigest !== effectRequestDigest(request, this.limits) || event.adapterId !== adapter.id || event.adapterSemanticsDigest !== effectAdapterDigest(adapter) || event.outcome === null || event.outcome.state === 'indeterminate') throw new Error('replay_mismatch');
     this.cursor++; return immutable(copy(event.outcome, this.limits));
   }
+  /** Read one exact recorded outcome without dispatch, reconciliation, budget
+   * mutation or current authorization. In V2 the complete journal is checked
+   * against its witness before this can return a cached receipt. */
+  inspectRecorded(input: EffectRequestV1, adapter: EffectAdapter): EffectOutcome | null {
+    if (this.mode !== 'live') throw new Error('isolated_record_inspection_forbidden');
+    validateEffectRequest(input, this.limits); const request = immutable(copy(input, this.limits));
+    const semanticsDigest = effectAdapterDigest(adapter);
+    return this.locked(() => {
+      const journal = this.read(), event = this.find(journal, request);
+      if (!event) return null;
+      if (event.adapterId !== adapter.id || event.adapterSemanticsDigest !== semanticsDigest) throw new Error('effect_adapter_conflict');
+      return event.outcome === null ? null : immutable(copy(event.outcome, this.limits));
+    });
+  }
   /** Restore only an isolated immutable trace cursor. No live adapter, grant,
    * reservation or reconciliation callback is evaluated. Validate the complete
    * ordered prefix before publishing the new cursor, including backwards moves. */

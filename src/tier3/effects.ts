@@ -138,14 +138,23 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     return this.#decode(outcome.value);
   }
   reconcileRecorded(capability: CapabilityName, request: EffectRequestV1): EffectOutcome {
+    this.#assertRecorded(capability, request);
+    const adapter = this.#options.adapters.get(capability)!;
+    if (!adapter.semantics.readOnly || !adapter.semantics.reconciliation) throw new TypeError('recorded Wasm effect lacks read-only reconciliation');
+    return this.#options.broker.reconcile(request, adapter);
+  }
+  inspectRecorded(capability: CapabilityName, request: EffectRequestV1): EffectOutcome | null {
+    this.#assertRecorded(capability, request);
+    const adapter = this.#options.adapters.get(capability)!;
+    return this.#options.broker.inspectRecorded(request, adapter);
+  }
+  #assertRecorded(capability: CapabilityName, request: EffectRequestV1): void {
     if (!this.#bound || !this.#attested || this.#attested.capability !== capability || this.#options.broker.executionMode !== 'live'
       || request.executionId !== this.#options.executionId || request.executionManifest !== this.#manifestDigest
       || request.policyEpoch !== this.#options.policyEpoch || request.deadline !== this.#options.deadline
       || request.capabilityGrantRef !== this.#attested.grantRef || request.branchId !== null
       || request.budgetReservationId !== null) throw new TypeError('recorded Wasm effect differs from attested broker context');
-    const adapter = this.#options.adapters.get(capability);
-    if (!adapter || !adapter.semantics.readOnly || !adapter.semantics.reconciliation) throw new TypeError('recorded Wasm effect lacks read-only reconciliation');
-    return this.#options.broker.reconcile(request, adapter);
+    if (!this.#options.adapters.has(capability)) throw new TypeError('recorded Wasm effect lacks an adapter');
   }
   #request(capability: CapabilityName, args: readonly Value[], effectId: string) {
     const payload: TaggedValueV1 = { tag: 'sequence', items: [
@@ -233,4 +242,8 @@ export function brokerReconcileLast(router: RuntimeEffectRouter, capability: Cap
 export function brokerReconcileRecorded(router: RuntimeEffectRouter, capability: CapabilityName, request: EffectRequestV1): EffectOutcome {
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
   return BrokerEffectRouter.prototype.reconcileRecorded.call(router, capability, request);
+}
+export function brokerInspectRecorded(router: RuntimeEffectRouter, capability: CapabilityName, request: EffectRequestV1): EffectOutcome | null {
+  if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
+  return BrokerEffectRouter.prototype.inspectRecorded.call(router, capability, request);
 }

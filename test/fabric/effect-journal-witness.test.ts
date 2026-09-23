@@ -43,6 +43,13 @@ test('V2 witnessed broker refuses recomputed local terminal receipts and restore
   const receipt = broker.dispatch(f.request, f.adapter);
   assert.equal(receipt.state, 'committed'); assert.equal(f.calls(), 1);
   assert.equal(f.head().revision, '5');
+  const observer = new DurableEffectBroker({ ...f.opts,
+    authorize: () => { throw new Error('inspection reached live authority'); },
+    authorizeReconciliation: () => { throw new Error('inspection reached cleanup authority'); } });
+  const passive = { ...f.adapter, execute: () => { throw new Error('inspection reached the sink'); },
+    reconcile: () => { throw new Error('inspection reached sink status'); } };
+  assert.deepEqual(encodeCanonical(observer.inspectRecorded(f.request, passive)), encodeCanonical(receipt));
+  assert.equal(observer.inspectRecorded({ ...f.request, effectId: 'effect:missing' }, passive), null);
   const committed = readFileSync(f.file, 'utf8');
   const forged = JSON.parse(committed);
   forged.records[0].outcome.value.value = '999';
