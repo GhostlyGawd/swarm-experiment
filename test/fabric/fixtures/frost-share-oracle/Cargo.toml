@@ -1,0 +1,13 @@
+[package]
+name = "aether-frost-share-oracle"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+frost-core = "=3.0.0"
+frost-ed25519 = "=3.0.0"
+serde_json = "=1.0.145"
+
+[profile.release]
+lto = "thin"
