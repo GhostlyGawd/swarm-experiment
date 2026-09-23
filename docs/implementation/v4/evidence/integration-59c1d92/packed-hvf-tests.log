@@ -1,0 +1,10 @@
+/var/folders/3r/mm394ldj6fx82vpdgz3tmwj00000gp/T/aether-packed-hvf-iuU9So/driver: replacing existing signature
+✔ actual EL1 guest reads and mutates authenticated packed checkpoint with differential and failure evidence (10851.580791ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10957.23275

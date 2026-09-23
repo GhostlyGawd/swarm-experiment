@@ -1,0 +1,5 @@
+/tmp/aether-packed-hvf-hot-verify-ejvtfS/driver: replacing existing signature
+/tmp/aether-packed-hvf-hot-verify-ejvtfS/campaign-driver: replacing existing signature
+/tmp/aether-packed-hvf-hot-nRpqiK/driver: replacing existing signature
+/tmp/aether-packed-hvf-hot-nRpqiK/campaign-driver: replacing existing signature
+{"verified":true,"sourceCommit":"a705390eefb4fe24f592ab50e9a7e16a9389ad1d","operations":128,"samples":1000,"medianNs":38500.000000308,"maxNs":181125.000001449,"mappedBytes":65536,"observedResidentBytes":65536,"boundedBootGatePassed":true}

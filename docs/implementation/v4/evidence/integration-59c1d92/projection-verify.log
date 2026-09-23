@@ -1,0 +1,27 @@
+{
+  "format": "aether.projection-token-audit/1",
+  "passed": true,
+  "messages": 33,
+  "dependencyMessages": 9,
+  "tokenizers": [
+    "cl100k_base",
+    "o200k_base"
+  ],
+  "sourceSnapshots": 27,
+  "aggregate": [
+    {
+      "tokenizer": "cl100k_base",
+      "legacyTsReviewTokens": 3354,
+      "ae2Tokens": 6819,
+      "ratioOfSums": 0.49186097668279805,
+      "meetsFourfoldDiagnostic": false
+    },
+    {
+      "tokenizer": "o200k_base",
+      "legacyTsReviewTokens": 3379,
+      "ae2Tokens": 6782,
+      "ratioOfSums": 0.4982306104393984,
+      "meetsFourfoldDiagnostic": false
+    }
+  ]
+}

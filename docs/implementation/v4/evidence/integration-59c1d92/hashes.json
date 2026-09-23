@@ -1,0 +1,19 @@
+{
+  "bench-enforce.log": "f67b6b652ca81030ec2a3e81565a20174831ea70da6dabaf49b7f444722b4997",
+  "bench-verify.log": "4a2d3ca6a4605b6e998979ccce5227b6586477669089438e5913f908a592402d",
+  "benchmark-manifest.json": "fa4e9fd6a0a36dc93224c2c4a13b6a0ff2dcaa9049870e3e7834b117d40e69e6",
+  "benchmark-samples.json": "ae8fba66f201bf0db48b37b1f26512ec6b260752f1011f1fd129cdf8c162c6d1",
+  "frost-differential.log": "b7d37777077e5a4f57fd728d1e082f156e12c422207ebcc6d85e30cf64e8ccf8",
+  "full-test.log": "50ad5bf36dcc051557afdf16834bce833d097ca2212de14af44c012998972ef2",
+  "isolated-wasm-verify.log": "ceab10bd2e3055bb2c13efccf4a8a89d0334fb9c68e44621044bdaaafab74408",
+  "packed-hvf-campaign-verify.log": "c69b39125f30683fa7807e7d493b057ba1af610ba899f614b52cc9c18936020a",
+  "packed-hvf-tests.log": "fac850514d0e3c280c4dab2f345d6a83bee096359be4dd7ffa1ae0007ef7f351",
+  "packed-native-tests.log": "64958944856fbad211811134326f654c25d27620b9f6cbece34f3a9fc9f6a027",
+  "packed-strings-repeat.json": "08f8e5d5e7a6bfc40d1f52b6798657d8cf7a695b1908ed216da5583cdf8b67a4",
+  "packed-strings-verify.log": "318d703556dcd2000d77c93af7f90845028d0ddb98091697edf9e509cd116c61",
+  "projection-verify.log": "d5aebb227ac9195d5462a08fa4146f48bd4072116e5ab56f2bee07a0e0d7fc09",
+  "ristretto-tests.log": "956d9193c1dc35d2bab9d93f80dea7aa0bf6286ea78e0001d4c2a30f018a89eb",
+  "roadmap-check.log": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+  "roadmap-v4-check.log": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+  "typecheck.log": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a"
+}
