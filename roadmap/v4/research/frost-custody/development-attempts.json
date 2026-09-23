@@ -1,0 +1,21 @@
+{
+  "format": "aether.custody-research-development/1",
+  "attempts": [
+    {
+      "stage": "initial formatting",
+      "result": "rejected Rust source syntax",
+      "detail": "Comma-separated let bindings for initialization marker paths were not valid Rust.",
+      "resolution": "Separated the bindings before compilation. No protocol result was claimed."
+    },
+    {
+      "stage": "initial integration suite",
+      "result": "7 tests passed"
+    },
+    {
+      "stage": "final campaign-01",
+      "result": "9 tests passed",
+      "actualSigkillBoundaries": 4,
+      "protocolFailuresExcluded": 0
+    }
+  ]
+}

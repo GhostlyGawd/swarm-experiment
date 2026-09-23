@@ -1,0 +1,5 @@
+   Compiling aether-frost-custody-research v0.1.0 (/Users/rhenmcleod/Repositories/swarm-experiment/roadmap/v4/research/frost-custody)
+    Finished `release` profile [optimized] target(s) in 5.49s
+  Executable unittests src/lib.rs (roadmap/v4/research/frost-custody/target/release/deps/aether_frost_custody_research-1134a05ea32ec6f8)
+  Executable unittests src/main.rs (roadmap/v4/research/frost-custody/target/release/deps/aether_frost_custody_research-dc35065e20a04731)
+  Executable tests/campaign.rs (roadmap/v4/research/frost-custody/target/release/deps/campaign-aaba2fb08d080d04)
