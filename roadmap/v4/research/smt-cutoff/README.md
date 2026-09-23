@@ -6,4 +6,12 @@ The 1,500 ms boundary includes input validation, serialization, child launch, so
 
 This initial profile covers the bundled solver only. It does not bound an external solver fallback, unbounded caller work before invocation, arbitrary malformed-input validation, or a production proof-checking pipeline. Formulas are limited to 20,000 nodes, depth 64, 1 MiB serialized input and 128-digit integer literals. Hard cases return `unknown`; no timeout is treated as a proof or counterexample.
 
-Focused tests exercise a tautology, a validated counterexample, a real unsatisfiable pigeonhole query interrupted at a short deadline, and malformed/cyclic/accessor-backed inputs. A preregistered 1,500 ms campaign on the target hardware is still required before V4-NFR-08 can be marked measured or passed in the release profile.
+Focused tests exercise a tautology, a validated counterexample, a real unsatisfiable pigeonhole query interrupted at a short deadline, and malformed/cyclic/accessor-backed inputs. `campaign.ts` preregisters an exact nine-into-eight pigeonhole workload, source hashes and target environment before one warmup and five measured 1,500 ms trials. Its verifier recomputes raw trial/summary arithmetic without rerunning timing:
+
+```sh
+node --experimental-strip-types roadmap/v4/research/smt-cutoff/campaign.ts --register roadmap/v4/research/smt-cutoff/results/NEW-CAMPAIGN
+node --experimental-strip-types roadmap/v4/research/smt-cutoff/campaign.ts --run roadmap/v4/research/smt-cutoff/results/NEW-CAMPAIGN
+node --experimental-strip-types roadmap/v4/research/smt-cutoff/campaign.ts --verify roadmap/v4/research/smt-cutoff/results/NEW-CAMPAIGN
+```
+
+A clean exact-source campaign on the target hardware is still required before V4-NFR-08 can be marked measured or passed in the release profile.
