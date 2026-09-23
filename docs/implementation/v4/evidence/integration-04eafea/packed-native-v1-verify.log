@@ -1,0 +1,9 @@
+{
+  "format": "aether.packed-native-evidence-verification/1",
+  "sourceCommit": "3ddd99bf6fab73ae7c28655699a225114c0c28dd",
+  "pinnedSources": 7,
+  "campaigns": 6,
+  "operations": 768,
+  "nativeBinaryMatches": true,
+  "rawRerunMatches": true
+}
