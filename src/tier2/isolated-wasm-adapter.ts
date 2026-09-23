@@ -82,6 +82,10 @@ export function createIsolatedWasmAdapter(options: IsolatedWasmAdapterOptions): 
   const adapter: EffectAdapter = {
     id,
     semantics: ISOLATED_WASM_I32_SEMANTICS,
+    preflight(request: EffectRequestV1): void {
+      validateEffectRequest(request);
+      i32(request.payload, expectedCapability);
+    },
     execute(request: EffectRequestV1): TaggedValueV1 {
       validateEffectRequest(request);
       const input = i32(request.payload, expectedCapability);

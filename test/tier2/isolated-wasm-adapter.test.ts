@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { DurableEffectBroker, effectAdapterDigest, effectPayloadDigest, type EffectRequestV1 } from '../../src/fabric/effects.ts';
+import { DurableEffectBroker, effectAdapterDigest, effectPayloadDigest, type EffectAdapter, type EffectRequestV1 } from '../../src/fabric/effects.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
 import { encodeCanonical } from '../../src/fabric/encoding.ts';
 import { createIsolatedWasmAdapter } from '../../src/tier2/isolated-wasm-adapter.ts';
@@ -99,4 +99,53 @@ test('durable broker records child crash as indeterminate, then reconciles pure 
     if (result.state === 'committed') assert.deepEqual(encodeCanonical(result.value), encodeCanonical({ tag: 'int', value: '7' }));
     assert.equal(new DurableEffectBroker(opts).events().length, 2);
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('Wasm preflight rejects invalid i32 before dispatch while valid requests still execute', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-isolated-wasm-preflight-'));
+  try {
+    let reservations = 0;
+    const opts = { directory, clockDomain: 'isolated-preflight/1', clock: () => 100n, authorize: () => true,
+      budgets: { reserve: () => { reservations++; return true; }, consume: () => {}, release: () => {} } };
+    const broker = new DurableEffectBroker(opts), guest = adapter();
+    const invalid = { ...request('2147483648', 'too-large'), budgetReservationId: 'reservation:invalid' };
+    assert.deepEqual(broker.dispatch(invalid, guest), { state: 'rejected', code: 'adapter_preflight_rejected' });
+    assert.equal(reservations, 0, 'invalid input must not reserve economic budget');
+    const event = broker.events()[0];
+    assert.equal(event.dispatchStarted, false);
+    assert.deepEqual(event.transitions.map(t => t.state), ['requested', 'rejected']);
+    assert.deepEqual(encodeCanonical(new DurableEffectBroker(opts).dispatch(invalid, guest)),
+      encodeCanonical({ state: 'rejected', code: 'adapter_preflight_rejected' }));
+    const wrong = { tag: 'sequence' as const, items: [{ tag: 'string' as const, value: 'cap:test:wrong' }, { tag: 'int' as const, value: '1' }] };
+    assert.deepEqual(broker.dispatch({ ...request('1', 'wrong-cap'), payload: wrong, payloadDigest: effectPayloadDigest(wrong) }, guest),
+      { state: 'rejected', code: 'adapter_preflight_rejected' });
+    const valid = broker.dispatch(request('41', 'valid-after-reject'), guest);
+    assert.equal(valid.state, 'committed');
+    if (valid.state === 'committed') assert.deepEqual(encodeCanonical(valid.value), encodeCanonical({ tag: 'int', value: '42' }));
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('authorization denies before pure preflight; adapters without preflight keep their existing dispatch behavior', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-isolated-wasm-denial-'));
+  const legacyDirectory = mkdtempSync(join(tmpdir(), 'aether-isolated-wasm-legacy-'));
+  try {
+    let preflights = 0, executions = 0;
+    const guarded: EffectAdapter = { id: 'guarded/1', semantics: { readOnly: true, atomicIdempotency: true, transactional: false, reconciliation: false },
+      preflight() { preflights++; }, execute() { executions++; return { tag: 'int', value: '1' }; } };
+    const denied = new DurableEffectBroker({ directory, clockDomain: 'denial/1', clock: () => 100n, authorize: () => false });
+    assert.deepEqual(denied.dispatch(request('1'), guarded), { state: 'rejected', code: 'authorization_denied' });
+    assert.equal(preflights, 0); assert.equal(executions, 0);
+    assert.equal(denied.events()[0].dispatchStarted, false);
+    const legacy: EffectAdapter = { id: 'legacy-no-preflight/1', semantics: guarded.semantics,
+      execute() { executions++; return { tag: 'int', value: '2' }; } };
+    const allowed = new DurableEffectBroker({ directory: legacyDirectory,
+      clockDomain: 'legacy/1', clock: () => 100n, authorize: () => true });
+    const result = allowed.dispatch(request('2147483648', 'legacy'), legacy);
+    assert.equal(result.state, 'committed'); assert.equal(executions, 1);
+    const asyncPreflight: EffectAdapter = { ...guarded, id: 'async-preflight/1',
+      preflight: (() => Promise.resolve()) as () => void };
+    assert.deepEqual(allowed.dispatch(request('1', 'async-preflight'), asyncPreflight),
+      { state: 'rejected', code: 'adapter_preflight_rejected' });
+    assert.equal(executions, 1, 'async preflight cannot pass a synchronous validation boundary');
+  } finally { rmSync(directory, { recursive: true, force: true }); rmSync(legacyDirectory, { recursive: true, force: true }); }
 });

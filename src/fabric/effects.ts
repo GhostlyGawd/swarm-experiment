@@ -41,6 +41,10 @@ export interface EffectAdapter {
     readonly transactional: boolean;
     readonly reconciliation: boolean;
   };
+  /** Pure, synchronous input validation before any dispatch marker or budget
+   * reservation. It must not contact an external sink or execute guest code.
+   * Throwing produces a durable terminal rejection. */
+  preflight?(request: EffectRequestV1): void;
   /** Read-only or nontransactional sink operation. Must atomically enforce effectId if advertised. */
   execute?(request: EffectRequestV1): TaggedValueV1;
   /** Must not perform irreversible external work; returned token must be durable and serializable. */
@@ -216,7 +220,7 @@ export class DurableEffectBroker {
       } else if (state === 'indeterminate') { identifier(out.recoveryId); if (out.recoveryId !== e.requestDigest) throw new TypeError('corrupt effect recovery binding'); }
       else if (state === 'rejected' || state === 'aborted') {
         identifier(out.code);
-        if (state === 'rejected' && (e.dispatchStarted || !['deadline_exceeded', 'branch_not_admitted', 'authorization_denied', 'budget_adapter_missing', 'budget_exhausted'].includes(out.code))) throw new TypeError('rejection cannot follow an uncertain dispatch');
+        if (state === 'rejected' && (e.dispatchStarted || !['deadline_exceeded', 'branch_not_admitted', 'authorization_denied', 'budget_adapter_missing', 'budget_exhausted', 'adapter_preflight_rejected'].includes(out.code))) throw new TypeError('rejection cannot follow an uncertain dispatch');
         if (state === 'aborted' && (e.dispatchStarted ? out.code !== 'sink_confirmed_not_committed' : !['cancelled', 'recovered_before_dispatch'].includes(out.code))) throw new TypeError('abort lacks matching noncommit evidence');
       }
       else throw new TypeError('unsupported effect outcome');
@@ -373,6 +377,14 @@ export class DurableEffectBroker {
       };
       try {
         let refusal = this.authorize(request, options.signal);
+        if (refusal) return abort(refusal);
+        if (adapter.preflight) {
+          let accepted = false;
+          try { const verdict: unknown = adapter.preflight(request); accepted = verdict === undefined; }
+          catch { /* Pure validation refusal. */ }
+          if (!accepted) return abort('adapter_preflight_rejected');
+        }
+        refusal = this.authorize(request, options.signal);
         if (refusal) return abort(refusal);
         if (request.budgetReservationId !== null) {
           if (!this.options.budgets) return abort('budget_adapter_missing');
