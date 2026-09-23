@@ -93,7 +93,7 @@ export class ScopedGrantAuthority {
   issue(request: GrantRequestV2, ttlMs: number): ScopedGrantV2 {
     const r = exactObject(request, ['capability', 'audience', 'path']); capability(r.capability as string); identifier(r.audience); path(r.path);
     if (!Number.isSafeInteger(ttlMs) || ttlMs < 1 || ttlMs > this.maxTtlMs) throw new TypeError('invalid capability grant lifetime');
-    if (this.options.isRevoked(request.capability, request.path) || !this.options.authorizeIssue(request)) throw new Error('capability grant issuance denied');
+    if (this.options.isRevoked(request.capability, request.path) !== false || this.options.authorizeIssue(request) !== true) throw new Error('capability grant issuance denied');
     const issuedAt = this.now(), expiresAt = issuedAt + ttlMs;
     if (!Number.isSafeInteger(expiresAt)) throw new RangeError('capability grant expiry overflow');
     const { policyEpoch, revocationEpoch } = this.currentEpochs(request.capability, request.path);
@@ -107,7 +107,7 @@ export class ScopedGrantAuthority {
       const r = exactObject(request, ['capability', 'audience', 'path']); capability(r.capability as string); identifier(r.audience); path(r.path);
       const token = value as ScopedGrantV2, body = token.body, now = this.now();
       if (body.repositoryId !== this.options.repositoryId || body.capability !== request.capability || body.audience !== request.audience || !prefix(body.path, request.path) || now < body.issuedAt || now >= body.expiresAt || body.expiresAt - body.issuedAt > this.maxTtlMs) return false;
-      if (this.options.isRevoked(body.capability, request.path)) return false;
+      if (this.options.isRevoked(body.capability, request.path) !== false) return false;
       // A broad grant must still observe revocation of the concrete resource
       // used at this boundary, including narrower descendant scopes.
       const current = this.currentEpochs(body.capability, request.path);
@@ -121,7 +121,7 @@ export class ScopedGrantAuthority {
     const r = exactObject(next, ['capability', 'audience', 'path']); capability(r.capability as string); identifier(r.audience); path(r.path);
     if (next.capability !== parent.body.capability || !prefix(parent.body.path, next.path)) throw new Error('capability attenuation would widen authority');
     if (!this.verify(parent, { capability: next.capability, audience: parent.body.audience, path: next.path })) throw new Error('parent capability grant is revoked for the child resource');
-    if (!this.options.authorizeDelegate(parent.body.audience, next.audience, next.capability)) throw new Error('capability delegation denied');
+    if (this.options.authorizeDelegate(parent.body.audience, next.audience, next.capability) !== true) throw new Error('capability delegation denied');
     const issuedAt = this.now();
     if (!Number.isSafeInteger(ttlMs) || ttlMs < 1 || ttlMs > this.maxTtlMs || issuedAt + ttlMs > parent.body.expiresAt) throw new Error('capability attenuation would extend lifetime');
     const current = this.currentEpochs(next.capability, next.path);

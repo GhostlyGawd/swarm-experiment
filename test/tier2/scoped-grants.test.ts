@@ -82,4 +82,8 @@ test('malformed grants and invalid issuance inputs fail closed', () => {
   assert.throws(() => f.authority.issue({ ...f.request, path: ['..'] }, 10), /path/);
   assert.throws(() => f.authority.issue(f.request, 0), /lifetime/);
   assert.throws(() => f.authority.issue(f.request, 1001), /lifetime/);
+  const asyncPolicy = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(1), repositoryId: 'repository', clock: () => 100,
+    policyEpoch: () => '0', revocationEpoch: () => '0', isRevoked: () => false,
+    authorizeIssue: (() => Promise.resolve(true)) as unknown as () => boolean, authorizeDelegate: () => true });
+  assert.throws(() => asyncPolicy.issue(f.request, 10), /issuance denied/);
 });
