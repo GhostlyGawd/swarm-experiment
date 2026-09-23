@@ -395,6 +395,13 @@ export class CausalLineageLedger {
     return current;
   }
   assertCurrent(manifest: Digest): void { this.currentArtifact(this.read(), manifest); }
+  /** Bind metadata to the exact admitted manifest, including dependency nodes.
+   * A shared root may be admitted by several manifests with different closure;
+   * intersecting root/node lineage sets would accept a node from the wrong one. */
+  assertNodeCurrent(manifest: Digest, subject: NodeRef): void {
+    node(subject);
+    if (!this.currentArtifact(this.read(), manifest).some(record => record.nodes.includes(subject))) throw new LineageAdmissionError('UnadmittedArtifact', 'AST node is outside the admitted manifest closure');
+  }
   admissionAdapter(): StrictLineageAdmission {
     const adapter: StrictLineageAdmission = Object.freeze({ profile: 'aether.strict-lineage-admission/1' as const,
       assertCurrent: (manifest: Digest) => this.assertCurrent(manifest),
