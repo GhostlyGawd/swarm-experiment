@@ -1,0 +1,21 @@
+{
+  "format": "aether.isolated-wasm-evidence/1",
+  "commit": "890114ab66728ccf359d42fe432b0f11e21444fa",
+  "timestamp": "2026-09-23T17:16:43.044Z",
+  "node": "v26.7.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "files": {
+    "src/tier2/isolated-wasm-adapter.ts": "d78d34af3c5da784391ca9520cdadaa22f85f1e37f0f1e1ceda2f06783e5f660",
+    "src/tier2/isolated-wasm-worker.ts": "3a94b2e3e6678fd97436e7a03b87fc3f160fb804d1f4da67891e57a9f77a37e1",
+    "src/tier2/adapter-artifact.ts": "6dfdaca66d8037bd0369b62b4007fe6ab869134e3d88a779808367072e5414f5",
+    "src/fabric/effects.ts": "44d4b2ab758966c83ec79410db19d55177921165b8493a7d78f25043c07005ff",
+    "test/tier2/isolated-wasm-adapter.test.ts": "a5c61d333a9f5de79524bec3463ceccefff8d08396af3e3341278ed796083497",
+    "test/tier2/adapter-artifact.test.ts": "9e4a9927ab1627161728892304f93b649ffec337b5ef57e0a62311143aa3e81c"
+  },
+  "commands": [
+    "node --test --experimental-strip-types test/tier2/isolated-wasm-adapter.test.ts test/tier2/adapter-artifact.test.ts",
+    "npm run typecheck",
+    "npm run build"
+  ]
+}

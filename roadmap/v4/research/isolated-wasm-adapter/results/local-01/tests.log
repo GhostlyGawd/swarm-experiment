@@ -1,0 +1,22 @@
+✔ V3 Wasm descriptor binds bytes, fixed read-only semantics and finite resource limits (3.415875ms)
+✔ V3 approved Wasm bytes run through a branded isolated adapter and actual durable broker (272.269458ms)
+✔ approved exact adapter bytes mint one immutable code-provenance identity (84.696792ms)
+✔ changed or malformed source fails before execution; descriptor mismatch cannot mint provenance (1.030625ms)
+✔ caller mutation during asynchronous module import cannot relabel admitted source bytes (1.018209ms)
+✔ V2 signs an import-free profile and admits local exports with import text in comments and strings (1.96275ms)
+✔ dependency syntax is refused before either the adapter or imported module can run (2.813292ms)
+✔ old V1 identity keeps import-capable behavior only through the explicit legacy admission profile (1.399708ms)
+✔ unsupported adapter module syntax fails before top-level execution (0.447541ms)
+✔ bounded import-free i32 guest executes through an EffectAdapter with exact source identity (168.982792ms)
+✔ imports, unbounded/oversized memory and wrong function signature fail at admission (335.811125ms)
+✔ memory.grow respects the declared maximum and malicious infinite loop is killed (769.527833ms)
+✔ worker rejects forged or tampered IPC identity before running guest code (318.250417ms)
+✔ durable broker records child crash as indeterminate, then reconciles pure computation and allows new effect ID (409.439583ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2095.038542

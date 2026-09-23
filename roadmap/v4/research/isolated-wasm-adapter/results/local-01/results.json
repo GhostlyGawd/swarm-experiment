@@ -1,0 +1,19 @@
+{
+  "format": "aether.isolated-wasm-result/1",
+  "exitCodes": {
+    "tests": 0,
+    "typecheck": 0,
+    "build": 0
+  },
+  "logs": {
+    "tests.log": "b9400a49afdc9f73d70247dfe2c161b3de4f9dd25491fe2f144dbe7376134b70",
+    "typecheck.log": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a",
+    "build.log": "8363fdc26e2d313e30ef5063fc39a96098798d351fa3e2f8de82828d0efdbbfe"
+  },
+  "targetedTests": {
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0
+  },
+  "releaseClaim": false
+}

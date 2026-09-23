@@ -32,3 +32,10 @@ and `npm run typecheck`. The test builds the Wasm modules from explicit bytes,
 then checks exact source identity, router capability binding, imports, memory
 limits, wrong ABI, `memory.grow`, a killed infinite loop, forged/tampered worker
 requests, and durable broker crash/retry behavior.
+
+`results/local-01/` pins the six relevant source/test files to commit
+`890114ab66728ccf359d42fe432b0f11e21444fa`. The combined V3 admission
+and worker campaign passed 14/14 targeted tests, typecheck, and build on
+Node 26.7.0 / Darwin arm64. Run `node roadmap/v4/research/isolated-wasm-adapter/verify.mjs`
+to independently check source blobs and retained log hashes. This campaign is
+candidate evidence only; it does not satisfy the full release gate.
