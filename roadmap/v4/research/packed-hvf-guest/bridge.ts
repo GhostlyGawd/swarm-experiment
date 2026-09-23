@@ -27,6 +27,9 @@ export interface GuestResult {
     readonly guestMappedBytes: number; readonly guestResidentObservedBytes: number;
     readonly guestResidentPeakUpperBoundBytes: number; readonly controllerCurrentRssBytes: number;
     readonly controllerPeakRssBytes: number; readonly processLaunchToExitNs: number;
+    readonly campaignWarmups?: number;
+    readonly campaignSamples?: readonly { readonly ordinal: number; readonly residentBytes: number;
+      readonly ticks: readonly number[] }[];
   };
   /** A candidate image only. The runtime must authorize and journal corrections. */
   readonly candidateHeap: PackedHeapImage;
@@ -38,8 +41,12 @@ const signed64 = (value: string): bigint => {
   return integer;
 };
 const width = (span: bigint): number => span === 0n ? 0 : span.toString(2).length;
-const fieldWidth = (field: PackedField): number => field.kind === 'bool' ? 1 : field.kind === 'ref'
-  ? width(BigInt(2 * field.maxRelative + 1)) : width(BigInt(field.max) - BigInt(field.min));
+const fieldWidth = (field: PackedField): number => {
+  if (field.kind === 'bool') return 1;
+  if (field.kind === 'ref') return width(BigInt(2 * field.maxRelative + 1));
+  if (field.kind === 'int') return width(BigInt(field.max) - BigInt(field.min));
+  throw new TypeError('packed guest does not support string fields');
+};
 /** Runs an authenticated resumable checkpoint through an actual EL1 guest.
  * The bounded field plan is host derived; the guest independently checks its
  * frame, spans, widths and integer range before touching any packed byte. */
@@ -53,9 +60,13 @@ export function executePackedCheckpointGuest(args: {
   expectedDriverSha256: string;
   expectedGuestSha256: string;
   operations: readonly GuestOperation[];
+  /** Bounded repeated fresh guests in one running controller, for research. */
+  campaign?: true;
 }): GuestResult {
   unpackResumableCheckpoint(args.packed, args.program, args.expectedSnapshotDigest, args.expectedLayoutDigest);
   const image = args.packed.heap, model = PackedHeap.fromImage(image, args.expectedLayoutDigest);
+  if (model.layouts.some(layout => layout.fields.some(field => field.kind === 'string')))
+    throw new TypeError('packed guest does not support string fields');
   if (sha256(readFileSync(args.driver)) !== args.expectedDriverSha256 ||
       sha256(readFileSync(args.guestImage)) !== args.expectedGuestSha256)
     throw new TypeError('packed guest executable digest mismatch');
@@ -138,7 +149,8 @@ export function executePackedCheckpointGuest(args: {
   raw.copy(initial, bytesAt); initial.fill(0, resultsAt, bytesAt); initial.writeUInt32LE(0, 44);
   const processStart = process.hrtime.bigint();
   const run = spawnSync(args.driver, [args.guestImage], {
-    input: initial, timeout: 5000, killSignal: 'SIGKILL', maxBuffer: 65536,
+    input: initial, timeout: args.campaign ? 30000 : 5000, killSignal: 'SIGKILL',
+    maxBuffer: args.campaign ? 1024 * 1024 : 65536,
   });
   const processLaunchToExitNs = Number(process.hrtime.bigint() - processStart);
   if (run.error || run.status !== 0 || run.signal) throw new Error(`packed EL1 guest failed: ${String(run.error ?? run.signal ?? run.status)}; ${run.stderr.toString('utf8')}`);
@@ -160,6 +172,26 @@ export function executePackedCheckpointGuest(args: {
       diagnostic.guestMappedBytes !== 65536 || Number(diagnostic.guestResidentObservedBytes) > 65536 ||
       diagnostic.guestImageBytes !== readFileSync(args.guestImage).length)
     throw new TypeError('invalid packed EL1 guest diagnostic');
+  if (args.campaign) {
+    const samples = diagnostic.campaignSamples;
+    if (diagnostic.campaignWarmups !== 20 || !Array.isArray(samples) || samples.length !== 1000)
+      throw new TypeError('invalid packed EL1 campaign count');
+    for (let index = 0; index < samples.length; index++) {
+      const sample = samples[index] as Record<string, unknown>;
+      const ticks = sample?.ticks;
+      if (!sample || sample.ordinal !== index || sample.residentBytes !== 65536 ||
+          !Array.isArray(ticks) || ticks.length !== 7 ||
+          ticks.some(tick => !Number.isSafeInteger(tick) || tick < 0) ||
+          ticks.some((tick, step) => step > 0 && tick < ticks[step - 1]))
+        throw new TypeError('invalid packed EL1 campaign sample');
+      if (index > 0 && ticks[0] < (samples[index - 1] as { ticks: number[] }).ticks[6])
+        throw new TypeError('overlapping packed EL1 campaign sample');
+    }
+    const last = samples[999] as { ticks: number[] };
+    if (last.ticks[0] !== diagnostic.guestStartTick || last.ticks[5] !== diagnostic.runStartTick ||
+        last.ticks[6] !== diagnostic.validatedResponseTick)
+      throw new TypeError('packed EL1 campaign final tick mismatch');
+  }
   const diagnostics = { ...diagnostic, mainStartTick: String(diagnostic.mainStartTick),
     guestStartTick: String(diagnostic.guestStartTick), runStartTick: String(diagnostic.runStartTick),
     validatedResponseTick: String(diagnostic.validatedResponseTick), processLaunchToExitNs } as GuestResult['diagnostics'];

@@ -134,6 +134,20 @@ test('actual EL1 guest reads and mutates authenticated packed checkpoint with di
       cases.push({ kind: 'signed-i64-edges', operations: edgeOperations,
         observations: edgeResult.observations, inputImageDigest: edgePacked.heap.imageDigest,
         candidateImageDigest: edgeResult.candidateHeap.imageDigest, diagnostics: edgeResult.diagnostics });
+      const strings = fixture('packed-hvf-string-rejection');
+      const stringName = typeName('type:test:packed_hvf_string');
+      const stringType = { t: 'Record' as const, name: stringName,
+        fields: [['text', b.Str]] as const };
+      strings.allocateRecord(stringType, { text: 'é' });
+      const stringPacked = packResumableCheckpoint(strings.snapshot(), strings.program,
+        [{ typeName: stringName, fields: [{ name: 'text', kind: 'string', maxUtf8Bytes: 16 }] }]);
+      assert.equal(stringPacked.format, 'aether.packed-resumable-checkpoint/2');
+      assert.throws(() => executePackedCheckpointGuest({ packed: stringPacked, program: strings.program,
+        expectedSnapshotDigest: stringPacked.snapshotDigest,
+        expectedLayoutDigest: stringPacked.heap.layoutDigest, driver: binary.driver,
+        guestImage: binary.image, expectedDriverSha256: binary.driverSha256,
+        expectedGuestSha256: binary.guestSha256, operations: [] }),
+      /does not support string fields/);
       let state = 0x52d8a441;
       const next = () => { state ^= state << 13; state ^= state >>> 17; state ^= state << 5; return state >>> 0; };
       for (const maxRelative of [1, 15]) for (let campaign = 0; campaign < 3; campaign++) {
