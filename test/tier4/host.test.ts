@@ -129,6 +129,10 @@ test('pure state-changing strict topology entry requires a current audience-boun
   assert.equal(host.dispatch({ ...request, id: 'wrong-audience', capabilities: host.issueTokens(other) }).ok, false);
   const tokens = host.issueTokens(setter); assert.equal(tokens.length, 1);
   assert.equal((tokens[0] as { body: { capability: string } }).body.capability, TOPOLOGY_INVOKE);
+  const forged = { ...tokens[0], signature: '0'.repeat(64) };
+  assert.equal(host.dispatch({ ...request, id: 'forged-extra', capabilities: [...tokens, forged] }).ok, false);
+  assert.equal(host.dispatch({ ...request, id: 'duplicate-grant', capabilities: [...tokens, ...tokens] }).ok, false);
+  assert.equal(host.readRecord(first).get('balance'), 0n);
   assert.equal(host.dispatch({ ...request, id: 'authorized', capabilities: tokens }).ok, true);
   assert.equal(host.readRecord(first).get('balance'), 99n);
   const second = host.allocateRecord(ACCOUNT, { id: 'bob', balance: 0n });

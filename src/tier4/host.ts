@@ -176,7 +176,9 @@ export class TopologyHost {
     if (this.partitioned.has(unit)) return { ok: false, unit, fault: fault('partition', `unit ${unit} is partitioned`, true, false) };
     if (!Array.isArray(request.capabilities)) return { ok: false, unit, fault: fault('authority', 'malformed capability grant list', false, false) };
     const declaration = this.declarations.get(request.to);
-    const required = this.scopedGrants ? [TOPOLOGY_INVOKE, ...(declaration?.capabilities ?? [])] : declaration?.capabilities ?? [];
+    const required = this.scopedGrants ? [...new Set([TOPOLOGY_INVOKE, ...(declaration?.capabilities ?? [])])] : declaration?.capabilities ?? [];
+    if (this.scopedGrants && request.capabilities.length !== required.length)
+      return { ok: false, unit, fault: fault('authority', 'exact scoped grant set required', false, false) };
     for (const capability of required) {
       const valid = this.scopedGrants
         ? request.capabilities.some(token => this.scopedGrants!.verify(token, { capability, audience: request.to, path: this.grantPath(unit) }))
@@ -216,7 +218,8 @@ export class TopologyHost {
 
   private grantPath(unit: string): readonly string[] { return ['topology', String(this.generationValue), domainDigest('aether.topology-unit/1', unit).split(':').at(-1)!]; }
   private validStrictDispatch(authority: { symbol: SymbolId; unit: string; tokens: readonly (CapabilityToken | ScopedGrantV2)[] }): boolean {
-    return [TOPOLOGY_INVOKE, ...(this.declarations.get(authority.symbol)?.capabilities ?? [])].every(capability =>
+    const required = [...new Set([TOPOLOGY_INVOKE, ...(this.declarations.get(authority.symbol)?.capabilities ?? [])])];
+    return authority.tokens.length === required.length && required.every(capability =>
       authority.tokens.some(token => this.scopedGrants!.verify(token, { capability, audience: authority.symbol, path: this.grantPath(authority.unit) })));
   }
   private currentStrictAuthority(): boolean {
@@ -232,7 +235,7 @@ export class TopologyHost {
   issueTokens(symbol: SymbolId, ttlMs = 60_000): (CapabilityToken | ScopedGrantV2)[] {
     const unit = this.unitFor(symbol);
     if (!unit) throw new ReferenceError(`unplaced function ${symbol}`);
-    return (this.scopedGrants ? [TOPOLOGY_INVOKE, ...(this.declarations.get(symbol)?.capabilities ?? [])] : this.declarations.get(symbol)?.capabilities ?? [])
+    return (this.scopedGrants ? [...new Set([TOPOLOGY_INVOKE, ...(this.declarations.get(symbol)?.capabilities ?? [])])] : this.declarations.get(symbol)?.capabilities ?? [])
       .map((capability) => this.scopedGrants
         ? this.scopedGrants.issue({ capability, audience: symbol, path: this.grantPath(unit) }, ttlMs)
         : this.sealer.issue(capability, unit, ttlMs));
