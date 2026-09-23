@@ -23,7 +23,7 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-T3-07](#v4-t3-07), [V4-T3-10](#v4-t3-10).
+**Ready now:** [V4-T3-10](#v4-t3-10).
 
 ## Milestones
 
@@ -79,7 +79,7 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-T3-04](#v4-t3-04) | Historical counterfactual replay | runtime | v2 | planned | [V4-T3-01](#v4-t3-01), [V4-T3-03](#v4-t3-03) |
 | [V4-T3-05](#v4-t3-05) | Polyhedral accelerator kernels | compiler | v4 | planned | [V4-R02](#v4-r02), [V4-R04](#v4-r04), [V4-T3-10](#v4-t3-10), [V4-T2-10](#v4-t2-10) |
 | [V4-T3-06](#v4-t3-06) | Differentiable program relaxation | synthesis | v4 | planned | [V4-R04](#v4-r04), [V4-T3-02](#v4-t3-02), [V4-T3-05](#v4-t3-05) |
-| [V4-T3-07](#v4-t3-07) | Three-level runtime fallback trees | runtime | v2 | planned | [V4-F04](#v4-f04), [V4-F06](#v4-f06), [V4-T3-01](#v4-t3-01) |
+| [V4-T3-07](#v4-t3-07) | Three-level runtime fallback trees | runtime | v2 | in_progress | [V4-F04](#v4-f04), [V4-F06](#v4-f06), [V4-T3-01](#v4-t3-01) |
 | [V4-T3-08](#v4-t3-08) | Spatial-semantic UI runtime | language | v3 | planned | [V4-T1-02](#v4-t1-02), [V4-T2-01](#v4-t2-01) |
 | [V4-T3-09](#v4-t3-09) | Persona and accessibility evaluation | verification | v3 | planned | [V4-T3-08](#v4-t3-08), [V4-T3-03](#v4-t3-03) |
 | [V4-T3-10](#v4-t3-10) | Packed heap and native value ABI | compiler | v4 | planned | [V4-R02](#v4-r02), [V4-R04](#v4-r04), [V4-T3-01](#v4-t3-01) |
@@ -848,7 +848,7 @@ Evidence: not yet produced.
 
 ### V4-T3-07
 
-**Three-level runtime fallback trees** · implementation · v2 · owner: runtime · **planned**
+**Three-level runtime fallback trees** · implementation · v2 · owner: runtime · **in_progress**
 
 Prerequisites: [V4-F04](#v4-f04), [V4-F06](#v4-f06), [V4-T3-01](#v4-t3-01).
 
