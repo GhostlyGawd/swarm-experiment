@@ -13,7 +13,7 @@ The user requested a coherent stopping point with all work committed and pushed.
 - Native approved-boundary clean campaign remains a bounded prototype pass: 1,000 fresh guests, maximum 159.542 µs, 65,536 bytes guest residency. Full native runtime/driver qualification remains open.
 - No full-v4 completion claim. Existing failed/unmeasured release targets remain visible.
 
-Final validation and the exact checkpoint commit are recorded in `evidence/stopping-point-2026-09-22/REVIEW.md`.
+Final clean-source validation at `e71627bbb17764727bdbcd4d627d5162f0867b7e`: **536 tests passed**, build/typecheck/roadmaps passed. Benchmark enforcement correctly retained 17 unmet targets. Logs and hashes are recorded in [stopping-point evidence](evidence/stopping-point-2026-09-22/REVIEW.md).
 
 
 Branch: `aether/v4-implementation`. Planning checkpoint: `9f23a7b`. First implementation checkpoint: `4a9b0776276251cf92ca647baa114c638a2559bf`.
