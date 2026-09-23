@@ -2,6 +2,8 @@
 
 **Status:** research and adversarial reproduction. Production integration lives in `src/tier2/effect-signer-anchor.ts`, `src/tier4/process-host.ts` and `src/tier4/process-deployment.ts`; this directory contains no production runtime. This work does not close V4-T2-04.
 
+This document records the anchored V4 signer slice and its historical compatibility test. The later import-free V2 adapter artifact/V3 signed-policy profile is the fresh `scoped-anchored-v5` default; `scoped-anchored-v4` remains an explicit reopen profile with its original deployment `/4` and host-config `/2` bytes. See [adapter artifacts](../adapter-artifacts/README.md).
+
 ## Finding
 
 The historical ProcessHost configuration included the policy digest and signer **name**, but omitted the signer's **public key**. `process-host-reopen.test.mjs` reproduces the consequence under the now-explicit `legacyEffectSignerTrust: 'factory-v1'` compatibility mode: open under key A, close, re-sign the identical policy body with key B under the same signer name, and reopen the same journal with key B. It succeeds. The policy body digest, manifest and old host configuration remain unchanged. The new anchored profile binds the independently provisioned public-key identity into host configuration `/2` and denies the substitution. A signature alone does not establish which signer is authorized; old histories require explicit compatibility selection and retain their original trust assumption.

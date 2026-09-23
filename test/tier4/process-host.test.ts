@@ -9,9 +9,9 @@ import { buildLedgerExample, ACCOUNT, CENTS, CAP_LEDGER_APPEND } from '../../src
 import { CapabilitySealer, CapabilityRegistry, RevocationList } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
-import { effectResourcePolicyDigest, effectResourcePolicyDigestV2, signEffectResourcePolicy, signEffectResourcePolicyV2, type EffectResourcePolicyBodyV1, type EffectResourcePolicyBodyV2 } from '../../src/tier2/effect-resource-policy.ts';
+import { effectResourcePolicyDigest, effectResourcePolicyDigestV2, effectResourcePolicyDigestV3, signEffectResourcePolicy, signEffectResourcePolicyV2, signEffectResourcePolicyV3, type EffectResourcePolicyBodyV1, type EffectResourcePolicyBodyV2, type EffectResourcePolicyBodyV3 } from '../../src/tier2/effect-resource-policy.ts';
 import { createEffectSignerAnchor } from '../../src/tier2/effect-signer-anchor.ts';
-import { adapterArtifactForSource, admitAdapterSource, admittedAdapterArtifactDigest } from '../../src/tier2/adapter-artifact.ts';
+import { adapterArtifactForSource, legacyAdapterArtifactForSource, admitAdapterSource, admittedAdapterArtifactDigest } from '../../src/tier2/adapter-artifact.ts';
 import { createEvidenceManifest } from '../../src/fabric/evidence.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
 import { DurableEffectBroker, effectAdapterDigest, type EffectAdapter } from '../../src/fabric/effects.ts';
@@ -262,8 +262,8 @@ test('v2 process policy requires the exact loader-admitted adapter bytes before 
   try {
     globals.__aetherV2SinkCalls = 0;
     const source = new TextEncoder().encode(`export default {id:'loaded-ledger/1',semantics:{readOnly:false,atomicIdempotency:false,transactional:false,reconciliation:true},execute(){globalThis.__aetherV2SinkCalls++;return{tag:'null'};},reconcile(){return{state:'unknown'};}};`);
-    const artifact = adapterArtifactForSource(source, CAP_LEDGER_APPEND, 'loaded-ledger/1', { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true });
-    const adapter = await admitAdapterSource(source, artifact), artifactDigest = admittedAdapterArtifactDigest(adapter)!;
+    const artifact = legacyAdapterArtifactForSource(source, CAP_LEDGER_APPEND, 'loaded-ledger/1', { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true });
+    const adapter = await admitAdapterSource(source, artifact, { legacyProfile: 'aether.adapter-js-legacy-v1/1' }), artifactDigest = admittedAdapterArtifactDigest(adapter)!;
     const body: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: grants.repositoryId,
       astRoot: f.options.manifest.astRoot, policyEpoch: epochs.policyEpoch,
       rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: adapter.id,
@@ -306,8 +306,11 @@ test('anchored ProcessHost pins signer key in durable configuration across reope
     const old = signEffectResourcePolicyV2(body, anchor.signer, trusted.privateKey);
     const forged = signEffectResourcePolicyV2(body, anchor.signer, replacement.privateKey);
     const options: ProcessHostOptions = { ...f.options, manifest: manifestValue, scopedGrants: grants,
-      signedEffectResourcePolicy: old, effectSignerAnchor: anchor };
+      signedEffectResourcePolicy: old, effectSignerAnchor: anchor, legacyAnchoredEffectPolicy: 'anchored-v2' };
+    await assert.rejects(ProcessHost.open({ ...options, legacyAnchoredEffectPolicy: undefined }), /signed policy v3/);
     host = await ProcessHost.open(options); const before = await host.snapshot();
+    const originalConfiguration = (JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8')) as { configuration: string }).configuration;
+    assert.match(originalConfiguration, /^aether\.process-host-config\/2:/);
     await host.close(); host = undefined;
     await assert.rejects(ProcessHost.open({ ...options, signedEffectResourcePolicy: forged }), /untrusted effect resource policy v2 signer/);
     await assert.rejects(ProcessHost.open({ ...options, effectResourceSignerKey: replacement.publicKey }), /independent signer authority/);
@@ -320,7 +323,116 @@ test('anchored ProcessHost pins signer key in durable configuration across reope
     await assert.rejects(ProcessHost.open({ ...options, effectSignerAnchor: replacedEpochSource }), /configuration mismatch/);
     host = await ProcessHost.open(options);
     assert.deepEqual(await host.snapshot(), before);
+    assert.equal((JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8')) as { configuration: string }).configuration,
+      originalConfiguration, 'compatibility reopen must retain historical host-config/2 bytes');
   } finally { await host?.close(); f.cleanup(); }
+});
+
+test('anchored V3 ProcessHost binds import-free adapter, signer key, epoch and host-config/3 before effects', async () => {
+  const f = fixture(), { epochs, grants } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  const globals = globalThis as Record<string, unknown>;
+  try {
+    globals.__aetherV3SinkCalls = 0;
+    const source = new TextEncoder().encode(`export default {id:'v3-ledger/1',semantics:{readOnly:false,atomicIdempotency:false,transactional:false,reconciliation:true},execute(){globalThis.__aetherV3SinkCalls++;return{tag:'null'};},reconcile(){return{state:'unknown'};}};`);
+    const semantics = { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true } as const;
+    const approvedArtifact = adapterArtifactForSource(source, CAP_LEDGER_APPEND, 'v3-ledger/1', semantics);
+    const approved = await admitAdapterSource(source, approvedArtifact);
+    const legacyArtifact = legacyAdapterArtifactForSource(source, CAP_LEDGER_APPEND, 'v3-ledger/1', semantics);
+    const legacy = await admitAdapterSource(source, legacyArtifact, { legacyProfile: 'aether.adapter-js-legacy-v1/1' });
+    assert.equal(admittedAdapterArtifactDigest(approved), domainDigest('aether.effect-adapter-artifact/2', approvedArtifact));
+    assert.equal(admittedAdapterArtifactDigest(legacy), domainDigest('aether.effect-adapter-artifact/1', legacyArtifact));
+    const body: EffectResourcePolicyBodyV3 = { format: 'aether.effect-resource-policy/3', repositoryId: grants.repositoryId,
+      astRoot: f.options.manifest.astRoot, policyEpoch: epochs.policyEpoch,
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: approved.id,
+        adapterDigest: effectAdapterDigest(approved), adapterArtifactDigest: admittedAdapterArtifactDigest(approved)! }] };
+    const manifestValue = { ...f.options.manifest, capabilityPolicyDigest: effectResourcePolicyDigestV3(body) };
+    const trusted = generateKeyPairSync('ed25519'), replacement = generateKeyPairSync('ed25519');
+    let policyEpoch = epochs.policyEpoch, active: EffectAdapter = approved, overrideInvoke = false, unapprovedCalls = 0;
+    class OverrideRouter extends BrokerEffectRouter {
+      override invoke(): null { unapprovedCalls++; return null; }
+    }
+    const anchor = createEffectSignerAnchor({ repositoryId: grants.repositoryId, signer: 'v3-ledger-policy',
+      epochAuthorityId: 'process-host-policy-epochs', publicKey: trusted.publicKey, currentEpoch: () => policyEpoch });
+    const signedEffectResourcePolicy = signEffectResourcePolicyV3(body, anchor.signer, trusted.privateKey);
+    const options: ProcessHostOptions = { ...f.options, manifest: manifestValue, scopedGrants: grants, effectSignerAnchor: anchor,
+      signedEffectResourcePolicy, effectRouterFactory: context => {
+        const router = factory(f.directory, manifestValue, CAP_LEDGER_APPEND, active)(context);
+        if (overrideInvoke) Object.setPrototypeOf(router, OverrideRouter.prototype);
+        return router;
+      } };
+    await assert.rejects(ProcessHost.open({ ...options, signedEffectResourcePolicy: signEffectResourcePolicyV3(body, anchor.signer, replacement.privateKey) }), /untrusted effect resource policy v3 signer/);
+    await assert.rejects(ProcessHost.open({ ...options, legacyAnchoredEffectPolicy: 'anchored-v2' }), /legacy anchored effect policy requires/);
+    assert.equal(globals.__aetherV3SinkCalls, 0);
+    assert.equal(existsSync(join(f.directory, 'host.json')), false);
+    host = await ProcessHost.open(options);
+    const journal = JSON.parse(readFileSync(join(f.directory, 'host.json'), 'utf8')) as { configuration: string };
+    assert.match(journal.configuration, /^aether\.process-host-config\/3:/);
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const args = [reference(alice), reference(bob), integer(10)], scope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
+    const valid = await host.call(f.ex.symbols.transfer, args, { operationId: 'v3-approved', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) });
+    assert.equal(valid.state, 'completed');
+    assert.equal(globals.__aetherV3SinkCalls, 1);
+    assert.deepEqual(balances(await host.snapshot()), ['90', '10']);
+    overrideInvoke = true;
+    const overridden = await host.call(f.ex.symbols.transfer, args,
+      { operationId: 'v3-router-override', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) });
+    assert.equal(overridden.state, 'completed');
+    assert.equal(unapprovedCalls, 0, 'signed host must bypass virtual router invocation');
+    assert.equal(globals.__aetherV3SinkCalls, 2);
+    assert.deepEqual(balances(await host.snapshot()), ['80', '20']);
+    overrideInvoke = false;
+    const beforeDenied = await host.snapshot();
+    active = legacy;
+    const wrongArtifact = await host.call(f.ex.symbols.transfer, args, { operationId: 'v3-legacy-artifact', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) });
+    assert.match(JSON.stringify(wrongArtifact), /effect_indeterminate|artifact is outside signed resource policy v3/);
+    assert.equal(globals.__aetherV3SinkCalls, 2);
+    assert.deepEqual(await host.snapshot(), beforeDenied);
+    await host.close(); host = undefined;
+    const newAnchor = createEffectSignerAnchor({ repositoryId: grants.repositoryId, signer: anchor.signer,
+      epochAuthorityId: anchor.epochAuthorityId, publicKey: replacement.publicKey, currentEpoch: () => policyEpoch });
+    await assert.rejects(ProcessHost.open({ ...options, effectSignerAnchor: newAnchor,
+      signedEffectResourcePolicy: signEffectResourcePolicyV3(body, anchor.signer, replacement.privateKey) }), /configuration mismatch/);
+    assert.equal(globals.__aetherV3SinkCalls, 2);
+  } finally { await host?.close(); f.cleanup(); delete globals.__aetherV3SinkCalls; }
+});
+
+test('anchored V3 ProcessHost refuses a policy epoch change at effect intent without publishing heap or sink', async () => {
+  const f = fixture(), { epochs, grants } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  const globals = globalThis as Record<string, unknown>;
+  try {
+    globals.__aetherV3EpochSinkCalls = 0;
+    const source = new TextEncoder().encode(`export default {id:'v3-epoch-ledger/1',semantics:{readOnly:false,atomicIdempotency:false,transactional:false,reconciliation:true},execute(){globalThis.__aetherV3EpochSinkCalls++;return{tag:'null'};},reconcile(){return{state:'unknown'};}};`);
+    const artifact = adapterArtifactForSource(source, CAP_LEDGER_APPEND, 'v3-epoch-ledger/1',
+      { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true });
+    const adapter = await admitAdapterSource(source, artifact);
+    const body: EffectResourcePolicyBodyV3 = { format: 'aether.effect-resource-policy/3', repositoryId: grants.repositoryId,
+      astRoot: f.options.manifest.astRoot, policyEpoch: epochs.policyEpoch,
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: adapter.id,
+        adapterDigest: effectAdapterDigest(adapter), adapterArtifactDigest: admittedAdapterArtifactDigest(adapter)! }] };
+    const manifestValue = { ...f.options.manifest, capabilityPolicyDigest: effectResourcePolicyDigestV3(body) };
+    const keys = generateKeyPairSync('ed25519'); let policyEpoch = '1', rotateAtEffect = false;
+    const anchor = createEffectSignerAnchor({ repositoryId: grants.repositoryId, signer: 'v3-epoch-policy',
+      epochAuthorityId: 'process-host-policy-epochs', publicKey: keys.publicKey, currentEpoch: () => policyEpoch });
+    const options: ProcessHostOptions = { ...f.options, manifest: manifestValue, scopedGrants: grants, effectSignerAnchor: anchor,
+      signedEffectResourcePolicy: signEffectResourcePolicyV3(body, anchor.signer, keys.privateKey),
+      effectRouterFactory: factory(f.directory, manifestValue, CAP_LEDGER_APPEND, adapter),
+      onPhase: phase => { if (phase === 'effect-requested' && rotateAtEffect) policyEpoch = '1'; } };
+    await assert.rejects(ProcessHost.open(options), /stale or foreign effect resource policy v3/);
+    assert.equal(existsSync(join(f.directory, 'host.json')), false);
+    policyEpoch = epochs.policyEpoch;
+    host = await ProcessHost.open(options);
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const before = await host.snapshot();
+    rotateAtEffect = true;
+    const scope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
+    const denied = await host.call(f.ex.symbols.transfer, [reference(alice), reference(bob), integer(10)],
+      { operationId: 'v3-epoch-race', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) });
+    assert.match(JSON.stringify(denied), /effect_indeterminate|stale or foreign/);
+    assert.equal(globals.__aetherV3EpochSinkCalls, 0);
+    assert.deepEqual(await host.snapshot(), before);
+  } finally { await host?.close(); f.cleanup(); delete globals.__aetherV3EpochSinkCalls; }
 });
 
 test('strict scoped grants remain bound through an actual cross-process nested call', async () => {

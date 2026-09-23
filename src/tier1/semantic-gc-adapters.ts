@@ -10,7 +10,7 @@ import { domainDigest, executionManifestDigest, validateExecutionManifest, valid
 import { JournalLock } from '../fabric/journal-lock.ts';
 import { CapabilityRegistry } from '../tier2/ocap.ts';
 import { typecheck } from '../tier2/typecheck.ts';
-import { adapterArtifactDigest, adapterArtifactForSource, type AdapterArtifactV1 } from '../tier2/adapter-artifact.ts';
+import { adapterArtifactDigest, legacyAdapterArtifactForSource, type AdapterArtifactV1 } from '../tier2/adapter-artifact.ts';
 import { generatePortableCertificate } from '../tier2/portable-proof-producer.ts';
 import { checkPortableCertificate, type PortableCertificateV1 } from '../tier2/portable-proof-checker.ts';
 import { CausalLineageLedger } from './causal-lineage.ts';
@@ -121,7 +121,7 @@ export class SemanticAdapterGarbageCollector {
     for (const item of table.registrations) {
       const node = this.options.store.hydrate(item.sourceRoot);
       if (node.kind !== 'Lit' || node.ty.t !== 'Str' || typeof node.value !== 'string') throw new Error('adapter source must be a retained string artifact');
-      const actual = adapterArtifactForSource(Buffer.from(node.value), item.capability, item.artifact.id, item.artifact.semantics);
+      const actual = legacyAdapterArtifactForSource(Buffer.from(node.value), item.capability, item.artifact.id, item.artifact.semantics);
       if (!equal(actual, item.artifact)) throw new Error('adapter source bytes differ from declared artifact');
     }
   }

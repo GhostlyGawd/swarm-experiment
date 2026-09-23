@@ -16,9 +16,9 @@ import { ACCOUNT, CAP_LEDGER_APPEND, buildLedgerExample } from '../../src/exampl
 import { CapabilitySealer, RevocationList } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
-import { effectResourcePolicyDigest, effectResourcePolicyDigestV2, signEffectResourcePolicy, signEffectResourcePolicyV2, type EffectResourcePolicyBodyV1, type EffectResourcePolicyBodyV2 } from '../../src/tier2/effect-resource-policy.ts';
+import { effectResourcePolicyDigest, effectResourcePolicyDigestV2, effectResourcePolicyDigestV3, signEffectResourcePolicy, signEffectResourcePolicyV2, signEffectResourcePolicyV3, type EffectResourcePolicyBodyV1, type EffectResourcePolicyBodyV2, type EffectResourcePolicyBodyV3 } from '../../src/tier2/effect-resource-policy.ts';
 import { createEffectSignerAnchor } from '../../src/tier2/effect-signer-anchor.ts';
-import { adapterArtifactDigest, adapterArtifactForSource, admitAdapterSource } from '../../src/tier2/adapter-artifact.ts';
+import { adapterArtifactDigest, adapterArtifactForSource, legacyAdapterArtifactForSource, admitAdapterSource } from '../../src/tier2/adapter-artifact.ts';
 import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
 import { DurableEffectBroker, type EffectAdapter } from '../../src/fabric/effects.ts';
 import { JournalLock } from '../../src/fabric/journal-lock.ts';
@@ -26,7 +26,7 @@ import { DEFAULT_EVIDENCE_POLICY, DEFAULT_EVIDENCE_POLICY_V2, mintLocalEvidence,
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
 import type { TaggedValueV1, LogicalRefV1 } from '../../src/fabric/encoding.ts';
 import { PromotionCoordinator, approvePromotion, evidenceBundleDigest, migrationPlanDigest, effectPlanDigest, type PromotionInput, type PromotionCoordinatorOptions } from '../../src/fabric/promotion.ts';
-import { ProcessDeployment, processMigrationPlan, processEffectPlan, processAnchoredEffectPlan, type ProcessArtifactV1, type ProcessDeploymentOptions } from '../../src/tier4/process-deployment.ts';
+import { ProcessDeployment, processMigrationPlan, processEffectPlan, processAnchoredEffectPlan, processImportFreeEffectPlan, type ProcessArtifactV1, type ProcessDeploymentOptions } from '../../src/tier4/process-deployment.ts';
 import { ProcessHost, PROCESS_INVOKE } from '../../src/tier4/process-host.ts';
 import type { TopologyPlan } from '../../src/tier4/topology.ts';
 
@@ -37,7 +37,9 @@ const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const DEPLOYMENT_LEDGER_ADAPTER_DIGEST = domainDigest('aether.effect-adapter/1', { id: 'deployment-ledger/1', semantics: { readOnly: false, atomicIdempotency: true, transactional: false, reconciliation: true } });
 const ARTIFACT_SINK_SEMANTICS = { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true } as const;
 const ARTIFACT_SINK_SOURCE = new TextEncoder().encode(`export default {id:'admitted-ledger/1',semantics:{readOnly:false,atomicIdempotency:false,transactional:false,reconciliation:true},execute(){globalThis.__deploymentArtifactCalls++;return{tag:'null'};},reconcile(){return{state:'unknown'};}};`);
+const ARTIFACT_SINK_DESCRIPTOR_V1 = legacyAdapterArtifactForSource(ARTIFACT_SINK_SOURCE, CAP_LEDGER_APPEND, 'admitted-ledger/1', ARTIFACT_SINK_SEMANTICS);
 const ARTIFACT_SINK_DESCRIPTOR = adapterArtifactForSource(ARTIFACT_SINK_SOURCE, CAP_LEDGER_APPEND, 'admitted-ledger/1', ARTIFACT_SINK_SEMANTICS);
+const ARTIFACT_SINK_DIGEST_V1 = adapterArtifactDigest(ARTIFACT_SINK_DESCRIPTOR_V1);
 const ARTIFACT_SINK_DIGEST = adapterArtifactDigest(ARTIFACT_SINK_DESCRIPTOR);
 const ARTIFACT_SINK_ADAPTER_DIGEST = domainDigest('aether.effect-adapter/1', { id: ARTIFACT_SINK_DESCRIPTOR.id, semantics: ARTIFACT_SINK_SEMANTICS });
 
@@ -64,7 +66,7 @@ function hostFactory(directory: string, artifact: ProcessArtifactV1, overrideSin
     return new BrokerEffectRouter({ broker, manifest: artifact.manifest, executionId: context.operationId, policyEpoch: '1', deadline: '1000', adapters: new Map([[CAP_LEDGER_APPEND, sink]]), grant: () => 'governor-ledger-grant' });
   } };
 }
-function fixture(signedPolicy: boolean | 'artifact-v2' = false) {
+function fixture(signedPolicy: boolean | 'artifact-v2' | 'artifact-v3' = false) {
   const directory = mkdtempSync(join(tmpdir(), 'aether-process-deployment-'));
   const ex = buildLedgerExample('deployment-ledger'), keys = generateKeyPairSync('ed25519');
   const sum = ex.syms.define('composed-sum');
@@ -84,10 +86,14 @@ function fixture(signedPolicy: boolean | 'artifact-v2' = false) {
     const resourcePolicy: EffectResourcePolicyBodyV1 = { format: 'aether.effect-resource-policy/1', repositoryId: 'deployment-test', astRoot, policyEpoch: '0',
       rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: 'deployment-ledger/1', adapterDigest: DEPLOYMENT_LEDGER_ADAPTER_DIGEST }] };
     const artifactPolicy: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: 'deployment-test', astRoot, policyEpoch: '0',
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR_V1.id,
+        adapterDigest: ARTIFACT_SINK_ADAPTER_DIGEST, adapterArtifactDigest: ARTIFACT_SINK_DIGEST_V1 }] };
+    const importFreePolicy: EffectResourcePolicyBodyV3 = { format: 'aether.effect-resource-policy/3', repositoryId: 'deployment-test', astRoot, policyEpoch: '0',
       rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR.id,
         adapterDigest: ARTIFACT_SINK_ADAPTER_DIGEST, adapterArtifactDigest: ARTIFACT_SINK_DIGEST }] };
-    return { module, registry: ex.capabilities, specification: 'Ledger conservation and composed total at least eighteen.', semanticsVersion: 'reference/1', compilerDigest: digest('compiler'), capabilityPolicyDigest: signedPolicy === 'artifact-v2' ? effectResourcePolicyDigestV2(artifactPolicy) : signedPolicy ? effectResourcePolicyDigest(resourcePolicy) : digest('effects-policy'),
-      target: { abiVersion: 'process/1', profileDigest: digest('two-workers'), artifactDigest: digest(encodeIR(module).text) }, policy: { ...(signedPolicy === 'artifact-v2' ? DEFAULT_EVIDENCE_POLICY_V2 : DEFAULT_EVIDENCE_POLICY), requireFormal: false } };
+    return { module, registry: ex.capabilities, specification: 'Ledger conservation and composed total at least eighteen.', semanticsVersion: 'reference/1', compilerDigest: digest('compiler'), capabilityPolicyDigest: signedPolicy === 'artifact-v3' ? effectResourcePolicyDigestV3(importFreePolicy)
+      : signedPolicy === 'artifact-v2' ? effectResourcePolicyDigestV2(artifactPolicy) : signedPolicy ? effectResourcePolicyDigest(resourcePolicy) : digest('effects-policy'),
+      target: { abiVersion: 'process/1', profileDigest: digest('two-workers'), artifactDigest: digest(encodeIR(module).text) }, policy: { ...(signedPolicy === 'artifact-v2' || signedPolicy === 'artifact-v3' ? DEFAULT_EVIDENCE_POLICY_V2 : DEFAULT_EVIDENCE_POLICY), requireFormal: false } };
   };
   const plan = (swap = false): TopologyPlan => ({ shape: 'containers', units: [
     { id: 'a', members: swap ? [ex.symbols.feeFor, sum] : [ex.symbols.transfer, sum], capabilities: swap ? [] : [CAP_LEDGER_APPEND], placement: 'container', memoryMb: 32 },
@@ -197,14 +203,15 @@ test('fresh production deployment serves exact loader-admitted adapter bytes und
   const scopedGrants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(57), repositoryId: 'deployment-test', clock: () => 100,
     policyEpoch: () => epochs.policyEpoch, revocationEpoch: () => epochs.epoch,
     isRevoked: (cap, path) => epochs.isRevoked(cap, path), authorizeIssue: () => true, authorizeDelegate: () => true });
-  const keys = generateKeyPairSync('ed25519'), adapter = await admitAdapterSource(ARTIFACT_SINK_SOURCE, ARTIFACT_SINK_DESCRIPTOR);
+  const keys = generateKeyPairSync('ed25519'), adapter = await admitAdapterSource(ARTIFACT_SINK_SOURCE, ARTIFACT_SINK_DESCRIPTOR_V1,
+    { legacyProfile: 'aether.adapter-js-legacy-v1/1' });
   let downgradeCandidate = false;
   const factories = new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => {
     if (downgradeCandidate) return { ...hostFactory(f.directory, artifact, adapter), scopedGrants };
     const body: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: scopedGrants.repositoryId,
       astRoot: artifact.manifest.astRoot, policyEpoch: epochs.policyEpoch,
-      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR.id,
-        adapterDigest: ARTIFACT_SINK_ADAPTER_DIGEST, adapterArtifactDigest: ARTIFACT_SINK_DIGEST }] };
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR_V1.id,
+        adapterDigest: ARTIFACT_SINK_ADAPTER_DIGEST, adapterArtifactDigest: ARTIFACT_SINK_DIGEST_V1 }] };
     assert.equal(effectResourcePolicyDigestV2(body), artifact.manifest.capabilityPolicyDigest);
     return { ...hostFactory(f.directory, artifact, adapter), scopedGrants,
       signedEffectResourcePolicy: signEffectResourcePolicyV2(body, 'deployment-artifact-policy', keys.privateKey),
@@ -235,8 +242,8 @@ test('fresh production deployment serves exact loader-admitted adapter bytes und
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); delete globals.__deploymentArtifactCalls; }
 });
 
-async function anchoredDeploymentFixture() {
-  const f = fixture('artifact-v2');
+async function anchoredDeploymentFixture(legacy = false) {
+  const f = fixture(legacy ? 'artifact-v2' : 'artifact-v3');
   const epochs = new DurableGrantEpochs({ directory: join(f.directory, 'anchored-grant-epochs'), repositoryId: 'deployment-test' });
   const scopedGrants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(58), repositoryId: 'deployment-test', clock: () => 100,
     policyEpoch: () => epochs.policyEpoch, revocationEpoch: () => epochs.epoch,
@@ -245,20 +252,29 @@ async function anchoredDeploymentFixture() {
   const anchor = createEffectSignerAnchor({ repositoryId: scopedGrants.repositoryId, signer: 'production-policy',
     epochAuthorityId: 'anchored-grant-epochs', publicKey: trusted.publicKey,
     currentEpoch: () => epochs.policyEpoch });
-  const adapter = await admitAdapterSource(ARTIFACT_SINK_SOURCE, ARTIFACT_SINK_DESCRIPTOR);
-  let useReplacement = false, changeEpochAtEffect = false, changeKeyAtActivation = false;
+  const adapter = legacy
+    ? await admitAdapterSource(ARTIFACT_SINK_SOURCE, ARTIFACT_SINK_DESCRIPTOR_V1, { legacyProfile: 'aether.adapter-js-legacy-v1/1' })
+    : await admitAdapterSource(ARTIFACT_SINK_SOURCE, ARTIFACT_SINK_DESCRIPTOR);
+  let useReplacement = false, useWrongSigner = false, changeEpochAtEffect = false, changeKeyAtActivation = false;
   const factories = new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => {
-    const body: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: scopedGrants.repositoryId,
+    const body: EffectResourcePolicyBodyV3 = { format: 'aether.effect-resource-policy/3', repositoryId: scopedGrants.repositoryId,
       astRoot: artifact.manifest.astRoot, policyEpoch: epochs.policyEpoch,
       rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR.id,
         adapterDigest: ARTIFACT_SINK_ADAPTER_DIGEST, adapterArtifactDigest: ARTIFACT_SINK_DIGEST }] };
+    const historicalBody: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: scopedGrants.repositoryId,
+      astRoot: artifact.manifest.astRoot, policyEpoch: epochs.policyEpoch,
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR_V1.id,
+        adapterDigest: ARTIFACT_SINK_ADAPTER_DIGEST, adapterArtifactDigest: ARTIFACT_SINK_DIGEST_V1 }] };
     return { ...hostFactory(f.directory, artifact, adapter), scopedGrants,
-      signedEffectResourcePolicy: signEffectResourcePolicyV2(body, anchor.signer, useReplacement ? replacement.privateKey : trusted.privateKey),
+      signedEffectResourcePolicy: legacy
+        ? signEffectResourcePolicyV2(historicalBody, anchor.signer, useReplacement ? replacement.privateKey : trusted.privateKey)
+        : signEffectResourcePolicyV3(body, useWrongSigner ? 'wrong-signer' : anchor.signer, useReplacement ? replacement.privateKey : trusted.privateKey),
       onPhase: (phase: string) => { if (phase === 'effect-requested' && changeEpochAtEffect) epochs.advancePolicy(epochs.policyEpoch); } };
   }]]);
-  const options: ProcessDeploymentOptions = { ...f.options, capabilityProfile: undefined, effectSignerAnchor: anchor, factories,
+  const options: ProcessDeploymentOptions = { ...f.options, capabilityProfile: legacy ? 'scoped-anchored-v4' : undefined, effectSignerAnchor: anchor, factories,
     phase: phase => { if (phase === 'before-activation' && changeKeyAtActivation) useReplacement = true; } };
   return { ...f, anchor, epochs, options, setReplacement: (value: boolean) => { useReplacement = value; },
+    setWrongSigner: (value: boolean) => { useWrongSigner = value; },
     setEpochAtEffect: (value: boolean) => { changeEpochAtEffect = value; },
     setKeyAtActivation: (value: boolean) => { changeKeyAtActivation = value; } };
 }
@@ -271,7 +287,7 @@ test('default effectful deployment pins independent signer across real sink, can
     await assert.rejects(ProcessDeployment.open({ ...f.options, effectSignerAnchor: undefined }), /independently provisioned effect signer anchor/);
     assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false);
     deployment = await ProcessDeployment.open(f.options);
-    assert.equal(deployment.status().capabilityProfile, 'scoped-anchored-v4');
+    assert.equal(deployment.status().capabilityProfile, 'scoped-anchored-v5');
     const stateFile = join(f.options.directory, 'deployment.json'), state = readFileSync(stateFile, 'utf8');
     const { alice, bob } = await accounts(deployment);
     const scope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
@@ -279,14 +295,17 @@ test('default effectful deployment pins independent signer across real sink, can
     assert.equal((await deployment.call(f.ex.symbols.transfer, args,
       { operationId: 'anchored-valid', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) })).state, 'completed');
     assert.equal(globals.__deploymentArtifactCalls, 1);
-    f.setReplacement(true);
     const candidate = f.context('v2'), evidence = mintLocalEvidence(candidate);
     const candidatePath = join(f.options.directory, 'artifacts', `${executionManifestDigest(evidence.manifest).split(':').at(-1)}.json`);
-    assert.throws(() => deployment!.registerArtifact({ context: candidate, evidence, plan: f.plan(true), factoryId: 'ledger-services/1' }), /untrusted effect resource policy v2 signer/);
+    f.setWrongSigner(true);
+    assert.throws(() => deployment!.registerArtifact({ context: candidate, evidence, plan: f.plan(true), factoryId: 'ledger-services/1' }), /signer\/repository/);
+    assert.equal(existsSync(candidatePath), false);
+    f.setWrongSigner(false); f.setReplacement(true);
+    assert.throws(() => deployment!.registerArtifact({ context: candidate, evidence, plan: f.plan(true), factoryId: 'ledger-services/1' }), /untrusted effect resource policy v3 signer/);
     assert.equal(existsSync(candidatePath), false);
     await deployment.close(); deployment = undefined;
     const beforeReopen = readFileSync(stateFile, 'utf8');
-    await assert.rejects(ProcessDeployment.open({ ...f.options, genesis: undefined }), /untrusted effect resource policy v2 signer/);
+    await assert.rejects(ProcessDeployment.open({ ...f.options, genesis: undefined }), /untrusted effect resource policy v3 signer/);
     assert.equal(readFileSync(stateFile, 'utf8'), beforeReopen, 'rejected key substitution must not rewrite durable deployment state');
     f.setReplacement(false);
     deployment = await ProcessDeployment.open({ ...f.options, genesis: undefined });
@@ -300,6 +319,24 @@ test('default effectful deployment pins independent signer across real sink, can
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); delete globals.__deploymentArtifactCalls; }
 });
 
+test('explicit anchored-v4 compatibility reopens old adapter-policy bytes without silent upgrade', async () => {
+  const f = await anchoredDeploymentFixture(true); let deployment: ProcessDeployment | undefined;
+  try {
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined }), /import-free deployment profile requires signed adapter policy v3/);
+    assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false);
+    deployment = await ProcessDeployment.open(f.options);
+    await accounts(deployment);
+    const file = join(f.options.directory, 'deployment.json'), original = readFileSync(file, 'utf8');
+    assert.equal(JSON.parse(original).format, 'aether.process-deployment/4');
+    await deployment.close(); deployment = undefined;
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, genesis: undefined }), /readiness|profile/);
+    assert.equal(readFileSync(file, 'utf8'), original);
+    deployment = await ProcessDeployment.open({ ...f.options, genesis: undefined });
+    assert.equal(deployment.status().capabilityProfile, 'scoped-anchored-v4');
+    assert.deepEqual(await balances(deployment), ['100', '0']);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
 test('anchored promotion binds signer identity and refuses key substitution before activation', async () => {
   const f = await anchoredDeploymentFixture(); let deployment: ProcessDeployment | undefined;
   const globals = globalThis as Record<string, unknown>;
@@ -307,11 +344,11 @@ test('anchored promotion binds signer identity and refuses key substitution befo
     globals.__deploymentArtifactCalls = 0;
     deployment = await ProcessDeployment.open(f.options);
     await accounts(deployment);
-    const draft = await f.proposal(deployment), effectPlan = processAnchoredEffectPlan('ledger-services/1', draft.evidence.manifest.capabilityPolicyDigest, f.anchor.digest);
+    const draft = await f.proposal(deployment), effectPlan = processImportFreeEffectPlan('ledger-services/1', draft.evidence.manifest.capabilityPolicyDigest, f.anchor.digest);
     const proposal = { ...draft.proposal, effectPlanDigest: effectPlanDigest(effectPlan) };
     const approved = { ...draft, effectPlan, proposal, approval: approvePromotion(proposal, 'governor', f.keys.privateKey) };
     f.setKeyAtActivation(true);
-    await assert.rejects(deployment.promote(approved), /untrusted effect resource policy v2 signer/);
+    await assert.rejects(deployment.promote(approved), /untrusted effect resource policy v3 signer/);
     assert.equal(globals.__deploymentArtifactCalls, 0);
     f.setReplacement(false); f.setKeyAtActivation(false);
     await deployment.recover();

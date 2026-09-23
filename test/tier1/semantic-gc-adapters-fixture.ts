@@ -10,7 +10,7 @@ import { DurableGraphStore } from '../../src/tier1/durable-store.ts';
 import { CausalLineageLedger, fenceRequirement, signIntent, signSpecRevision } from '../../src/tier1/causal-lineage.ts';
 import { SemanticGarbageCollector } from '../../src/tier1/semantic-gc.ts';
 import { SemanticAdapterGarbageCollector, declarativeAdapterTableDigest, type DeclarativeAdapterTable, type SemanticAdapterGcOptions } from '../../src/tier1/semantic-gc-adapters.ts';
-import { adapterArtifactForSource } from '../../src/tier2/adapter-artifact.ts';
+import { legacyAdapterArtifactForSource } from '../../src/tier2/adapter-artifact.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
@@ -28,7 +28,7 @@ export function adapterGcFixture(options: { exportUnused?: boolean; protectUnuse
   const table: DeclarativeAdapterTable = { format: 'aether.declarative-adapter-table/1', repositoryId: 'adapter-gc', registrations: [
     { id: 'a-live', capability: liveCap, source: `export default {id:'fixture-live/1',semantics:${JSON.stringify(semantics)},execute(){return {tag:'null'}}};` },
     { id: 'b-unused', capability: unusedCap, source: `throw new Error('Dormant adapter must never be imported during GC'); export default {id:'fixture-unused/1',semantics:${JSON.stringify(semantics)},execute(){return {tag:'null'}}};` },
-  ].map(item => ({ id: item.id, capability: item.capability, artifact: adapterArtifactForSource(Buffer.from(item.source), item.capability, item.id === 'a-live' ? 'fixture-live/1' : 'fixture-unused/1', semantics), sourceRoot: store.intern(b.str(item.source), { leaseId: item.id }), lifecycle: 'lazy-declarative-no-unload/1' })) };
+  ].map(item => ({ id: item.id, capability: item.capability, artifact: legacyAdapterArtifactForSource(Buffer.from(item.source), item.capability, item.id === 'a-live' ? 'fixture-live/1' : 'fixture-unused/1', semantics), sourceRoot: store.intern(b.str(item.source), { leaseId: item.id }), lifecycle: 'lazy-declarative-no-unload/1' })) };
   const author = generateKeyPairSync('ed25519'), currentAuthority = { policyEpoch: '1', eligibleAuthors: ['author'] };
   const lineage = new CausalLineageLedger({ directory: join(directory, 'lineage'), repositoryId: 'adapter-gc', store, authority: () => currentAuthority, authorKey: () => author.publicKey });
   const specification = { id: 'application', revision: lineage.publishSpec(signSpecRevision({ repositoryId: 'adapter-gc', id: 'application', revision: 1, previous: null, parents: [], text: 'Preserve the exact declared export surface and formal fences.', requirements: [fenceRequirement(fenced), ...(options.fenceUnused && module.kind === 'Module' ? [fenceRequirement(module.members[2])] : [])], author: 'author', policyEpoch: '1', nonce: randomUUID() }, author.privateKey)) };

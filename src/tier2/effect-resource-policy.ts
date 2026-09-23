@@ -127,3 +127,63 @@ export function assertEffectResourceAdapterV2(policy: SignedEffectResourcePolicy
   const rule = policy.body.rules.find(item => item.capability === name);
   if (!rule || rule.adapterId !== actual.id || rule.adapterDigest !== actual.digest || rule.adapterArtifactDigest !== actual.artifactDigest) throw new Error('effect adapter artifact is outside signed resource policy v2');
 }
+
+/** Version 3 admits only import-free V2 adapter artifacts. Its body and
+ * signature domains are independent of earlier policy versions. */
+export interface EffectResourceRuleV3 extends EffectResourceRuleV2 {}
+export interface EffectResourcePolicyBodyV3 {
+  readonly format: 'aether.effect-resource-policy/3'; readonly repositoryId: string;
+  readonly astRoot: Digest; readonly policyEpoch: string; readonly rules: readonly EffectResourceRuleV3[];
+}
+export interface SignedEffectResourcePolicyV3 { readonly format: 'aether.signed-effect-resource-policy/3'; readonly body: EffectResourcePolicyBodyV3; readonly signer: string; readonly signature: string }
+export function validateEffectResourcePolicyBodyV3(value: unknown): asserts value is EffectResourcePolicyBodyV3 {
+  encodeCanonical(value);
+  const body = exactObject(value, ['format', 'repositoryId', 'astRoot', 'policyEpoch', 'rules']);
+  if (body.format !== 'aether.effect-resource-policy/3' || !isNodeRef(body.astRoot)) throw new TypeError('invalid effect resource policy v3 subject');
+  identifier(body.repositoryId); decimal(body.policyEpoch);
+  if (!Array.isArray(body.rules) || body.rules.length < 1 || body.rules.length > 128) throw new TypeError('effect resource policy v3 requires bounded rules');
+  let previous = '';
+  for (const item of body.rules) {
+    const rule = exactObject(item, ['capability', 'prefix', 'argument', 'adapterId', 'adapterDigest', 'adapterArtifactDigest']);
+    capability(rule.capability as string); path(rule.prefix); identifier(rule.adapterId);
+    validateDigest(rule.adapterDigest, 'aether.effect-adapter/1'); validateDigest(rule.adapterArtifactDigest, 'aether.effect-adapter-artifact/2');
+    if ((rule.capability as string) <= previous || rule.argument !== null && (!Number.isSafeInteger(rule.argument) || (rule.argument as number) < 0 || (rule.argument as number) > 31)) throw new TypeError('noncanonical or invalid effect resource rule v3');
+    previous = rule.capability as string;
+  }
+}
+export function effectResourcePolicyDigestV3(body: EffectResourcePolicyBodyV3): Digest {
+  validateEffectResourcePolicyBodyV3(body); return domainDigest('aether.effect-resource-policy/3', body);
+}
+function signingBytesV3(body: EffectResourcePolicyBodyV3, signer: string): Uint8Array {
+  return encodeCanonical({ domain: 'aether.effect-resource-policy-signature/3', body, signer });
+}
+export function signEffectResourcePolicyV3(body: EffectResourcePolicyBodyV3, signer: string, key: KeyObject | string): SignedEffectResourcePolicyV3 {
+  validateEffectResourcePolicyBodyV3(body); identifier(signer);
+  const privateKey = typeof key === 'string' ? createPrivateKey(key) : key;
+  if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'ed25519') throw new TypeError('Ed25519 policy signing key required');
+  return { format: 'aether.signed-effect-resource-policy/3', body, signer, signature: sign(null, signingBytesV3(body, signer), privateKey).toString('base64') };
+}
+export function assertSignedEffectResourcePolicyV3(value: unknown, manifest: ExecutionManifestV1, repositoryId: string, currentEpoch: string, key: KeyObject | string): asserts value is SignedEffectResourcePolicyV3 {
+  encodeCanonical(value); const policy = exactObject(value, ['format', 'body', 'signer', 'signature']);
+  if (policy.format !== 'aether.signed-effect-resource-policy/3') throw new TypeError('unsupported signed effect resource policy v3');
+  validateEffectResourcePolicyBodyV3(policy.body); identifier(policy.signer); identifier(repositoryId); decimal(currentEpoch);
+  const body = policy.body as EffectResourcePolicyBodyV3;
+  if (body.repositoryId !== repositoryId || body.astRoot !== manifest.astRoot || body.policyEpoch !== currentEpoch || effectResourcePolicyDigestV3(body) !== manifest.capabilityPolicyDigest) throw new Error('stale or foreign effect resource policy v3');
+  if (typeof policy.signature !== 'string' || !/^[A-Za-z0-9+/]{86}==$/.test(policy.signature)) throw new TypeError('invalid effect policy v3 signature');
+  const signature = Buffer.from(policy.signature, 'base64'), publicKey = typeof key === 'string' ? createPublicKey(key) : key.type === 'private' ? createPublicKey(key) : key;
+  if (publicKey.asymmetricKeyType !== 'ed25519' || signature.toString('base64') !== policy.signature || !verify(null, signingBytesV3(body, policy.signer as string), publicKey, signature)) throw new TypeError('untrusted effect resource policy v3 signer');
+}
+export function effectResourcePathV3(policy: SignedEffectResourcePolicyV3, name: CapabilityName, args: readonly TaggedValueV1[]): readonly string[] {
+  validateEffectResourcePolicyBodyV3(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule) throw new Error('effect capability has no signed v3 resource rule');
+  if (rule.argument === null) return [...rule.prefix];
+  const value = args[rule.argument];
+  if (!value || value.tag !== 'string' || !SEGMENT.test(value.value) || value.value === '.' || value.value === '..') throw new TypeError('effect target is outside signed resource grammar');
+  return [...rule.prefix, value.value];
+}
+export function assertEffectResourceAdapterV3(policy: SignedEffectResourcePolicyV3, name: CapabilityName, actual: Readonly<{ id: string; digest: Digest; artifactDigest: Digest | null }>): void {
+  validateEffectResourcePolicyBodyV3(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule || rule.adapterId !== actual.id || rule.adapterDigest !== actual.digest || rule.adapterArtifactDigest !== actual.artifactDigest) throw new Error('effect adapter artifact is outside signed resource policy v3');
+}

@@ -42,57 +42,57 @@ export interface RuntimeEffectRouterOptions {
 
 /** One logical execution; replay/retry reconstructs the router with the same context. */
 export class BrokerEffectRouter implements RuntimeEffectRouter {
-  private readonly options: RuntimeEffectRouterOptions;
-  private readonly root: string;
-  private readonly manifestDigest: string;
-  private sequence = 0n;
-  private bound = false;
-  get mode(): ExecutionMode { return this.options.broker.executionMode; }
+  readonly #options: RuntimeEffectRouterOptions;
+  readonly #root: string;
+  readonly #manifestDigest: string;
+  #sequence = 0n;
+  #bound = false;
+  get mode(): ExecutionMode { return this.#options.broker.executionMode; }
 
   constructor(options: RuntimeEffectRouterOptions) {
     const manifest = decodeExecutionManifest(encodeExecutionManifest(options.manifest));
-    this.options = { ...options, manifest, adapters: new Map(options.adapters) };
-    this.root = manifest.astRoot;
-    this.manifestDigest = executionManifestDigest(manifest);
+    this.#options = { ...options, manifest, adapters: new Map(options.adapters) };
+    this.#root = manifest.astRoot;
+    this.#manifestDigest = executionManifestDigest(manifest);
     brokerRouters.add(this);
   }
   bind(root: NodeRef): void {
-    if (root !== this.root) throw new TypeError('effect router execution manifest does not match loaded code');
-    this.bound = true;
+    if (root !== this.#root) throw new TypeError('effect router execution manifest does not match loaded code');
+    this.#bound = true;
   }
   adapterIdentity(capability: CapabilityName): Readonly<{ id: string; digest: string; artifactDigest: string | null }> {
-    const adapter = this.options.adapters.get(capability);
+    const adapter = this.#options.adapters.get(capability);
     if (!adapter) throw new Error(`no broker adapter for ${capability}`);
     return { id: adapter.id, digest: effectAdapterDigest(adapter), artifactDigest: admittedAdapterArtifactDigest(adapter) };
   }
   fork(): RuntimeEffectRouter {
-    if (!this.options.isolatedFork) throw new Error('broker-backed fork requires an isolated effect router');
-    const child = this.options.isolatedFork();
+    if (!this.#options.isolatedFork) throw new Error('broker-backed fork requires an isolated effect router');
+    const child = this.#options.isolatedFork();
     if (child === this || child.mode === 'live') throw new Error('fork cannot reuse live effect authority');
-    child.bind(this.root as NodeRef);
+    child.bind(this.#root as NodeRef);
     return child;
   }
   invoke(capability: CapabilityName, args: readonly Value[]): Value {
-    if (!this.bound) throw new Error('effect router is not bound to loaded code');
-    const adapter = this.options.adapters.get(capability);
+    if (!this.#bound) throw new Error('effect router is not bound to loaded code');
+    const adapter = this.#options.adapters.get(capability);
     if (!adapter) throw new Error(`no broker adapter for ${capability}`);
     const payload: TaggedValueV1 = { tag: 'sequence', items: [
-      { tag: 'string', value: capability }, ...args.map(value => this.encode(value)),
+      { tag: 'string', value: capability }, ...args.map(value => this.#encode(value)),
     ] };
     validateTaggedValue(payload);
-    const effectId = `operation-${this.sequence++}`;
-    const outcome = this.options.broker.dispatch({
-      format: 'aether.effect/1', executionId: this.options.executionId, effectId,
-      branchId: this.options.branchId ?? null, executionManifest: this.manifestDigest,
-      capabilityGrantRef: this.options.grant(capability), policyEpoch: this.options.policyEpoch,
+    const effectId = `operation-${this.#sequence++}`;
+    const outcome = this.#options.broker.dispatch({
+      format: 'aether.effect/1', executionId: this.#options.executionId, effectId,
+      branchId: this.#options.branchId ?? null, executionManifest: this.#manifestDigest,
+      capabilityGrantRef: this.#options.grant(capability), policyEpoch: this.#options.policyEpoch,
       payloadDigest: effectPayloadDigest(payload), payload,
-      budgetReservationId: this.options.reservation?.(capability, effectId) ?? null,
-      deadline: this.options.deadline,
+      budgetReservationId: this.#options.reservation?.(capability, effectId) ?? null,
+      deadline: this.#options.deadline,
     }, adapter);
     if (outcome.state !== 'committed') throw new EffectInvocationError(outcome);
-    return this.decode(outcome.value);
+    return this.#decode(outcome.value);
   }
-  private encode(value: Value, depth = 0): TaggedValueV1 {
+  #encode(value: Value, depth = 0): TaggedValueV1 {
     if (depth > 64) throw new RangeError('effect argument nesting limit');
     if (value === null) return { tag: 'null' };
     if (typeof value === 'boolean') return { tag: 'bool', value };
@@ -100,24 +100,24 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     if (typeof value === 'string') return { tag: 'string', value };
     if (isClosureValue(value) || isTaskValue(value)) throw new TypeError('opaque execution state cannot be sent to an effect adapter');
     if (isRef(value)) {
-      if (!this.options.references) throw new TypeError('effect reference requires explicit ownership translation');
-      return { tag: 'ref', value: this.options.references.encode(value) };
+      if (!this.#options.references) throw new TypeError('effect reference requires explicit ownership translation');
+      return { tag: 'ref', value: this.#options.references.encode(value) };
     }
-    if (isSeqValue(value)) return { tag: 'sequence', items: value.map(item => this.encode(item, depth + 1)) };
-    if (isResultValue(value)) return { tag: 'result', variant: value.variant, value: this.encode(value.value, depth + 1) };
+    if (isSeqValue(value)) return { tag: 'sequence', items: value.map(item => this.#encode(item, depth + 1)) };
+    if (isResultValue(value)) return { tag: 'result', variant: value.variant, value: this.#encode(value.value, depth + 1) };
     throw new TypeError('unsupported runtime effect value');
   }
-  private decode(value: TaggedValueV1): Value {
+  #decode(value: TaggedValueV1): Value {
     validateTaggedValue(value);
     switch (value.tag) {
       case 'null': return null;
       case 'bool': case 'string': return value.value;
       case 'int': return BigInt(value.value);
-      case 'sequence': return value.items.map(item => this.decode(item));
-      case 'result': return { variant: value.variant, value: this.decode(value.value) };
+      case 'sequence': return value.items.map(item => this.#decode(item));
+      case 'result': return { variant: value.variant, value: this.#decode(value.value) };
       case 'ref':
-        if (!this.options.references) throw new TypeError('effect reference requires explicit ownership translation');
-        return this.options.references.decode(value.value);
+        if (!this.#options.references) throw new TypeError('effect reference requires explicit ownership translation');
+        return this.#options.references.decode(value.value);
       case 'authority': throw new TypeError('effect result cannot install authority implicitly');
     }
   }
@@ -127,4 +127,20 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
 export function brokerAdapterIdentity(router: RuntimeEffectRouter, capability: CapabilityName): Readonly<{ id: string; digest: string; artifactDigest: string | null }> {
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
   return BrokerEffectRouter.prototype.adapterIdentity.call(router, capability);
+}
+
+/** Signed-policy hosts call the base router boundary directly. Subclasses or
+ * own properties cannot replace bind, mode or dispatch after identity checking;
+ * the base uses JavaScript-private adapter and broker state. */
+export function brokerMode(router: RuntimeEffectRouter): ExecutionMode {
+  if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
+  return Object.getOwnPropertyDescriptor(BrokerEffectRouter.prototype, 'mode')!.get!.call(router) as ExecutionMode;
+}
+export function brokerBind(router: RuntimeEffectRouter, root: NodeRef): void {
+  if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
+  BrokerEffectRouter.prototype.bind.call(router, root);
+}
+export function brokerInvoke(router: RuntimeEffectRouter, capability: CapabilityName, args: readonly Value[]): Value {
+  if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
+  return BrokerEffectRouter.prototype.invoke.call(router, capability, args);
 }

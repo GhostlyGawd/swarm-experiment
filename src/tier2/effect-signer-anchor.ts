@@ -7,7 +7,7 @@
 import { createPublicKey, KeyObject } from 'node:crypto';
 import { decimal, identifier } from '../fabric/encoding.ts';
 import { domainDigest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
-import { assertSignedEffectResourcePolicyV2, type SignedEffectResourcePolicyV2 } from './effect-resource-policy.ts';
+import { assertSignedEffectResourcePolicyV2, assertSignedEffectResourcePolicyV3, type SignedEffectResourcePolicyV2, type SignedEffectResourcePolicyV3 } from './effect-resource-policy.ts';
 
 const created = new WeakSet<object>();
 
@@ -53,9 +53,16 @@ export function assertEffectSignerAnchor(value: unknown): asserts value is Effec
   if (anchor.format !== 'aether.effect-signer-anchor/1' || anchor.currentEpoch() === undefined) throw new TypeError('invalid effect signer anchor');
 }
 
-export function assertAnchoredEffectPolicy(anchor: EffectSignerAnchor, policy: SignedEffectResourcePolicyV2,
-  manifest: ExecutionManifestV1, repositoryId: string): void {
+export function assertAnchoredEffectPolicy(anchor: EffectSignerAnchor, policy: SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3,
+  manifest: ExecutionManifestV1, repositoryId: string, compatibility?: 'anchored-v2'): void {
   assertEffectSignerAnchor(anchor);
+  if (compatibility !== undefined && compatibility !== 'anchored-v2') throw new TypeError('unsupported anchored effect policy compatibility');
   if (repositoryId !== anchor.repositoryId || policy?.signer !== anchor.signer) throw new TypeError('effect policy signer/repository differs from independent anchor');
-  assertSignedEffectResourcePolicyV2(policy, manifest, anchor.repositoryId, anchor.currentEpoch(), anchor.publicKey);
+  if (compatibility === 'anchored-v2') {
+    if (policy.format !== 'aether.signed-effect-resource-policy/2') throw new TypeError('legacy anchored policy requires v2');
+    assertSignedEffectResourcePolicyV2(policy, manifest, anchor.repositoryId, anchor.currentEpoch(), anchor.publicKey);
+  } else {
+    if (policy.format !== 'aether.signed-effect-resource-policy/3') throw new TypeError('anchored policy requires signed policy v3');
+    assertSignedEffectResourcePolicyV3(policy, manifest, anchor.repositoryId, anchor.currentEpoch(), anchor.publicKey);
+  }
 }

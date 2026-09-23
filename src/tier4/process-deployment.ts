@@ -40,7 +40,8 @@ export interface ProcessArtifactV1 {
   readonly schemaDigest: Digest;
 }
 export type ProcessHostServices = Pick<ProcessHostOptions, 'sealer' | 'scopedGrants' | 'effectResourcePath' | 'effectResourcePolicyDigest' | 'signedEffectResourcePolicy' | 'effectResourceSignerKey' | 'currentEffectPolicyEpoch' | 'revocations' | 'effectRouterFactory' | 'authorizeRecovery' | 'timeoutMs' | 'lockWaitMs' | 'maxWorkers' | 'onPhase'>;
-export type CapabilityDeploymentProfile = 'scoped-anchored-v4' | 'scoped-artifact-v4' | 'scoped-signed-v3' | 'scoped-v2' | 'legacy-sealed-v1';
+export type CapabilityDeploymentProfile = 'scoped-anchored-v5' | 'scoped-anchored-v4' | 'scoped-artifact-v4' | 'scoped-signed-v3' | 'scoped-v2' | 'legacy-sealed-v1';
+const anchoredProfile = (profile: CapabilityDeploymentProfile): boolean => profile === 'scoped-anchored-v5' || profile === 'scoped-anchored-v4';
 export interface ProcessDeploymentOptions {
   readonly directory: string;
   readonly coordinator: PromotionCoordinator;
@@ -65,7 +66,7 @@ interface DeploymentReference {
   readonly generation: string;
 }
 interface DeploymentState {
-  readonly format: 'aether.process-deployment/3' | 'aether.process-deployment/4';
+  readonly format: 'aether.process-deployment/3' | 'aether.process-deployment/4' | 'aether.process-deployment/5';
   readonly admissionProfile: PromotionAdmissionProfile;
   readonly capabilityProfile: CapabilityDeploymentProfile;
   readonly effectSignerAnchorDigest?: Digest;
@@ -95,7 +96,7 @@ interface DeploymentInvocation {
   readonly receiptDigest: Digest | null;
 }
 interface PreparedRecord {
-  readonly format: 'aether.process-deployment-prepared/1' | 'aether.process-deployment-prepared/2';
+  readonly format: 'aether.process-deployment-prepared/1' | 'aether.process-deployment-prepared/2' | 'aether.process-deployment-prepared/3';
   readonly effectSignerAnchorDigest?: Digest;
   readonly binding: PromotionBindingV1 | null;
   readonly reference: DeploymentReference;
@@ -151,6 +152,11 @@ export function processEffectPlan(factoryId: string, capabilityPolicyDigest: Dig
 export function processAnchoredEffectPlan(factoryId: string, capabilityPolicyDigest: Digest, anchorDigest: Digest): TaggedValueV1 {
   identifier(factoryId); validateDigest(capabilityPolicyDigest); validateDigest(anchorDigest, 'aether.effect-signer-anchor/1');
   return { tag: 'sequence', items: [{ tag: 'string', value: 'aether.process-effect-factory/2' },
+    { tag: 'string', value: factoryId }, { tag: 'string', value: capabilityPolicyDigest }, { tag: 'string', value: anchorDigest }] };
+}
+export function processImportFreeEffectPlan(factoryId: string, capabilityPolicyDigest: Digest, anchorDigest: Digest): TaggedValueV1 {
+  identifier(factoryId); validateDigest(capabilityPolicyDigest, 'aether.effect-resource-policy/3'); validateDigest(anchorDigest, 'aether.effect-signer-anchor/1');
+  return { tag: 'sequence', items: [{ tag: 'string', value: 'aether.process-effect-factory/3' },
     { tag: 'string', value: factoryId }, { tag: 'string', value: capabilityPolicyDigest }, { tag: 'string', value: anchorDigest }] };
 }
 function schemaDigest(module: Term): Digest {
@@ -230,10 +236,10 @@ export class ProcessDeployment implements PromotionDriver {
   private historicalRecovery: string | null = null;
   private closed = false;
   private constructor(options: ProcessDeploymentOptions) {
-    this.options = options; this.capabilityProfile = options.capabilityProfile ?? 'scoped-anchored-v4';
-    if (!['scoped-anchored-v4', 'scoped-artifact-v4', 'scoped-signed-v3', 'scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
+    this.options = options; this.capabilityProfile = options.capabilityProfile ?? 'scoped-anchored-v5';
+    if (!['scoped-anchored-v5', 'scoped-anchored-v4', 'scoped-artifact-v4', 'scoped-signed-v3', 'scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
       || options.legacyCapabilityMigration !== undefined && !['adopt-legacy-sealed-v1', 'adopt-scoped-v2'].includes(options.legacyCapabilityMigration)) throw new TypeError('invalid capability deployment profile/migration');
-    if (this.capabilityProfile === 'scoped-anchored-v4') assertEffectSignerAnchor(options.effectSignerAnchor);
+    if (anchoredProfile(this.capabilityProfile)) assertEffectSignerAnchor(options.effectSignerAnchor);
     else if (options.effectSignerAnchor !== undefined) throw new TypeError('independent effect signer anchor requires anchored deployment profile');
     ensureDirectory(options.directory);
     ensureDirectory(join(options.directory, 'artifacts')); ensureDirectory(join(options.directory, 'deployments'));
@@ -253,7 +259,7 @@ export class ProcessDeployment implements PromotionDriver {
           await deployment.hostFor(migrated.active); save(deployment.stateFile,migrated);
         }
         if(existsSync(deployment.stateFile)&&(load(deployment.stateFile) as {format?:unknown}).format==='aether.process-deployment/2'){
-          if(deployment.capabilityProfile==='scoped-signed-v3'||deployment.capabilityProfile==='scoped-artifact-v4'||deployment.capabilityProfile==='scoped-anchored-v4')throw new Error('v2 authority cannot be silently upgraded to signed policy; use a new admitted deployment');
+          if(deployment.capabilityProfile==='scoped-signed-v3'||deployment.capabilityProfile==='scoped-artifact-v4'||anchoredProfile(deployment.capabilityProfile))throw new Error('v2 authority cannot be silently upgraded to signed policy; use a new admitted deployment');
           const required = deployment.capabilityProfile === 'scoped-v2' ? 'adopt-scoped-v2' : 'adopt-legacy-sealed-v1';
           if(options.legacyCapabilityMigration!==required)throw new Error('unprofiled capability history requires explicit legacy capability migration');
           const migrated = deployment.readState('v2'); deployment.assertHistoricalServices(migrated);
@@ -268,12 +274,14 @@ export class ProcessDeployment implements PromotionDriver {
           const manifest = executionManifestDigest(artifact.manifest), admission = options.coordinator.state();
           if (admission.committedManifest !== manifest || admission.generation !== '0' || admission.pendingProposal !== null) throw new Error('genesis does not match production admission');
           const reference: DeploymentReference = { id: 'genesis', manifest, artifactDigest: processArtifactDigest(artifact), generation: '0' };
-          deployment.writePrepared({ format: deployment.capabilityProfile === 'scoped-anchored-v4' ? 'aether.process-deployment-prepared/2' : 'aether.process-deployment-prepared/1',
-            ...(deployment.capabilityProfile === 'scoped-anchored-v4' ? { effectSignerAnchorDigest: options.effectSignerAnchor!.digest } : {}),
+          deployment.writePrepared({ format: deployment.capabilityProfile === 'scoped-anchored-v5' ? 'aether.process-deployment-prepared/3'
+            : deployment.capabilityProfile === 'scoped-anchored-v4' ? 'aether.process-deployment-prepared/2' : 'aether.process-deployment-prepared/1',
+            ...(anchoredProfile(deployment.capabilityProfile) ? { effectSignerAnchorDigest: options.effectSignerAnchor!.digest } : {}),
             binding: null, reference, source: null, sourceSnapshotDigest: null, seed: null });
-          save(deployment.stateFile, { format: deployment.capabilityProfile === 'scoped-anchored-v4' ? 'aether.process-deployment/4' : 'aether.process-deployment/3',
+          save(deployment.stateFile, { format: deployment.capabilityProfile === 'scoped-anchored-v5' ? 'aether.process-deployment/5'
+            : deployment.capabilityProfile === 'scoped-anchored-v4' ? 'aether.process-deployment/4' : 'aether.process-deployment/3',
             admissionProfile: options.coordinator.admissionProfile, capabilityProfile: deployment.capabilityProfile,
-            ...(deployment.capabilityProfile === 'scoped-anchored-v4' ? { effectSignerAnchorDigest: options.effectSignerAnchor!.digest } : {}),
+            ...(anchoredProfile(deployment.capabilityProfile) ? { effectSignerAnchorDigest: options.effectSignerAnchor!.digest } : {}),
             genesisManifest: manifest, active: reference, readiness: 'ready', pendingProposal: null, invocations: [], allocations: [] });
         }
         const state = deployment.readState();
@@ -318,9 +326,11 @@ export class ProcessDeployment implements PromotionDriver {
   private readPrepared(reference: DeploymentReference): PreparedRecord {
     validateReference(reference);
     const raw = load(join(this.directory(reference.id), 'prepared.json')) as { format?: unknown };
-    const anchored = this.capabilityProfile === 'scoped-anchored-v4';
+    const anchored = anchoredProfile(this.capabilityProfile);
     const value = exactObject(raw, ['format', ...(anchored ? ['effectSignerAnchorDigest'] : []), 'binding', 'reference', 'source', 'sourceSnapshotDigest', 'seed']);
-    if (value.format !== (anchored ? 'aether.process-deployment-prepared/2' : 'aether.process-deployment-prepared/1') || !equal(value.reference, reference)) throw new TypeError('prepared deployment identity mismatch');
+    const expected = this.capabilityProfile === 'scoped-anchored-v5' ? 'aether.process-deployment-prepared/3'
+      : anchored ? 'aether.process-deployment-prepared/2' : 'aether.process-deployment-prepared/1';
+    if (value.format !== expected || !equal(value.reference, reference)) throw new TypeError('prepared deployment identity mismatch');
     if (anchored && value.effectSignerAnchorDigest !== this.options.effectSignerAnchor!.digest) throw new TypeError('prepared effect signer anchor mismatch');
     if (value.source !== null) validateReference(value.source);
     if (value.sourceSnapshotDigest !== null) validateDigest(value.sourceSnapshotDigest, 'aether.state/1');
@@ -331,10 +341,11 @@ export class ProcessDeployment implements PromotionDriver {
     return value as unknown as PreparedRecord;
   }
   private readState(legacy: 'v1' | 'v2' | null = null): DeploymentState {
-    const anchored = !legacy && this.capabilityProfile === 'scoped-anchored-v4';
+    const anchored = !legacy && anchoredProfile(this.capabilityProfile);
     const value = exactObject(load(this.stateFile), ['format', ...(legacy === 'v1' ? [] : ['admissionProfile']), ...(legacy ? [] : ['capabilityProfile']), ...(anchored ? ['effectSignerAnchorDigest'] : []), 'genesisManifest', 'active', 'readiness', 'pendingProposal', 'invocations', 'allocations']);
     validateReference(value.active); validateDigest(value.genesisManifest, 'aether.execution/1');
-    if (value.format !== (legacy === 'v1' ? 'aether.process-deployment/1' : legacy === 'v2' ? 'aether.process-deployment/2' : anchored ? 'aether.process-deployment/4' : 'aether.process-deployment/3')
+    if (value.format !== (legacy === 'v1' ? 'aether.process-deployment/1' : legacy === 'v2' ? 'aether.process-deployment/2'
+      : this.capabilityProfile === 'scoped-anchored-v5' ? 'aether.process-deployment/5' : anchored ? 'aether.process-deployment/4' : 'aether.process-deployment/3')
       || (legacy !== 'v1' && value.admissionProfile !== this.options.coordinator.admissionProfile)
       || (!legacy && value.capabilityProfile !== this.capabilityProfile)
       || !['ready', 'preparing', 'prepared'].includes(value.readiness as string) || (value.readiness === 'ready') !== (value.pendingProposal === null)) throw new TypeError('invalid deployment readiness/profile');
@@ -409,8 +420,9 @@ export class ProcessDeployment implements PromotionDriver {
     this.assertServices(services, context.module, artifact.policy, artifact.manifest);
     ensureDirectory(join(this.directory(reference.id), 'host'));
     const host = await ProcessHost.open({ ...services,
-      ...(this.capabilityProfile === 'scoped-anchored-v4' ? { effectSignerAnchor: this.options.effectSignerAnchor } : {}),
-      ...(services.signedEffectResourcePolicy && this.capabilityProfile !== 'scoped-anchored-v4'
+      ...(anchoredProfile(this.capabilityProfile) ? { effectSignerAnchor: this.options.effectSignerAnchor } : {}),
+      ...(this.capabilityProfile === 'scoped-anchored-v4' ? { legacyAnchoredEffectPolicy: 'anchored-v2' as const } : {}),
+      ...(services.signedEffectResourcePolicy && !anchoredProfile(this.capabilityProfile)
         ? { legacyEffectSignerTrust: 'factory-v1' as const } : {}),
       onPhase:(phase,detail)=>{
       if(this.historicalRecovery!==reference.id)this.options.coordinator.assertLineageCurrent(reference.manifest);
@@ -422,7 +434,7 @@ export class ProcessDeployment implements PromotionDriver {
     this.hosts.set(reference.id, host); return host;
   }
   private assertTrustedServices(reference: DeploymentReference): void {
-    if (this.capabilityProfile !== 'scoped-anchored-v4') return;
+    if (!anchoredProfile(this.capabilityProfile)) return;
     const artifact = this.readArtifact(reference.manifest), context = processArtifactContext(artifact);
     const factory = this.options.factories.get(artifact.factoryId)!;
     this.assertServices(factory(artifact), context.module, artifact.policy, artifact.manifest);
@@ -432,31 +444,41 @@ export class ProcessDeployment implements PromotionDriver {
     if (this.capabilityProfile === 'legacy-sealed-v1' ? !!services.scopedGrants || !!services.signedEffectResourcePolicy || !!services.effectResourcePath : !services.scopedGrants) {
       throw new Error('trusted deployment factory does not match durable capability profile');
     }
-    if ((this.capabilityProfile === 'scoped-signed-v3' || this.capabilityProfile === 'scoped-artifact-v4' || this.capabilityProfile === 'scoped-anchored-v4')
+    if ((this.capabilityProfile === 'scoped-signed-v3' || this.capabilityProfile === 'scoped-artifact-v4' || anchoredProfile(this.capabilityProfile))
       && (services.effectResourcePath || services.effectResourcePolicyDigest
         || invoked.size > 0 && (!services.signedEffectResourcePolicy
-          || this.capabilityProfile !== 'scoped-anchored-v4' && (!services.effectResourceSignerKey || !services.currentEffectPolicyEpoch)
+          || !anchoredProfile(this.capabilityProfile) && (!services.effectResourceSignerKey || !services.currentEffectPolicyEpoch)
           || [...invoked].some(cap => !services.signedEffectResourcePolicy!.body.rules.some(rule => rule.capability === cap))))) {
       throw new Error('signed deployment profile requires complete manifest-bound effect policy');
+    }
+    if (this.capabilityProfile === 'scoped-anchored-v5' && invoked.size > 0
+      && services.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/3') {
+      throw new Error('import-free deployment profile requires signed adapter policy v3');
     }
     if ((this.capabilityProfile === 'scoped-artifact-v4' || this.capabilityProfile === 'scoped-anchored-v4') && invoked.size > 0
       && services.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/2') {
       throw new Error('artifact deployment profile requires signed code-provenance policy v2');
     }
-    if ((this.capabilityProfile === 'scoped-artifact-v4' || this.capabilityProfile === 'scoped-anchored-v4') && evidencePolicy.format !== 'aether.evidence-policy/2') {
+    if ((this.capabilityProfile === 'scoped-artifact-v4' || anchoredProfile(this.capabilityProfile)) && evidencePolicy.format !== 'aether.evidence-policy/2') {
       throw new Error('artifact deployment profile requires process-isolated evidence policy v2');
     }
-    if (this.capabilityProfile === 'scoped-anchored-v4') {
+    if (anchoredProfile(this.capabilityProfile)) {
       const anchor = this.options.effectSignerAnchor!;
       assertEffectSignerAnchor(anchor);
       if (services.effectResourceSignerKey !== undefined || services.currentEffectPolicyEpoch !== undefined
         || (services as ProcessHostOptions).effectSignerAnchor !== undefined
-        || (services as ProcessHostOptions).legacyEffectSignerTrust !== undefined)
+        || (services as ProcessHostOptions).legacyEffectSignerTrust !== undefined
+        || (services as ProcessHostOptions).legacyAnchoredEffectPolicy !== undefined)
         throw new TypeError('effect signer authority must be independently provisioned');
       if (services.scopedGrants?.repositoryId !== anchor.repositoryId) throw new TypeError('effect grant repository differs from independent signer anchor');
       if (services.signedEffectResourcePolicy) {
-        if (services.signedEffectResourcePolicy.format !== 'aether.signed-effect-resource-policy/2') throw new TypeError('anchored deployment requires policy v2');
-        assertAnchoredEffectPolicy(anchor, services.signedEffectResourcePolicy, manifest, services.scopedGrants!.repositoryId);
+        if (this.capabilityProfile === 'scoped-anchored-v5') {
+          if (services.signedEffectResourcePolicy.format !== 'aether.signed-effect-resource-policy/3') throw new TypeError('import-free deployment requires policy v3');
+          assertAnchoredEffectPolicy(anchor, services.signedEffectResourcePolicy, manifest, services.scopedGrants!.repositoryId);
+        } else {
+          if (services.signedEffectResourcePolicy.format !== 'aether.signed-effect-resource-policy/2') throw new TypeError('anchored legacy deployment requires policy v2');
+          assertAnchoredEffectPolicy(anchor, services.signedEffectResourcePolicy, manifest, services.scopedGrants!.repositoryId, 'anchored-v2');
+        }
       }
     }
   }
@@ -638,13 +660,16 @@ export class ProcessDeployment implements PromotionDriver {
     if (sourceHost.status().unresolved.length || state.invocations.some(invocation => invocation.phase === 'pending') || state.allocations.some(allocation => allocation.result === null)) throw new Error('unresolved source execution prevents deployment');
     const snapshot = await sourceHost.snapshot(), artifactDigest = processArtifactDigest(candidate);
     if (!equal(binding.migrationPlan, processMigrationPlan(snapshot, artifactDigest))) throw new Error('approved migration source snapshot/artifact is stale');
-    const expectedEffectPlan = this.capabilityProfile === 'scoped-anchored-v4'
-      ? processAnchoredEffectPlan(candidate.factoryId, candidate.manifest.capabilityPolicyDigest, this.options.effectSignerAnchor!.digest)
-      : processEffectPlan(candidate.factoryId, candidate.manifest.capabilityPolicyDigest);
+    const expectedEffectPlan = this.capabilityProfile === 'scoped-anchored-v5'
+      ? processImportFreeEffectPlan(candidate.factoryId, candidate.manifest.capabilityPolicyDigest, this.options.effectSignerAnchor!.digest)
+      : this.capabilityProfile === 'scoped-anchored-v4'
+        ? processAnchoredEffectPlan(candidate.factoryId, candidate.manifest.capabilityPolicyDigest, this.options.effectSignerAnchor!.digest)
+        : processEffectPlan(candidate.factoryId, candidate.manifest.capabilityPolicyDigest);
     if (!equal(binding.effectPlan, expectedEffectPlan)) throw new Error('approved effect factory/policy/signer mismatch');
     const reference: DeploymentReference = { id: suffix(binding.proposalDigest), manifest: binding.proposal.candidateManifest, artifactDigest, generation: binding.generation };
-    const record: PreparedRecord = { format: this.capabilityProfile === 'scoped-anchored-v4' ? 'aether.process-deployment-prepared/2' : 'aether.process-deployment-prepared/1',
-      ...(this.capabilityProfile === 'scoped-anchored-v4' ? { effectSignerAnchorDigest: this.options.effectSignerAnchor!.digest } : {}),
+    const record: PreparedRecord = { format: this.capabilityProfile === 'scoped-anchored-v5' ? 'aether.process-deployment-prepared/3'
+      : this.capabilityProfile === 'scoped-anchored-v4' ? 'aether.process-deployment-prepared/2' : 'aether.process-deployment-prepared/1',
+      ...(anchoredProfile(this.capabilityProfile) ? { effectSignerAnchorDigest: this.options.effectSignerAnchor!.digest } : {}),
       binding, reference, source: state.active, sourceSnapshotDigest: runtimeSnapshotDigest(snapshot), seed: rebind(snapshot, reference.manifest, reference.generation, JSON.parse(candidate.plan)) };
     save(this.stateFile, { ...state, readiness: 'preparing', pendingProposal: binding.proposalDigest });
     this.writePrepared(record);

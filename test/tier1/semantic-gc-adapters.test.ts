@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -19,7 +19,7 @@ test('unused declarative registration retires with independent dispatch proof, u
   const f = adapterGcFixture(); try {
     const beforeHead = f.store.head('production'), proposal = f.manager.propose(); assert.ok(proposal); same(proposal.removed, ['b-unused']); f.manager.verify(proposal);
     const registration = f.manager.resolve(f.liveCap), source = f.store.hydrate(registration.sourceRoot); if (source.kind !== 'Lit' || typeof source.value !== 'string') throw new Error('source');
-    const adapter = await admitAdapterSource(Buffer.from(source.value), registration.artifact);
+    const adapter = await admitAdapterSource(Buffer.from(source.value), registration.artifact, { legacyProfile: 'aether.adapter-js-legacy-v1/1' });
     const invoke = (manifest: typeof f.genesis.evidence.manifest, directory: string) => {
       const broker = new DurableEffectBroker({ directory, clockDomain: 'test/1', clock: () => 1n, authorize: () => true });
       const router = new BrokerEffectRouter({ broker, manifest, executionId: directory, policyEpoch: '1', deadline: '100', adapters: new Map([[f.liveCap, adapter]]), grant: () => 'trusted-test-grant' }); router.bind(manifest.astRoot as NodeRef); return router.invoke(f.liveCap, []);
@@ -74,6 +74,8 @@ test('consumer validates with proof search physically replaced by a throwing stu
   const f = adapterGcFixture(), consumer = mkdtempSync(join(tmpdir(), 'aether-adapter-gc-consumer-')); try {
     const proposal = f.manager.propose(); assert.ok(proposal);
     cpSync(resolve('src'), join(consumer, 'src'), { recursive: true }); writeFileSync(join(consumer, 'package.json'), '{"type":"module"}');
+    mkdirSync(join(consumer, 'node_modules'));
+    for (const dependency of ['acorn', 'acorn-walk']) cpSync(resolve('node_modules', dependency), join(consumer, 'node_modules', dependency), { recursive: true });
     writeFileSync(join(consumer, 'src/tier2/portable-proof-producer.ts'), "export function generatePortableCertificate(){throw new Error('proof search forbidden in consumer');}\n");
     const loaded = await import(pathToFileURL(join(consumer, 'src/tier1/semantic-gc-adapters.ts')).href); const independent = new loaded.SemanticAdapterGarbageCollector(f.configuration); independent.verify(proposal);
   } finally { f.cleanup(); rmSync(consumer, { recursive: true, force: true }); }
