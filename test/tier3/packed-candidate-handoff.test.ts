@@ -8,7 +8,7 @@ import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { domainDigest, type Digest, type ExecutionManifestV1 } from '../../src/fabric/identity.ts';
 import { PackedHeap, packResumableCheckpoint, type PackedLayout } from '../../src/tier3/packed-heap.ts';
 import { ResumableRuntime, type PackedCandidateSubject } from '../../src/tier3/resumable-runtime.ts';
-import { checkpointDigest } from '../../src/tier3/resumable-state.ts';
+import { checkpointDigest, eventDigest } from '../../src/tier3/resumable-state.ts';
 
 function fixture() {
   const symbols = new SymbolSpace('packed-candidate-handoff'), entry = symbols.define('entry');
@@ -68,6 +68,10 @@ test('native packed candidate becomes one authorized, replayable correction even
   const reopened = new ResumableRuntime(f.module, f.options);
   reopened.restore(after, receipt.snapshotDigest);
   assert.equal(reopened.readRecord(f.first).get('label'), 'λambda');
+  const relabeled = structuredClone(after);
+  relabeled.events.at(-1)!.op = 'packed-correction:unbound';
+  relabeled.eventHead = eventDigest(relabeled.events.at(-1)!);
+  assert.throws(() => new ResumableRuntime(f.module, f.options).restore(relabeled, checkpointDigest(relabeled)), /bound instruction/);
   reopened.rewind(1);
   assert.equal(checkpointDigest(reopened.snapshot()), f.sourceDigest);
 });
