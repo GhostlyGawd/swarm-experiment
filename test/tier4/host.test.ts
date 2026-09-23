@@ -1,13 +1,20 @@
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { CapabilitySealer } from '../../src/tier2/ocap.ts';
-import { ACCOUNT, buildLedgerExample, ledgerTelemetry } from '../../src/examples/ledger.ts';
+import { ACCOUNT, CAP_LEDGER_APPEND, buildLedgerExample, ledgerTelemetry } from '../../src/examples/ledger.ts';
 import { TopologyHost } from '../../src/tier4/host.ts';
 import { slice } from '../../src/tier4/topology.ts';
 import * as b from '../../src/tier1/build.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
+import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
+
+const grantDirectories: string[] = [];
+after(() => grantDirectories.forEach(path => rmSync(path, { recursive: true, force: true })));
 
 const setup = () => {
   const ex = buildLedgerExample('distributed-host');
@@ -79,6 +86,30 @@ test('v2 topology dispatch binds grants to target function, generation and curre
   revoked = true;
   const denied = host.dispatch({ ...request, id: 'v2-revoked', capabilities: renewed });
   assert.equal(denied.ok, false); if (!denied.ok) assert.equal(denied.fault.kind, 'authority');
+});
+
+test('durable grant revocation survives restart at a real topology dispatch boundary', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-topology-grants-')); grantDirectories.push(directory);
+  const epochs = new DurableGrantEpochs({ directory, repositoryId: 'repository' });
+  const ex = buildLedgerExample('durable-topology-grants'), plan = slice(ex.module, ledgerTelemetry(ex), { symbols: ex.syms });
+  const grants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(23), repositoryId: 'repository', clock: () => 100,
+    policyEpoch: () => epochs.policyEpoch, revocationEpoch: () => epochs.epoch,
+    isRevoked: (cap, path) => epochs.isRevoked(cap, path), authorizeIssue: () => true, authorizeDelegate: () => true });
+  const host = new TopologyHost(ex.module, plan, { registry: ex.capabilities, symbols: ex.syms, scopedGrants: grants, clock: () => 100 });
+  const alice = host.allocateRecord(ACCOUNT, { id: 'alice', balance: 100n });
+  const bob = host.allocateRecord(ACCOUNT, { id: 'bob', balance: 0n });
+  const request = { id: 'durable-grant', from: ex.symbols.settle, to: ex.symbols.transfer, args: [alice, bob, 10n] } as const;
+  const original = host.issueTokens(ex.symbols.transfer);
+  assert.equal(host.dispatch({ ...request, capabilities: original }).ok, true);
+  epochs.revoke(CAP_LEDGER_APPEND, []);
+  const reopened = new DurableGrantEpochs({ directory, repositoryId: 'repository' });
+  assert.equal(reopened.epoch, '1');
+  const denied = host.dispatch({ ...request, id: 'revoked', capabilities: original });
+  assert.equal(denied.ok, false); if (!denied.ok) assert.equal(denied.fault.kind, 'authority');
+  epochs.restore(CAP_LEDGER_APPEND, []);
+  const stale = host.dispatch({ ...request, id: 'restored-stale', capabilities: original });
+  assert.equal(stale.ok, false); if (!stale.ok) assert.equal(stale.fault.kind, 'authority');
+  assert.equal(host.dispatch({ ...request, id: 'restored-new', capabilities: host.issueTokens(ex.symbols.transfer) }).ok, true);
 });
 
 test('D4/D5: a quiescent function moves live and host traffic becomes slicer telemetry', () => {
