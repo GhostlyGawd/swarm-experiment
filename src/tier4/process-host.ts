@@ -10,10 +10,11 @@ import { CapabilityRegistry, CapabilitySealer, RevocationList, type CapabilityTo
 import { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2 } from '../tier2/scoped-grants.ts';
 import { assertSignedEffectResourcePolicy, assertSignedEffectResourcePolicyV2, assertSignedEffectResourcePolicyV3, assertSignedEffectResourcePolicyV4, assertEffectResourceAdapter, assertEffectResourceAdapterV2, assertEffectResourceAdapterV3, assertEffectResourceAdapterV4, effectResourcePath as signedEffectResourcePath, effectResourcePathV2, effectResourcePathV3, effectResourcePathV4, effectResourcePolicyDigest, effectResourcePolicyDigestV2, effectResourcePolicyDigestV3, effectResourcePolicyDigestV4, type SignedEffectResourcePolicyV1, type SignedEffectResourcePolicyV2, type SignedEffectResourcePolicyV3, type SignedEffectResourcePolicyV4 } from '../tier2/effect-resource-policy.ts';
 import { assertEffectSignerAnchor, assertAnchoredEffectPolicy, type EffectSignerAnchor } from '../tier2/effect-signer-anchor.ts';
+import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { ProductionRuntime } from '../tier3/compile.ts';
 import { effectPayloadDigest, type EffectEventV1, type EffectRequestV1 } from '../fabric/effects.ts';
-import { EffectInvocationError, brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerInvoke, brokerReconcileLast, brokerReconcileRecorded, brokerMode, type RuntimeEffectRouter } from '../tier3/effects.ts';
+import { EffectInvocationError, brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerInvoke, brokerPinTrustedClock, brokerReconcileLast, brokerReconcileRecorded, brokerMode, type RuntimeEffectRouter } from '../tier3/effects.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
 import type { Value } from '../tier3/values.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
@@ -137,10 +138,12 @@ export interface ProcessHostOptions {
   readonly signedEffectResourcePolicy?: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3 | SignedEffectResourcePolicyV4;
   /** Independent production trust source; not supplied by a reloadable services factory. */
   readonly effectSignerAnchor?: EffectSignerAnchor;
+  /** Independently provisioned time/revision source; required by clocked Wasm V7. */
+  readonly trustedClockAnchor?: TrustedClockAnchor;
   /** Explicitly reopen anchored V2 journals under their original host-config/2 identity. */
   readonly legacyAnchoredEffectPolicy?: 'anchored-v2';
   /** New isolated Wasm signed-policy profile with host-config/4 identity. */
-  readonly anchoredEffectPolicyProfile?: 'isolated-wasm-v4';
+  readonly anchoredEffectPolicyProfile?: 'isolated-wasm-v4' | 'isolated-wasm-v5-clock';
   /** Compatibility-only signer authority for explicitly selected old profiles. */
   readonly effectResourceSignerKey?: KeyObject | string;
   readonly currentEffectPolicyEpoch?: () => string;
@@ -231,11 +234,18 @@ export class ProcessHost {
     if (options.effectResourcePolicyDigest) validateDigest(options.effectResourcePolicyDigest, 'aether.effect-resource-policy/1');
     const signed = options.signedEffectResourcePolicy !== undefined;
     const anchored = options.effectSignerAnchor !== undefined;
-    if (options.anchoredEffectPolicyProfile !== undefined && options.anchoredEffectPolicyProfile !== 'isolated-wasm-v4')
+    const clockedWasm = options.anchoredEffectPolicyProfile === 'isolated-wasm-v5-clock';
+    if (options.anchoredEffectPolicyProfile !== undefined &&
+        !['isolated-wasm-v4', 'isolated-wasm-v5-clock'].includes(options.anchoredEffectPolicyProfile))
       throw new TypeError('invalid isolated Wasm anchored effect policy profile');
+    if (clockedWasm) assertTrustedClockAnchor(options.trustedClockAnchor);
+    else if (options.trustedClockAnchor !== undefined) throw new TypeError('trusted clock requires clocked Wasm profile');
     if (options.anchoredEffectPolicyProfile && (!anchored || options.legacyAnchoredEffectPolicy
       || options.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/4'))
       throw new TypeError('isolated Wasm policy requires an independent anchor and signed policy v4');
+    if (clockedWasm && options.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4' &&
+        options.signedEffectResourcePolicy.body.rules.some(rule => rule.clockDomain !== options.trustedClockAnchor!.clockDomain))
+      throw new TypeError('signed Wasm clock domain differs from independent authority');
     if (options.legacyAnchoredEffectPolicy !== undefined && options.legacyAnchoredEffectPolicy !== 'anchored-v2')
       throw new TypeError('invalid legacy anchored effect policy profile');
     if (options.legacyAnchoredEffectPolicy !== undefined && (!anchored || options.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/2'))
@@ -256,7 +266,7 @@ export class ProcessHost {
         || options.effectResourceSignerKey !== undefined || options.currentEffectPolicyEpoch !== undefined
         || options.effectResourcePath !== undefined || options.effectResourcePolicyDigest !== undefined
         || signed && options.signedEffectResourcePolicy?.format !== (options.legacyAnchoredEffectPolicy === 'anchored-v2'
-          ? 'aether.signed-effect-resource-policy/2' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4'
+          ? 'aether.signed-effect-resource-policy/2' : options.anchoredEffectPolicyProfile
             ? 'aether.signed-effect-resource-policy/4' : 'aether.signed-effect-resource-policy/3'))
         throw new TypeError('anchored ProcessHost requires independent signer authority and signed policy v3 or an explicit anchored-v2/isolated-wasm-v4 profile');
     }
@@ -293,13 +303,14 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest(anchored ? options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+    this.configuration = domainDigest(anchored ? clockedWasm ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
       ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4' ? effectResourcePolicyDigestV4(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/3' ? effectResourcePolicyDigestV3(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2' ? effectResourcePolicyDigestV2(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy ? effectResourcePolicyDigest(this.signedEffectResourcePolicy.body) : options.effectResourcePolicyDigest ?? null,
         effectResourcePolicySigner: this.signedEffectResourcePolicy?.signer ?? null } : {}),
-      ...(anchored ? { effectSignerAnchor: options.effectSignerAnchor!.digest } : {}) });
+      ...(anchored ? { effectSignerAnchor: options.effectSignerAnchor!.digest } : {}),
+      ...(clockedWasm ? { trustedClockAnchor: options.trustedClockAnchor!.digest } : {}) });
     ensureDurableDirectory(options.directory);
     this.file = join(options.directory, 'host.json');
     this.lock = new JournalLock({ directory: join(options.directory, 'host-lock'), domain: 'aether.process-host-lock', busyError: 'process_host_busy: another state transition is active' });
@@ -383,8 +394,11 @@ export class ProcessHost {
     if (!authority) throw new Error('versioned scoped grants are not configured');
     const journal = this.read(), unit = this.unitIn(JSON.parse(journal.plan) as TopologyPlan, symbol);
     if (!unit) throw new Error('unplaced function');
-    return [...new Set([PROCESS_INVOKE, ...this.declarations.get(symbol)!.capabilities])]
+    const issued = [...new Set([PROCESS_INVOKE, ...this.declarations.get(symbol)!.capabilities])]
       .map(cap => authority.issue({ capability: cap, audience: symbol, path: [...this.scopedGrantPath(unit, journal.generation), ...(cap === PROCESS_INVOKE ? [] : resourceScopes.get(cap) ?? [])] }, ttlMs));
+    if (this.options.trustedClockAnchor) for (const token of issued)
+      assertGrantLifetime(this.options.trustedClockAnchor, token.body.issuedAt, token.body.expiresAt);
+    return issued;
   }
   /** Validate current deployment authority before serving a cross-version cached receipt. */
   authorizeInvocation(symbol: SymbolId, tokens: readonly ProcessInvocationGrant[]): void {
@@ -779,6 +793,8 @@ export class ProcessHost {
       throw new TypeError('isolated Wasm router requires signed v4 policy and factory');
     const rule = policy.body.rules.find(item => item.capability === request.capability);
     if (!rule) throw new TypeError('isolated Wasm effect lacks a signed rule');
+    if (this.options.trustedClockAnchor && active.mode === 'live')
+      assertBeforeDeadline(this.options.trustedClockAnchor, rule.deadline, rule.clockDomain);
     const grantRef = domainDigest('aether.process-effect-grant-ref/1', {
       configuration: this.configuration, operationId: id, capability: request.capability, policyEpoch: policy.body.policyEpoch,
     });
@@ -794,6 +810,11 @@ export class ProcessHost {
     brokerAttestContext(router, { executionId: id, manifestDigest: executionManifestDigest(this.manifest),
       mode: active.mode, policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
       capability: request.capability, grantRef });
+    if (this.options.trustedClockAnchor && active.mode === 'live')
+      brokerPinTrustedClock(router, this.options.trustedClockAnchor, active.tokens.map(token => {
+        const body = (token as ScopedGrantV2).body;
+        return { issuedAt: body.issuedAt, expiresAt: body.expiresAt };
+      }));
     return router;
   }
   private reconcileV4Call(journal: HostJournal, call: CallRecord): boolean {
@@ -850,6 +871,11 @@ export class ProcessHost {
       const value = request.args[0];
       if (request.args.length !== 1 || typeof value !== 'bigint' || value < -2147483648n || value > 2147483647n)
         throw new EffectInvocationError({ state: 'rejected', code: 'isolated_wasm_i32_argument_required' });
+      if (this.options.trustedClockAnchor && active.mode === 'live') {
+        const rule = this.signedEffectResourcePolicy.body.rules.find(item => item.capability === request.capability);
+        if (!rule) throw new TypeError('isolated Wasm effect lacks a signed rule');
+        assertBeforeDeadline(this.options.trustedClockAnchor, rule.deadline, rule.clockDomain);
+      }
     }
     this.adopt(active, request.snapshot);
     const id = processBoundaryId(request.operationId, 'effect', request.effectIndex);
@@ -993,6 +1019,7 @@ export class ProcessHost {
     if (!authority) return;
     const token = active.tokens.find(candidate => (candidate as ScopedGrantV2).body?.capability === capability);
     if (!token || !authority.verify(token, { capability, audience: active.call.symbol, path })) throw new Error(`authority_denied: scoped effect target ${capability}`);
+    if (this.options.trustedClockAnchor) assertGrantLifetime(this.options.trustedClockAnchor, token.body.issuedAt, token.body.expiresAt);
   }
   private authorize(symbol: SymbolId, unit: string, generation: string, tokens: readonly ProcessInvocationGrant[]): void {
     if (!Array.isArray(tokens)) throw new Error('invocation tokens required');
@@ -1008,6 +1035,7 @@ export class ProcessHost {
           || cap === PROCESS_INVOKE && scoped.body.path.length !== basePath.length
           || !this.options.scopedGrants.verify(scoped, { capability: cap, audience: symbol,
             path: cap === PROCESS_INVOKE ? basePath : scoped.body.path })) throw new Error(`authority_denied: missing valid ${cap}`);
+        if (this.options.trustedClockAnchor) assertGrantLifetime(this.options.trustedClockAnchor, scoped.body.issuedAt, scoped.body.expiresAt);
       }
       this.checkRevocations(symbol, unit, generation, 'live'); return;
     }

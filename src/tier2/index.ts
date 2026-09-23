@@ -9,6 +9,7 @@ export { validateEffectResourcePolicyBodyV2, effectResourcePolicyDigestV2, signE
 export { validateEffectResourcePolicyBodyV3, effectResourcePolicyDigestV3, signEffectResourcePolicyV3, assertSignedEffectResourcePolicyV3, effectResourcePathV3, assertEffectResourceAdapterV3, type EffectResourceRuleV3, type EffectResourcePolicyBodyV3, type SignedEffectResourcePolicyV3 } from './effect-resource-policy.ts';
 export { validateEffectResourcePolicyBodyV4, effectResourcePolicyDigestV4, signEffectResourcePolicyV4, assertSignedEffectResourcePolicyV4, effectResourcePathV4, assertEffectResourceAdapterV4, type EffectResourceRuleV4, type EffectResourcePolicyBodyV4, type SignedEffectResourcePolicyV4 } from './effect-resource-policy.ts';
 export { createEffectSignerAnchor, type EffectSignerAnchor } from './effect-signer-anchor.ts';
+export { createTrustedClockAnchor, assertTrustedClockAnchor, readTrustedClock, assertGrantLifetime, assertBeforeDeadline, type TrustedClockAnchor, type TrustedClockReading } from './trusted-clock-anchor.ts';
 export { ProofCache, type ProofCacheStats } from './proof-cache.ts';
 export { verifyIncremental, type IncrementalVerificationResult } from './incremental.ts';
 export { TypeChecker, typecheck, tyEqual, tyToString, underlying, type CheckResult, type Diagnostic } from './typecheck.ts';

@@ -4,6 +4,7 @@ import { JournalLock } from './journal-lock.ts';
 import { atomicWrite } from '../tier1/persistence.ts';
 import { decimal, decodeCanonical, encodeCanonical, encodingLimits, exactObject, identifier, validateTaggedValue, type EncodingLimits, type TaggedValueV1 } from './encoding.ts';
 import { domainDigest, validateDigest, type Digest } from './identity.ts';
+import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 
 export type ExecutionMode = 'live' | 'speculative' | 'shadow' | 'replay';
 export interface EffectRequestV1 {
@@ -159,7 +160,21 @@ export class DurableEffectBroker {
   private readonly trace: readonly EffectEventV1[];
   private readonly buffered: EffectRequestV1[] = [];
   private readonly bufferedHistory = new Map<string, Digest>();
+  #trustedClock: { anchor: TrustedClockAnchor; windows: readonly { issuedAt: number; expiresAt: number }[] } | null = null;
   get executionMode(): ExecutionMode { return this.mode; }
+  /** Host-owned independent deadline source for a versioned isolated profile.
+   * The reloadable adapter factory cannot replace it after pinning. */
+  pinTrustedClock(anchor: TrustedClockAnchor, windows: readonly { issuedAt: number; expiresAt: number }[]): void {
+    assertTrustedClockAnchor(anchor);
+    if (anchor.clockDomain !== this.options.clockDomain || this.#trustedClock && this.#trustedClock.anchor.digest !== anchor.digest ||
+        !Array.isArray(windows) || !windows.length)
+      throw new TypeError('broker trusted clock authority mismatch');
+    const checked = windows.map(window => {
+      assertGrantLifetime(anchor, window.issuedAt, window.expiresAt);
+      return Object.freeze({ issuedAt: window.issuedAt, expiresAt: window.expiresAt });
+    });
+    this.#trustedClock = { anchor, windows: Object.freeze(checked) };
+  }
   constructor(options: EffectBrokerOptions) {
     identifier(options.clockDomain);
     this.options = options; this.limits = encodingLimits(options.limits); this.mode = options.mode ?? 'live';
@@ -220,7 +235,7 @@ export class DurableEffectBroker {
       } else if (state === 'indeterminate') { identifier(out.recoveryId); if (out.recoveryId !== e.requestDigest) throw new TypeError('corrupt effect recovery binding'); }
       else if (state === 'rejected' || state === 'aborted') {
         identifier(out.code);
-        if (state === 'rejected' && (e.dispatchStarted || !['deadline_exceeded', 'branch_not_admitted', 'authorization_denied', 'budget_adapter_missing', 'budget_exhausted', 'adapter_preflight_rejected'].includes(out.code))) throw new TypeError('rejection cannot follow an uncertain dispatch');
+        if (state === 'rejected' && (e.dispatchStarted || !['deadline_exceeded', 'trusted_clock_denied', 'branch_not_admitted', 'authorization_denied', 'budget_adapter_missing', 'budget_exhausted', 'adapter_preflight_rejected'].includes(out.code))) throw new TypeError('rejection cannot follow an uncertain dispatch');
         if (state === 'aborted' && (e.dispatchStarted ? out.code !== 'sink_confirmed_not_committed' : !['cancelled', 'recovered_before_dispatch'].includes(out.code))) throw new TypeError('abort lacks matching noncommit evidence');
       }
       else throw new TypeError('unsupported effect outcome');
@@ -273,9 +288,19 @@ export class DurableEffectBroker {
   }
   private authorize(request: EffectRequestV1, signal?: AbortSignal): string | null {
     if (signal?.aborted) return 'cancelled';
+    const trustedRefusal = (): string | null => {
+      if (!this.#trustedClock) return null;
+      try {
+        for (const window of this.#trustedClock.windows) assertGrantLifetime(this.#trustedClock.anchor, window.issuedAt, window.expiresAt);
+        assertBeforeDeadline(this.#trustedClock.anchor, request.deadline, this.options.clockDomain);
+        return null;
+      } catch { return 'trusted_clock_denied'; }
+    };
+    const before = trustedRefusal(); if (before) return before;
     if (BigInt(this.time()) > BigInt(request.deadline)) return 'deadline_exceeded';
     if (request.branchId !== null && !this.options.authorizeBranch?.(request)) return 'branch_not_admitted';
-    return this.options.authorize(request) ? null : 'authorization_denied';
+    if (this.options.authorize(request) !== true) return 'authorization_denied';
+    return trustedRefusal();
   }
   /** Replay is isolated from current grants; exactly matches the recorded logical event sequence. */
   private replay(request: EffectRequestV1, adapter: EffectAdapter): EffectOutcome {
@@ -369,10 +394,11 @@ export class DurableEffectBroker {
       // ID, authorization context and ordered input are durable before any adapter or budget call.
       this.persist(journal, event);
       let reserved = false;
-      const abort = (code: string): EffectOutcome => {
+      const abort = (code: string, confirmedBeforeSink = false): EffectOutcome => {
         if (event.prepared !== null) adapter.abort?.(request, event.prepared);
         const outcome: EffectOutcome = { state: code === 'cancelled' ? 'aborted' : 'rejected', code };
-        event = this.step(journal, event, outcome.state, { outcome });
+        event = this.step(journal, event, outcome.state, { outcome,
+          ...(confirmedBeforeSink ? { dispatchStarted: false } : {}) });
         if (reserved) this.options.budgets!.release(request);
         return outcome;
       };
@@ -403,7 +429,12 @@ export class DurableEffectBroker {
         // from here until a durable receipt remains uncertain, including cancellation.
         event = this.step(journal, event, 'prepared', { dispatchStarted: true, observedAt: this.time() });
         refusal = this.authorize(request, options.signal);
-        if (refusal) { event = { ...event, dispatchStarted: false }; return abort(refusal); }
+        if (refusal) {
+          // We are still before adapter entry. Publish a terminal noncommit
+          // transition that clears the marker; a crash before this write
+          // leaves the original uncertain marker for reconciliation.
+          return abort(refusal, true);
+        }
         const value = adapter.semantics.transactional ? adapter.commit!(request, event.prepared!) : adapter.execute!(request);
         validateTaggedValue(value, this.limits);
         event = { ...event, observedAt: this.time() };

@@ -3,6 +3,7 @@ import { decodeExecutionManifest, encodeExecutionManifest, executionManifestDige
 import { validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { DurableEffectBroker, effectPayloadDigest, effectAdapterDigest, type EffectAdapter, type EffectOutcome, type EffectRequestV1, type ExecutionMode } from '../fabric/effects.ts';
 import { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from '../tier2/adapter-artifact.ts';
+import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 import { isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
 const brokerRouters = new WeakSet<object>();
 
@@ -60,6 +61,7 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   #sequence = 0n;
   #bound = false;
   #attested: Readonly<{ capability: CapabilityName; grantRef: string }> | null = null;
+  #trustedClock: { anchor: TrustedClockAnchor; windows: readonly { issuedAt: number; expiresAt: number }[] } | null = null;
   get mode(): ExecutionMode { return this.#options.broker.executionMode; }
 
   constructor(options: RuntimeEffectRouterOptions) {
@@ -94,6 +96,18 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     if (this.#options.grantRef !== expected.grantRef) throw new TypeError('broker router grant reference differs from signed host effect');
     this.#attested = Object.freeze({ capability: expected.capability, grantRef: expected.grantRef });
   }
+  pinTrustedClock(anchor: TrustedClockAnchor, windows: readonly { issuedAt: number; expiresAt: number }[]): void {
+    assertTrustedClockAnchor(anchor);
+    if (!this.#attested || this.#sequence !== 0n || this.#trustedClock || !Array.isArray(windows) || !windows.length)
+      throw new TypeError('trusted clock must bind one fresh attested router');
+    const checked = windows.map(window => {
+      assertGrantLifetime(anchor, window.issuedAt, window.expiresAt);
+      return Object.freeze({ issuedAt: window.issuedAt, expiresAt: window.expiresAt });
+    });
+    assertBeforeDeadline(anchor, this.#options.deadline, this.#options.broker.clockDomain);
+    DurableEffectBroker.prototype.pinTrustedClock.call(this.#options.broker, anchor, checked);
+    this.#trustedClock = { anchor, windows: Object.freeze(checked) };
+  }
   fork(): RuntimeEffectRouter {
     if (!this.#options.isolatedFork) throw new Error('broker-backed fork requires an isolated effect router');
     const child = this.#options.isolatedFork();
@@ -104,6 +118,10 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   invoke(capability: CapabilityName, args: readonly Value[]): Value {
     if (!this.#bound) throw new Error('effect router is not bound to loaded code');
     if (this.#attested && this.#attested.capability !== capability) throw new TypeError('attested effect capability mismatch');
+    if (this.#trustedClock && this.#options.broker.executionMode === 'live') {
+      for (const window of this.#trustedClock.windows) assertGrantLifetime(this.#trustedClock.anchor, window.issuedAt, window.expiresAt);
+      assertBeforeDeadline(this.#trustedClock.anchor, this.#options.deadline, this.#options.broker.clockDomain);
+    }
     const adapter = this.#options.adapters.get(capability);
     if (!adapter) throw new Error(`no broker adapter for ${capability}`);
     const outcome = this.#options.broker.dispatch(this.#request(capability, args, `operation-${this.#sequence++}`), adapter);
@@ -202,6 +220,11 @@ export function brokerInvoke(router: RuntimeEffectRouter, capability: Capability
 export function brokerAttestContext(router: RuntimeEffectRouter, expected: BrokerAttestedContext): void {
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
   BrokerEffectRouter.prototype.attestContext.call(router, expected);
+}
+export function brokerPinTrustedClock(router: RuntimeEffectRouter, anchor: TrustedClockAnchor,
+  windows: readonly { issuedAt: number; expiresAt: number }[]): void {
+  if (!brokerRouters.has(router)) throw new TypeError('trusted clock requires a broker-backed router');
+  BrokerEffectRouter.prototype.pinTrustedClock.call(router, anchor, windows);
 }
 export function brokerReconcileLast(router: RuntimeEffectRouter, capability: CapabilityName, args: readonly Value[]): Value {
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
