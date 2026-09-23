@@ -2,9 +2,18 @@
 
 Goal: implement the complete v4 specification, all 40 functional requirements and all NFR/governance/KPI gates. Full completion remains unproven.
 
-## Requested stopping point — 2026-09-22
+## Resumed implementation — 2026-09-23
 
-The user requested a coherent stopping point with all work committed and pushed. All agents are frozen. Goal work is paused after final validation/publication.
+The user resumed the build after the pushed stopping point. **19 of 62 tracked tasks are verified** (baseline 13/13, v2 6/20); full v4 completion and the release performance gates remain open. The current branch has new local source/evidence commits, with Agent-IR v2, resumable ProcessHost integration and semantic GC work in progress.
+
+- **V4-T1-04 verified:** a clean exact-source MiniLM campaign at `e71627b` passes the structural/semantic index task gates. The [acceptance audit](evidence/index-e71627b/REVIEW.md) compares labeled recall against exact search, checks all 175 persisted embeddings against raw inference, verifies pinned model bytes, and measures index/backfill/update/query costs. Exact remains default: recall@3 is 93.75% versus 79.17% for explicit LSH. The separately measured default exact text-query median is 3.150 ms, maximum 14.684 ms; the distinct 100M-node/2 ms hash-retrieval release target remains unmeasured and unmet.
+- **V4-T1-09 verified:** a durable typed cognitive blackboard attaches claim, hypothesis, decision, delegation and verified-evidence sidecars to an exact admitted AST node. Its [acceptance evidence](evidence/blackboard-870b438/REVIEW.md) binds clean source `870b438` and 540 passing tests. Restart discovery, signed-lineage invalidation, ACLs, bounded retention and stable executable hashes pass the declared gates. Host identity, creation authority, verifier and clock remain explicit trust boundaries.
+- **V4-T3-01 still active:** the resumable backend and effect reconciliation pass their existing focused tests. The production ProcessHost ownership bridge and exact-source gate closure are under implementation.
+- **V4-T1-02 still active:** the binary/model codec is present; native target projections/parsers and executable fixture validation are under implementation.
+
+## Historical requested stopping point — 2026-09-22
+
+The user requested a coherent stopping point with all work committed and pushed. This section records the state at that pause; work has since resumed.
 
 - Last verified integration before this checkpoint: 477 passing tests at `8020327`. Baseline M0, durable AST storage, portable scalar proofs, strict lineage and Tree-CRDT gates are verified.
 - Structural/vector index implementation and real MiniLM campaign are complete and independently reviewed; exact-source acceptance closure remains pending. Exact search is the default. Recorded recall@3 is 93.75% exact / 79.17% LSH; full text-query median 2.712 ms is not a 2 ms release pass.
@@ -63,10 +72,10 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 - No 100M-node or 1,000-agent production result exists. No task is verified merely because related unit tests pass.
 - No external blocker has been established; substantial local work remains.
 
-## Next actions when resumed
+## Current next actions
 
-1. Finish resumable-runtime review fixes and production factory integration, then verify exact source with real frame/task/effect restart cases.
-2. Independently review structural/vector retrieval and preserve actual MiniLM campaign evidence, including exact-versus-LSH quality and complete text-query cost.
-3. Continue remaining eligible v2 tasks and preserve all later functional, performance and governance requirements.
+1. Complete the ProcessHost ownership bridge and verify V4-T3-01 at an exact clean source commit.
+2. Complete native Agent-IR projections/parsers, target-language fixtures and corpus token accounting for V4-T1-02.
+3. Continue eligible v2/v3 tasks while preserving all later functional, performance and governance requirements.
 
-Goal-turn classification: user-requested stopping point — the baseline, durable AST persistence, portable scalar certificates, strict signed lineage and Tree-CRDT are verified. Resumable execution and semantic retrieval are progressing; full v4 remains open. No global blocker has been established.
+Current classification: active implementation. Baseline, durable AST persistence, portable scalar certificates, strict signed lineage, Tree-CRDT, semantic retrieval and typed scratchpads are verified at their declared task boundaries. Full v4 remains open. No global blocker has been established.

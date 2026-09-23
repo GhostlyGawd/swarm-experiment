@@ -1,0 +1,20 @@
+{
+  "task": "V4-T1-09",
+  "specVersion": "0.1.0",
+  "subjectCommit": "870b438559df87f3dbd641b0452bf29a0e66e929",
+  "recordedAt": "2026-09-23T01:37:53.935022+00:00",
+  "checks": [
+    {
+      "gate": "V4-T1-09/G1",
+      "result": "pass",
+      "method": "Clean-source 540-test suite; durable restart discovers node-attached boards, recovers typed causal items and current verified-evidence set; real signed-lineage integration invalidates stale evidence and writes.",
+      "artifact": "docs/implementation/v4/evidence/blackboard-870b438/REVIEW.md"
+    },
+    {
+      "gate": "V4-T1-09/G2",
+      "result": "pass",
+      "method": "Clean-source 540-test suite; unchanged AST node identity, exact admitted-manifest node binding, ACL and creation/discovery denial, retention pruning/expiry, and compare-and-swap regressions.",
+      "artifact": "docs/implementation/v4/evidence/blackboard-870b438/REVIEW.md"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"format":"aether.ast-object/1","node":["object",[["args",["array",[["string","ast:b3:e466c8875807211f150eb9cef3fcf391b28841005ed6dc296496c59fdde2a5b0"]]]],["capability",["string","cap:test:log"]],["kind",["string","Invoke"]]]]}

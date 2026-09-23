@@ -1,0 +1,59 @@
+/** Evidence-only driver; imports implementation exclusively from the exact checkout. */
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import os from 'node:os';
+const evidence = dirname(fileURLToPath(import.meta.url)), checkout = resolve(process.argv[2]);
+const target = join(evidence, 'default-exact-text'), plan = JSON.parse(readFileSync(join(evidence, 'default-exact-preregistration.json')));
+const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+assert.equal(sha(readFileSync(new URL(import.meta.url))), plan.driverSha256);
+assert.equal(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: checkout, encoding: 'utf8' }).trim(), plan.subjectCommit);
+assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: checkout, encoding: 'utf8' }).trim(), '');
+assert.equal(existsSync(target), false); mkdirSync(target);
+const load = path => import(pathToFileURL(join(checkout, path)).href);
+const { HybridGraphIndex, embeddingModelDigest } = await load('src/tier1/semantic-index.ts');
+const { DurableGraphStore } = await load('src/tier1/durable-store.ts');
+const { retrievalCorpus, LABELED_QUERIES } = await load('roadmap/v4/research/retrieval/corpus.ts');
+assert.equal(sha(readFileSync(join(checkout, 'roadmap/v4/research/retrieval/corpus.ts'))), plan.corpusSha256);
+const { AutoTokenizer, AutoModel, mean_pooling, env } = await import('/tmp/aether-t104-embedding-tools/node_modules/@huggingface/transformers/dist/transformers.node.mjs');
+const previous = JSON.parse(readFileSync(join(evidence, 'campaign-exact-e71627b/model.json'))), profile = previous.profile;
+assert.equal(JSON.parse(readFileSync('/tmp/aether-t104-embedding-tools/node_modules/@huggingface/transformers/package.json')).version, profile.runtime.version);
+env.cacheDir = '/tmp/aether-t104-model-cache'; env.allowRemoteModels = false;
+const startInit = process.hrtime.bigint(), ms = start => Number(process.hrtime.bigint() - start) / 1e6;
+const tokenizer = await AutoTokenizer.from_pretrained(profile.name, { revision: profile.revision, local_files_only: true });
+const model = await AutoModel.from_pretrained(profile.name, { revision: profile.revision, dtype: 'fp32', device: 'cpu', local_files_only: true, session_options: { intraOpNumThreads: 1, interOpNumThreads: 1 } });
+const initializationMs = ms(startInit), rows = [];
+const raw = row => appendFileSync(join(target, 'raw.jsonl'), JSON.stringify(row) + '\n');
+let inferenceCalls = 0;
+const provider = { modelDigest: embeddingModelDigest(profile), async embed(texts) {
+  const begin = process.hrtime.bigint(), lengths = texts.map(text => Number(tokenizer(text, { truncation: false }).input_ids.dims[1]));
+  const encoded = tokenizer(texts, { padding: true, truncation: true, max_length: 256 }), output = await model(encoded);
+  const vectors = mean_pooling(output.last_hidden_state ?? output.token_embeddings, encoded.attention_mask).normalize(2, -1).tolist();
+  raw({ kind: 'inference', call: ++inferenceCalls, count: texts.length, tokenLengths: lengths, elapsedMs: ms(begin), rss: process.memoryUsage().rss, load: os.loadavg() }); return vectors;
+} };
+const corpus = retrievalCorpus(), store = new DurableGraphStore({ directory: join(target, 'cas') });
+const root = store.intern(corpus.module, { leaseId: 'acceptance-corpus' }), previousReport = JSON.parse(readFileSync(join(evidence, 'campaign-exact-e71627b/report.json')));
+assert.equal(root, previousReport.update.oldScopeRoot);
+const original = JSON.parse(readFileSync(join(evidence, 'campaign-exact-e71627b/index/generations', previousReport.backfill.snapshot.split(':').at(-1) + '.json')));
+const index = new HybridGraphIndex({ directory: join(target, 'index'), store, model: profile, lsh: plan.lsh });
+const beginBackfill = process.hrtime.bigint(); const backfill = await index.backfill(original.scopes, provider); const backfillMs = ms(beginBackfill);
+const snapshot = index.snapshot, labels = new Map(corpus.declarations.map(row => [store.intern(row.term, { leaseId: 'acceptance-labels' }), row.label]));
+for (let queryIndex = 0; queryIndex < LABELED_QUERIES.length; queryIndex++) for (let repetition = 0; repetition < plan.repetitions; repetition++) {
+  const query = LABELED_QUERIES[queryIndex], start = process.hrtime.bigint();
+  // Intentionally omit mode: this measures the current public default path.
+  const result = await index.queryText(query.text, provider, { snapshot, k: 3, filter: { kinds: ['FunctionDecl'], declaredPurity: 'pure' } });
+  const row = { kind: 'default-exact-text', queryIndex, repetition, text: query.text, expected: query.relevant, elapsedMs: ms(start), result, labels: result.hits.map(hit => labels.get(hit.subject)), rss: process.memoryUsage().rss, load: os.loadavg() };
+  raw(row); assert.equal(result.mode, 'exact'); rows.push(row);
+}
+const values = rows.map(row => row.elapsedMs).sort((a, b) => a - b), report = {
+  format: 'aether.default-exact-text-audit/1', subjectCommit: plan.subjectCommit, recordedAt: new Date().toISOString(), modelDigest: embeddingModelDigest(profile), driverSha256: plan.driverSha256,
+  count: rows.length, queryCount: LABELED_QUERIES.length, repetitions: plan.repetitions, inferenceCalls, initializationMs, backfill: { ...backfill, elapsedMs: backfillMs },
+  timingsMs: { minimum: values[0], median: values[Math.floor(values.length / 2)], p95: values[Math.ceil(values.length * .95) - 1], maximum: values.at(-1), mean: values.reduce((a, b) => a + b, 0) / values.length },
+  firstQueryMs: rows[0].elapsedMs, over2Ms: rows.filter(row => row.elapsedMs > 2).length,
+  exactRecallAt3: rows.reduce((sum, row) => sum + row.labels.filter(label => row.expected.includes(label)).length / row.expected.length, 0) / rows.length,
+  sourceChangedDuringRun: execFileSync('git', ['status', '--porcelain'], { cwd: checkout, encoding: 'utf8' }).trim(), scope: plan.scope,
+};
+writeFileSync(join(target, 'report.json'), JSON.stringify(report, null, 2) + '\n'); await model.dispose(); console.log(JSON.stringify(report, null, 2));

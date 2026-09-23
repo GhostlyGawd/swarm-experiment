@@ -1,0 +1,12 @@
+[
+  {
+    "command": "npm run build",
+    "exitCode": 0,
+    "artifact": "build.log"
+  },
+  {
+    "command": "npm run typecheck",
+    "exitCode": 0,
+    "artifact": "typecheck.log"
+  }
+]

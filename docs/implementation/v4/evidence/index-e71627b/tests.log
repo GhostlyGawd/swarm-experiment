@@ -1,0 +1,29 @@
+✔ T1-04 actual-model evidence independently recomputes exact scores, labeled recall, timing summaries and retained artifacts (118.422667ms)
+✔ indexed creation computes newly exposed nodes before generation publication and preserves exact AST hashes (356.847416ms)
+✔ typed filters enforce declared purity, return type, capability, parent/child and nominal type dependency constraints (286.318083ms)
+✔ context/spec/model changes cannot reuse stale vectors; explicit backfill switches complete snapshots (296.983792ms)
+✔ failed inference retains old complete generation; finite canonical float32 encoding rejects malformed provider/wire values (365.211042ms)
+✔ actual inference/update process SIGKILL at after-embeddings exposes old or complete new index generation (546.631542ms)
+✔ actual inference/update process SIGKILL at before-generation-commit exposes old or complete new index generation (527.863084ms)
+✔ actual inference/update process SIGKILL at after-generation-commit exposes old or complete new index generation (541.851666ms)
+✔ self-consistent sidecar forgery cannot substitute stale structural/input metadata on reopen (234.203375ms)
+✔ concurrent backfills serialize publication and reject a stale writer before its inference can overwrite the winner (281.307042ms)
+✔ vector capture rejects accessor/proxy/sparse arrays without publishing and safely normalizes finite subnormals and maxima (446.634834ms)
+✔ expectedInput binds the current indexed source, input digest and exact vector bytes (355.567042ms)
+✔ actual initialization SIGKILL at after-init-marker resumes only the prepared empty index (313.8905ms)
+✔ actual initialization SIGKILL at after-init-profile resumes only the prepared empty index (303.077833ms)
+✔ actual initialization SIGKILL at before-init-head resumes only the prepared empty index (300.333375ms)
+✔ actual initialization SIGKILL at rename-before-head resumes only the prepared empty index (311.869458ms)
+✔ actual initialization SIGKILL at after-init-head resumes only the prepared empty index (331.508666ms)
+✔ actual initialization SIGKILL at after-init-seal resumes only the prepared empty index (308.81825ms)
+✔ actual initialization SIGKILL at before-init-clear resumes only the prepared empty index (307.742292ms)
+✔ actual initialization SIGKILL at after-init-clear resumes only the prepared empty index (309.038125ms)
+✔ completion receipt refuses established-head deletion and replayed initialization markers; legacy adoption never rewrites a head (344.54525ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7185.259

@@ -1,0 +1,82 @@
+{
+  "format": "aether.blackboard-verification/1",
+  "subjectCommit": "870b438559df87f3dbd641b0452bf29a0e66e929",
+  "workingTreeDirty": false,
+  "specVersion": "0.1.0",
+  "recordedAt": "2026-09-23T01:37:53.935022+00:00",
+  "checks": [
+    {
+      "command": "npm ci --ignore-scripts",
+      "exitCode": 0,
+      "artifact": "install.log"
+    },
+    {
+      "command": "npm test (includes build)",
+      "exitCode": 0,
+      "artifact": "tests.log",
+      "passedTests": 540
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "artifact": "build.log"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "artifact": "typecheck.log"
+    },
+    {
+      "command": "npm run roadmap:check",
+      "exitCode": 0,
+      "artifact": "roadmap.log"
+    },
+    {
+      "command": "npm run roadmap:v4:check",
+      "exitCode": 0,
+      "artifact": "roadmap-v4.log"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "V4-T1-09.json",
+      "sha256": "f12ee24412bb2af3fa3da5a7dba67198193d2578ce88107d2643ece5039a4683",
+      "bytes": 918
+    },
+    {
+      "path": "REVIEW.md",
+      "sha256": "26841ee586c5d7e7f6aba3488f0768a58e1df861274de2291559eaead7221291",
+      "bytes": 3309
+    },
+    {
+      "path": "build.log",
+      "sha256": "8363fdc26e2d313e30ef5063fc39a96098798d351fa3e2f8de82828d0efdbbfe",
+      "bytes": 59
+    },
+    {
+      "path": "roadmap-v4.log",
+      "sha256": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+      "bytes": 182
+    },
+    {
+      "path": "roadmap.log",
+      "sha256": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+      "bytes": 135
+    },
+    {
+      "path": "tests.log",
+      "sha256": "bef81fb71ba18daf795c78b1d8fb5b1a1eeda7bcc95d4846fd6c6e24ab4c8469",
+      "bytes": 53433
+    },
+    {
+      "path": "typecheck.log",
+      "sha256": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a",
+      "bytes": 69
+    },
+    {
+      "path": "install.log",
+      "sha256": "c80b3950ff6ae423834b4a7069efd05cf903177c0119575836eef6a3867db396",
+      "bytes": 139
+    }
+  ]
+}

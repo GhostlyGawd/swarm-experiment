@@ -1,0 +1,5 @@
+{
+  "outcome": "failed before model inference",
+  "reason": "The supplemental audit driver disabled remote model resolution; Transformers.js returned undefined tokenizer configuration instead of loading this cache-only repository ID. No corpus inference or timed query executed. Retrying with the already-tested pinned revision/cache loader used by the committed main campaign.",
+  "recordedAt": "2026-09-23T01:29:29.791928+00:00"
+}

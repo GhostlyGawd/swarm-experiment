@@ -1,0 +1,20 @@
+{
+  "task": "V4-T1-04",
+  "specVersion": "0.1.0",
+  "subjectCommit": "e71627bbb17764727bdbcd4d627d5162f0867b7e",
+  "recordedAt": "2026-09-23T01:33:20.730411+00:00",
+  "checks": [
+    {
+      "gate": "V4-T1-04/G1",
+      "result": "pass",
+      "method": "Clean exact-source actual pinned MiniLM inference:175 AST inputs,24 preregistered labeled queries\u00d73, exact and explicit-LSH recall comparison; independent reconstruction of72 rankings/metrics and175 persisted/raw embedding links. Exact default retains measured LSH quality loss; see REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/index-e71627b/REVIEW.md"
+    },
+    {
+      "gate": "V4-T1-04/G2",
+      "result": "pass",
+      "method": "21 clean-source focused tests, build and typecheck; stale model/context/input/vector rejection and actual crash recovery. New exact-source raw storage/backfill/update/vector/text costs plus separately preregistered public-default exact-text timing. No100M/2ms release qualification; see REVIEW.md.",
+      "artifact": "docs/implementation/v4/evidence/index-e71627b/REVIEW.md"
+    }
+  ]
+}

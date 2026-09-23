@@ -1,0 +1,18 @@
+{
+  "format": "aether.default-exact-text-preregistration/1",
+  "recordedBeforeExecutionAt": "2026-09-23T01:29:29.792485+00:00",
+  "subjectCommit": "e71627bbb17764727bdbcd4d627d5162f0867b7e",
+  "driverSha256": "99013b6fe63347113b1664a8b6e0a346b280e37cb17b0e6e4fcee65ab79a0cc9",
+  "corpusSha256": "f9bdcbf8474c3ed494573cb171d08f22a01d2793b48bf160ea13ee1e5508d99a",
+  "repetitions": 3,
+  "queryCount": 24,
+  "lsh": {
+    "format": "aether.cosine-lsh/1",
+    "seed": "aether-t104-lsh-campaign-v1",
+    "tables": 8,
+    "bits": 6
+  },
+  "scope": "Supplemental cost audit of the public default exact text-query path. Same frozen24 labels\u00d73 repetitions, one fresh local pinned-model inference per query, all first/raw samples retained. No implementation, corpus, model or parameter tuning; no100M/2ms release qualification. Model/setup/backfill timings recorded separately. Shared-host ambient load retained.",
+  "attempt": 2,
+  "previousAttempt": "default-exact-text.failed01/attempt.json"
+}

@@ -1,0 +1,9 @@
+file:///private/tmp/aether-t104-embedding-tools/node_modules/@huggingface/transformers/dist/transformers.node.mjs:16769
+    const tokenizerName = tokenizerConfig.tokenizer_class?.replace(/Fast$/, "") ?? "PreTrainedTokenizer";
+                                          ^
+
+TypeError: Cannot read properties of undefined (reading 'tokenizer_class')
+    at AutoTokenizer.from_pretrained (file:///private/tmp/aether-t104-embedding-tools/node_modules/@huggingface/transformers/dist/transformers.node.mjs:16769:43)
+    at async file:///Users/rhenmcleod/Repositories/swarm-experiment/docs/implementation/v4/evidence/index-e71627b/default-exact-audit.mjs:26:19
+
+Node.js v26.7.0

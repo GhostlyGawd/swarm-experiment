@@ -1,0 +1,18 @@
+{
+  "format": "aether.default-exact-text-aggregation-audit/1",
+  "passed": true,
+  "queries": 72,
+  "freshQueryInferenceCalls": 72,
+  "allRowsUsePublicExactDefault": true,
+  "sameRankingsAsIndependentExactBaseline": true,
+  "maximumScoreDifferenceFromBaseline": 0,
+  "firstRetained": true,
+  "over2Ms": 72,
+  "timingsMs": {
+    "minimum": 2.714542,
+    "median": 3.149792,
+    "p95": 4.490084,
+    "maximum": 14.68425,
+    "mean": 3.412648736111111
+  }
+}

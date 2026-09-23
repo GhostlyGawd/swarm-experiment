@@ -1,0 +1,31 @@
+{
+  "format": "aether.default-exact-text-audit/1",
+  "subjectCommit": "e71627bbb17764727bdbcd4d627d5162f0867b7e",
+  "recordedAt": "2026-09-23T01:29:34.728Z",
+  "modelDigest": "aether.embedding-model/1:b3:da6694ea68d62cf24e0834c54103ad4fd6c9fe5cbc69ca1cfc8ff2f9d109c7fe",
+  "driverSha256": "99013b6fe63347113b1664a8b6e0a346b280e37cb17b0e6e4fcee65ab79a0cc9",
+  "count": 72,
+  "queryCount": 24,
+  "repetitions": 3,
+  "inferenceCalls": 78,
+  "initializationMs": 270.95475,
+  "backfill": {
+    "snapshot": "aether.hybrid-generation/1:b3:122d10e4249e74d566d919e1dae27659818cd24929b0ab9e5e50976c7d5ab04c",
+    "generation": 1,
+    "embedded": 175,
+    "reused": 0,
+    "elapsedMs": 1789.26325
+  },
+  "timingsMs": {
+    "minimum": 2.714542,
+    "median": 3.149792,
+    "p95": 4.490084,
+    "maximum": 14.68425,
+    "mean": 3.41264873611111
+  },
+  "firstQueryMs": 14.68425,
+  "over2Ms": 72,
+  "exactRecallAt3": 0.9375,
+  "sourceChangedDuringRun": "",
+  "scope": "Supplemental cost audit of the public default exact text-query path. Same frozen24 labels×3 repetitions, one fresh local pinned-model inference per query, all first/raw samples retained. No implementation, corpus, model or parameter tuning; no100M/2ms release qualification. Model/setup/backfill timings recorded separately. Shared-host ambient load retained."
+}
