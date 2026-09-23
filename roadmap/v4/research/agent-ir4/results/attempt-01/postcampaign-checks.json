@@ -1,0 +1,9 @@
+{
+  "format": "aether.agent-ir4.checks/1",
+  "source": "roadmap/v4/research/agent-ir4/test.mjs",
+  "sourceSha256": "abc453351fc43450c8c9184caa8a285e49e9dc4bc7deb219acd88c2da2a32bba",
+  "testLogSha256": "40119aacd4e080c35510ea99bc8459764ecc9579d7d6be18b72e8dc5e043d6d5",
+  "auditLogSha256": "9a98970759c7cf9858ca6890b3ea9632909c8cdfcab4c51cdf35e9df174de06d",
+  "testExit": 0,
+  "auditExit": 0
+}

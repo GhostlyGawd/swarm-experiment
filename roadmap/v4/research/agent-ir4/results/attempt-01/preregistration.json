@@ -1,0 +1,72 @@
+{
+  "format": "aether.agent-ir4.campaign/1",
+  "started": "2026-09-23T14:05:27.043Z",
+  "baseline": "roadmap/v4/research/projections/results/campaign-11-generics",
+  "baselineArtifactsSha256": "aca7505a58eee44c1843267190f4263adfb0ff4dc28c0ccafef0fe1e837cb26b",
+  "baselineReportSha256": "08a206696443bfc7a555639ca2ee49772accf1849900a5ac430dcbe0edd71746",
+  "workloads": [
+    "scalar-math",
+    "loop-contract",
+    "external-effect",
+    "fixed-lazy",
+    "composite-alias-collections",
+    "full-ledger",
+    "continuation-capture-task",
+    "atomic-nested-return-fault",
+    "strings-linked-imports",
+    "generics-nested-import"
+  ],
+  "rootMessages": 30,
+  "tokenizers": [
+    "cl100k_base",
+    "o200k_base"
+  ],
+  "selection": "Every original V7 workload and version, unchanged. Full cold payload includes the entry plus all dependencies. For a closed bundle, derive AST import references from included dependency roots and retain the original complete snapshot digest. Choose AE4 only when shorter in UTF-8 bytes than AE3, before tokenizer measurement. Otherwise use AE3. Edits use AE3 and pay initial complete message.",
+  "hypothesis": "Content-addressed imported root references are redundant when the exact referenced roots are already in a paid complete message. Reconstruct them without dropping identities, imports or digest. Fourfold remains a required independent gate.",
+  "sources": [
+    {
+      "path": "roadmap/v4/research/agent-ir4/codec.mjs",
+      "sha256": "d272c5f1adf2761942569c5ff912e911f088e810bfd25c05706389ce6e22d33e"
+    },
+    {
+      "path": "roadmap/v4/research/agent-ir4/measure.mjs",
+      "sha256": "8351df25804138c8e5cbec7f91276043799273570e9e95743a196b5e9ed86b3c"
+    },
+    {
+      "path": "roadmap/v4/research/agent-ir4/verify.mjs",
+      "sha256": "098f56b2c2f60c3896fc97a746fa3fc2cc55efa51f32f24e73e20d079492bd3b"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3.ts",
+      "sha256": "ccc0ae236230bd8dfecf0c3682e7457b1860a5773ff9b495c6041fe6a045eb1c"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3-compact.ts",
+      "sha256": "508f56687d246d60cb7568804d9d42622ba851e5c4d322d739c8a2e943c387a5"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3-bounds.ts",
+      "sha256": "0d48117496330c4427cd88ea4f154aadf7106c9b32c259b255baf81694fee7bf"
+    },
+    {
+      "path": "src/tier1/agent-ir.ts",
+      "sha256": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b"
+    },
+    {
+      "path": "src/tier1/agent-ir-v2.ts",
+      "sha256": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671"
+    },
+    {
+      "path": "src/tier1/ast.ts",
+      "sha256": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb"
+    },
+    {
+      "path": "src/tier1/store.ts",
+      "sha256": "b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3"
+    },
+    {
+      "path": "src/util/tokens.ts",
+      "sha256": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9"
+    }
+  ]
+}
