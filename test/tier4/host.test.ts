@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CapabilitySealer } from '../../src/tier2/ocap.ts';
 import { ACCOUNT, CAP_LEDGER_APPEND, buildLedgerExample, ledgerTelemetry } from '../../src/examples/ledger.ts';
-import { TopologyHost } from '../../src/tier4/host.ts';
+import { TopologyHost, TOPOLOGY_INVOKE } from '../../src/tier4/host.ts';
 import { slice } from '../../src/tier4/topology.ts';
 import * as b from '../../src/tier1/build.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
@@ -106,6 +106,39 @@ test('strict topology dispatch rechecks a grant after the initial boundary check
   assert.equal(result.ok, false); if (!result.ok) assert.equal(result.fault.kind, 'authority');
   assert.equal(host.readRecord(alice).get('balance'), 100n);
   assert.equal(host.readRecord(bob).get('balance'), 0n);
+});
+
+test('pure state-changing strict topology entry requires a current audience-bound invocation grant', () => {
+  const symbols = new SymbolSpace('pure-topology-invoke'), setter = symbols.define('setter'), other = symbols.define('other'), account = symbols.define('account');
+  const registry = new CapabilityRegistry();
+  const module = b.module_({ symbol: symbols.define('module'), members: [
+    b.fn({ symbol: setter, params: [b.param(account, ACCOUNT)], returns: b.Unit, body: b.block(b.assign(b.place(account, 'balance'), b.int(99)), b.ret(b.unit())) }),
+    b.fn({ symbol: other, returns: b.Int, body: b.ret(b.int(0)) }),
+  ], symbolTable: symbols.table() });
+  const plan = { shape: 'containers' as const, units: [{ id: 'worker', members: [setter, other], capabilities: [], placement: 'container' as const, memoryMb: 16 }],
+    crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+  let now = 100, revoked = false, epoch = '0';
+  const grants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(59), repositoryId: 'repository', clock: () => now,
+    policyEpoch: () => '0', revocationEpoch: () => epoch, isRevoked: () => revoked,
+    authorizeIssue: () => true, authorizeDelegate: () => true });
+  const host = new TopologyHost(module, plan, { registry, symbols, scopedGrants: grants });
+  const first = host.allocateRecord(ACCOUNT, { id: 'alice', balance: 0n });
+  const request = { id: 'pure-set', from: null, to: setter, args: [first] } as const;
+  assert.equal(host.dispatch({ ...request, capabilities: [] }).ok, false);
+  assert.equal(host.readRecord(first).get('balance'), 0n);
+  assert.equal(host.dispatch({ ...request, id: 'wrong-audience', capabilities: host.issueTokens(other) }).ok, false);
+  const tokens = host.issueTokens(setter); assert.equal(tokens.length, 1);
+  assert.equal((tokens[0] as { body: { capability: string } }).body.capability, TOPOLOGY_INVOKE);
+  assert.equal(host.dispatch({ ...request, id: 'authorized', capabilities: tokens }).ok, true);
+  assert.equal(host.readRecord(first).get('balance'), 99n);
+  const second = host.allocateRecord(ACCOUNT, { id: 'bob', balance: 0n });
+  revoked = true;
+  assert.equal(host.dispatch({ ...request, id: 'revoked', args: [second], capabilities: tokens }).ok, false);
+  revoked = false; epoch = '1';
+  assert.equal(host.dispatch({ ...request, id: 'stale', args: [second], capabilities: tokens }).ok, false);
+  const fresh = host.issueTokens(setter); now = 60_100;
+  assert.equal(host.dispatch({ ...request, id: 'expired', args: [second], capabilities: fresh }).ok, false);
+  assert.equal(host.readRecord(second).get('balance'), 0n);
 });
 
 test('strict topology effect callbacks recheck revocation before each sink', () => {

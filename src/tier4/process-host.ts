@@ -562,6 +562,7 @@ export class ProcessHost {
       const execution = encodeProcessExecution(result.execution, this.scope(journal, call.unit), result.snapshot);
       this.phase('call-before-commit', call.operationId, journal.generation);
       this.assertActive(active);
+      if (mode === 'live') this.authorize(call.symbol, call.unit, journal.generation, active.tokens);
       // A failed invocation with no possible external commit cannot publish
       // speculative heap writes. In particular, a resource-scoped grant may
       // be denied after the worker has calculated its effect arguments.

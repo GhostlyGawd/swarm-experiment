@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
-import { buildLedgerExample, ACCOUNT, CAP_LEDGER_APPEND } from '../../src/examples/ledger.ts';
+import { buildLedgerExample, ACCOUNT, CENTS, CAP_LEDGER_APPEND } from '../../src/examples/ledger.ts';
 import { CapabilitySealer, CapabilityRegistry, RevocationList } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
@@ -117,6 +117,31 @@ test('strict ProcessHost rechecks a grant after effect intent and before the ext
     assert.equal(f.calls(), 0);
     assert.deepEqual(balances(await host.snapshot()), ['100', '0']);
   } finally { await host?.close(); f.cleanup(); }
+});
+
+test('strict pure worker call cannot publish state after invocation grant revocation at final commit', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-process-final-grant-')); let host: ProcessHost | undefined;
+  try {
+    const symbols = new SymbolSpace('final-grant'), setter = symbols.define('setter'), account = symbols.define('account');
+    const registry = new CapabilityRegistry();
+    const module = b.module_({ symbol: symbols.define('module'), members: [b.fn({ symbol: setter, params: [b.param(account, ACCOUNT)], returns: b.Unit,
+      body: b.block(b.assign(b.place(account, 'balance'), b.typed(CENTS, 99n)), b.ret(b.unit())) })], symbolTable: symbols.table() });
+    const plan: TopologyPlan = { shape: 'containers', units: [{ id: 'worker', members: [setter], capabilities: [], placement: 'container', memoryMb: 16 }],
+      crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+    const { epochs, grants } = scopedAuthority(directory); let beforeCommit = false;
+    const options: ProcessHostOptions = { directory, module, manifest: manifest(module, registry), plan, registry,
+      sealer: new CapabilitySealer(new Uint8Array(32).fill(63), () => 100), scopedGrants: grants,
+      onPhase: phase => { if (phase === 'call-before-commit') { beforeCommit = true; epochs.revoke(PROCESS_INVOKE, []); } } };
+    host = await ProcessHost.open(options);
+    const ref = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(0) }, { operationId: 'alice' });
+    const result = await host.call(setter, [reference(ref)], { operationId: 'revoked-at-commit', tokens: host.issueScopedTokens(setter) });
+    assert.equal(beforeCommit, true); assert.equal(result.state, 'indeterminate');
+    if (result.state === 'indeterminate') assert.match(result.reason, /authority_denied/);
+    assert.deepEqual(balances(await host.snapshot()), ['0']);
+    await host.close(); host = undefined;
+    host = await ProcessHost.open(options);
+    assert.deepEqual(balances(await host.snapshot()), ['0']);
+  } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('strict ProcessHost rejects pre-migration grants after a durable ownership generation change', async () => {

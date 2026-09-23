@@ -69,7 +69,7 @@ export {
   type Unit,
 } from './tier4/topology.ts';
 export { applyTuning, domainValues, findSurfaces, tune, verifyOnlyParametersChanged, type Assignment, type Objective, type TuningResult } from './tier4/surfaces.ts';
-export { TelemetryCollector, TopologyHost, type DistributedFault, type DistributedFaultKind, type DistributedResult, type TopologyHostOptions, type WireRequest } from './tier4/host.ts';
+export { TelemetryCollector, TopologyHost, TOPOLOGY_INVOKE, type DistributedFault, type DistributedFaultKind, type DistributedResult, type TopologyHostOptions, type WireRequest } from './tier4/host.ts';
 
 // --- Projection (§5) ---------------------------------------------------------
 export { TypeScriptProjector, projectTypeScript, type ProjectOptions } from './projection/typescript.ts';

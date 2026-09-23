@@ -1,5 +1,5 @@
 import type { Term, Ty } from '../tier1/ast.ts';
-import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
+import { capability, type CapabilityName, type SymbolId } from '../tier1/ids.ts';
 import { CapabilitySealer, type CapabilityToken } from '../tier2/ocap.ts';
 import { ScopedGrantAuthority, type ScopedGrantV2 } from '../tier2/scoped-grants.ts';
 import { domainDigest } from '../fabric/identity.ts';
@@ -78,6 +78,7 @@ export interface TopologyHostOptions extends CompileOptions {
   readonly telemetry?: TelemetryCollector;
   readonly clock?: () => number;
 }
+export const TOPOLOGY_INVOKE = capability('cap:topology:invoke');
 
 /** Executable host for a topology plan, including boundary and migration semantics. */
 export class TopologyHost {
@@ -175,7 +176,8 @@ export class TopologyHost {
     if (this.partitioned.has(unit)) return { ok: false, unit, fault: fault('partition', `unit ${unit} is partitioned`, true, false) };
     if (!Array.isArray(request.capabilities)) return { ok: false, unit, fault: fault('authority', 'malformed capability grant list', false, false) };
     const declaration = this.declarations.get(request.to);
-    for (const capability of declaration?.capabilities ?? []) {
+    const required = this.scopedGrants ? [TOPOLOGY_INVOKE, ...(declaration?.capabilities ?? [])] : declaration?.capabilities ?? [];
+    for (const capability of required) {
       const valid = this.scopedGrants
         ? request.capabilities.some(token => this.scopedGrants!.verify(token, { capability, audience: request.to, path: this.grantPath(unit) }))
         : request.capabilities.some(token => {
@@ -214,7 +216,7 @@ export class TopologyHost {
 
   private grantPath(unit: string): readonly string[] { return ['topology', String(this.generationValue), domainDigest('aether.topology-unit/1', unit).split(':').at(-1)!]; }
   private validStrictDispatch(authority: { symbol: SymbolId; unit: string; tokens: readonly (CapabilityToken | ScopedGrantV2)[] }): boolean {
-    return (this.declarations.get(authority.symbol)?.capabilities ?? []).every(capability =>
+    return [TOPOLOGY_INVOKE, ...(this.declarations.get(authority.symbol)?.capabilities ?? [])].every(capability =>
       authority.tokens.some(token => this.scopedGrants!.verify(token, { capability, audience: authority.symbol, path: this.grantPath(authority.unit) })));
   }
   private currentStrictAuthority(): boolean {
@@ -230,7 +232,7 @@ export class TopologyHost {
   issueTokens(symbol: SymbolId, ttlMs = 60_000): (CapabilityToken | ScopedGrantV2)[] {
     const unit = this.unitFor(symbol);
     if (!unit) throw new ReferenceError(`unplaced function ${symbol}`);
-    return (this.declarations.get(symbol)?.capabilities ?? [])
+    return (this.scopedGrants ? [TOPOLOGY_INVOKE, ...(this.declarations.get(symbol)?.capabilities ?? [])] : this.declarations.get(symbol)?.capabilities ?? [])
       .map((capability) => this.scopedGrants
         ? this.scopedGrants.issue({ capability, audience: symbol, path: this.grantPath(unit) }, ttlMs)
         : this.sealer.issue(capability, unit, ttlMs));

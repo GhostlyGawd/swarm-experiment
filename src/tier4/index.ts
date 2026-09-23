@@ -9,7 +9,7 @@ export {
   type Assignment, type Objective, type TuningResult,
 } from './surfaces.ts';
 export {
-  TelemetryCollector, TopologyHost,
+  TelemetryCollector, TopologyHost, TOPOLOGY_INVOKE,
   type DistributedFault, type DistributedFaultKind, type DistributedResult,
   type TopologyHostOptions, type WireRequest,
 } from './host.ts';
