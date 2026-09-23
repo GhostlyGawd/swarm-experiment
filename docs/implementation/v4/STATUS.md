@@ -74,6 +74,7 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 
 - Initial snapshot test used an invalid nominal type identifier; corrected. Independent review also found stale closure access, broken moved callbacks and inconsistent memory/latency pricing; all were repaired with regression tests before verification.
 - New strict-grant closure regression exposed an F07 ordering gap: a worker could commit an external effect and only then discover a retained JS closure prevented process snapshot export. `exportBoundarySnapshot` now refuses that continuation before sending the effect callback; both legacy and strict profiles have a zero-sink regression. Exact-source F07 compatibility revalidation remains pending.
+- Clean integration attempt `64894c6` finished with 629/630 tests passing. The sole Rust composite failure executed the standard-ledger test binary because two parallel tests shared a Cargo target directory; [failed evidence](evidence/integration-64894c6/REVIEW.md) retains the full result. Source `35d9897` isolates each build output and the two affected files pass together (7/7); a corrected full clean run is in progress.
 - Bounded research is verified; full native targets, portable proof kernel/ZK, Tree-CRDT/BFT and numerical/model features remain to be implemented and qualified.
 - No 100M-node or 1,000-agent production result exists. No task is verified merely because related unit tests pass.
 - No external blocker has been established; substantial local work remains.
