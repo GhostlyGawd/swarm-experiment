@@ -85,8 +85,9 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 
 ## Current next actions
 
-1. Use verified T3-01 as the prerequisite for living micro-world, counterfactual replay and fallback tasks; keep multi-unit frame transport and authorized-correction proof policy explicit.
-2. Expand lossless projections to closures/tasks, atomics, imports and generics; improve representative token density for V4-T1-02 and V4-Q03.
-3. Extend semantic GC to general shims/adapter retirement; finish default strict grants and signed adapter policy; add threshold DKG, reconfiguration and production quorum admission; continue the remaining dependency graph.
+1. For T2-04, test every direct, closure, cross-process and external-effect boundary under forged, narrowed, expired and revoked grants. Add production adapter dependency isolation and an externally rollback-protected signer epoch/rotation path; keep historical profiles explicit. Only then evaluate T2-05's dependency closure.
+2. For T1-02, finish open generic continuations, nested imports and remaining projection contexts. Continue model-facing density research with all identity/dependency bytes counted; the unchanged 4× target still fails and needs a justified interface or comparison decision before closure.
+3. For T3-03, extend the real broker micro-world from local schedules to process/network faults and measure the declared distributed throughput. For T3-07, add effectful proof-admitted fallbacks and native in-frame timing.
+4. For T2-06, move the bounded threshold/HotStuff research into independently operated production custody, authenticated membership handoff and promotion admission, with rollback protection and review. Continue the remaining dependency graph afterward.
 
 Current classification: active implementation. Baseline, durable AST persistence, portable scalar certificates, strict signed lineage, Tree-CRDT, semantic retrieval, typed scratchpads and resumable execution are verified at their declared task boundaries. Full v4 remains open. No global blocker has been established.
