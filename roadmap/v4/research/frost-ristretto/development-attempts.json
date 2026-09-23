@@ -1,0 +1,21 @@
+{
+  "format": "aether.ristretto-research-development/1",
+  "attempts": [
+    {
+      "stage": "initial Rust build",
+      "outcome": "compile error",
+      "code": "E0308",
+      "detail": "Compared PublicKeyPackage::min_signers() with &Some(3); pinned API returns Option<u16> by value.",
+      "correction": "Compare with Some(3).",
+      "cryptographicResult": "No protocol run or signature claimed from this failed build."
+    },
+    {
+      "stage": "campaign-01",
+      "outcome": "passed",
+      "dkgCeremonies": 10,
+      "authenticatedSignatures": 40,
+      "certificateRejections": 840,
+      "protocolRejections": 190
+    }
+  ]
+}

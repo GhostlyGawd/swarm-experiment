@@ -1,0 +1,5158 @@
+{
+  "format": "aether.ristretto-research-campaign/1",
+  "createdAt": "2026-09-23T04:19:46.649Z",
+  "sourceHead": "e006b929df69f57501c841a7118e413064910c1e",
+  "sourceHashes": {
+    "roadmap/v4/research/frost-ristretto/Cargo.toml": "efb3852011fe3748afb971c33893d8fcabaacccbf369d54082e4a93cefd2c445",
+    "roadmap/v4/research/frost-ristretto/Cargo.lock": "6288d16e897c766a118f897f9823615d25be2848432a9eafcbcadaa4c561c386",
+    "roadmap/v4/research/frost-ristretto/src/lib.rs": "23650b50d628a70573eafa0a335a285ef8f25e974128c09d0b178ccd52832c18",
+    "roadmap/v4/research/frost-ristretto/src/main.rs": "9ed86e25dfbff733d3c084b91224fdbf3e4225eda063a467728db3bfda32b493",
+    "roadmap/v4/research/frost-ristretto/src/verify.rs": "4d663e5e6b79f46690ec3960a4ab2df32419a3aae3c7350a06c99fd02a3cb634",
+    "roadmap/v4/research/frost-ristretto/tests/protocol.rs": "95f64e36206805db3b8126599d43864e0d6879e851b9cb057e2e53e942c62335",
+    "roadmap/v4/research/frost-ristretto/run.mjs": "bbbd9d54d1a30a3e55166315e9c584ec1022443d839d46bf4863e290e1108366",
+    "roadmap/v4/research/frost-ristretto/verify.mjs": "4d05f65690d875bb67e7fa839651ba8e647758c03cdd72e4feb1fda2974157fb",
+    "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+    "src/fabric/quorum-crypto.ts": "10d1fa45c13688ce57a1c99052a92d3845dc55dac493066684263ed747bac0a5",
+    "src/fabric/identity.ts": "a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+    "src/fabric/promotion.ts": "34c2dc8f0b61ebc23829c4a9d5004731ec80c034f7ed6029227ee0c12e8e327f"
+  },
+  "binarySha256": "01c2d6385448c6e39787890229f598b2f2aa4667d78077a71802482c09df5384",
+  "cargoLockSha256": "6288d16e897c766a118f897f9823615d25be2848432a9eafcbcadaa4c561c386",
+  "toolchain": {
+    "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "node": "v26.7.0",
+    "openssl": "3.6.4"
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "release": "25.6.0",
+    "cpu": "Apple M4 Pro"
+  },
+  "buildNs": "47667125",
+  "trials": 10,
+  "signatures": 40,
+  "results": [
+    {
+      "trial": 0,
+      "checked": [
+        {
+          "round": 0,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:099f26ea18a3082015db6037bd9f49ed64c7eaf335131a54d79994589e9221c9",
+            "group": "aether.ristretto-research-group/1:b3:71c05578dd3e53a32cef055eb99e38c4a2a8f99b0620b08d57fa35bff5c6c79b",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-3"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "14782167"
+        },
+        {
+          "round": 1,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:74c36ac006b937a5d8edc3589ff97534a43c8a91738c5817d7dd2bc350feaea1",
+            "group": "aether.ristretto-research-group/1:b3:71c05578dd3e53a32cef055eb99e38c4a2a8f99b0620b08d57fa35bff5c6c79b",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10253958"
+        },
+        {
+          "round": 2,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:c02d956379658b906617b22047ab8f10e60b041bb8af905face90dd2c069e0a5",
+            "group": "aether.ristretto-research-group/1:b3:71c05578dd3e53a32cef055eb99e38c4a2a8f99b0620b08d57fa35bff5c6c79b",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "11256000"
+        },
+        {
+          "round": 3,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:0ca46dfc58a1dac221e6190638c9647b7669e2fad2479f29acfa2dc0b85fcdda",
+            "group": "aether.ristretto-research-group/1:b3:71c05578dd3e53a32cef055eb99e38c4a2a8f99b0620b08d57fa35bff5c6c79b",
+            "participants": [
+              "fixture-validator-2",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9838917"
+        }
+      ],
+      "rejections": [
+        {
+          "round": 0,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        }
+      ],
+      "dkgNs": "23656084",
+      "signingNs": [
+        "5801333",
+        "4962667",
+        "4607917",
+        "3958750"
+      ],
+      "aggregateNs": [
+        "271500",
+        "223958",
+        "235375",
+        "181250"
+      ],
+      "verifyAllSharesNs": [
+        "1779333",
+        "1527542",
+        "1424750",
+        "1185458"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 1,
+      "checked": [
+        {
+          "round": 0,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:69df516691e73e76cc8d01c0bb3ae75b4968bb5d4adc7e94d6d098e8c988b1f7",
+            "group": "aether.ristretto-research-group/1:b3:8143675e78708b0701fed81e7f20f4e1801d9aff1e2aeb03c1e1d2fa0c4b4a76",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-3"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9481333"
+        },
+        {
+          "round": 1,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:021ce0e7b65cfbc2550e855d3142847557b5260c50d0a5deb8eb88ac12de4e9d",
+            "group": "aether.ristretto-research-group/1:b3:8143675e78708b0701fed81e7f20f4e1801d9aff1e2aeb03c1e1d2fa0c4b4a76",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9445042"
+        },
+        {
+          "round": 2,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:adbf8aadb407a3809eae3089ee078c42e78cc6d2c70cf9be493fb19eb8acc04c",
+            "group": "aether.ristretto-research-group/1:b3:8143675e78708b0701fed81e7f20f4e1801d9aff1e2aeb03c1e1d2fa0c4b4a76",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "8838833"
+        },
+        {
+          "round": 3,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:af438c92157a4f76af90e1f0cb9f35c6a0d35ba6bafb1da22601dab643dde6dc",
+            "group": "aether.ristretto-research-group/1:b3:8143675e78708b0701fed81e7f20f4e1801d9aff1e2aeb03c1e1d2fa0c4b4a76",
+            "participants": [
+              "fixture-validator-2",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "8979458"
+        }
+      ],
+      "rejections": [
+        {
+          "round": 0,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        }
+      ],
+      "dkgNs": "21385917",
+      "signingNs": [
+        "2736000",
+        "2655292",
+        "2565833",
+        "2503750"
+      ],
+      "aggregateNs": [
+        "128417",
+        "123792",
+        "116750",
+        "113583"
+      ],
+      "verifyAllSharesNs": [
+        "815167",
+        "797708",
+        "754833",
+        "741375"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 2,
+      "checked": [
+        {
+          "round": 0,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:cc9cb59f226c745e6aec998d5cdc838d19262b0fc06fc705150780c84c4423e5",
+            "group": "aether.ristretto-research-group/1:b3:2e8be22ab91f9a487403256b775fcc1349142d2835ce7766284e58c773b9da8d",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-3"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10503459"
+        },
+        {
+          "round": 1,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:fcc93196c934d65db64c4aee1b5daa1044eb3e9a7e97b02bc08d69a5e7c1927b",
+            "group": "aether.ristretto-research-group/1:b3:2e8be22ab91f9a487403256b775fcc1349142d2835ce7766284e58c773b9da8d",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "7743917"
+        },
+        {
+          "round": 2,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:c031bd635d5a79862779563b32c6935f6a55e7d3c22dcc9e8cb8c160bc4006b3",
+            "group": "aether.ristretto-research-group/1:b3:2e8be22ab91f9a487403256b775fcc1349142d2835ce7766284e58c773b9da8d",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "8330375"
+        },
+        {
+          "round": 3,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:22e85f86faca163548656f4d86ca1c8860bf53172bd5a0d85c806af2dd698735",
+            "group": "aether.ristretto-research-group/1:b3:2e8be22ab91f9a487403256b775fcc1349142d2835ce7766284e58c773b9da8d",
+            "participants": [
+              "fixture-validator-2",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9631042"
+        }
+      ],
+      "rejections": [
+        {
+          "round": 0,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        }
+      ],
+      "dkgNs": "20202667",
+      "signingNs": [
+        "2688417",
+        "2568792",
+        "2497125",
+        "2484708"
+      ],
+      "aggregateNs": [
+        "126208",
+        "122209",
+        "116584",
+        "112125"
+      ],
+      "verifyAllSharesNs": [
+        "823834",
+        "774959",
+        "738791",
+        "717708"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 3,
+      "checked": [
+        {
+          "round": 0,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:61171e68e1942e281c2c8f1d16053982abbb32b614b1c5073676ac539fc6c800",
+            "group": "aether.ristretto-research-group/1:b3:3cf3945c4a89b7677299214895cb147f4b10ec5c15283c6d08427a2942dffac3",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-3"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "8200917"
+        },
+        {
+          "round": 1,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:56c843add02423ec09cf2ef729a0b2bbc72b130ccb9e2bd950e0a31535c9ff05",
+            "group": "aether.ristretto-research-group/1:b3:3cf3945c4a89b7677299214895cb147f4b10ec5c15283c6d08427a2942dffac3",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9331250"
+        },
+        {
+          "round": 2,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:3dcead4dcecc2bef77a72b26f2cf4247bfac2e86e9d20ac815d7071b4c0db976",
+            "group": "aether.ristretto-research-group/1:b3:3cf3945c4a89b7677299214895cb147f4b10ec5c15283c6d08427a2942dffac3",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "11305834"
+        },
+        {
+          "round": 3,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:a8dee2d8433c56dbcc7dff1e0d059a0b217ab2c20730e77603d9f594705e0d4b",
+            "group": "aether.ristretto-research-group/1:b3:3cf3945c4a89b7677299214895cb147f4b10ec5c15283c6d08427a2942dffac3",
+            "participants": [
+              "fixture-validator-2",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9905667"
+        }
+      ],
+      "rejections": [
+        {
+          "round": 0,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        }
+      ],
+      "dkgNs": "20657666",
+      "signingNs": [
+        "2747458",
+        "2635708",
+        "2543875",
+        "2525208"
+      ],
+      "aggregateNs": [
+        "130375",
+        "121000",
+        "117208",
+        "114667"
+      ],
+      "verifyAllSharesNs": [
+        "818917",
+        "792834",
+        "774292",
+        "748500"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 4,
+      "checked": [
+        {
+          "round": 0,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:f38dd4f46fab8458e67043155b38b1cb62fab21eca5021ada2c568fba1c9790e",
+            "group": "aether.ristretto-research-group/1:b3:30b4546fab8a4985f8bde7c86db4772ca6fa1a65ce16a5ce0ee9f5c8dbadf489",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-3"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "8899875"
+        },
+        {
+          "round": 1,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:9f38a0f9205416179b4893e4ef5c958dc505e2baf6ae028e8a6eff9cd52bda33",
+            "group": "aether.ristretto-research-group/1:b3:30b4546fab8a4985f8bde7c86db4772ca6fa1a65ce16a5ce0ee9f5c8dbadf489",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9111792"
+        },
+        {
+          "round": 2,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:efb9fe7287504ad771190e66183dbd478a7ec2a1b03dc1876b0e5de9dc5cb31f",
+            "group": "aether.ristretto-research-group/1:b3:30b4546fab8a4985f8bde7c86db4772ca6fa1a65ce16a5ce0ee9f5c8dbadf489",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10183125"
+        },
+        {
+          "round": 3,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:8c849a3f4e370f826810e161d8bf9a4111f8c83b93582710e062866d82018136",
+            "group": "aether.ristretto-research-group/1:b3:30b4546fab8a4985f8bde7c86db4772ca6fa1a65ce16a5ce0ee9f5c8dbadf489",
+            "participants": [
+              "fixture-validator-2",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "8866084"
+        }
+      ],
+      "rejections": [
+        {
+          "round": 0,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        }
+      ],
+      "dkgNs": "18724584",
+      "signingNs": [
+        "2728458",
+        "2612000",
+        "2523625",
+        "2497917"
+      ],
+      "aggregateNs": [
+        "128500",
+        "124375",
+        "118625",
+        "113000"
+      ],
+      "verifyAllSharesNs": [
+        "818541",
+        "763584",
+        "746291",
+        "727958"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 5,
+      "checked": [
+        {
+          "round": 0,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:9a743647db664cdba29228e28a4c4cf6f9453f4614430caa294f1f5614864afd",
+            "group": "aether.ristretto-research-group/1:b3:ce3c4a02bd05ea22fa15aa4fa103415178b3aeb9548403356f376abac0f4a8a4",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-3"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9317750"
+        },
+        {
+          "round": 1,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:ff91bbc0565fd1d3ce59388d0a5f814049157ffe441a004406f2cbbcd798809e",
+            "group": "aether.ristretto-research-group/1:b3:ce3c4a02bd05ea22fa15aa4fa103415178b3aeb9548403356f376abac0f4a8a4",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10162083"
+        },
+        {
+          "round": 2,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:b882d8ff8cd86960e9a889bf5abe2fe1c98dae947d5a23296bf1b50bfe46bbd0",
+            "group": "aether.ristretto-research-group/1:b3:ce3c4a02bd05ea22fa15aa4fa103415178b3aeb9548403356f376abac0f4a8a4",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10179334"
+        },
+        {
+          "round": 3,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:72da6da95cb644b677eb0ad3424b075effad3ffd93f2d2cc4b4506a473e2ecc1",
+            "group": "aether.ristretto-research-group/1:b3:ce3c4a02bd05ea22fa15aa4fa103415178b3aeb9548403356f376abac0f4a8a4",
+            "participants": [
+              "fixture-validator-2",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10305917"
+        }
+      ],
+      "rejections": [
+        {
+          "round": 0,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        }
+      ],
+      "dkgNs": "20681209",
+      "signingNs": [
+        "2671792",
+        "2584625",
+        "2487250",
+        "2440209"
+      ],
+      "aggregateNs": [
+        "120375",
+        "114875",
+        "108000",
+        "104333"
+      ],
+      "verifyAllSharesNs": [
+        "782958",
+        "759666",
+        "708084",
+        "680792"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 6,
+      "checked": [
+        {
+          "round": 0,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:947e0a022db1170a9113f57d0c8f3777826f785417baf26887b9af0535883d6d",
+            "group": "aether.ristretto-research-group/1:b3:77441ea86916ebc2543c92221f44de80c25bc57ccdde7701bd412fc7f3887253",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-3"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10007208"
+        },
+        {
+          "round": 1,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:8dc1116aaa8e3e1119c6e6e242b41c10ecafba5b433e614e27adefd9ede12bf3",
+            "group": "aether.ristretto-research-group/1:b3:77441ea86916ebc2543c92221f44de80c25bc57ccdde7701bd412fc7f3887253",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "12452583"
+        },
+        {
+          "round": 2,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:a23ef1b65c84854c8dd5da495b498b9e51effe3ffb79fc981c74bc5a3422c35d",
+            "group": "aether.ristretto-research-group/1:b3:77441ea86916ebc2543c92221f44de80c25bc57ccdde7701bd412fc7f3887253",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10777458"
+        },
+        {
+          "round": 3,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:a4981160241c5fc99b6bbbdf6b2dd7a60d5e26388d1ce80dbdaf7ff8221b1c83",
+            "group": "aether.ristretto-research-group/1:b3:77441ea86916ebc2543c92221f44de80c25bc57ccdde7701bd412fc7f3887253",
+            "participants": [
+              "fixture-validator-2",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "11373625"
+        }
+      ],
+      "rejections": [
+        {
+          "round": 0,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        }
+      ],
+      "dkgNs": "20557792",
+      "signingNs": [
+        "2685709",
+        "2593417",
+        "2499042",
+        "2443875"
+      ],
+      "aggregateNs": [
+        "127083",
+        "119167",
+        "117750",
+        "104917"
+      ],
+      "verifyAllSharesNs": [
+        "800167",
+        "742375",
+        "726292",
+        "678750"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 7,
+      "checked": [
+        {
+          "round": 0,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:4d878553d49e7a5134cbb87fd0ae75fcc72d76411be33736ebb8ea7864f81ca6",
+            "group": "aether.ristretto-research-group/1:b3:b86a4ce465ad6ea3ee152b55e4562a1449a24a2adf8756e4614035cd47b3025e",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-3"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9390250"
+        },
+        {
+          "round": 1,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:1829e4b92c2e1c133a912af9a214c37e279d5ee245460148c46737e17f29afdb",
+            "group": "aether.ristretto-research-group/1:b3:b86a4ce465ad6ea3ee152b55e4562a1449a24a2adf8756e4614035cd47b3025e",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9157041"
+        },
+        {
+          "round": 2,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:8c7b5ad8cea4d131cf49aaa2416b1609b1ac619995500f073681a4768e42444a",
+            "group": "aether.ristretto-research-group/1:b3:b86a4ce465ad6ea3ee152b55e4562a1449a24a2adf8756e4614035cd47b3025e",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10634250"
+        },
+        {
+          "round": 3,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:a5da50080c5443e7936e96e2d2ef2105a385cc2311fa574c6309faa68ae6f630",
+            "group": "aether.ristretto-research-group/1:b3:b86a4ce465ad6ea3ee152b55e4562a1449a24a2adf8756e4614035cd47b3025e",
+            "participants": [
+              "fixture-validator-2",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9129666"
+        }
+      ],
+      "rejections": [
+        {
+          "round": 0,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        }
+      ],
+      "dkgNs": "19493083",
+      "signingNs": [
+        "2937084",
+        "2675167",
+        "2540625",
+        "2465709"
+      ],
+      "aggregateNs": [
+        "130166",
+        "132833",
+        "118250",
+        "118041"
+      ],
+      "verifyAllSharesNs": [
+        "871583",
+        "799459",
+        "752459",
+        "732417"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 8,
+      "checked": [
+        {
+          "round": 0,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:f34a7cbb63a53e36b719380830bd2022ae6fa7079b1443912ab85f5d9a0c1342",
+            "group": "aether.ristretto-research-group/1:b3:80ce71b1e35cd8391dd5964a252b3e3229ddcf717556d188696e8b77898a7d78",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-3"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "8535917"
+        },
+        {
+          "round": 1,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:6c428578b25a6b0f53538a2cb24a1e712a830dcfcf0e1408650f61ee02d6bc98",
+            "group": "aether.ristretto-research-group/1:b3:80ce71b1e35cd8391dd5964a252b3e3229ddcf717556d188696e8b77898a7d78",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "11397875"
+        },
+        {
+          "round": 2,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:3310b0c0240ddb9b927687ac68ff0570e6c78e404d7a14ded02669ec4b6d3bad",
+            "group": "aether.ristretto-research-group/1:b3:80ce71b1e35cd8391dd5964a252b3e3229ddcf717556d188696e8b77898a7d78",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10031375"
+        },
+        {
+          "round": 3,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:dcdad66ab21401d247ed49c09dca7fd2ea8420c819642d5a9c77022d6b748e70",
+            "group": "aether.ristretto-research-group/1:b3:80ce71b1e35cd8391dd5964a252b3e3229ddcf717556d188696e8b77898a7d78",
+            "participants": [
+              "fixture-validator-2",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10612791"
+        }
+      ],
+      "rejections": [
+        {
+          "round": 0,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        }
+      ],
+      "dkgNs": "17926000",
+      "signingNs": [
+        "2762458",
+        "2632375",
+        "2522041",
+        "2507042"
+      ],
+      "aggregateNs": [
+        "127667",
+        "124500",
+        "121875",
+        "115000"
+      ],
+      "verifyAllSharesNs": [
+        "827958",
+        "797792",
+        "758250",
+        "750667"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 9,
+      "checked": [
+        {
+          "round": 0,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:60ed7977d41cfa3003c9ee8df39e9c8521071b197769ae466c8ce85fe32b268a",
+            "group": "aether.ristretto-research-group/1:b3:997277c1ba0e983473eb8487fab86830f8da11115556aeb5d815fb7ddde9e3cc",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-3"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "8814500"
+        },
+        {
+          "round": 1,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:50c840cfd444fa881c07eb97677e1106c1c74d820d49154233fcd58b06de93fd",
+            "group": "aether.ristretto-research-group/1:b3:997277c1ba0e983473eb8487fab86830f8da11115556aeb5d815fb7ddde9e3cc",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-2",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "11147583"
+        },
+        {
+          "round": 2,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:d51151e13666a6d2b6a9bd3ad69467275694184da27d09405655d293fc109c46",
+            "group": "aether.ristretto-research-group/1:b3:997277c1ba0e983473eb8487fab86830f8da11115556aeb5d815fb7ddde9e3cc",
+            "participants": [
+              "fixture-validator-1",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "10616708"
+        },
+        {
+          "round": 3,
+          "result": {
+            "profile": "ristretto255-research-only/1",
+            "certificate": "aether.ristretto-research-certificate/1:b3:0df654d4a26d1612b70ba1f10584df16d45abebe3da10d0731b36beb724c9fca",
+            "group": "aether.ristretto-research-group/1:b3:997277c1ba0e983473eb8487fab86830f8da11115556aeb5d815fb7ddde9e3cc",
+            "participants": [
+              "fixture-validator-2",
+              "fixture-validator-3",
+              "fixture-validator-4"
+            ],
+            "productionAdmission": false
+          },
+          "verifyNs": "9329167"
+        }
+      ],
+      "rejections": [
+        {
+          "round": 0,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 0,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 1,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 2,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed view",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed phase",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed membershipEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed policyEpoch",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed candidateManifest",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed expectedParent",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed roster",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed parentBlock",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed proposal",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed family",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "changed role",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "group-signature-only",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "duplicate participation",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "forged identity signature",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "expired exact boundary",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "wrong expected group",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "unpinned verifier",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated changed-share",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated cancelling-shares",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "authenticated malformed-point",
+          "rejected": true
+        },
+        {
+          "round": 3,
+          "scenario": "Ed25519 profile substitution",
+          "rejected": true
+        }
+      ],
+      "dkgNs": "18804250",
+      "signingNs": [
+        "2672250",
+        "2756458",
+        "2485167",
+        "2427375"
+      ],
+      "aggregateNs": [
+        "131416",
+        "134416",
+        "109042",
+        "104667"
+      ],
+      "verifyAllSharesNs": [
+        "793375",
+        "767792",
+        "688209",
+        "684459"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    }
+  ],
+  "measurements": {
+    "dkgWithProcessLaunchIpcAndIdentityEnrollment": {
+      "count": 10,
+      "minNs": 17926000,
+      "medianNs": 20557792,
+      "maxNs": 23656084
+    },
+    "signingWithIpcShareVerificationAndIdentityAttestation": {
+      "count": 40,
+      "minNs": 2427375,
+      "medianNs": 2593417,
+      "maxNs": 5801333
+    },
+    "aggregate": {
+      "count": 40,
+      "minNs": 104333,
+      "medianNs": 121000,
+      "maxNs": 271500
+    },
+    "pinnedAllSharesAndGroupVerification": {
+      "count": 40,
+      "minNs": 678750,
+      "medianNs": 767792,
+      "maxNs": 1779333
+    },
+    "freshVerifierAndOpenSslIdentityAuthentication": {
+      "count": 40,
+      "minNs": 7743917,
+      "medianNs": 9905667,
+      "maxNs": 14782167
+    }
+  },
+  "limitations": [
+    "This uses D04-compatible FROST(ristretto255,SHA-512), but remains a research profile without production admission.",
+    "Four worker processes perform actual DKG/signing; trusted local plaintext IPC exposes confidential DKG deliveries to the coordinator.",
+    "Workers authenticate enrollment and complete individually-verified public transcripts with fixture identity keys, not real operator enrollment credentials.",
+    "Fresh public verification is process-separated but uses the same pinned FROST implementation; OpenSSL independently verifies Ed25519 identity attestations only.",
+    "Key custody, secure broadcast/channels, durable nonce/replay journals, membership handoff, protocol integration and independent security review remain open.",
+    "Finite same-host timings include the stated IPC/process/attestation costs; no product latency or WAN guarantee is claimed."
+  ]
+}

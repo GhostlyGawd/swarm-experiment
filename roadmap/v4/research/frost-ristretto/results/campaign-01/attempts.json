@@ -1,0 +1,72 @@
+[
+  {
+    "trial": 0,
+    "status": 0,
+    "signal": null,
+    "stderr": "",
+    "wallNs": "235632209"
+  },
+  {
+    "trial": 1,
+    "status": 0,
+    "signal": null,
+    "stderr": "",
+    "wallNs": "41863125"
+  },
+  {
+    "trial": 2,
+    "status": 0,
+    "signal": null,
+    "stderr": "",
+    "wallNs": "39865875"
+  },
+  {
+    "trial": 3,
+    "status": 0,
+    "signal": null,
+    "stderr": "",
+    "wallNs": "39841792"
+  },
+  {
+    "trial": 4,
+    "status": 0,
+    "signal": null,
+    "stderr": "",
+    "wallNs": "38007333"
+  },
+  {
+    "trial": 5,
+    "status": 0,
+    "signal": null,
+    "stderr": "",
+    "wallNs": "41236292"
+  },
+  {
+    "trial": 6,
+    "status": 0,
+    "signal": null,
+    "stderr": "",
+    "wallNs": "39903250"
+  },
+  {
+    "trial": 7,
+    "status": 0,
+    "signal": null,
+    "stderr": "",
+    "wallNs": "40778208"
+  },
+  {
+    "trial": 8,
+    "status": 0,
+    "signal": null,
+    "stderr": "",
+    "wallNs": "37243333"
+  },
+  {
+    "trial": 9,
+    "status": 0,
+    "signal": null,
+    "stderr": "",
+    "wallNs": "38546750"
+  }
+]
