@@ -12,7 +12,7 @@ Frozen before measuring `results/local-01`. This is a bounded native-process exp
 
 ## Measurement and reporting
 
-- Compile the C driver and existing ABI with local `clang -O3 -std=c11 -Wall -Wextra -Werror`. Pin compiler version, OS/CPU, git head and SHA-256 of preregistration, runner, driver, ABI, header, packed heap source and each retained fixture.
+- Compile the C driver and existing ABI with local `clang -O3 -std=c11 -Wall -Wextra -Werror`. Pin compiler version, OS/CPU, git head and SHA-256 of the executable, preregistration, runner, driver, ABI, header, transitive packed heap sources and each retained fixture. The verifier compares source hashes to both current files and the pinned Git commit, then recompiles the binary and compares its hash.
 - For each case/pattern/arm: five warmups, then seven unfiltered monotonic-clock trials. Alternate the order of the three arms by trial number to reduce fixed-order bias. Retain every raw nanosecond sample, checksum, median, maximum, and per-case ratios. No trimming or outlier rejection.
 - The independent verifier checks source/fixture hashes, parses retained fixture bytes, recomputes every logical-to-packed value/reference mapping and expected pattern checksums, and recalculates all medians, maxima and ratios from raw trials. It rejects tampered reports and missing or altered inputs. Run it against `results/local-01/report.json`.
 - Interpret wall time only as a workload locality **proxy**: no hardware cache counters, energy, process resident set, guest launch, migration, full value domain, 2 MB release, or 100M-node measurement is claimed. Preserve slowdowns and maximum-latency misses. This campaign alone cannot verify V4-T3-10/G2.
