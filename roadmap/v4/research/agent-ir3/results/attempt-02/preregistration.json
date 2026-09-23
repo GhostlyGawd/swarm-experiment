@@ -1,0 +1,64 @@
+{
+  "format": "aether.agent-ir3.campaign/1",
+  "started": "2026-09-23T05:43:26.961Z",
+  "baseline": "roadmap/v4/research/projections/results/campaign-11-generics",
+  "baselineArtifactsSha256": "aca7505a58eee44c1843267190f4263adfb0ff4dc28c0ccafef0fe1e837cb26b",
+  "baselineReportSha256": "08a206696443bfc7a555639ca2ee49772accf1849900a5ac430dcbe0edd71746",
+  "workloads": [
+    "scalar-math",
+    "loop-contract",
+    "external-effect",
+    "fixed-lazy",
+    "composite-alias-collections",
+    "full-ledger",
+    "continuation-capture-task",
+    "atomic-nested-return-fault",
+    "strings-linked-imports",
+    "generics-nested-import"
+  ],
+  "rootMessages": 30,
+  "tokenizers": [
+    "cl100k_base",
+    "o200k_base"
+  ],
+  "selection": "Fixed full V7 campaign, original root plus every original dependency; no regenerated or removed inputs. Full messages measured independently; session pays initial full snapshot and both base-bound edits. Encoder chooses full vs delta by UTF-8 byte length, not measured tokens.",
+  "hypothesis": "Shared bundle dictionaries and explicit edit reuse reduce full/session cost; 4x remains required and is evaluated without omitting identities, headers, dependencies, or base/target bindings.",
+  "sources": [
+    {
+      "path": "src/tier1/agent-ir-v3-compact.ts",
+      "sha256": "508f56687d246d60cb7568804d9d42622ba851e5c4d322d739c8a2e943c387a5"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3.ts",
+      "sha256": "d46c79a3b99ae0fd3370962a2a8fa37aef75910d102f7e726dff4384acb79f8e"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3-bounds.ts",
+      "sha256": "565788a6efc10c3fd861e74770a46917d4705abf5499ba322a3e024eeb7493da"
+    },
+    {
+      "path": "src/tier1/agent-ir.ts",
+      "sha256": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b"
+    },
+    {
+      "path": "src/tier1/agent-ir-v2.ts",
+      "sha256": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671"
+    },
+    {
+      "path": "src/tier1/ast.ts",
+      "sha256": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb"
+    },
+    {
+      "path": "src/tier1/store.ts",
+      "sha256": "b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3"
+    },
+    {
+      "path": "src/util/tokens.ts",
+      "sha256": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9"
+    },
+    {
+      "path": "roadmap/v4/research/agent-ir3/measure.mjs",
+      "sha256": "e32ba3527179f72c92d072f4f58b7431c8e9eec2ce4cac911ac01f01790b52de"
+    }
+  ]
+}

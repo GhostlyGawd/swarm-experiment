@@ -16,6 +16,7 @@ export { CausalLineageLedger, LineageAdmissionError, signSpecRevision, signInten
 export { CognitiveBlackboard, type BlackboardItem, type BlackboardAcl, type BlackboardPolicy, type BlackboardEntry, type BlackboardView, type CognitiveBlackboardOptions } from './tier1/cognitive-blackboard.ts';
 export { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, type SemanticGcProfile, type SemanticGcOptions, type SemanticGcPolicy, type SemanticGcProposal, type SemanticRetention, type SemanticRetentionKind } from './tier1/semantic-gc.ts';
 export { SemanticAdapterGarbageCollector, declarativeAdapterTableDigest, type DeclarativeAdapterRegistration, type DeclarativeAdapterTable, type AdapterRetirementProposal, type SemanticAdapterGcOptions } from './tier1/semantic-gc-adapters.ts';
+export { agentIr3Snapshot, encodeAgentIr3, decodeAgentIr3, AGENT_IR3_PROFILE, AGENT_IR3_LIMITS, type AgentIr3Snapshot, type AgentIr3Format } from './tier1/agent-ir-v3.ts';
 export { DurableTreeWorkspace, type TreeWorkspaceOptions, type TreePlacement, type TreeMutation, type TreeFence, type TreeCheckpoint, type TreeCheckpointAck, type TreeCheckpointCertificate } from './tier1/tree-workspace.ts';
 export { allocateFractionalPosition, compareFractionalPositions, parseFractionalPosition } from './tier1/fractional-position.ts';
 export { projectOccurrences, occurrenceIdForInsert, type OccurrenceNode, type OccurrenceProjection, type TreeDiagnostic } from './tier1/occurrence-tree.ts';

@@ -1,0 +1,535 @@
+{
+  "format": "aether.agent-ir3.campaign/1",
+  "started": "2026-09-23T05:53:10.576Z",
+  "baseline": "roadmap/v4/research/projections/results/campaign-11-generics",
+  "baselineArtifactsSha256": "aca7505a58eee44c1843267190f4263adfb0ff4dc28c0ccafef0fe1e837cb26b",
+  "baselineReportSha256": "08a206696443bfc7a555639ca2ee49772accf1849900a5ac430dcbe0edd71746",
+  "workloads": [
+    "scalar-math",
+    "loop-contract",
+    "external-effect",
+    "fixed-lazy",
+    "composite-alias-collections",
+    "full-ledger",
+    "continuation-capture-task",
+    "atomic-nested-return-fault",
+    "strings-linked-imports",
+    "generics-nested-import"
+  ],
+  "rootMessages": 30,
+  "tokenizers": [
+    "cl100k_base",
+    "o200k_base"
+  ],
+  "selection": "Fixed full V7 campaign, original root plus every original dependency; no regenerated or removed inputs. Full messages measured independently; session pays initial full snapshot and both base-bound edits. Encoder chooses full/delta and supported opcode spellings by UTF-8 byte length, not measured tokens.",
+  "hypothesis": "Shared bundle dictionaries and explicit edit reuse reduce full/session cost; 4x remains required and is evaluated without omitting identities, headers, dependencies, or base/target bindings.",
+  "sources": [
+    {
+      "path": "test/tier1/agent-ir-v3.test.ts",
+      "sha256": "cb531e940ab66ebef45f08ea525ca399ac74d29de73e85df23c4bb7ca8cad58d"
+    },
+    {
+      "path": "roadmap/v4/research/agent-ir3/verify.mjs",
+      "sha256": "50d336fe8d65d0ec2f3c19effb185c83bec321b7250ca0d798680e8315112d03"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3-compact.ts",
+      "sha256": "508f56687d246d60cb7568804d9d42622ba851e5c4d322d739c8a2e943c387a5"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3.ts",
+      "sha256": "ccc0ae236230bd8dfecf0c3682e7457b1860a5773ff9b495c6041fe6a045eb1c"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3-bounds.ts",
+      "sha256": "0d48117496330c4427cd88ea4f154aadf7106c9b32c259b255baf81694fee7bf"
+    },
+    {
+      "path": "src/tier1/agent-ir.ts",
+      "sha256": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b"
+    },
+    {
+      "path": "src/tier1/agent-ir-v2.ts",
+      "sha256": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671"
+    },
+    {
+      "path": "src/tier1/ast.ts",
+      "sha256": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb"
+    },
+    {
+      "path": "src/tier1/store.ts",
+      "sha256": "b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3"
+    },
+    {
+      "path": "src/util/tokens.ts",
+      "sha256": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9"
+    },
+    {
+      "path": "roadmap/v4/research/agent-ir3/measure.mjs",
+      "sha256": "b64cfd7e8ae262330d63f34dc0ec8264ead45eb92d9a7663c73e85eb091db809"
+    }
+  ],
+  "completed": "2026-09-23T05:53:11.739Z",
+  "codecHeader": [
+    "AE3C",
+    "F"
+  ],
+  "node": "v26.7.0",
+  "git": "65fcc2f7be3a2afd86c68bd8c576d469c6e56101",
+  "tokenizerPackage": "1.0.21",
+  "rows": [
+    {
+      "workload": "scalar-math",
+      "tokenizer": "cl100k_base",
+      "baselineLegacyCold": 85,
+      "baselineAe2Cold": 222,
+      "baselineLegacySession": 255,
+      "baselineAe2Session": 686,
+      "baselineAe1Session": 333,
+      "cold": 210,
+      "fullMessages": [
+        210,
+        210,
+        210
+      ],
+      "sessionMessages": [
+        210,
+        95,
+        95
+      ],
+      "session": 400
+    },
+    {
+      "workload": "scalar-math",
+      "tokenizer": "o200k_base",
+      "baselineLegacyCold": 85,
+      "baselineAe2Cold": 223,
+      "baselineLegacySession": 255,
+      "baselineAe2Session": 689,
+      "baselineAe1Session": 334,
+      "cold": 211,
+      "fullMessages": [
+        211,
+        211,
+        211
+      ],
+      "sessionMessages": [
+        211,
+        95,
+        95
+      ],
+      "session": 401
+    },
+    {
+      "workload": "loop-contract",
+      "tokenizer": "cl100k_base",
+      "baselineLegacyCold": 118,
+      "baselineAe2Cold": 235,
+      "baselineLegacySession": 354,
+      "baselineAe2Session": 710,
+      "baselineAe1Session": 361,
+      "cold": 212,
+      "fullMessages": [
+        212,
+        212,
+        212
+      ],
+      "sessionMessages": [
+        212,
+        95,
+        95
+      ],
+      "session": 402
+    },
+    {
+      "workload": "loop-contract",
+      "tokenizer": "o200k_base",
+      "baselineLegacyCold": 118,
+      "baselineAe2Cold": 235,
+      "baselineLegacySession": 354,
+      "baselineAe2Session": 711,
+      "baselineAe1Session": 361,
+      "cold": 212,
+      "fullMessages": [
+        212,
+        212,
+        212
+      ],
+      "sessionMessages": [
+        212,
+        95,
+        95
+      ],
+      "session": 402
+    },
+    {
+      "workload": "external-effect",
+      "tokenizer": "cl100k_base",
+      "baselineLegacyCold": 53,
+      "baselineAe2Cold": 140,
+      "baselineLegacySession": 159,
+      "baselineAe2Session": 426,
+      "baselineAe1Session": 161,
+      "cold": 133,
+      "fullMessages": [
+        133,
+        133,
+        133
+      ],
+      "sessionMessages": [
+        133,
+        97,
+        97
+      ],
+      "session": 327
+    },
+    {
+      "workload": "external-effect",
+      "tokenizer": "o200k_base",
+      "baselineLegacyCold": 54,
+      "baselineAe2Cold": 140,
+      "baselineLegacySession": 162,
+      "baselineAe2Session": 428,
+      "baselineAe1Session": 161,
+      "cold": 133,
+      "fullMessages": [
+        133,
+        133,
+        133
+      ],
+      "sessionMessages": [
+        133,
+        97,
+        97
+      ],
+      "session": 327
+    },
+    {
+      "workload": "fixed-lazy",
+      "tokenizer": "cl100k_base",
+      "baselineLegacyCold": 86,
+      "baselineAe2Cold": 166,
+      "baselineLegacySession": 258,
+      "baselineAe2Session": 487,
+      "baselineAe1Session": 212,
+      "cold": 152,
+      "fullMessages": [
+        152,
+        152,
+        152
+      ],
+      "sessionMessages": [
+        152,
+        95,
+        95
+      ],
+      "session": 342
+    },
+    {
+      "workload": "fixed-lazy",
+      "tokenizer": "o200k_base",
+      "baselineLegacyCold": 86,
+      "baselineAe2Cold": 163,
+      "baselineLegacySession": 258,
+      "baselineAe2Session": 478,
+      "baselineAe1Session": 209,
+      "cold": 152,
+      "fullMessages": [
+        152,
+        152,
+        152
+      ],
+      "sessionMessages": [
+        152,
+        95,
+        95
+      ],
+      "session": 342
+    },
+    {
+      "workload": "composite-alias-collections",
+      "tokenizer": "cl100k_base",
+      "baselineLegacyCold": 162,
+      "baselineAe2Cold": 366,
+      "baselineLegacySession": 486,
+      "baselineAe2Session": 1089,
+      "baselineAe1Session": 518,
+      "cold": 331,
+      "fullMessages": [
+        331,
+        331,
+        331
+      ],
+      "sessionMessages": [
+        331,
+        95,
+        95
+      ],
+      "session": 521
+    },
+    {
+      "workload": "composite-alias-collections",
+      "tokenizer": "o200k_base",
+      "baselineLegacyCold": 165,
+      "baselineAe2Cold": 364,
+      "baselineLegacySession": 495,
+      "baselineAe2Session": 1081,
+      "baselineAe1Session": 515,
+      "cold": 331,
+      "fullMessages": [
+        331,
+        331,
+        331
+      ],
+      "sessionMessages": [
+        331,
+        95,
+        95
+      ],
+      "session": 521
+    },
+    {
+      "workload": "full-ledger",
+      "tokenizer": "cl100k_base",
+      "baselineLegacyCold": 878,
+      "baselineAe2Cold": 977,
+      "baselineLegacySession": 2634,
+      "baselineAe2Session": 2938,
+      "baselineAe1Session": 1701,
+      "cold": 899,
+      "fullMessages": [
+        899,
+        899,
+        899
+      ],
+      "sessionMessages": [
+        899,
+        105,
+        105
+      ],
+      "session": 1109
+    },
+    {
+      "workload": "full-ledger",
+      "tokenizer": "o200k_base",
+      "baselineLegacyCold": 886,
+      "baselineAe2Cold": 974,
+      "baselineLegacySession": 2658,
+      "baselineAe2Session": 2930,
+      "baselineAe1Session": 1695,
+      "cold": 904,
+      "fullMessages": [
+        904,
+        904,
+        904
+      ],
+      "sessionMessages": [
+        904,
+        105,
+        105
+      ],
+      "session": 1114
+    },
+    {
+      "workload": "continuation-capture-task",
+      "tokenizer": "cl100k_base",
+      "baselineLegacyCold": 96,
+      "baselineAe2Cold": 261,
+      "baselineLegacySession": 288,
+      "baselineAe2Session": 781,
+      "baselineAe1Session": 339,
+      "cold": 230,
+      "fullMessages": [
+        230,
+        230,
+        230
+      ],
+      "sessionMessages": [
+        230,
+        93,
+        93
+      ],
+      "session": 416
+    },
+    {
+      "workload": "continuation-capture-task",
+      "tokenizer": "o200k_base",
+      "baselineLegacyCold": 98,
+      "baselineAe2Cold": 258,
+      "baselineLegacySession": 294,
+      "baselineAe2Session": 772,
+      "baselineAe1Session": 336,
+      "cold": 230,
+      "fullMessages": [
+        230,
+        230,
+        230
+      ],
+      "sessionMessages": [
+        230,
+        93,
+        93
+      ],
+      "session": 416
+    },
+    {
+      "workload": "atomic-nested-return-fault",
+      "tokenizer": "cl100k_base",
+      "baselineLegacyCold": 671,
+      "baselineAe2Cold": 855,
+      "baselineLegacySession": 2013,
+      "baselineAe2Session": 2565,
+      "baselineAe1Session": 1582,
+      "cold": 802,
+      "fullMessages": [
+        802,
+        802,
+        802
+      ],
+      "sessionMessages": [
+        802,
+        93,
+        93
+      ],
+      "session": 988
+    },
+    {
+      "workload": "atomic-nested-return-fault",
+      "tokenizer": "o200k_base",
+      "baselineLegacyCold": 677,
+      "baselineAe2Cold": 851,
+      "baselineLegacySession": 2031,
+      "baselineAe2Session": 2553,
+      "baselineAe1Session": 1574,
+      "cold": 801,
+      "fullMessages": [
+        801,
+        801,
+        801
+      ],
+      "sessionMessages": [
+        801,
+        93,
+        93
+      ],
+      "session": 987
+    },
+    {
+      "workload": "strings-linked-imports",
+      "tokenizer": "cl100k_base",
+      "baselineLegacyCold": 435,
+      "baselineAe2Cold": 1585,
+      "baselineLegacySession": 1305,
+      "baselineAe2Session": 4767,
+      "baselineAe1Session": 1315,
+      "cold": 725,
+      "fullMessages": [
+        725,
+        725,
+        725
+      ],
+      "sessionMessages": [
+        725,
+        97,
+        97
+      ],
+      "session": 919
+    },
+    {
+      "workload": "strings-linked-imports",
+      "tokenizer": "o200k_base",
+      "baselineLegacyCold": 435,
+      "baselineAe2Cold": 1574,
+      "baselineLegacySession": 1305,
+      "baselineAe2Session": 4737,
+      "baselineAe1Session": 1320,
+      "cold": 726,
+      "fullMessages": [
+        726,
+        726,
+        726
+      ],
+      "sessionMessages": [
+        726,
+        97,
+        97
+      ],
+      "session": 920
+    },
+    {
+      "workload": "generics-nested-import",
+      "tokenizer": "cl100k_base",
+      "baselineLegacyCold": 663,
+      "baselineAe2Cold": 1725,
+      "baselineLegacySession": 1989,
+      "baselineAe2Session": 5178,
+      "baselineAe1Session": 2804,
+      "cold": 1340,
+      "fullMessages": [
+        1340,
+        1340,
+        1340
+      ],
+      "sessionMessages": [
+        1340,
+        95,
+        95
+      ],
+      "session": 1530
+    },
+    {
+      "workload": "generics-nested-import",
+      "tokenizer": "o200k_base",
+      "baselineLegacyCold": 668,
+      "baselineAe2Cold": 1711,
+      "baselineLegacySession": 2004,
+      "baselineAe2Session": 5137,
+      "baselineAe1Session": 2801,
+      "cold": 1340,
+      "fullMessages": [
+        1340,
+        1340,
+        1340
+      ],
+      "sessionMessages": [
+        1340,
+        95,
+        95
+      ],
+      "session": 1530
+    }
+  ],
+  "aggregate": [
+    {
+      "tokenizer": "cl100k_base",
+      "cold": 5034,
+      "session": 6954,
+      "legacyCold": 3247,
+      "ae2Cold": 6532,
+      "legacySession": 9741,
+      "ae2Session": 19627,
+      "legacyToCandidateCold": 0.6450139054429876,
+      "legacyToCandidateSession": 1.4007765314926661,
+      "coldReductionFromAe2": 0.22933251684017142,
+      "sessionReductionFromAe2": 0.6456921587608906,
+      "meetsFourfoldCold": false,
+      "meetsFourfoldSession": false
+    },
+    {
+      "tokenizer": "o200k_base",
+      "cold": 5040,
+      "session": 6960,
+      "legacyCold": 3272,
+      "ae2Cold": 6493,
+      "legacySession": 9816,
+      "ae2Session": 19516,
+      "legacyToCandidateCold": 0.6492063492063492,
+      "legacyToCandidateSession": 1.410344827586207,
+      "coldReductionFromAe2": 0.2237794547974742,
+      "sessionReductionFromAe2": 0.6433695429391268,
+      "meetsFourfoldCold": false,
+      "meetsFourfoldSession": false
+    }
+  ],
+  "qualifiedReleaseDensity": false
+}

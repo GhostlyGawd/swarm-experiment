@@ -22,3 +22,4 @@ export * from './provenance.ts';
 export { IrContext, decode, encode, type AgentIr } from './agent-ir.ts';
 export * as build from './build.ts';
 export { encodeAgentIrBinary, decodeAgentIrBinary, encodeAgentIrModel, decodeAgentIrModel, AGENT_IR_V2_LIMITS } from './agent-ir-v2.ts';
+export { agentIr3Snapshot, encodeAgentIr3, decodeAgentIr3, AGENT_IR3_PROFILE, AGENT_IR3_LIMITS, type AgentIr3Snapshot, type AgentIr3Format } from './agent-ir-v3.ts';
