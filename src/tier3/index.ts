@@ -9,7 +9,7 @@ export { LivingCampaign, LIVING_CAMPAIGN_PROFILE, measureR04JsonEvents, type Cam
 export { generateCase, materialise, shrinkPlain, type Plain } from './generate.ts';
 export type { ProductionSnapshot } from './heap-state.ts';
 export { BrokerEffectRouter, EffectInvocationError, type RuntimeEffectRouter, type RuntimeEffectRouterOptions } from './effects.ts';
-export { ResumableRuntime, type ResumableRuntimeOptions, type ResumableRunResult, type ResumableRef, type ResumableEffects } from './resumable-runtime.ts';
+export { ResumableRuntime, type ResumableRuntimeOptions, type ResumableRunResult, type ResumableRef, type ResumableEffects, type PackedCandidateSubject } from './resumable-runtime.ts';
 export { ResumableCheckpointStore, type ResumableCheckpointOptions, type CheckpointHead, type CheckpointPersistenceFault } from './resumable-checkpoint.ts';
 export { compileResumableProgram, type ResumableProgram, type ResumableCode } from './resumable-program.ts';
 export { checkpointDigest, type ResumableSnapshot, type MachineCore, type MachineEvent, type MachineValue } from './resumable-state.ts';

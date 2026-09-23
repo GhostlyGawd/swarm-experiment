@@ -143,7 +143,8 @@ export function validateResumableSnapshot(value: unknown, program: ResumableProg
     for (const delta of event.delta) { exactObject(delta, ['section', 'before', 'after']); if (!fields.includes(delta.section) || sections.has(delta.section)) throw new TypeError('invalid checkpoint inverse delta'); sections.add(delta.section); }
     const instruction = program.codes.find(code => code.id === event.code)?.instructions[event.pc];
     const rewind = snapshot.format === 'aether.resumable-state/2' && /^rewind-v1:[1-9][0-9]*$/.test(event.op);
-    if (!Number.isSafeInteger(event.pc) || event.pc < 0 || (event.code === 'host' ? !rewind && !['allocate', 'correction', 'retry-reconciled-effect'].includes(event.op) : event.op !== 'start' && instruction?.op !== event.op)) throw new TypeError('checkpoint event does not name a bound instruction');
+    const packedCorrection = /^packed-correction:aether\.packed-candidate-correction\/1:b3:[0-9a-f]{64}$/.test(event.op);
+    if (!Number.isSafeInteger(event.pc) || event.pc < 0 || (event.code === 'host' ? !rewind && !packedCorrection && !['allocate', 'correction', 'retry-reconciled-effect'].includes(event.op) : event.op !== 'start' && instruction?.op !== event.op)) throw new TypeError('checkpoint event does not name a bound instruction');
     if (event.effect !== null) {
       exactObject(event.effect, ['source', 'request', 'outcome']);
       if (!['live', 'recorded', 'isolated'].includes(event.effect.source) || (snapshot.core.mode === 'live') !== (event.effect.source === 'live')) throw new TypeError('checkpoint effect source/mode mismatch'); validateEffectRequest(event.effect.request); effectReplayOutcomeDigest(event.effect.outcome);
@@ -175,9 +176,28 @@ export function validateResumableSnapshot(value: unknown, program: ResumableProg
       if (!code || code.kind !== 'function' || event.pc !== 0 || before.frames.length || before.state === 'running' || before.state === 'blocked' || afterCore.frames.length !== 1 || afterCore.frames[0].code !== code.id || afterCore.frames[0].pc !== 0 || afterCore.state !== 'running') throw new TypeError('invalid checkpoint start provenance');
     } else if (event.code === 'host') {
       if (event.pc !== 0) throw new TypeError('invalid checkpoint host program counter');
+      const packedCorrection = /^packed-correction:aether\.packed-candidate-correction\/1:b3:[0-9a-f]{64}$/.test(event.op);
       if (event.op === 'allocate' && (before.frames.length || before.state === 'running' || before.state === 'blocked')) throw new TypeError('host allocation outside idle safe point');
       if (event.op === 'retry-reconciled-effect' && (before.state !== 'blocked' || afterCore.state !== 'running' || afterCore.fault !== null || Buffer.compare(encodeCanonical(before.frames, MACHINE_LIMITS), encodeCanonical(afterCore.frames, MACHINE_LIMITS)))) throw new TypeError('invalid checkpoint retry provenance');
       if (event.op === 'correction' && event.delta.some(delta => !['records', 'environments', 'sequences', 'results', 'nextSequence', 'nextResult'].includes(delta.section))) throw new TypeError('correction changed protected execution control');
+      if (packedCorrection) {
+        if (event.effect !== null || event.delta.length !== 1 || event.delta[0].section !== 'records' || before.records.length !== afterCore.records.length) throw new TypeError('invalid packed correction delta');
+        let changed = false;
+        for (let row = 0; row < before.records.length; row++) {
+          const prior = before.records[row], next = afterCore.records[row];
+          if (prior.id !== next.id || prior.epoch !== next.epoch ||
+              Buffer.compare(encodeCanonical(prior.ty, MACHINE_LIMITS), encodeCanonical(next.ty, MACHINE_LIMITS)) ||
+              prior.fields.length !== next.fields.length) throw new TypeError('packed correction changed row identity or type');
+          let rowChanged = false;
+          for (let field = 0; field < prior.fields.length; field++) {
+            if (prior.fields[field][0] !== next.fields[field][0]) throw new TypeError('packed correction changed field identity');
+            if (Buffer.compare(encodeCanonical(prior.fields[field][1], MACHINE_LIMITS), encodeCanonical(next.fields[field][1], MACHINE_LIMITS))) rowChanged = true;
+          }
+          if (next.version !== String(BigInt(prior.version) + (rowChanged ? 1n : 0n))) throw new TypeError('packed correction row version mismatch');
+          changed ||= rowChanged;
+        }
+        if (!changed) throw new TypeError('empty packed correction event');
+      }
     } else {
       const top = before.frames.at(-1);
       if (!code || before.state !== 'running' || !top || top.code !== event.code || top.pc !== event.pc || code.instructions[event.pc]?.op !== event.op) throw new TypeError('checkpoint instruction/frame provenance mismatch');

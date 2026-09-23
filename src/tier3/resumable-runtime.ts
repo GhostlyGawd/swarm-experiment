@@ -9,6 +9,7 @@ import { underlying } from '../tier2/typecheck.ts';
 import { isRef, isSeqValue, isResultValue, isTaskValue, isClosureValue, type Value, type Ref } from './values.ts';
 import { validateMachineArguments, validateMachineResult, instantiateMachineType } from './resumable-types.ts';
 import { compileResumableProgram, type ResumableCode, type ResumableProgram } from './resumable-program.ts';
+import { PackedHeap, unpackResumableCheckpoint, type PackedHeapImage, type PackedResumableCheckpoint } from './packed-heap.ts';
 import { MAX_MACHINE_EVENTS, MACHINE_LIMITS, checkpointDigest, emptyEventHead, eventDigest, machineClone, machineDigest, validateMachineCore, validateMachineValue, validateResumableSnapshot, type MachineCore, type MachineValue, type MachineFrame, type MachineEnvironment, type MachineCapture, type MachineEvent, type MachineSection, type ResumableSnapshot } from './resumable-state.ts';
 
 const executionSnapshots = new WeakMap<object, { digest: Digest; origin: Digest; program: Digest }>();
@@ -39,7 +40,20 @@ export interface ResumableRuntimeOptions {
   readonly maxCheckpointBytes?: number;
   readonly onSafePoint?: (event: MachineEvent, runtime: ResumableRuntime) => void;
   readonly authorizeCorrection?: (snapshot: ResumableSnapshot) => boolean;
+  /** Separate authority for one exact native candidate, bound to the current
+   * checkpoint, program, layout and candidate image digests. */
+  readonly authorizePackedCandidate?: (snapshot: ResumableSnapshot, subject: PackedCandidateSubject) => boolean;
   readonly fault?: (point: 'before-effect' | 'after-effect' | 'before-instruction-commit' | 'after-instruction-commit') => void;
+}
+export interface PackedCandidateSubject {
+  readonly format: 'aether.packed-candidate-correction/1';
+  readonly sourceSnapshotDigest: Digest;
+  readonly sourceImageDigest: Digest;
+  readonly candidateImageDigest: Digest;
+  readonly layoutDigest: Digest;
+  readonly programDigest: Digest;
+  readonly manifestDigest: Digest;
+  readonly changesDigest: Digest;
 }
 export type ResumableRunResult = { readonly state: MachineCore['state']; readonly value: MachineValue | null; readonly fault: MachineCore['fault']; readonly steps: number };
 class MachineFault extends Error { readonly kind: string; readonly recoveryId: string | null; constructor(kind: string, message: string, recoveryId: string | null = null) { super(message); this.kind = kind; this.recoveryId = recoveryId; } }
@@ -448,5 +462,55 @@ export class ResumableRuntime {
       const row = this.record(this.hostReference(reference)), entry = row.fields.find(([name]) => name === field);
       if (!entry) throw new TypeError('unknown corrected field'); entry[1] = this.importValue(value); row.version = String(BigInt(row.version) + 1n);
     });
+  }
+  /** Commit a native candidate as one host correction event after validating
+   * its exact source and obtaining candidate-specific trusted authorization.
+   * Candidate bytes alone never become an event-bound checkpoint. */
+  commitPackedCandidate(sourceInput: PackedResumableCheckpoint, candidateInput: PackedHeapImage,
+    expectedSourceDigest: Digest, expectedLayoutDigest: Digest): {
+      readonly subjectDigest: Digest; readonly snapshotDigest: Digest; readonly eventCursor: string; readonly changedFields: number
+    } {
+    const source = machineClone(sourceInput), candidate = machineClone(candidateInput);
+    const original = unpackResumableCheckpoint(source, this.program, expectedSourceDigest, expectedLayoutDigest);
+    const current = this.snapshot();
+    if (checkpointDigest(current) !== expectedSourceDigest || !equalBytes(current, original)) throw new TypeError('stale packed candidate source checkpoint');
+    if (current.core.state === 'blocked') throw new TypeError('packed candidate cannot bypass blocked effect reconciliation');
+    const heap = PackedHeap.fromImage(candidate, expectedLayoutDigest);
+    const sameHeader = (image: PackedHeapImage) => ({ format: image.format, heapId: image.heapId,
+      layouts: image.layouts, layoutDigest: image.layoutDigest, rows: image.rows });
+    if (!equalBytes(sameHeader(source.heap), sameHeader(candidate))) throw new TypeError('native candidate changed packed layout or logical row identity');
+    const records = heap.unpack(), changes: { row: number; field: number; value: MachineValue }[] = [];
+    for (let row = 0; row < records.length; row++) {
+      const before = original.core.records[row], after = records[row];
+      if (!before || !after || before.fields.length !== after.fields.length) throw new TypeError('native candidate row shape changed');
+      for (let field = 0; field < before.fields.length; field++) {
+        if (before.fields[field][0] !== after.fields[field][0]) throw new TypeError('native candidate field shape changed');
+        if (!equalBytes(before.fields[field][1], after.fields[field][1])) changes.push({ row, field, value: after.fields[field][1] });
+      }
+    }
+    const subject: PackedCandidateSubject = Object.freeze({ format: 'aether.packed-candidate-correction/1',
+      sourceSnapshotDigest: expectedSourceDigest, sourceImageDigest: source.heap.imageDigest,
+      candidateImageDigest: candidate.imageDigest, layoutDigest: expectedLayoutDigest,
+      programDigest: this.program.digest, manifestDigest: this.program.manifestDigest,
+      changesDigest: domainDigest('aether.packed-candidate-changes/1', changes, MACHINE_LIMITS) });
+    const subjectDigest = domainDigest('aether.packed-candidate-correction/1', subject, MACHINE_LIMITS);
+    if (this.options.authorizeCorrection?.(current) !== true || this.options.authorizePackedCandidate?.(current, subject) !== true)
+      throw new Error('host did not authorize packed candidate correction');
+    if (checkpointDigest(this.snapshot()) !== expectedSourceDigest) throw new TypeError('packed candidate source changed during authorization');
+    if (changes.length) this.hostMutation(`packed-correction:${subjectDigest}`, () => {
+      const touched = new Set<number>();
+      for (const change of changes) {
+        const row = this.core.records[change.row], expected = original.core.records[change.row];
+        if (!row || row.id !== expected.id || row.epoch !== expected.epoch) throw new TypeError('packed candidate row changed during commit');
+        row.fields[change.field][1] = machineClone(change.value);
+        touched.add(change.row);
+      }
+      for (const index of touched) this.core.records[index].version = String(BigInt(this.core.records[index].version) + 1n);
+      const repacked = PackedHeap.pack(this.core.records, this.core.heapId, candidate.layouts).image();
+      if (repacked.bytes !== candidate.bytes || repacked.stringBytes !== candidate.stringBytes ||
+          !equalBytes(repacked.stringEntries ?? [], candidate.stringEntries ?? [])) throw new TypeError('native candidate did not map to corrected logical state');
+    });
+    const committed = this.snapshot();
+    return { subjectDigest, snapshotDigest: checkpointDigest(committed), eventCursor: committed.eventCursor, changedFields: changes.length };
   }
 }

@@ -56,7 +56,7 @@ export { dischargeProof, formatReport, verifyFunction, type Obligation, type Ver
 export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec, type SpecRule } from './tier2/spec.ts';
 
 // --- Tier 3: execution and simulation ---------------------------------------
-export { ResumableRuntime, type ResumableRuntimeOptions, type ResumableRunResult, type ResumableRef, type ResumableEffects } from './tier3/resumable-runtime.ts';
+export { ResumableRuntime, type ResumableRuntimeOptions, type ResumableRunResult, type ResumableRef, type ResumableEffects, type PackedCandidateSubject } from './tier3/resumable-runtime.ts';
 export { ResumableCheckpointStore, type ResumableCheckpointOptions, type CheckpointHead, type CheckpointPersistenceFault } from './tier3/resumable-checkpoint.ts';
 export { compileResumableProgram, type ResumableProgram, type ResumableCode } from './tier3/resumable-program.ts';
 export { checkpointDigest, type ResumableSnapshot, type MachineCore, type MachineEvent, type MachineValue } from './tier3/resumable-state.ts';

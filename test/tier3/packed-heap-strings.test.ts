@@ -9,7 +9,6 @@ import { domainDigest, type ExecutionManifestV1 } from '../../src/fabric/identit
 import { MACHINE_LIMITS, checkpointDigest, type MachineRecord } from '../../src/tier3/resumable-state.ts';
 import { ResumableRuntime } from '../../src/tier3/resumable-runtime.ts';
 import { PackedHeap, migratePackedHeap, migratePackedResumableCheckpoint, packResumableCheckpoint, unpackResumableCheckpoint, type PackedHeapImage, type PackedLayout } from '../../src/tier3/packed-heap.ts';
-import { executePackedCheckpointNative } from '../../roadmap/v4/research/packed-native-bridge/bridge.ts';
 
 const name = typeName('type:test:packed_string_node');
 const ty = { t: 'Record' as const, name, fields: [['text', b.Str], ['copy', b.Str], ['link', b.Unit]] as const };
@@ -138,8 +137,6 @@ test('real resumable v2 checkpoint restores strings and aliases; rehashed dictio
   runtime.correctRecord(first, 'link', second); runtime.correctRecord(second, 'link', first);
   const before = runtime.snapshot(), expected = checkpointDigest(before), packed = packResumableCheckpoint(before, runtime.program, [layout]);
   assert.equal(packed.format, 'aether.packed-resumable-checkpoint/2');
-  assert.throws(() => executePackedCheckpointNative({ packed, program: runtime.program, expectedSnapshotDigest: expected,
-    expectedLayoutDigest: packed.heap.layoutDigest, executable: '/nonexistent-packed-string-guest', expectedExecutableSha256: 'sha256:unused', operations: [] }), /does not support packed string images/);
   const restored = unpackResumableCheckpoint(packed, runtime.program, expected, packed.heap.layoutDigest);
   assert.deepEqual(plain(restored), plain(before));
   const resumed = fixture.runtime(); resumed.restore(restored, expected);
