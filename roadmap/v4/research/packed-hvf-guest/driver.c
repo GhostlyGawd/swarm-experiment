@@ -53,8 +53,7 @@ int main(int argc,char **argv) {
   hv_return_t code=hv_vm_create(NULL);if(code!=HV_SUCCESS)return failure("hv_vm_create",code);
 #define HV(call,stage) do {code=(call);if(code!=HV_SUCCESS)return failure((stage),code);} while(0)
   HV(hv_vm_map(memory,base,page,HV_MEMORY_READ|HV_MEMORY_EXEC),"map RX code");
-  HV(hv_vm_map(frame,base+page,page*2,HV_MEMORY_READ|HV_MEMORY_WRITE),"map RW frame");
-  HV(hv_vm_map((unsigned char*)memory+page*3,base+page*3,page,HV_MEMORY_READ|HV_MEMORY_WRITE),"map RW stack");
+  HV(hv_vm_map(frame,base+page,page*3,HV_MEMORY_READ|HV_MEMORY_WRITE),"map RW frame and stack");
   hv_vcpu_t cpu;hv_vcpu_exit_t *exit_info=NULL;
   HV(hv_vcpu_create(&cpu,&exit_info,NULL),"hv_vcpu_create");
   HV(hv_vcpu_set_reg(cpu,HV_REG_PC,base),"set PC");
