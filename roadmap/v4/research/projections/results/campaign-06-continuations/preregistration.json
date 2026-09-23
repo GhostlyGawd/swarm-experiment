@@ -1,0 +1,78 @@
+{
+  "format": "aether.projection-token-campaign/1",
+  "createdAt": "2026-09-23T03:51:29.068Z",
+  "tokenizers": [
+    "cl100k_base",
+    "o200k_base"
+  ],
+  "workloads": [
+    "scalar-math",
+    "loop-contract",
+    "external-effect",
+    "fixed-lazy",
+    "composite-alias-collections",
+    "full-ledger",
+    "continuation-capture-task"
+  ],
+  "session": "one original complete module and two complete-module replacements; every message includes framing/dictionary overhead",
+  "densityGoal": 4,
+  "scope": "Small authored scalar corpus, no representative-production or release density qualification. Legacy TS review syntax is a diagnostic baseline; native v2 metadata/runtime overhead is reported separately.",
+  "sources": [
+    {
+      "path": "src/projection/executable-continuations.ts",
+      "sha256": "f45ae8a31d4c35331d63724a6424b0f303560826fe1381aff37e4e872dde9521"
+    },
+    {
+      "path": "src/projection/executable-continuation-plan.ts",
+      "sha256": "5a485445e949091b59c347c270a0c8ef760aa02bbda1c873d7973fe6710ea28d"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus-continuations.ts",
+      "sha256": "538f65731f91af3947069966386ca1d77a24823afa1a2cc31d01acd5cf5a88ed"
+    },
+    {
+      "path": "src/projection/executable-composites.ts",
+      "sha256": "e4a272e67dc1341f510fff032668e40582efc62dc8aa138c7fc1d57d9174cb97"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus-composites.ts",
+      "sha256": "7d9c23377fc94d1c58e8142e4b085d282cb35a82aa996d6fa19e10828d9d2ddb"
+    },
+    {
+      "path": "src/tier1/agent-ir-v2.ts",
+      "sha256": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671"
+    },
+    {
+      "path": "src/tier1/agent-ir.ts",
+      "sha256": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b"
+    },
+    {
+      "path": "src/projection/executable.ts",
+      "sha256": "7264b5e718367ef68ad171646db0c66a852f4087e2ae19fc4814b79898ca4f63"
+    },
+    {
+      "path": "src/projection/executable-runtime.ts",
+      "sha256": "e357d7a1fecbf3c03d20661747bbd18457cebea962ef246ea0feb480a16325fe"
+    },
+    {
+      "path": "src/projection/typescript.ts",
+      "sha256": "952e790f7da01ab12dd2fa0a247c7ac1699e106462c70fe388fe9923e592594a"
+    },
+    {
+      "path": "src/util/tokens.ts",
+      "sha256": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus.ts",
+      "sha256": "1ba712e5dabe13991272f0075f6ac485c1c1a543804628e94aecd852a8d87304"
+    },
+    {
+      "path": "roadmap/v4/research/projections/measure.mjs",
+      "sha256": "572338a89bd8f194faa9fbc1575fac100b6fab0311c8ccd69c66061250d4f6a2"
+    },
+    {
+      "path": "roadmap/v4/research/projections/Cargo.lock",
+      "sha256": "d04dcb5467cd0c7a1252561be05befdc2cadd456fd285506c04225ea7ec1d58e"
+    }
+  ]
+}
