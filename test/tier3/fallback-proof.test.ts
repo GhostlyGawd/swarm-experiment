@@ -51,6 +51,8 @@ test('independent scalar Tier 2 proof binds the exact executed declaration and r
     assert.equal(runtime.conservativeProofDigest, checkConservativeFallbackProof(f.module, f.manifest, f.tier2, f.proof));
     const result = runtime.call([{ tag: 'int', value: '7' }], { operationId: 'proved-fallback', tokens: runtime.issueTokens() });
     assert.deepEqual(JSON.parse(JSON.stringify(result)), { state: 'completed', tier: 2, operationId: 'proved-fallback', value: { tag: 'int', value: '8' }, productionAuthorized: false });
+    assert.throws(() => new FallbackTreeRuntime({ directory, module: f.module, manifest: f.manifest, tier1: f.tier1, tier2: f.tier2,
+      grants, key }), /fallback journal\/profile bound/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
