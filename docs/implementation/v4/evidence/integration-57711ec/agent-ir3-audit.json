@@ -1,0 +1,39 @@
+{
+  "format": "aether.agent-ir3.audit/1",
+  "passed": true,
+  "rootMessages": 30,
+  "dependencyMessages": 9,
+  "snapshots": 11,
+  "aggregate": [
+    {
+      "tokenizer": "cl100k_base",
+      "cold": 5034,
+      "session": 6954,
+      "legacyCold": 3247,
+      "ae2Cold": 6532,
+      "legacySession": 9741,
+      "ae2Session": 19627,
+      "legacyToCandidateCold": 0.6450139054429876,
+      "legacyToCandidateSession": 1.4007765314926661,
+      "coldReductionFromAe2": 0.22933251684017142,
+      "sessionReductionFromAe2": 0.6456921587608906,
+      "meetsFourfoldCold": false,
+      "meetsFourfoldSession": false
+    },
+    {
+      "tokenizer": "o200k_base",
+      "cold": 5040,
+      "session": 6960,
+      "legacyCold": 3272,
+      "ae2Cold": 6493,
+      "legacySession": 9816,
+      "ae2Session": 19516,
+      "legacyToCandidateCold": 0.6492063492063492,
+      "legacyToCandidateSession": 1.410344827586207,
+      "coldReductionFromAe2": 0.2237794547974742,
+      "sessionReductionFromAe2": 0.6433695429391268,
+      "meetsFourfoldCold": false,
+      "meetsFourfoldSession": false
+    }
+  ]
+}

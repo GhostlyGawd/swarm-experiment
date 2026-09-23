@@ -1,0 +1,50 @@
+{
+  "format": "aether.hotstuff-threshold-campaign/1",
+  "createdAt": "2026-09-23T06:00:47.010Z",
+  "sourceHead": "83a8c8c852e15d213c25b30dee4ddfb7588663c5",
+  "sourceHashes": {
+    "roadmap/v4/research/hotstuff-threshold/Cargo.toml": "0c5b05d742b37676631a6f566830e74a26c21ff5de5557fb2a79274b41f16182",
+    "roadmap/v4/research/hotstuff-threshold/Cargo.lock": "be6d577acbbdb66688274c168dd853dd452185606afe51037148bacbd7709044",
+    "roadmap/v4/research/hotstuff-threshold/src/lib.rs": "b52be9ed4dfbf36b69a1a3e990f763f6474bcf26162d54bc1e73a93ea1befbc0",
+    "roadmap/v4/research/hotstuff-threshold/src/custody.rs": "6fdfb634afdc631787d9c00c54fc8f08ec9ac55fd1971092add4c683cf01e516",
+    "roadmap/v4/research/hotstuff-threshold/src/channel.rs": "f25ba7a31bad02f368eae281235960b4afd85ceb438bdcb9e23b4f369ee06554",
+    "roadmap/v4/research/hotstuff-threshold/src/main.rs": "014dc294748e12137f55b938925bc9e5097b50249bc4206690080b9c52fa6edd",
+    "roadmap/v4/research/hotstuff-threshold/src/proof.rs": "9792174930f880d95b6e4d56d8f1ff24133126861a50ed5f517190e1c6528a22",
+    "roadmap/v4/research/hotstuff-threshold/src/setup.rs": "8aec20a2426567aa6c616dc35e9e2b8011b27970cbe2179bfbbdee14d40f01c2",
+    "roadmap/v4/research/hotstuff-threshold/protocol.mjs": "7ffb5d6403a7d7be0129a62cf4ba09cbd20dca94b6ab7d2688b1302ed8333d3b",
+    "roadmap/v4/research/hotstuff-threshold/peer.mjs": "b278a3eac1f2835882492f1d1c62c1209a05daf100baa02cea291318459b447a",
+    "roadmap/v4/research/hotstuff-threshold/run.mjs": "8b577f8fef6248a9f360f0284a4f3016d19aae653f9f2f22dbef1c8d6372449a",
+    "src/fabric/quorum-node.ts": "7f6c9bdf89e7f5e4689412abcbd8ec497be9217547badaed1f4b58d3b86054d1",
+    "src/fabric/quorum-crypto.ts": "10d1fa45c13688ce57a1c99052a92d3845dc55dac493066684263ed747bac0a5",
+    "src/fabric/quorum-votes.ts": "f83940e4ac22c14a43d59aa951ed1df524e55b21b7206c4fed9fa2ebe256c4e5",
+    "src/fabric/journal-lock.ts": "8a551fa3896b22c9b5f0de21ba9a56fcb4044e286a2a51939494fe4846ca6e74",
+    "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+    "src/fabric/identity.ts": "a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+    "src/fabric/promotion.ts": "34c2dc8f0b61ebc23829c4a9d5004731ec80c034f7ed6029227ee0c12e8e327f"
+  },
+  "binarySha256": "53ff6d5a8724389b16ef79a71525142c6d411c56a1a090adb9fd8e9c3bd50acb",
+  "cargoLockSha256": "be6d577acbbdb66688274c168dd853dd452185606afe51037148bacbd7709044",
+  "toolchain": {
+    "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "node": "v26.7.0"
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "release": "25.6.0",
+    "cpu": "Apple M4 Pro"
+  },
+  "thresholdProofs": 9,
+  "checks": 32,
+  "restarts": 7,
+  "elapsedNs": "16572938334",
+  "productionAdmission": false,
+  "limitations": [
+    "Four-validator same-host simulation; local supervisor, filesystem and fixture identity credentials remain trusted.",
+    "Existing HotStuff Ed25519 QCs are retained; matching Ristretto sidecar proofs are mandatory in this research harness, not a production QC format.",
+    "One bounded membership transition with old commit proof, durable old-quorum retirement and new readiness/activation; no general partition-tolerant production reconfiguration claim.",
+    "No whole-store anti-rollback anchor, HSM, independent operator identity or independent security review.",
+    "No production coordinator/runtime admission; no WAN, throughput or latency qualification."
+  ]
+}
