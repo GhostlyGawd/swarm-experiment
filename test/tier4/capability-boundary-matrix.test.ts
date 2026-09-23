@@ -41,9 +41,10 @@ function fixture(directory: string) {
 function attacks(token: ScopedGrantV2, other: ScopedGrantV2, grants: ScopedGrantAuthority, invoke: ScopedGrantV2['body']['capability']) {
   const forged = { ...token, signature: '0'.repeat(64) };
   const narrowed = grants.attenuate(token, { capability: invoke, audience: token.body.audience, path: [...token.body.path, 'child'] }, 60_000);
+  const wrongPath = grants.issue({ capability: invoke, audience: token.body.audience, path: ['wrong'] }, 60_000);
   return [
     ['empty', []], ['forged-signature', [forged]], ['wrong-audience', [other]],
-    ['wrong-path', [{ ...token, body: { ...token.body, path: ['wrong'] } }]],
+    ['wrong-path', [wrongPath]], ['edited-path', [{ ...token, body: { ...token.body, path: ['wrong'] } }]],
     ['wrong-policy-epoch', [{ ...token, body: { ...token.body, policyEpoch: '99' } }]],
     ['wrong-identity', [{ ...token, id: domainDigest('aether.capability-grant/2', 'forged') }]],
     ['narrowed-child', [narrowed]], ['forged-extra', [token, forged]], ['duplicate', [token, token]],
