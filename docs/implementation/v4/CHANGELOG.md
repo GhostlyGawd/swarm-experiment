@@ -5,6 +5,7 @@
 - Added `scoped-anchored-wasm-v7` with operator-provisioned trusted clock anchor `/1`, deployment `/7`, prepared `/5`, host configuration `/5` and effect plan `/5`. Signed V4 policy rules must use the anchor's clock domain. V6 remains byte-preserved under its explicit trusted-factory-clock model.
 - The host checks independent grant lifetime at issue/entry/nested/effect boundaries and signed deadline before router creation. A nonvirtual broker path rechecks both after factory authorization and before sink entry. A real ProcessHost/ProcessDeployment test holds factory clocks frozen while independent time advances; expired grants and deadlines refuse new guests/sinks, including after promotion/reopen. The external provider must prevent rollback across restarts; general adapter isolation and T2-04 remain open.
 - Corrected the broker's terminal pre-sink refusal path to persist an explicit no-dispatch transition after a durable dispatch marker. A crash before that terminal record remains indeterminate; no effect is blindly retried.
+- Retained an independently verified 59-case capability campaign at exact source `c07e4aa`, with 57 zero-sink/unchanged-heap denials and two positive controls across local topology, workers, broker and deployment. It does not cover signed adapter deployment effects, cross-process closure transport or formal noninterference; T2-04 stays open.
 
 ## Verified native run control and AST-derived EL1 guest — 2026-09-23
 
