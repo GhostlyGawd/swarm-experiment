@@ -4,6 +4,8 @@
 
 The comparison runner compiles three distinct ASTs and runs 57 fixed vectors against `ResumableRuntime`. It also edits a literal in the AST and checks that the AST root, generated source, guest image and observed answer change. It rejects stale manifests, unsupported syntax, incompatible layouts, invalid packed codes, arithmetic overflow and division by zero. See [registration](PREREGISTRATION.md) and retained [report](results/local-01/report.json).
 
+The retained `Mac16,8` / macOS 26.7 campaign pins source commit `e707c5f99e4f87d8d96e48c8e55727cdfdd758c4`. Its 57 fresh-guest intervals range from **440,292 ns** to **785,833 ns** (median **577,458 ns**); the three generated images are 4,852–5,032 bytes. The controller mapped and observed 65,536 bytes of guest backing for each sample. Earlier exploratory runs of this code showed a sample above 1 ms; those unretained runs are not qualification evidence. The finite retained workload and incomplete runtime mean the full 1 ms maximum gate is still open.
+
 Run on Apple silicon with the Hypervisor entitlement available:
 
 ```sh

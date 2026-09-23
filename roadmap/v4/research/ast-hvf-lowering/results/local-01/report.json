@@ -1,0 +1,1523 @@
+{
+  "format": "aether.ast-hvf-lowering-research/1",
+  "gitCommit": "e707c5f99e4f87d8d96e48c8e55727cdfdd758c4",
+  "platform": {
+    "arch": "arm64",
+    "platform": "darwin",
+    "release": "26.7",
+    "hardware": "Mac16,8",
+    "pageBytes": 16384
+  },
+  "toolchain": {
+    "clang": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+    "linker": "LLD 22.1.6 (https://github.com/rust-lang/llvm-project.git dcc3606807c989700e0ac1cac18c31741bcd40d9) (compatible with GNU linkers)"
+  },
+  "sourceHashes": {
+    "compiler.ts": "sha256:d96574bf6478cee2e4c1c8118eb41e73be20bc18f4eedb0db97b7e6e8e396219",
+    "driver.c": "sha256:aeb14e4f5f19353d2db4032a6fd84bf38a927ebb23f101ee8ea36f61f9cf5faa",
+    "start.S": "sha256:2e849ed5c3794ea9bfe213943077b83636d54ff1e9289ce785abedbc490b93c0",
+    "kernel.ld": "sha256:3b0833ef9484f104c9ea95cd78f2d1ec3b9068be76826c96d5d14847ceb21b91",
+    "run.ts": "sha256:fcb1ea0c3deab1ea119a2b03ab774b47ae48fa87577085821fc5ef52275f119f",
+    "verify.ts": "sha256:f38eef53b9522dc1013b2abd9fd010938a9f66eab72e7c04b7726c2425197045",
+    "../native/hypervisor.entitlements": "sha256:70d65ae13874e183526aa48e55bb330f2156da94effca24f89b5e2f940262723",
+    "../../../../src/tier1/ast.ts": "sha256:b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb",
+    "../../../../src/tier1/build.ts": "sha256:e1617b0eed8c27cf4d3162e68494126f817f28ec1bf24d32828ebcaa55e6d934",
+    "../../../../src/tier1/store.ts": "sha256:b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3",
+    "../../../../src/tier2/typecheck.ts": "sha256:19113ce88ac99a02a1e7b1f4acad694a1d1c83f9520b2fe7f2545669a5da1b18",
+    "../../../../src/tier3/resumable-program.ts": "sha256:35f84ce3f72a37a6737d9da6c04e4359aa073063fc841e22e512d9966103fa7b",
+    "../../../../src/tier3/resumable-runtime.ts": "sha256:8ebfb09d6110fb13ea969e672ab1c6b28e47ca839058c71741f56fb7739e0196",
+    "../../../../src/fabric/identity.ts": "sha256:a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+    "../../../../src/fabric/encoding.ts": "sha256:22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d"
+  },
+  "artifacts": {
+    "arithmetic": {
+      "root": "ast:b3:9cb6ba119c0d87fe19b5b8664fa5db6a366f62dfbebfcac578faa161d0267b29",
+      "manifestDigest": "aether.execution/1:b3:5c992fd654a23d77caee5ecb14de3056e92f94b86c632d4b4e78d8de2ad8ff67",
+      "generatedSourceSha256": "sha256:c0d860ef3ff6037ead11992123276e024b86b8e3ddff9738369715801fdcad4c",
+      "guestImageSha256": "sha256:3e06a945ff1fe06dd4e1906092c66403b733ec991b80000ba7d0c84bb841da7d",
+      "guestImageBytes": 4860,
+      "controllerSha256": "sha256:68850bcc6f372ca688898216650211ace218c16537da166a8ade4fa5aff877c1"
+    },
+    "packed": {
+      "root": "ast:b3:8d2e5f4effaff517bc1c604b6ceffc87dbaa4724be91c56e53632859e51683b1",
+      "manifestDigest": "aether.execution/1:b3:67177f68707383133ec234e144eb91b9944bd8ea871192b06fb8a1eb35ddfef5",
+      "generatedSourceSha256": "sha256:d58c5485115b84dda0e48fc18808707d6cbf96b23ff3d8069a5ef307821e960f",
+      "guestImageSha256": "sha256:7779d54db6ea4d7a289f735c6f683ca360f656621245e99fed6115f02054f3fb",
+      "guestImageBytes": 5032,
+      "controllerSha256": "sha256:68850bcc6f372ca688898216650211ace218c16537da166a8ade4fa5aff877c1"
+    },
+    "division": {
+      "root": "ast:b3:7fdf5d1f8227ca14c31803f573284942af233b294c7a197771ab8501d5293342",
+      "manifestDigest": "aether.execution/1:b3:dcd6d7aa3553266c3df3974e969144bdaae7e20d8a2a0e3101cbf5183089bbcb",
+      "generatedSourceSha256": "sha256:04b737adb05778647c93ec4ac312b19b9c9798df3b62a95f8338c7ea9f055fa7",
+      "guestImageSha256": "sha256:e63a70c7a31969b0ef0d003ab5784d7c536227114cd25e4c29180ff7869d60a4",
+      "guestImageBytes": 4852,
+      "controllerSha256": "sha256:68850bcc6f372ca688898216650211ace218c16537da166a8ade4fa5aff877c1"
+    }
+  },
+  "comparisons": [
+    {
+      "name": "arithmetic",
+      "args": [
+        "0",
+        "0"
+      ],
+      "expected": "0",
+      "actual": "0",
+      "frameSha256": "sha256:68dadc457b58cccff483c5bf17f324ded7836447725dda037accfd99b13ede0e",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745018114577,
+        "guestStartTick": 2745018115442,
+        "runStartTick": 2745018128550,
+        "validatedResponseTick": 2745018128865,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 595333.333,
+        "freshGuestToValidatedResponseNs": 559291.667,
+        "hvVcpuRunToValidatedResponseNs": 13125,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-1000",
+        "1000"
+      ],
+      "expected": "2000",
+      "actual": "2000",
+      "frameSha256": "sha256:e15f5309be3d020939c5019e7af1555e856cfddf50b2449dec7e2d1bcb8fb92d",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745018608441,
+        "guestStartTick": 2745018609267,
+        "runStartTick": 2745018622606,
+        "validatedResponseTick": 2745018622949,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 604500,
+        "freshGuestToValidatedResponseNs": 570083.333,
+        "hvVcpuRunToValidatedResponseNs": 14291.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "1000",
+        "-1000"
+      ],
+      "expected": "2000",
+      "actual": "2000",
+      "frameSha256": "sha256:24341d607b255aec23f4d3c73e316dfda70f2764052213afac00b7eaf6a01356",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745019069396,
+        "guestStartTick": 2745019070303,
+        "runStartTick": 2745019083855,
+        "validatedResponseTick": 2745019084134,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 614083.333,
+        "freshGuestToValidatedResponseNs": 576291.667,
+        "hvVcpuRunToValidatedResponseNs": 11625,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-9223372036854775808",
+        "-9223372036854775808"
+      ],
+      "expected": "0",
+      "actual": "0",
+      "frameSha256": "sha256:93114fa8292e8763cf8967f0b5ac42146b3cd42625d352c167bc1582d927aaab",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745019551571,
+        "guestStartTick": 2745019552398,
+        "runStartTick": 2745019567089,
+        "validatedResponseTick": 2745019567355,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 657666.667,
+        "freshGuestToValidatedResponseNs": 623208.333,
+        "hvVcpuRunToValidatedResponseNs": 11083.333,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-1000",
+          "delta": "-3"
+        },
+        "1"
+      ],
+      "expected": "-998",
+      "actual": "-998",
+      "frameSha256": "sha256:88f576d6111ac55e4f8f965aede40b12da50a1c6918674dbe4a4a5e5c4e329e1",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745022573354,
+        "guestStartTick": 2745022574115,
+        "runStartTick": 2745022587616,
+        "validatedResponseTick": 2745022587890,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 605666.667,
+        "freshGuestToValidatedResponseNs": 573958.333,
+        "hvVcpuRunToValidatedResponseNs": 11416.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "1000",
+          "delta": "3"
+        },
+        "0"
+      ],
+      "expected": "3",
+      "actual": "3",
+      "frameSha256": "sha256:14ea0a823854c7d0e3e605d4c7cbc82afe576f28f0559eee3d3dbdbad51d9596",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745023188353,
+        "guestStartTick": 2745023189197,
+        "runStartTick": 2745023203399,
+        "validatedResponseTick": 2745023203667,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 638083.333,
+        "freshGuestToValidatedResponseNs": 602916.667,
+        "hvVcpuRunToValidatedResponseNs": 11166.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "0",
+          "delta": "0"
+        },
+        "-10"
+      ],
+      "expected": "10",
+      "actual": "10",
+      "frameSha256": "sha256:5b495f707d32c05f8c34574cdefe6f31597f643036877e3634825e3685f96b95",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745023714591,
+        "guestStartTick": 2745023715237,
+        "runStartTick": 2745023728206,
+        "validatedResponseTick": 2745023728440,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 577041.667,
+        "freshGuestToValidatedResponseNs": 550125,
+        "hvVcpuRunToValidatedResponseNs": 9750,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "division",
+      "args": [
+        "-9223372036854775808",
+        "1"
+      ],
+      "expected": "-9223372036854775808",
+      "actual": "-9223372036854775808",
+      "frameSha256": "sha256:dee636ce1b1bf38c27a73f5f76548b3349865546e4c7da32efcd25bf76bae640",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745026831614,
+        "guestStartTick": 2745026832399,
+        "runStartTick": 2745026846548,
+        "validatedResponseTick": 2745026846822,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 633666.667,
+        "freshGuestToValidatedResponseNs": 600958.333,
+        "hvVcpuRunToValidatedResponseNs": 11416.667,
+        "guestImageBytes": 4852,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "division",
+      "args": [
+        "7",
+        "-3"
+      ],
+      "expected": "-2",
+      "actual": "-2",
+      "frameSha256": "sha256:ca233d7da9d102a818b83f39c0e4afff363bd5fd632f2227488664336f352ba9",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745027164617,
+        "guestStartTick": 2745027165436,
+        "runStartTick": 2745027182977,
+        "validatedResponseTick": 2745027183275,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 777416.667,
+        "freshGuestToValidatedResponseNs": 743291.667,
+        "hvVcpuRunToValidatedResponseNs": 12416.667,
+        "guestImageBytes": 4852,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-632",
+        "380"
+      ],
+      "expected": "1012",
+      "actual": "1012",
+      "frameSha256": "sha256:e1e33a2a7da9023263163b4ba29377d12eb8313a2871d8d4566d51d439b35c94",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745027505061,
+        "guestStartTick": 2745027505830,
+        "runStartTick": 2745027519802,
+        "validatedResponseTick": 2745027520068,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 625291.667,
+        "freshGuestToValidatedResponseNs": 593250,
+        "hvVcpuRunToValidatedResponseNs": 11083.333,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-174",
+          "delta": "0"
+        },
+        "-29"
+      ],
+      "expected": "29",
+      "actual": "29",
+      "frameSha256": "sha256:6c645728574ea054be3a895583efd29c5fb994c63a534306eed7399ce9e9a1be",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745027929316,
+        "guestStartTick": 2745027930074,
+        "runStartTick": 2745027944137,
+        "validatedResponseTick": 2745027944447,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 630458.333,
+        "freshGuestToValidatedResponseNs": 598875,
+        "hvVcpuRunToValidatedResponseNs": 12916.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-74",
+        "142"
+      ],
+      "expected": "216",
+      "actual": "216",
+      "frameSha256": "sha256:dd73e5fa77620a94959cf2025740e346cb9edc96271b679870c703470dc4ddf4",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745028481545,
+        "guestStartTick": 2745028482323,
+        "runStartTick": 2745028496395,
+        "validatedResponseTick": 2745028496657,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 629666.667,
+        "freshGuestToValidatedResponseNs": 597250,
+        "hvVcpuRunToValidatedResponseNs": 10916.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-264",
+          "delta": "2"
+        },
+        "2"
+      ],
+      "expected": "-260",
+      "actual": "-260",
+      "frameSha256": "sha256:e54404705da7ee728ac7fe3f6ebe92ab737f8832517e1cb35a399c6d09e69064",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745028872211,
+        "guestStartTick": 2745028872995,
+        "runStartTick": 2745028886444,
+        "validatedResponseTick": 2745028886697,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 603583.333,
+        "freshGuestToValidatedResponseNs": 570916.667,
+        "hvVcpuRunToValidatedResponseNs": 10541.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-360",
+        "403"
+      ],
+      "expected": "763",
+      "actual": "763",
+      "frameSha256": "sha256:fc9aaf2985b4fe6945e3c935d8b036b4263da512c49cd15447402e6566975514",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745029480305,
+        "guestStartTick": 2745029481112,
+        "runStartTick": 2745029494130,
+        "validatedResponseTick": 2745029494438,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 588875,
+        "freshGuestToValidatedResponseNs": 555250,
+        "hvVcpuRunToValidatedResponseNs": 12833.333,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "440",
+          "delta": "-2"
+        },
+        "11"
+      ],
+      "expected": "462",
+      "actual": "462",
+      "frameSha256": "sha256:09033eb03ec85f5cbcfebd0e44eebd51f0ecb5f1ca4c5c280763334e5bd5626a",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745029883686,
+        "guestStartTick": 2745029884383,
+        "runStartTick": 2745029897315,
+        "validatedResponseTick": 2745029897571,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 578541.667,
+        "freshGuestToValidatedResponseNs": 549500,
+        "hvVcpuRunToValidatedResponseNs": 10666.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-154",
+        "-405"
+      ],
+      "expected": "-867",
+      "actual": "-867",
+      "frameSha256": "sha256:3a53df3a034eac9fa489d96360bc7c2b816312e758373eb9e4535a0aed08c593",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745030480773,
+        "guestStartTick": 2745030481511,
+        "runStartTick": 2745030495512,
+        "validatedResponseTick": 2745030495763,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 624583.333,
+        "freshGuestToValidatedResponseNs": 593833.333,
+        "hvVcpuRunToValidatedResponseNs": 10458.333,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-288",
+          "delta": "-3"
+        },
+        "98"
+      ],
+      "expected": "-92",
+      "actual": "-92",
+      "frameSha256": "sha256:b39c50e6e2a0fd220538cf75bea4b6a1ff8c5ea1663ca71ad7aba668525e2e13",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745030921056,
+        "guestStartTick": 2745030921772,
+        "runStartTick": 2745030936823,
+        "validatedResponseTick": 2745030937085,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 667875,
+        "freshGuestToValidatedResponseNs": 638041.667,
+        "hvVcpuRunToValidatedResponseNs": 10916.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-855",
+        "-122"
+      ],
+      "expected": "733",
+      "actual": "733",
+      "frameSha256": "sha256:cb32c49aff0a3dd52e86928074b5f35e05c4149e13a00a2f60fb3616f1b76326",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745031489651,
+        "guestStartTick": 2745031490382,
+        "runStartTick": 2745031501048,
+        "validatedResponseTick": 2745031501355,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 487666.667,
+        "freshGuestToValidatedResponseNs": 457208.333,
+        "hvVcpuRunToValidatedResponseNs": 12791.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-734",
+          "delta": "-2"
+        },
+        "-62"
+      ],
+      "expected": "60",
+      "actual": "60",
+      "frameSha256": "sha256:c57c01779e78853027a8b62a8bf3f347297164aa615a68b4d38270720cc8dcc5",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745031890680,
+        "guestStartTick": 2745031891335,
+        "runStartTick": 2745031903890,
+        "validatedResponseTick": 2745031904129,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 560375,
+        "freshGuestToValidatedResponseNs": 533083.333,
+        "hvVcpuRunToValidatedResponseNs": 9958.333,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "57",
+        "130"
+      ],
+      "expected": "73",
+      "actual": "73",
+      "frameSha256": "sha256:58e43d3801a2c89f7371389e87ae16c126f77ca80aa322e320d044094fdad9a8",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745032371800,
+        "guestStartTick": 2745032372542,
+        "runStartTick": 2745032386178,
+        "validatedResponseTick": 2745032386455,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 610625,
+        "freshGuestToValidatedResponseNs": 579708.333,
+        "hvVcpuRunToValidatedResponseNs": 11541.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "975",
+          "delta": "-2"
+        },
+        "-66"
+      ],
+      "expected": "64",
+      "actual": "64",
+      "frameSha256": "sha256:c92bae63153df43daaf86a3e50c2f217f2823dda2b3250e03d9f7591fcc06f9a",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745032753550,
+        "guestStartTick": 2745032754513,
+        "runStartTick": 2745032769949,
+        "validatedResponseTick": 2745032770211,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 694208.333,
+        "freshGuestToValidatedResponseNs": 654083.333,
+        "hvVcpuRunToValidatedResponseNs": 10916.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "976",
+        "265"
+      ],
+      "expected": "3193",
+      "actual": "3193",
+      "frameSha256": "sha256:3fe750c43193fc722b499d3f94c5e44e2ccf468d50937057eb86e403e297fd93",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745033251030,
+        "guestStartTick": 2745033251943,
+        "runStartTick": 2745033264316,
+        "validatedResponseTick": 2745033264574,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 564333.333,
+        "freshGuestToValidatedResponseNs": 526291.667,
+        "hvVcpuRunToValidatedResponseNs": 10750,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "837",
+          "delta": "-3"
+        },
+        "36"
+      ],
+      "expected": "909",
+      "actual": "909",
+      "frameSha256": "sha256:41d86a191bac4a0151b6be66dd314596df1f92d60c498e11009d3f9740af8708",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745033665494,
+        "guestStartTick": 2745033666442,
+        "runStartTick": 2745033680800,
+        "validatedResponseTick": 2745033681109,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 650625,
+        "freshGuestToValidatedResponseNs": 611125,
+        "hvVcpuRunToValidatedResponseNs": 12875,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "933",
+        "221"
+      ],
+      "expected": "3020",
+      "actual": "3020",
+      "frameSha256": "sha256:35fb0c6850f6e0fb84f6f7e20cbfa7449ce87df5dad205c009da9a2ba7ca3d3d",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745034221667,
+        "guestStartTick": 2745034222697,
+        "runStartTick": 2745034237329,
+        "validatedResponseTick": 2745034237585,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 663250,
+        "freshGuestToValidatedResponseNs": 620333.333,
+        "hvVcpuRunToValidatedResponseNs": 10666.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "417",
+          "delta": "1"
+        },
+        "42"
+      ],
+      "expected": "501",
+      "actual": "501",
+      "frameSha256": "sha256:a71fb10c38452527bfc91b751caf0cd1733cc4828786f6626b927981ea9029b4",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745034635715,
+        "guestStartTick": 2745034636700,
+        "runStartTick": 2745034649988,
+        "validatedResponseTick": 2745034650253,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 605750,
+        "freshGuestToValidatedResponseNs": 564708.333,
+        "hvVcpuRunToValidatedResponseNs": 11041.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-196",
+        "785"
+      ],
+      "expected": "981",
+      "actual": "981",
+      "frameSha256": "sha256:05c753cfd152b4d54248eb9007e73df9e36d04457d1b0ae9345a7359bc09b3cd",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745035270820,
+        "guestStartTick": 2745035271917,
+        "runStartTick": 2745035289456,
+        "validatedResponseTick": 2745035289700,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 786666.667,
+        "freshGuestToValidatedResponseNs": 740958.333,
+        "hvVcpuRunToValidatedResponseNs": 10166.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "384",
+          "delta": "2"
+        },
+        "-76"
+      ],
+      "expected": "78",
+      "actual": "78",
+      "frameSha256": "sha256:32dba794cb1053efac46fd4a91c01fea6617d77b909dd7e5d2899fb9ac6a6963",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745035633052,
+        "guestStartTick": 2745035633948,
+        "runStartTick": 2745035650197,
+        "validatedResponseTick": 2745035650446,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 724750,
+        "freshGuestToValidatedResponseNs": 687416.667,
+        "hvVcpuRunToValidatedResponseNs": 10375,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "326",
+        "-674"
+      ],
+      "expected": "304",
+      "actual": "304",
+      "frameSha256": "sha256:f08d652bb396df93137523c4010c047c2f99d1d96d2daf611f9448b842f371a2",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745036162022,
+        "guestStartTick": 2745036163036,
+        "runStartTick": 2745036176236,
+        "validatedResponseTick": 2745036176473,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 602125,
+        "freshGuestToValidatedResponseNs": 559875,
+        "hvVcpuRunToValidatedResponseNs": 9875,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-918",
+          "delta": "-3"
+        },
+        "6"
+      ],
+      "expected": "-906",
+      "actual": "-906",
+      "frameSha256": "sha256:f05f1ce25d772df3d370f6dd9b2322bb3f460f4e88470e75d85bcc23c349ca3d",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745036590407,
+        "guestStartTick": 2745036591362,
+        "runStartTick": 2745036604758,
+        "validatedResponseTick": 2745036605003,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 608166.667,
+        "freshGuestToValidatedResponseNs": 568375,
+        "hvVcpuRunToValidatedResponseNs": 10208.333,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-564",
+        "400"
+      ],
+      "expected": "964",
+      "actual": "964",
+      "frameSha256": "sha256:b38dc50a6abea09e243525ac6d595f4c1f1a305ac4b230d2765f816ddb81ce83",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745037158950,
+        "guestStartTick": 2745037160066,
+        "runStartTick": 2745037175625,
+        "validatedResponseTick": 2745037175908,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 706583.333,
+        "freshGuestToValidatedResponseNs": 660083.333,
+        "hvVcpuRunToValidatedResponseNs": 11791.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "551",
+          "delta": "2"
+        },
+        "-48"
+      ],
+      "expected": "50",
+      "actual": "50",
+      "frameSha256": "sha256:aa5a299c4ceb0561c01dc70a1de8e279474c9f504e7531d27e2a773d26b3661f",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745037540031,
+        "guestStartTick": 2745037541041,
+        "runStartTick": 2745037556543,
+        "validatedResponseTick": 2745037556776,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 697708.333,
+        "freshGuestToValidatedResponseNs": 655625,
+        "hvVcpuRunToValidatedResponseNs": 9708.333,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "829",
+        "198"
+      ],
+      "expected": "2685",
+      "actual": "2685",
+      "frameSha256": "sha256:3380d272c795e424d9ea8757fe2d55b6494b27fd5b9d03ec0c68c203fc28d6e7",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745038152847,
+        "guestStartTick": 2745038153853,
+        "runStartTick": 2745038169518,
+        "validatedResponseTick": 2745038169770,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 705125,
+        "freshGuestToValidatedResponseNs": 663208.333,
+        "hvVcpuRunToValidatedResponseNs": 10500,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "783",
+          "delta": "1"
+        },
+        "35"
+      ],
+      "expected": "853",
+      "actual": "853",
+      "frameSha256": "sha256:2dbeb26b45c23b50a59db86ea2a21044b75eb157dae6a732f2d3710dcac8a16f",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745038593691,
+        "guestStartTick": 2745038594740,
+        "runStartTick": 2745038607598,
+        "validatedResponseTick": 2745038607831,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 589166.667,
+        "freshGuestToValidatedResponseNs": 545458.333,
+        "hvVcpuRunToValidatedResponseNs": 9708.333,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "122",
+        "-231"
+      ],
+      "expected": "135",
+      "actual": "135",
+      "frameSha256": "sha256:710b689c5c085bad29098ed110662461c1a9cf2408e0f4ad905c0a262e6aaf54",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745039145245,
+        "guestStartTick": 2745039146112,
+        "runStartTick": 2745039158927,
+        "validatedResponseTick": 2745039159166,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 580041.667,
+        "freshGuestToValidatedResponseNs": 543916.667,
+        "hvVcpuRunToValidatedResponseNs": 9958.333,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "119",
+          "delta": "-2"
+        },
+        "51"
+      ],
+      "expected": "221",
+      "actual": "221",
+      "frameSha256": "sha256:3a128a8d839b41cb37ba902aeb9168d6950143da27ba48584de67a9f0a9f5a74",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745039483332,
+        "guestStartTick": 2745039484150,
+        "runStartTick": 2745039494463,
+        "validatedResponseTick": 2745039494717,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 474375,
+        "freshGuestToValidatedResponseNs": 440291.667,
+        "hvVcpuRunToValidatedResponseNs": 10583.333,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "732",
+        "-415"
+      ],
+      "expected": "1781",
+      "actual": "1781",
+      "frameSha256": "sha256:8bd28db29ed7ae6334e71343e318f810b2e56668cdf97755b2af24c8413ffc7d",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745040011832,
+        "guestStartTick": 2745040012507,
+        "runStartTick": 2745040028073,
+        "validatedResponseTick": 2745040028322,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 687083.333,
+        "freshGuestToValidatedResponseNs": 658958.333,
+        "hvVcpuRunToValidatedResponseNs": 10375,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-545",
+          "delta": "-1"
+        },
+        "-44"
+      ],
+      "expected": "43",
+      "actual": "43",
+      "frameSha256": "sha256:7401162c02b940f0a97ff75ec1522b7c81f380c9aa41f7e226731a48135e37cb",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745040421277,
+        "guestStartTick": 2745040421988,
+        "runStartTick": 2745040438141,
+        "validatedResponseTick": 2745040438404,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 713625,
+        "freshGuestToValidatedResponseNs": 684000,
+        "hvVcpuRunToValidatedResponseNs": 10958.333,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-637",
+        "-801"
+      ],
+      "expected": "-2712",
+      "actual": "-2712",
+      "frameSha256": "sha256:6e1af374fb2b7f809d19687befeea536bcab7a099c5e6269a73992a532cd8d62",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745040925696,
+        "guestStartTick": 2745040926357,
+        "runStartTick": 2745040938546,
+        "validatedResponseTick": 2745040938776,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 545000,
+        "freshGuestToValidatedResponseNs": 517458.333,
+        "hvVcpuRunToValidatedResponseNs": 9583.333,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "906",
+          "delta": "-3"
+        },
+        "-66"
+      ],
+      "expected": "63",
+      "actual": "63",
+      "frameSha256": "sha256:3914b4d6d39fe26e6bea2de043415f95f106b5bdddebae13bffb8bddff56f625",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745041356000,
+        "guestStartTick": 2745041356696,
+        "runStartTick": 2745041369464,
+        "validatedResponseTick": 2745041369713,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 571375,
+        "freshGuestToValidatedResponseNs": 542375,
+        "hvVcpuRunToValidatedResponseNs": 10375,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "670",
+        "994"
+      ],
+      "expected": "324",
+      "actual": "324",
+      "frameSha256": "sha256:b9d9329e2889c81063d860b3dd9c4a32e89efe14e3f0e7aa5c96695b6cc05e04",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745041871338,
+        "guestStartTick": 2745041872118,
+        "runStartTick": 2745041885497,
+        "validatedResponseTick": 2745041885827,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 603708.333,
+        "freshGuestToValidatedResponseNs": 571208.333,
+        "hvVcpuRunToValidatedResponseNs": 13750,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "761",
+          "delta": "1"
+        },
+        "-7"
+      ],
+      "expected": "8",
+      "actual": "8",
+      "frameSha256": "sha256:b961dedff8f25875ee304c63700f8c9c0dde6c34bb31052f9176e740f6973688",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745042256365,
+        "guestStartTick": 2745042257023,
+        "runStartTick": 2745042272433,
+        "validatedResponseTick": 2745042272682,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 679875,
+        "freshGuestToValidatedResponseNs": 652458.333,
+        "hvVcpuRunToValidatedResponseNs": 10375,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-729",
+        "-629"
+      ],
+      "expected": "100",
+      "actual": "100",
+      "frameSha256": "sha256:2f1e31de3bb282de1af32dbbdb9758a48450bea9b11c235fb37215c841258477",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745042683104,
+        "guestStartTick": 2745042684458,
+        "runStartTick": 2745042696840,
+        "validatedResponseTick": 2745042697101,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 583208.333,
+        "freshGuestToValidatedResponseNs": 526791.667,
+        "hvVcpuRunToValidatedResponseNs": 10875,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "447",
+          "delta": "-2"
+        },
+        "-26"
+      ],
+      "expected": "24",
+      "actual": "24",
+      "frameSha256": "sha256:4f6873e3515a09b61b7476c51e33ab6616dcdcae39b7dd1a1ccdeb7885a42d0f",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745042975249,
+        "guestStartTick": 2745042976198,
+        "runStartTick": 2745042990329,
+        "validatedResponseTick": 2745042990587,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 639083.333,
+        "freshGuestToValidatedResponseNs": 599541.667,
+        "hvVcpuRunToValidatedResponseNs": 10750,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "437",
+        "306"
+      ],
+      "expected": "1617",
+      "actual": "1617",
+      "frameSha256": "sha256:81e256485e64fab5a866bb27e96e92afb6a955de8d7187f8c4f2322c12f40ca5",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745043510417,
+        "guestStartTick": 2745043511187,
+        "runStartTick": 2745043523624,
+        "validatedResponseTick": 2745043523871,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 560583.333,
+        "freshGuestToValidatedResponseNs": 528500,
+        "hvVcpuRunToValidatedResponseNs": 10291.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "345",
+          "delta": "3"
+        },
+        "-77"
+      ],
+      "expected": "80",
+      "actual": "80",
+      "frameSha256": "sha256:acc45aab7783a571926898ae3f2e7dca58e326f69113103157332a56756aafe9",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745043923373,
+        "guestStartTick": 2745043924070,
+        "runStartTick": 2745043938738,
+        "validatedResponseTick": 2745043939014,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 651708.333,
+        "freshGuestToValidatedResponseNs": 622666.667,
+        "hvVcpuRunToValidatedResponseNs": 11500,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-392",
+        "381"
+      ],
+      "expected": "773",
+      "actual": "773",
+      "frameSha256": "sha256:74640287b6c354f491aca728f50b093c6276de1b4898ef2a6cd5630713a74f39",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745044396844,
+        "guestStartTick": 2745044397664,
+        "runStartTick": 2745044413656,
+        "validatedResponseTick": 2745044414005,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 715041.667,
+        "freshGuestToValidatedResponseNs": 680875,
+        "hvVcpuRunToValidatedResponseNs": 14541.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-19",
+          "delta": "-3"
+        },
+        "-77"
+      ],
+      "expected": "74",
+      "actual": "74",
+      "frameSha256": "sha256:c0c86007e08d53d41aa9903bb62ebea0c978c92bad5bde14524b74714d6073fc",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745044772895,
+        "guestStartTick": 2745044773493,
+        "runStartTick": 2745044787658,
+        "validatedResponseTick": 2745044787880,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 624375,
+        "freshGuestToValidatedResponseNs": 599458.333,
+        "hvVcpuRunToValidatedResponseNs": 9250,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-679",
+        "-607"
+      ],
+      "expected": "72",
+      "actual": "72",
+      "frameSha256": "sha256:f8eb5da4be0f590ec6e5f6732fa648d8d8cee6d7e34ad4cae937242e8e92dfe0",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745045268597,
+        "guestStartTick": 2745045269177,
+        "runStartTick": 2745045284379,
+        "validatedResponseTick": 2745045284662,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 669375,
+        "freshGuestToValidatedResponseNs": 645208.333,
+        "hvVcpuRunToValidatedResponseNs": 11791.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-990",
+          "delta": "-1"
+        },
+        "96"
+      ],
+      "expected": "-798",
+      "actual": "-798",
+      "frameSha256": "sha256:13eef8b2a8d10d169435abc178494cc3cee1d3fef48d7cfb6bc2ddd13486200e",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745045648780,
+        "guestStartTick": 2745045649531,
+        "runStartTick": 2745045662717,
+        "validatedResponseTick": 2745045662988,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 592000,
+        "freshGuestToValidatedResponseNs": 560708.333,
+        "hvVcpuRunToValidatedResponseNs": 11291.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-106",
+        "-844"
+      ],
+      "expected": "-1162",
+      "actual": "-1162",
+      "frameSha256": "sha256:333e5542f752f3c29758e2147a164776ccfbea789ac6f90699596b4e8af3b307",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745046185261,
+        "guestStartTick": 2745046186091,
+        "runStartTick": 2745046199716,
+        "validatedResponseTick": 2745046199950,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 612041.667,
+        "freshGuestToValidatedResponseNs": 577458.333,
+        "hvVcpuRunToValidatedResponseNs": 9750,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "702",
+          "delta": "-3"
+        },
+        "-22"
+      ],
+      "expected": "19",
+      "actual": "19",
+      "frameSha256": "sha256:d3fe5a9471dfa19bf9a50a00c2973e4776bf76af427aeed5a1e978c856017131",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745046592413,
+        "guestStartTick": 2745046593140,
+        "runStartTick": 2745046606595,
+        "validatedResponseTick": 2745046606838,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 601041.667,
+        "freshGuestToValidatedResponseNs": 570750,
+        "hvVcpuRunToValidatedResponseNs": 10125,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "-324",
+        "-296"
+      ],
+      "expected": "28",
+      "actual": "28",
+      "frameSha256": "sha256:ec596d3e751ca30915f67ab7f588628d994dc042819d09354ffd5f52676794fe",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745047126729,
+        "guestStartTick": 2745047127439,
+        "runStartTick": 2745047138003,
+        "validatedResponseTick": 2745047138244,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 479791.667,
+        "freshGuestToValidatedResponseNs": 450208.333,
+        "hvVcpuRunToValidatedResponseNs": 10041.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-254",
+          "delta": "-3"
+        },
+        "-20"
+      ],
+      "expected": "17",
+      "actual": "17",
+      "frameSha256": "sha256:a1146523120d4a92da9efeaa59e2dc20fc5901ebde081ccc83b22e9b0f620a67",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745047475667,
+        "guestStartTick": 2745047476388,
+        "runStartTick": 2745047488990,
+        "validatedResponseTick": 2745047489246,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 565791.667,
+        "freshGuestToValidatedResponseNs": 535750,
+        "hvVcpuRunToValidatedResponseNs": 10666.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "509",
+        "789"
+      ],
+      "expected": "280",
+      "actual": "280",
+      "frameSha256": "sha256:59a332887ceccb586eec40e9504d3ba85730968476399e610fa1695fe1e19964",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745047954125,
+        "guestStartTick": 2745047954856,
+        "runStartTick": 2745047967716,
+        "validatedResponseTick": 2745047967945,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 575833.333,
+        "freshGuestToValidatedResponseNs": 545375,
+        "hvVcpuRunToValidatedResponseNs": 9541.667,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "-573",
+          "delta": "-1"
+        },
+        "-8"
+      ],
+      "expected": "7",
+      "actual": "7",
+      "frameSha256": "sha256:5b05e12270af964c7dc4bd57184fc5dcb61c4d948f5e0a6d5d6c3536e7868321",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745048303505,
+        "guestStartTick": 2745048304210,
+        "runStartTick": 2745048316721,
+        "validatedResponseTick": 2745048316980,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 561458.333,
+        "freshGuestToValidatedResponseNs": 532083.333,
+        "hvVcpuRunToValidatedResponseNs": 10791.667,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "arithmetic",
+      "args": [
+        "38",
+        "796"
+      ],
+      "expected": "758",
+      "actual": "758",
+      "frameSha256": "sha256:962caac3fb5d93dbaafa244801ed78ac218ee1b0e19434bc4c8326b6e00769e0",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745048817840,
+        "guestStartTick": 2745048818487,
+        "runStartTick": 2745048832141,
+        "validatedResponseTick": 2745048832410,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 607083.333,
+        "freshGuestToValidatedResponseNs": 580125,
+        "hvVcpuRunToValidatedResponseNs": 11208.333,
+        "guestImageBytes": 4860,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    },
+    {
+      "name": "packed",
+      "args": [
+        {
+          "number": "236",
+          "delta": "-2"
+        },
+        "85"
+      ],
+      "expected": "406",
+      "actual": "406",
+      "frameSha256": "sha256:4642b1e3f8a4824e49ff4a41b6f1e91453e8bc2e18221420378db92c337f3c6d",
+      "sample": {
+        "kind": "ast_hvf_guest_sample",
+        "mainStartTick": 2745049220829,
+        "guestStartTick": 2745049221709,
+        "runStartTick": 2745049240312,
+        "validatedResponseTick": 2745049240569,
+        "tickNs": 41.666666667,
+        "mainToResponseNs": 822500,
+        "freshGuestToValidatedResponseNs": 785833.333,
+        "hvVcpuRunToValidatedResponseNs": 10708.333,
+        "guestImageBytes": 5032,
+        "guestMappedBytes": 65536,
+        "guestResidentObservedBytes": 65536
+      }
+    }
+  ],
+  "adversarial": {
+    "editedAstRoot": "ast:b3:d744d1855425a37077075b4de0f8019dad56b0ae42aa134958df0401723338bd",
+    "editedImageSha256": "sha256:64fc2c2e97b37635959f37d4e905636cee9c3532a7c1a4d93cf5c0905b6e2857",
+    "editedResult": "29",
+    "wrongDigestExit": 2,
+    "badFieldStatus": 3,
+    "overflowStatus": 1,
+    "divisionByZeroStatus": 2,
+    "divisionByZeroReference": {
+      "state": "faulted",
+      "value": null,
+      "fault": "division_by_zero"
+    }
+  }
+}
