@@ -153,8 +153,9 @@ export class CognitiveBlackboard {
     return digest;
   }
   create(manifest: ExecutionManifestV1, subject: NodeRef, readers: readonly string[], writers: readonly string[], retention: BlackboardPolicy): Digest {
-    const actor = this.actor(), digest = this.bound(manifest, subject); names(readers); names(writers); policy(retention);
+    const actor = this.actor(), digest = executionManifestDigest(manifest); names(readers); names(writers); policy(retention);
     if (this.options.authorizeCreate(actor, digest, subject) !== true) throw new Error('blackboard creation denied');
+    this.bound(manifest, subject);
     if (this.now() >= retention.expiresAt || retention.expiresAt - this.now() > this.maxRetentionMs) throw new Error('blackboard retention outside host policy');
     const nonce = randomUUID(), id = boardId(this.options.repositoryId, digest, subject, nonce);
     this.lock.recoverDeadWriter(false);
@@ -201,7 +202,6 @@ export class CognitiveBlackboard {
   /** Discover retained sidecars for a node without exposing other agents' boards. */
   listForNode(manifest: ExecutionManifestV1, subject: NodeRef): readonly Digest[] {
     const actor = this.actor(), manifestDigest = executionManifestDigest(manifest);
-    this.options.store.get(subject);
     const visible: Digest[] = [];
     for (const name of this.boardFiles()) {
       const id = `aether.blackboard/1:b3:${name.slice(0, -5)}`;

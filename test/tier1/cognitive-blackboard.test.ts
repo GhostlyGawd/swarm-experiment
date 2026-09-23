@@ -57,6 +57,7 @@ test('typed task state survives restart, preserves AST identity and separates cl
   assert.deepEqual(f.store.get(f.subject), before);
   const reopened = new CognitiveBlackboard(f.options); f.setPrincipal('reader');
   assert.deepEqual(reopened.listForNode(f.manifest, f.subject), [id]);
+  assert.deepEqual(reopened.listForNode(f.manifest, f.d('unknown-node') as typeof f.subject), []);
   const view = reopened.view(id);
   assert.deepEqual(view.entries.map(entry => entry.item.kind), ['claim', 'hypothesis', 'delegation', 'evidence', 'decision']);
   assert.deepEqual(view.verifiedEvidenceIds, [evidence.id]);
@@ -72,6 +73,7 @@ test('ACL, compare-and-swap and retention deny unauthorized or stale changes', (
   const f = setup(), board = new CognitiveBlackboard(f.options);
   f.setPrincipal('intruder');
   assert.throws(() => board.create(f.manifest, f.subject, [], [], { maxEntries: 2, expiresAt: 2_000 }), /creation denied/);
+  assert.throws(() => board.create(f.manifest, f.d('unknown-node') as typeof f.subject, [], [], { maxEntries: 2, expiresAt: 2_000 }), /creation denied/);
   f.setPrincipal('owner');
   const id = board.create(f.manifest, f.subject, ['reader'], ['writer'], { maxEntries: 2, expiresAt: 2_000 });
   assert.throws(() => new CognitiveBlackboard({ ...f.options, maxBoards: 1 }).create(f.manifest, f.subject, [], [], { maxEntries: 1, expiresAt: 2_000 }), /count limit/);
