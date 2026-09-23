@@ -55,3 +55,14 @@ test('changed or malformed source fails before execution; descriptor mismatch ca
   assert.throws(() => adapterArtifactDigest({ ...artifact, sourceSha256: '0'.repeat(63) }), /source hash/);
   delete globals.__aetherAdapterLoads;
 });
+
+test('caller mutation during asynchronous module import cannot relabel admitted source bytes', async () => {
+  const source = bytes(sourceText), original = adapterArtifactForSource(source, cap, 'source-ledger/1', semantics);
+  const mutable = { ...original, semantics: { ...original.semantics } };
+  const pending = admitAdapterSource(source, mutable);
+  (mutable as { sourceSha256: string }).sourceSha256 = '0'.repeat(64);
+  (mutable.semantics as { readOnly: boolean }).readOnly = true;
+  const adapter = await pending;
+  assert.equal(admittedAdapterArtifactDigest(adapter), adapterArtifactDigest(original));
+  assert.equal(adapter.id, original.id); assert.deepEqual(adapter.semantics, original.semantics);
+});

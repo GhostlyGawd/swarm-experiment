@@ -4,7 +4,7 @@
  */
 import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
-import { encodeCanonical, exactObject, identifier } from '../fabric/encoding.ts';
+import { decodeCanonical, encodeCanonical, exactObject, identifier } from '../fabric/encoding.ts';
 import { domainDigest, validateDigest, type Digest } from '../fabric/identity.ts';
 import { effectAdapterDigest, type EffectAdapter } from '../fabric/effects.ts';
 import { capability, type CapabilityName } from '../tier1/ids.ts';
@@ -42,9 +42,13 @@ export function adapterArtifactForSource(source: Uint8Array, capabilityName: Cap
  * A caller choosing both bytes and expected hash has no external authority. */
 export async function admitAdapterSource(source: Uint8Array, artifact: AdapterArtifactV1): Promise<EffectAdapter> {
   validateArtifact(artifact);
+  // Capture caller-owned metadata before the first await. No later decision
+  // may observe a mutable descriptor supplied by the caller.
+  const approved = decodeCanonical(encodeCanonical(artifact)) as unknown as AdapterArtifactV1;
+  validateArtifact(approved); Object.freeze(approved.semantics); Object.freeze(approved);
   if (!(source instanceof Uint8Array) || source.byteLength < 1 || source.byteLength > MAX_SOURCE_BYTES) throw new RangeError('adapter source byte bound');
   const bytes = Buffer.from(source);
-  if (createHash('sha256').update(bytes).digest('hex') !== artifact.sourceSha256) throw new TypeError('adapter source does not match approved artifact');
+  if (createHash('sha256').update(bytes).digest('hex') !== approved.sourceSha256) throw new TypeError('adapter source does not match approved artifact');
   new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   // The exact checked bytes become the module URL, avoiding a file-read/import
   // substitution. Node data: imports still have process privileges.
@@ -52,10 +56,10 @@ export async function admitAdapterSource(source: Uint8Array, artifact: AdapterAr
   if (!namespace.default || typeof namespace.default !== 'object') throw new TypeError('adapter module must export a default object');
   const implementation = namespace.default as EffectAdapter;
   const declared = { id: implementation.id, semantics: implementation.semantics };
-  if (implementation.id !== artifact.id || effectAdapterDigest(implementation) !== domainDigest('aether.effect-adapter/1', { id: artifact.id, semantics: artifact.semantics })) throw new TypeError('adapter implementation differs from approved descriptor');
+  if (implementation.id !== approved.id || effectAdapterDigest(implementation) !== domainDigest('aether.effect-adapter/1', { id: approved.id, semantics: approved.semantics })) throw new TypeError('adapter implementation differs from approved descriptor');
   if (!declared.semantics || typeof declared.semantics !== 'object') throw new TypeError('adapter semantics missing');
   Object.freeze(implementation.semantics); Object.freeze(implementation);
-  const adapter: EffectAdapter = Object.freeze({ id: artifact.id, semantics: Object.freeze({ ...artifact.semantics }),
+  const adapter: EffectAdapter = Object.freeze({ id: approved.id, semantics: Object.freeze({ ...approved.semantics }),
     ...(implementation.execute ? { execute: implementation.execute.bind(implementation) } : {}),
     ...(implementation.prepare ? { prepare: implementation.prepare.bind(implementation) } : {}),
     ...(implementation.commit ? { commit: implementation.commit.bind(implementation) } : {}),
@@ -63,7 +67,7 @@ export async function admitAdapterSource(source: Uint8Array, artifact: AdapterAr
     ...(implementation.reconcile ? { reconcile: implementation.reconcile.bind(implementation) } : {}),
   });
   if (effectAdapterDigest(adapter) !== effectAdapterDigest(implementation)) throw new TypeError('adapter descriptor changed during admission');
-  admitted.set(adapter, adapterArtifactDigest(artifact));
+  admitted.set(adapter, adapterArtifactDigest(approved));
   return adapter;
 }
 export function admittedAdapterArtifactDigest(adapter: EffectAdapter): Digest | null {
