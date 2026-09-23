@@ -299,6 +299,39 @@ async function processRevocationWindows() {
     } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
   }
   {
+    const directory = mkdtempSync(join(tmpdir(), 'aether-cap-matrix-nested-window-'));
+    const ex = buildLedgerExample('cap-matrix-nested-window'), { epochs, grants } = authority(directory);
+    const manifestValue = manifest(ex.module, ex.capabilities);
+    let calls = 0, phaseSeen = false, host: ProcessHost | undefined;
+    const sink: EffectAdapter = { id: 'matrix-nested-window-sink/1',
+      semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true },
+      execute: () => { calls++; return { tag: 'null' }; }, reconcile: () => ({ state: 'unknown' }) };
+    const options: ProcessHostOptions = { directory: join(directory, 'host'), module: ex.module, manifest: manifestValue, plan: ledgerPlan(ex),
+      registry: ex.capabilities, sealer: new CapabilitySealer(new Uint8Array(32).fill(86), () => 100),
+      scopedGrants: grants, effectRouterFactory: brokerFactory(directory, manifestValue, sink), authorizeRecovery: () => true,
+      onPhase: phase => { if (phase === 'boundary') { phaseSeen = true; epochs.revoke(PROCESS_INVOKE, []); } } };
+    try {
+      host = await ProcessHost.open(options);
+      const alice = await host.allocateRecord(ACCOUNT, { id: { tag: 'string', value: 'alice' }, balance: tagged(100) }, { operationId: 'alice' });
+      const bob = await host.allocateRecord(ACCOUNT, { id: { tag: 'string', value: 'bob' }, balance: tagged(0) }, { operationId: 'bob' });
+      const args = [ref(alice), ref(bob), tagged(10)], tokens = host.issueScopedTokens(ex.symbols.settle);
+      const before = runtimeSnapshotDigest(await host.snapshot());
+      const result = await host.call(ex.symbols.settle, args, { operationId: 'nested-boundary-revoked', tokens });
+      const denied = result.state !== 'completed' || !result.execution.ok;
+      record({ id: 'process/cross-process/revoked-at-boundary', boundary: 'ProcessHost onCall',
+        attack: 'revoke-before-nested-worker', expected: 'deny-zero-sink-unchanged-heap',
+        observed: JSON.stringify(result), denied: denied && phaseSeen, sinkBefore: 0, sinkAfter: calls,
+        heapBefore: before, heapAfter: runtimeSnapshotDigest(await host.snapshot()) });
+      await host.close(); host = undefined;
+      host = await ProcessHost.open(options);
+      const reopened = runtimeSnapshotDigest(await host.snapshot());
+      record({ id: 'process/cross-process/reopen-after-boundary-revocation', boundary: 'ProcessHost.open',
+        attack: 'reopen', expected: 'deny-zero-sink-unchanged-heap',
+        observed: reopened === before ? 'unchanged' : 'changed', denied: reopened === before,
+        sinkBefore: calls, sinkAfter: calls, heapBefore: before, heapAfter: reopened });
+    } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
+  }
+  {
     const directory = mkdtempSync(join(tmpdir(), 'aether-cap-matrix-final-'));
     const { epochs, grants } = authority(directory);
     const syms = new SymbolSpace('cap-matrix-final'), setter = syms.define('setter'), account = syms.define('account');

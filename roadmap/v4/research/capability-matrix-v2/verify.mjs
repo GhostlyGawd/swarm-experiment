@@ -39,6 +39,8 @@ required.push(
   'process/cross-process/wrong-audience',
   'process/cross-process/positive',
   'process/cross-process/replay-revoked',
+  'process/cross-process/revoked-at-boundary',
+  'process/cross-process/reopen-after-boundary-revocation',
   'process/reopen/denial-persistence',
   'process/effect/revoked-before-sink',
   'process/effect/reopen-after-revocation',
