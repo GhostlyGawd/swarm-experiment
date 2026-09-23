@@ -19,6 +19,7 @@ import { JournalLock } from '../fabric/journal-lock.ts';
 import { ProductionRuntime } from './compile.ts';
 import { decodeProcessValue, encodeProcessValue, fromWireSnapshot, toWireSnapshot, type ProcessScope } from '../tier4/process-values.ts';
 import { validateProcessAllocation, validateProcessArguments, validateProcessResult } from '../tier4/process-type-validation.ts';
+import { checkConservativeFallbackProof, type ConservativeFallbackProofInput } from './fallback-proof.ts';
 
 export const FALLBACK_INVOKE = capability('cap:fallback:invoke');
 export interface FallbackTreeOptions {
@@ -27,6 +28,8 @@ export interface FallbackTreeOptions {
   readonly key: KeyObject | string;
   /** Compiler entry/loop-backedge guard checks, not machine instructions. */
   readonly maxGuardChecks?: number;
+  /** Optional independently checked proof for a closed scalar Tier 2. */
+  readonly conservativeProof?: ConservativeFallbackProofInput;
   readonly fault?: (phase: 'call-intent' | 'tier1-failed' | 'tier2-failed' | 'before-commit' | 'committed' | 'repair-delivered') => void;
 }
 export interface FallbackRepairEvent {
@@ -55,6 +58,7 @@ const validateFallbackType = (ty: Ty): void => {
     };
 export class FallbackTreeRuntime {
   readonly profileDigest: Digest;
+  readonly conservativeProofDigest: Digest | null;
   private readonly module: Term;
   private readonly options: FallbackTreeOptions;
   private readonly declarations: readonly Extract<Term, { kind: 'FunctionDecl' }>[];
@@ -77,10 +81,13 @@ export class FallbackTreeRuntime {
     if (declarations.some(node => node.purity !== 'pure' || node.capabilities.length || node.typeParams.length || node.surfaces.length || !node.body)) throw new TypeError('fallback declaration is not closed pure code');
     const one = declarations.find(node => node.symbol === options.tier1), two = declarations.find(node => node.symbol === options.tier2);
     if (!one || !two || one.symbol === two.symbol || !one.contract || !two.contract || store.intern(one.contract) !== store.intern(two.contract) || one.params.length !== two.params.length || one.params.some((p, i) => p.symbol !== two.params[i].symbol || !tyEqual(p.ty, two.params[i].ty)) || !tyEqual(one.returns, two.returns)) throw new TypeError('fallback tiers require identical signature and explicit contract/frame');
+    this.conservativeProofDigest = options.conservativeProof
+      ? checkConservativeFallbackProof(this.module, manifest, two.symbol, options.conservativeProof) : null;
     this.declarations = [one, two]; this.guardLimit = options.maxGuardChecks ?? 1000;
     if (!Number.isSafeInteger(this.guardLimit) || this.guardLimit < 1 || this.guardLimit > 100_000) throw new TypeError('invalid fallback guard bound');
     ensure(resolve(options.directory)); this.directory = realpathSync(resolve(options.directory));
-    this.profileDigest = hash('aether.pure-fallback-tree/1', { manifest: executionManifestDigest(manifest), tier1: one.symbol, tier2: two.symbol, repositoryId: options.grants.repositoryId, guardLimit: this.guardLimit, directory: this.directory, publicKey: createPublicKey(this.key).export({ type: 'spki', format: 'der' }).toString('base64') });
+    this.profileDigest = hash('aether.pure-fallback-tree/1', { manifest: executionManifestDigest(manifest), tier1: one.symbol, tier2: two.symbol, repositoryId: options.grants.repositoryId, guardLimit: this.guardLimit, directory: this.directory, publicKey: createPublicKey(this.key).export({ type: 'spki', format: 'der' }).toString('base64'),
+      ...(this.conservativeProofDigest === null ? {} : { conservativeProof: this.conservativeProofDigest }) });
     this.scope = { executionManifest: executionManifestDigest(manifest), astRoot: root as NodeRef, heapId: `fallback:${this.profileDigest.split(':').at(-1)}`, ownershipEpoch: '0', unit: 'fallback' };
     this.file = join(this.directory, 'fallback.json'); ensure(join(this.directory, 'tickets')); ensure(join(this.directory, 'delivery-tickets'));
     this.lock = new JournalLock({ directory: join(this.directory, 'tickets'), domain: 'aether.fallback-lock' }); this.delivery = new JournalLock({ directory: join(this.directory, 'delivery-tickets'), domain: 'aether.fallback-delivery-lock' });

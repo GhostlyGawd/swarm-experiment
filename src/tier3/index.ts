@@ -3,6 +3,7 @@ export { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, isTaskVa
 export { ProductionRuntime, formatCompilation, type ClauseDecision, type CompilationReport, type CompileOptions, type ElisionPolicy, type ProductionSampling, type TelemetrySample } from './compile.ts';
 export { MicroWorld, exploreSchedules, formatMicroWorld, materializeCounterexample, simulateModule, type Counterexample, type MicroWorldReport, type PersistedCounterexample, type PropertyName, type ScheduleOutcome, type ScheduleStep } from './microworld.ts';
 export { FallbackTreeRuntime, FALLBACK_INVOKE, type FallbackTreeOptions, type FallbackRepairEvent, type FallbackResult } from './fallback-tree.ts';
+export { checkConservativeFallbackProof, type ConservativeFallbackProofInput } from './fallback-proof.ts';
 export { PackedHeap, migratePackedHeap, packResumableCheckpoint, unpackResumableCheckpoint, migratePackedResumableCheckpoint, type PackedField, type PackedLayout, type PackedRowHeader, type PackedHeapImage, type PackedResumableCheckpoint } from './packed-heap.ts';
 export { LivingCampaign, LIVING_CAMPAIGN_PROFILE, measureR04JsonEvents, type CampaignScalar, type CampaignInput, type CampaignEvent, type CampaignStep, type CampaignScenario, type LivingCampaignManifest, type LivingCase, type LivingCaseResult, type LivingCounterexample, type LivingCampaignReport, type R04JsonObservation } from './living-campaign.ts';
 export { generateCase, materialise, shrinkPlain, type Plain } from './generate.ts';

@@ -51,6 +51,18 @@ contract identity. It does **not** supply independent portable Tier 2 correctnes
 or termination proof; F06 evidence admission remains required for production.
 The returned result has `productionAuthorized: false`.
 
+An optional closed scalar Tier 2 proof profile now accepts an independently
+checked portable AST certificate. The proof module must contain exactly the
+executed Tier 2 declaration, with no dependencies; its manifest must match the
+full fallback execution context except for the standalone proof root. The
+proof digest is bound into the fallback profile, so reopening with a changed
+certificate cannot silently inherit prior state. Focused tests run the actual
+fallback and reject edited Tier 2 bodies, missing obligations and changed
+execution context. This profile proves source-level Int/Bool total return and
+formal contract obligations under checked entry preconditions. The record
+fallback fixture, effectful ProcessHost supervisor and native switch do not
+yet carry this proof, and compiler/OS resource behavior remains outside it.
+
 ## Invocation authority
 
 The host supplies a `ScopedGrantAuthority`. Every tier requires

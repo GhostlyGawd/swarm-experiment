@@ -1,5 +1,9 @@
 # Implementation specification changelog
 
+## Portable conservative fallback proof profile — 2026-09-23
+
+- Added an opt-in, independently checked portable certificate for a closed scalar Tier 2 declaration. Its proof manifest must match the fallback execution context except for the standalone AST root; the proof digest is bound into the durable fallback profile. The remaining effectful/record/native paths are not proved or production authorized.
+
 ## Process fallback and packed heap candidates — 2026-09-23
 
 - Added an opt-in effect-aware ProcessHost fallback supervisor with durable signed operation state, current grants, pre-effect abort, exact host replay and a repair outbox. Possible external commits block automatic Tier 2 selection. Portable proof admission and the 50 ns limit remain open.
