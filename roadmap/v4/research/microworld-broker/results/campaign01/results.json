@@ -1,0 +1,147 @@
+{
+  "format": "aether.living-broker-campaign-result/1",
+  "registrationSha256": "0a9a6db9091ba146bb09d505905b1d3843619456355b34bb995d1e965f4d827f",
+  "declaredPerCandidate": 6,
+  "generated": 12,
+  "executed": 12,
+  "goodPassed": 6,
+  "brokenFailed": 6,
+  "excluded": 0,
+  "rows": [
+    {
+      "candidate": "stable-effect-id",
+      "ordinal": 0,
+      "resultDigest": "aether.living-broker-result/1:b3:7a74533fa957356a63d03ea5e36bb3e9f9bbab63c18749a33354c8d243d1f796",
+      "elapsedMs": 134.901958,
+      "passed": true,
+      "failure": null
+    },
+    {
+      "candidate": "stable-effect-id",
+      "ordinal": 1,
+      "resultDigest": "aether.living-broker-result/1:b3:39b1fefe45eed4de751cd2b4b8d0313c091b665325b30c2ec91b7b6ba9b3007a",
+      "elapsedMs": 125.851583,
+      "passed": true,
+      "failure": null
+    },
+    {
+      "candidate": "stable-effect-id",
+      "ordinal": 2,
+      "resultDigest": "aether.living-broker-result/1:b3:e7a396a04062e13fc0b05282430cb0fa6c130aaa645820933218172c28a2b3e8",
+      "elapsedMs": 121.951583,
+      "passed": true,
+      "failure": null
+    },
+    {
+      "candidate": "stable-effect-id",
+      "ordinal": 3,
+      "resultDigest": "aether.living-broker-result/1:b3:7a74533fa957356a63d03ea5e36bb3e9f9bbab63c18749a33354c8d243d1f796",
+      "elapsedMs": 127.770125,
+      "passed": true,
+      "failure": null
+    },
+    {
+      "candidate": "stable-effect-id",
+      "ordinal": 4,
+      "resultDigest": "aether.living-broker-result/1:b3:39b1fefe45eed4de751cd2b4b8d0313c091b665325b30c2ec91b7b6ba9b3007a",
+      "elapsedMs": 127.526834,
+      "passed": true,
+      "failure": null
+    },
+    {
+      "candidate": "stable-effect-id",
+      "ordinal": 5,
+      "resultDigest": "aether.living-broker-result/1:b3:e7a396a04062e13fc0b05282430cb0fa6c130aaa645820933218172c28a2b3e8",
+      "elapsedMs": 124.711459,
+      "passed": true,
+      "failure": null
+    },
+    {
+      "candidate": "attempt-derived-effect-id",
+      "ordinal": 0,
+      "resultDigest": "aether.living-broker-result/1:b3:dfe7d6907e3b9df9a5ae9a2b07a1db43763fbe8329549405d1acddac03c69db7",
+      "elapsedMs": 177.664333,
+      "passed": false,
+      "failure": "duplicate-effect"
+    },
+    {
+      "candidate": "attempt-derived-effect-id",
+      "ordinal": 1,
+      "resultDigest": "aether.living-broker-result/1:b3:4244be58b7b0eb015e72ce513b2f52b86c76ecf8a5b7a7c56fa010df8f2a7f4c",
+      "elapsedMs": 169.335875,
+      "passed": false,
+      "failure": "duplicate-effect"
+    },
+    {
+      "candidate": "attempt-derived-effect-id",
+      "ordinal": 2,
+      "resultDigest": "aether.living-broker-result/1:b3:1891de4ffdc01cb458d38804769b468e460a4426ced9eea5bbfd025cab7effe5",
+      "elapsedMs": 164.339292,
+      "passed": false,
+      "failure": "duplicate-effect"
+    },
+    {
+      "candidate": "attempt-derived-effect-id",
+      "ordinal": 3,
+      "resultDigest": "aether.living-broker-result/1:b3:dfe7d6907e3b9df9a5ae9a2b07a1db43763fbe8329549405d1acddac03c69db7",
+      "elapsedMs": 168.272084,
+      "passed": false,
+      "failure": "duplicate-effect"
+    },
+    {
+      "candidate": "attempt-derived-effect-id",
+      "ordinal": 4,
+      "resultDigest": "aether.living-broker-result/1:b3:4244be58b7b0eb015e72ce513b2f52b86c76ecf8a5b7a7c56fa010df8f2a7f4c",
+      "elapsedMs": 170.559541,
+      "passed": false,
+      "failure": "duplicate-effect"
+    },
+    {
+      "candidate": "attempt-derived-effect-id",
+      "ordinal": 5,
+      "resultDigest": "aether.living-broker-result/1:b3:1891de4ffdc01cb458d38804769b468e460a4426ced9eea5bbfd025cab7effe5",
+      "elapsedMs": 176.468292,
+      "passed": false,
+      "failure": "duplicate-effect"
+    }
+  ],
+  "counterexampleDigest": "aether.living-broker-counterexample/1:b3:88ab4e7340a6c2b0a8cc426c06fc824cd27b610bb43be55df0ff5135645a15e6",
+  "elapsedMs": 5039.924833,
+  "originalCasesPerSecond": 2.3809878912136546,
+  "timingScope": "Generated inputs were preregistered. Timer includes all original case executions, durable raw observation publication, and one broken-case shrink campaign; excludes registration and final results publication.",
+  "distributedThroughputQualified": false,
+  "productionAuthorized": false,
+  "after": {
+    "at": "2026-09-23T14:47:01.230Z",
+    "node": "v26.7.0",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "arch": "arm64",
+    "cpus": [
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro"
+    ],
+    "load": [
+      4.0126953125,
+      3.380859375,
+      3.27001953125
+    ],
+    "memory": {
+      "rss": 129089536,
+      "heapTotal": 32505856,
+      "heapUsed": 18400616,
+      "external": 8119994,
+      "arrayBuffers": 1804368
+    }
+  }
+}

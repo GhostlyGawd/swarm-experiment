@@ -1,0 +1,148 @@
+{
+  "format": "aether.living-broker-observation/1",
+  "input": {
+    "format": "aether.living-broker-case/1",
+    "seed": "20260923/broker-campaign/3",
+    "ordinal": 3,
+    "sourceCase": {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-cooperative-campaign/1:b3:a258e26688e624a5f56f54fb151130b4320f3918e9ed8c04d9bab21bb6bbb6de",
+      "scenario": "faulted-json-network",
+      "ordinal": 0,
+      "seed": "20260922/faulted-json-network/0",
+      "schedule": [
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport"
+      ],
+      "variables": {}
+    },
+    "actions": [
+      "send",
+      "partition",
+      "duplicate",
+      "deliver",
+      "drop",
+      "duplicate",
+      "heal",
+      "arm-fault",
+      "deliver",
+      "restart",
+      "deliver",
+      "replay"
+    ]
+  },
+  "result": {
+    "format": "aether.living-broker-result/1",
+    "candidate": "stable-effect-id",
+    "sourceResult": {
+      "caseDigest": "aether.living-case/1:b3:ddb432c0e4907df42d44e7c8fe75e36b29bc4697b80e1427d3b81683339fb224",
+      "passed": true,
+      "failure": null,
+      "filtered": false,
+      "calls": 5,
+      "steps": 84,
+      "evaluatedOperations": 12,
+      "allocatedBytes": 0,
+      "peakAllocatedBytes": 0,
+      "allocationChecksum": 0,
+      "networkFrames": 6,
+      "deliveredFrames": 4,
+      "rejectedFrames": 1,
+      "droppedFrames": 1,
+      "coverage": [
+        "candidate-call",
+        "event:ordered",
+        "event:sequence",
+        "ingress:delivered",
+        "ingress:empty",
+        "ingress:malformed",
+        "network:checksum",
+        "network:drop",
+        "network:duplicate",
+        "network:malformed",
+        "network:none",
+        "runtime:assign",
+        "runtime:branch",
+        "runtime:call",
+        "runtime:return",
+        "step:$checks/final-value",
+        "step:transport/bad-integrity",
+        "step:transport/bad-json",
+        "step:transport/dup",
+        "step:transport/duplicate",
+        "step:transport/empty",
+        "step:transport/first",
+        "step:transport/good",
+        "step:transport/last",
+        "step:transport/loss",
+        "step:transport/reject-integrity",
+        "step:transport/reject-json"
+      ],
+      "trace": [
+        "transport/dup",
+        "transport/first",
+        "transport/duplicate",
+        "transport/bad-json",
+        "transport/reject-json",
+        "transport/bad-integrity",
+        "transport/reject-integrity",
+        "transport/loss",
+        "transport/empty",
+        "transport/good",
+        "transport/last",
+        "$checks/final-value"
+      ],
+      "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614"
+    },
+    "sourceResultDigest": "aether.living-case-result/1:b3:467dd396e726abf953221afc6f5cf69b5808afe588b5411f7035cd2d7168f01c",
+    "sourcePassed": true,
+    "passed": true,
+    "failure": null,
+    "coverage": [
+      "aether:effect-call",
+      "broker:isolated-replay",
+      "broker:live-dispatch",
+      "broker:reconciled",
+      "broker:reopened",
+      "fault:receipt-write",
+      "network:dropped",
+      "network:duplicated",
+      "network:healed",
+      "network:partition",
+      "network:sent",
+      "network:withheld",
+      "sink:durable-write"
+    ],
+    "attemptedDeliveries": 3,
+    "liveDispatches": 2,
+    "withheldDeliveries": 1,
+    "sinkWrites": 1,
+    "journalEvents": 1,
+    "replayConsumed": 1,
+    "outcomes": [
+      {
+        "recoveryId": "aether.effect/1:b3:6e7f0d15a3d1086d48db18670a35f2aa29a02394263ba2eead53a4c8e0d81002",
+        "state": "indeterminate"
+      },
+      {
+        "receiptDigest": "aether.effect-receipt/1:b3:f0c62b3cd30bab877d5fb82c57261ea0d99240e559f88d419444e75bd1604f8b",
+        "state": "committed",
+        "value": {
+          "tag": "null"
+        }
+      }
+    ],
+    "journalDigest": "aether.living-broker-journal/1:b3:9a42e82288f9f255edaeb40b50bd937d5f39ebf41d6f80d7cbafe6c868fef6c0",
+    "sinkDigest": "aether.living-broker-sink/1:b3:50b176d844b3cd5def8015fde8cb49943351fea6e84eb30970193be402bd457c"
+  },
+  "elapsedMs": 127.770125
+}

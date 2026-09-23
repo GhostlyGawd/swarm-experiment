@@ -1,0 +1,13 @@
+{
+  "format": "aether.living-broker-research-profile/1",
+  "seed": "20260923/broker-campaign",
+  "casesPerCandidate": 6,
+  "sourceScenario": "faulted-json-network",
+  "sourceCandidate": "good livingFixture() module and exact generated network case",
+  "candidates": ["stable-effect-id", "attempt-derived-effect-id"],
+  "network": "Serialized intent frames in a bounded queue; partition blocks delivery, duplicate and drop mutate queued frames, heal permits delivery",
+  "fault": "One injected committed-receipt persistence failure after the durable sink write, followed by broker reopen and reconciliation",
+  "replay": "Ordered terminal broker events consumed through replay mode with adapter and policy callbacks forbidden",
+  "shrinkLimit": 64,
+  "qualification": "Local synchronous broker research; no socket partition, native-thread schedule, process SIGKILL, or distributed-throughput claim"
+}
