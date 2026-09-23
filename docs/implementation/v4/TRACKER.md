@@ -6,7 +6,7 @@ Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) f
 
 > This is implementation status. Publishing the specification does not complete runtime work. A verified task needs evidence for every gate; functional delivery does not imply that the release NFR/KPI gates passed.
 
-**19/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
+**18/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
 
 ## First implementation slice
 
@@ -30,7 +30,7 @@ The four research tasks can produce decisions early; the baseline release gate a
 | Milestone | Verified | Total | Release gate |
 |---|---:|---:|---|
 | baseline | 13 | 13 | [V4-M0](#v4-m0) |
-| v2 | 6 | 20 | [V4-M2](#v4-m2) |
+| v2 | 5 | 20 | [V4-M2](#v4-m2) |
 | v3 | 0 | 14 | [V4-M3](#v4-m3) |
 | v4 | 0 | 15 | [V4-M4](#v4-m4) |
 
@@ -58,7 +58,7 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-T1-06](#v4-t1-06) | Tree-CRDT concurrency | distribution | v2 | verified | [V4-F05](#v4-f05), [V4-R01](#v4-r01), [V4-T1-01](#v4-t1-01) |
 | [V4-T1-07](#v4-t1-07) | Module LoRA training and loading | synthesis | v3 | planned | [V4-R04](#v4-r04), [V4-T1-09](#v4-t1-09), [V4-T2-05](#v4-t2-05), [V4-F08](#v4-f08) |
 | [V4-T1-08](#v4-t1-08) | Semantic binary lifting | compiler | v4 | planned | [V4-R02](#v4-r02), [V4-T2-04](#v4-t2-04), [V4-T3-10](#v4-t3-10) |
-| [V4-T1-09](#v4-t1-09) | Typed cognitive scratchpads | substrate | v2 | verified | [V4-T1-01](#v4-t1-01), [V4-T1-03](#v4-t1-03) |
+| [V4-T1-09](#v4-t1-09) | Typed cognitive scratchpads | substrate | v2 | in_progress | [V4-T1-01](#v4-t1-01), [V4-T1-03](#v4-t1-03) |
 | [V4-T1-10](#v4-t1-10) | Federated private rewrite lemmas | verification | v4 | planned | [V4-T1-05](#v4-t1-05), [V4-T2-09](#v4-t2-09) |
 | [V4-T1-11](#v4-t1-11) | Topological role induction | synthesis | v3 | planned | [V4-T1-04](#v4-t1-04), [V4-T1-07](#v4-t1-07), [V4-T1-09](#v4-t1-09), [V4-T2-05](#v4-t2-05) |
 | [V4-T2-01](#v4-t2-01) | Executable cross-layer specifications | language | v2 | planned | [V4-T1-02](#v4-t1-02), [V4-T1-03](#v4-t1-03) |
@@ -533,7 +533,7 @@ Evidence: not yet produced.
 
 ### V4-T1-09
 
-**Typed cognitive scratchpads** · implementation · v2 · owner: substrate · **verified**
+**Typed cognitive scratchpads** · implementation · v2 · owner: substrate · **in_progress**
 
 Prerequisites: [V4-T1-01](#v4-t1-01), [V4-T1-03](#v4-t1-03).
 
@@ -544,7 +544,7 @@ Acceptance gates:
 - **V4-T1-09/G1** — Agents recover structured task state after restart and distinguish claims from verified facts.
 - **V4-T1-09/G2** — Scratchpad updates preserve executable hashes and enforce access/retention controls.
 
-Evidence: [manifest](../../../docs/implementation/v4/evidence/blackboard-870b438/V4-T1-09.json).
+Evidence: not yet produced.
 
 ### V4-T1-10
 

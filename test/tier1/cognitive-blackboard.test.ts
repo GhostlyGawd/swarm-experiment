@@ -112,6 +112,19 @@ test('expiry, subject binding and invalidated lineage fail closed', () => {
   assert.throws(() => board.view(id));
 });
 
+test('asynchronous policy callbacks cannot become accidental authority', () => {
+  const f = setup();
+  const asyncCreate = new CognitiveBlackboard({ ...f.options, authorizeCreate: (() => Promise.resolve(true)) as unknown as typeof f.options.authorizeCreate });
+  assert.throws(() => asyncCreate.create(f.manifest, f.subject, [], [], { maxEntries: 3, expiresAt: 2_000 }), /creation denied/);
+  const board = new CognitiveBlackboard(f.options), id = board.create(f.manifest, f.subject, [], [], { maxEntries: 3, expiresAt: 2_000 });
+  const claim = board.append(id, { kind: 'claim', text: 'Needs proof', confidence: 3_000 });
+  const asyncEvidence = new CognitiveBlackboard({ ...f.options, verifyEvidence: (() => Promise.resolve(true)) as unknown as typeof f.options.verifyEvidence });
+  assert.throws(() => asyncEvidence.append(id, { kind: 'evidence', claim: claim.id, evidence: f.d('verified-proof'), verifier: 'kernel' }, [claim.id]), /not verified/);
+  const proof = board.append(id, { kind: 'evidence', claim: claim.id, evidence: f.d('verified-proof'), verifier: 'kernel' }, [claim.id]);
+  assert.deepEqual(asyncEvidence.view(id).verifiedEvidenceIds, []);
+  assert.deepEqual(board.view(id).verifiedEvidenceIds, [proof.id]);
+});
+
 test('real signed artifact lineage binds a child-node board and later marks its evidence stale', () => {
   const directory = mkdtempSync(join(tmpdir(), 'aether-blackboard-lineage-')); directories.push(directory);
   const store = new DurableGraphStore({ directory: join(directory, 'ast') });

@@ -154,7 +154,7 @@ export class CognitiveBlackboard {
   }
   create(manifest: ExecutionManifestV1, subject: NodeRef, readers: readonly string[], writers: readonly string[], retention: BlackboardPolicy): Digest {
     const actor = this.actor(), digest = this.bound(manifest, subject); names(readers); names(writers); policy(retention);
-    if (!this.options.authorizeCreate(actor, digest, subject)) throw new Error('blackboard creation denied');
+    if (this.options.authorizeCreate(actor, digest, subject) !== true) throw new Error('blackboard creation denied');
     if (this.now() >= retention.expiresAt || retention.expiresAt - this.now() > this.maxRetentionMs) throw new Error('blackboard retention outside host policy');
     const nonce = randomUUID(), id = boardId(this.options.repositoryId, digest, subject, nonce);
     this.lock.recoverDeadWriter(false);
@@ -178,7 +178,7 @@ export class CognitiveBlackboard {
       if (item.kind === 'evidence') {
         if (!known.has(item.claim) || !state.entries.some(entry => entry.id === item.claim && (entry.item.kind === 'claim' || entry.item.kind === 'hypothesis'))) throw new TypeError('evidence must cite a retained claim or hypothesis');
         if (!parents.includes(item.claim)) throw new TypeError('evidence must causally depend on its claim');
-        if (!this.options.verifyEvidence(item.evidence, executionManifestDigest(state.manifest), state.subject, item.verifier)) throw new Error('blackboard evidence not verified');
+        if (this.options.verifyEvidence(item.evidence, executionManifestDigest(state.manifest), state.subject, item.verifier) !== true) throw new Error('blackboard evidence not verified');
       }
       const revision = state.revision + 1;
       const entry = { id: entryId(id, actor, parents, item, revision), actor, parents, item, revision };
@@ -195,7 +195,7 @@ export class CognitiveBlackboard {
     const payload = { board: id, revision: state.revision, entries: state.entries };
     const { sidecar, digest } = metadataSidecar(state.subject, 'scratchpad', '1', { manifest, ...payload });
     const retained = new Set(state.entries.map(entry => entry.id));
-    const verifiedEvidenceIds = current ? state.entries.filter(entry => entry.item.kind === 'evidence' && retained.has(entry.item.claim) && this.options.verifyEvidence(entry.item.evidence, manifest, state.subject, entry.item.verifier)).map(entry => entry.id) : [];
+    const verifiedEvidenceIds = current ? state.entries.filter(entry => entry.item.kind === 'evidence' && retained.has(entry.item.claim) && this.options.verifyEvidence(entry.item.evidence, manifest, state.subject, entry.item.verifier) === true).map(entry => entry.id) : [];
     return { id, manifest, subject: state.subject, sidecar, sidecarDigest: digest, acl: state.acl, policy: state.policy, revision: state.revision, entries: state.entries, verifiedEvidenceIds, current };
   }
   /** Discover retained sidecars for a node without exposing other agents' boards. */

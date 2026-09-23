@@ -333,7 +333,7 @@ export const PLAN: Plan = {
                   : task.id === 'V4-T1-06'
                     ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/tree-8020327/V4-T1-06.json' }
                     : task.id === 'V4-T1-09'
-                      ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/blackboard-870b438/V4-T1-09.json' }
+                      ? { ...task, status: 'in_progress' as const }
                     : task.id === 'V4-T1-04'
                       ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/index-e71627b/V4-T1-04.json' }
                     : ['V4-T1-02', 'V4-T1-05', 'V4-T2-04', 'V4-T3-01'].includes(task.id) ? { ...task, status: 'in_progress' as const } : task),
