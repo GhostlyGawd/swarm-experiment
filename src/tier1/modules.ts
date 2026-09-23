@@ -19,12 +19,9 @@ export class ModuleResolver {
     const resolved = new Set<NodeRef>();
     const dependencies: NodeRef[] = [];
 
-    const link = (ref: NodeRef): Extract<Term, { kind: 'Module' }> => {
-      if (visiting.has(ref)) throw new Error(`module import cycle at ${ref}`);
-      const hydrated = this.store.hydrate(ref);
-      if (hydrated.kind !== 'Module') throw new TypeError(`import ${ref} is not a module`);
-      visiting.add(ref);
-      const localMembers = hydrated.members.filter((member) => member.kind !== 'Import');
+    const linkMembers = (hydrated: Extract<Term, { kind: 'Module' }>): Extract<Term, { kind: 'Module' }> => {
+      const localMembers = hydrated.members.filter((member) => member.kind !== 'Import').map(member =>
+        member.kind === 'Module' ? linkMembers(member) : member);
       const importedMembers: Term[] = [];
       const importedNames: Array<readonly [SymbolId, string]> = [];
       for (const declaration of hydrated.members) {
@@ -45,8 +42,6 @@ export class ModuleResolver {
           }
         }
       }
-      visiting.delete(ref);
-
       const seen = new Set<SymbolId>();
       for (const member of [...localMembers, ...importedMembers]) {
         if (!('symbol' in member)) continue;
@@ -54,6 +49,8 @@ export class ModuleResolver {
         if (seen.has(symbol)) throw new Error(`duplicate imported symbol ${symbol}`);
         seen.add(symbol);
       }
+      if (!importedMembers.length && !hydrated.members.some(member => member.kind === 'Import'))
+        return localMembers.every((member, index) => member === hydrated.members[index]) ? hydrated : { ...hydrated, members: localMembers };
       const localNames = hydrated.symbolTable.kind === 'SymbolTable' ? hydrated.symbolTable.entries : [];
       const names = new Map<SymbolId, string>([...localNames, ...importedNames]);
       return {
@@ -61,6 +58,14 @@ export class ModuleResolver {
         members: [...localMembers, ...importedMembers],
         symbolTable: { kind: 'SymbolTable', entries: [...names].sort((a, b) => a[0].localeCompare(b[0])) },
       };
+    };
+    const link = (ref: NodeRef): Extract<Term, { kind: 'Module' }> => {
+      if (visiting.has(ref)) throw new Error(`module import cycle at ${ref}`);
+      const hydrated = this.store.hydrate(ref);
+      if (hydrated.kind !== 'Module') throw new TypeError(`import ${ref} is not a module`);
+      visiting.add(ref);
+      try { return linkMembers(hydrated); }
+      finally { visiting.delete(ref); }
     };
 
     return { module: link(root), dependencies };

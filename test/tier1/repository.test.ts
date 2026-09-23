@@ -9,6 +9,8 @@ import { ModuleResolver } from '../../src/tier1/modules.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import { ProvenanceLedger } from '../../src/tier1/provenance.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
+import { Runtime } from '../../src/tier3/runtime.ts';
+import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import type { InvariantId } from '../../src/tier1/ids.ts';
 
 const directories: string[] = [];
@@ -142,4 +144,31 @@ test('B6: exact-address imports resolve explicit symbols across modules', () => 
   assert.deepEqual(resolved.dependencies, [dependencyRoot]);
   assert.ok(resolved.module.members.some((member) => member.kind === 'FunctionDecl' && member.symbol === incrementSymbol));
   assert.equal(resolved.module.members.some((member) => member.kind === 'Import'), false);
+});
+
+test('nested exact-address imports link inside their owning module and execute without hoisting state', () => {
+  const store = new GraphStore(), symbols = new SymbolSpace('nested-module-imports');
+  const helper = symbols.define('helper'), argument = symbols.define('argument'), entry = symbols.define('entry');
+  const library = b.module_({ symbol: symbols.define('library'), symbolTable: symbols.table(), members: [
+    b.fn({ symbol: helper, params: [b.param(argument, b.Int)], returns: b.Int,
+      body: b.ret(b.add(b.v(argument), b.int(1))) }),
+  ] });
+  const address = store.intern(library);
+  const nested = b.module_({ symbol: symbols.define('nested'), symbolTable: symbols.table(), members: [
+    b.import_(address, [helper]), b.fn({ symbol: entry, returns: b.Int, body: b.ret(b.call(helper, b.int(41))) }),
+  ] });
+  const outer = b.module_({ symbol: symbols.define('outer'), symbolTable: symbols.table(), members: [nested] });
+  const linked = new ModuleResolver(store).resolve(store.intern(outer));
+  assert.deepEqual(linked.dependencies, [address]);
+  assert.equal(linked.module.members.length, 1);
+  const inner = linked.module.members[0]; assert.equal(inner.kind, 'Module');
+  assert.equal(inner.members.some(member => member.kind === 'Import'), false);
+  assert.equal(inner.members.some(member => member.kind === 'FunctionDecl' && member.symbol === helper), true);
+  const result = new Runtime({ registry: new CapabilityRegistry() }).load(linked.module).call(entry, []);
+  assert.equal(result.ok, true); if (result.ok) assert.equal(result.value, 42n);
+  if (library.kind !== 'Module') throw new Error('fixture library');
+  const duplicate = b.module_({ symbol: symbols.define('duplicate'), symbolTable: symbols.table(), members: [
+    b.import_(address, [helper]), library.members[0], b.fn({ symbol: entry, returns: b.Int, body: b.ret(b.int(0)) }),
+  ] });
+  assert.throws(() => new ModuleResolver(store).resolve(store.intern(duplicate)), /duplicate imported symbol/);
 });
