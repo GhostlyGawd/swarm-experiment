@@ -21,7 +21,7 @@ import { adapterArtifactDigest, adapterArtifactForSource, admitAdapterSource } f
 import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
 import { DurableEffectBroker, type EffectAdapter } from '../../src/fabric/effects.ts';
 import { JournalLock } from '../../src/fabric/journal-lock.ts';
-import { DEFAULT_EVIDENCE_POLICY, mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
+import { DEFAULT_EVIDENCE_POLICY, DEFAULT_EVIDENCE_POLICY_V2, mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
 import type { TaggedValueV1, LogicalRefV1 } from '../../src/fabric/encoding.ts';
 import { PromotionCoordinator, approvePromotion, evidenceBundleDigest, migrationPlanDigest, effectPlanDigest, type PromotionInput, type PromotionCoordinatorOptions } from '../../src/fabric/promotion.ts';
@@ -86,7 +86,7 @@ function fixture(signedPolicy: boolean | 'artifact-v2' = false) {
       rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR.id,
         adapterDigest: ARTIFACT_SINK_ADAPTER_DIGEST, adapterArtifactDigest: ARTIFACT_SINK_DIGEST }] };
     return { module, registry: ex.capabilities, specification: 'Ledger conservation and composed total at least eighteen.', semanticsVersion: 'reference/1', compilerDigest: digest('compiler'), capabilityPolicyDigest: signedPolicy === 'artifact-v2' ? effectResourcePolicyDigestV2(artifactPolicy) : signedPolicy ? effectResourcePolicyDigest(resourcePolicy) : digest('effects-policy'),
-      target: { abiVersion: 'process/1', profileDigest: digest('two-workers'), artifactDigest: digest(encodeIR(module).text) }, policy: { ...DEFAULT_EVIDENCE_POLICY, requireFormal: false } };
+      target: { abiVersion: 'process/1', profileDigest: digest('two-workers'), artifactDigest: digest(encodeIR(module).text) }, policy: { ...(signedPolicy === 'artifact-v2' ? DEFAULT_EVIDENCE_POLICY_V2 : DEFAULT_EVIDENCE_POLICY), requireFormal: false } };
   };
   const plan = (swap = false): TopologyPlan => ({ shape: 'containers', units: [
     { id: 'a', members: swap ? [ex.symbols.feeFor, sum] : [ex.symbols.transfer, sum], capabilities: swap ? [] : [CAP_LEDGER_APPEND], placement: 'container', memoryMb: 32 },
@@ -211,6 +211,10 @@ test('fresh production deployment serves exact loader-admitted adapter bytes und
   }]]);
   try {
     globals.__deploymentArtifactCalls = 0;
+    const oldContext: EvidenceContext = { ...f.original, policy: { ...DEFAULT_EVIDENCE_POLICY, requireFormal: false } };
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, factories,
+      genesis: { context: oldContext, evidence: mintLocalEvidence(oldContext), plan: f.plan(), factoryId: 'ledger-services/1' } }), /process-isolated evidence policy v2/);
+    assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false);
     deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, factories });
     assert.equal(deployment.status().capabilityProfile, 'scoped-artifact-v4');
     const { alice, bob } = await accounts(deployment), scope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);

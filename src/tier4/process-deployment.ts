@@ -9,7 +9,7 @@ import { CapabilityRegistry, type CapabilityDescriptor, type CapabilityToken } f
 import { underlying } from '../tier2/typecheck.ts';
 import { decodeCanonical, encodeCanonical, exactObject, identifier, decimal, validateTaggedValue, type TaggedValueV1, type LogicalRefV1 } from '../fabric/encoding.ts';
 import { domainDigest, executionManifestDigest, validateDigest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
-import { DEFAULT_EVIDENCE_POLICY, validateEvidence, validateVettedEvidence, type EvidenceContext, type EvidencePolicyV1, type LocalEvidenceV1, type VettedEvidence } from '../fabric/evidence.ts';
+import { DEFAULT_EVIDENCE_POLICY, validateEvidence, validateVettedEvidence, type EvidenceContext, type EvidencePolicy, type LocalEvidenceV1, type VettedEvidence } from '../fabric/evidence.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
 import { runtimeSnapshotDigest, validateRuntimeSnapshot, type RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
 import { createPromotionHandle, evidenceBundleDigest, type PromotionAdmissionProfile, type PromotionBindingV1, type PromotionCoordinator, type PromotionDriver, type PromotionInput, type PreparedPromotionHandleV1, type ProductionAdmissionState } from '../fabric/promotion.ts';
@@ -30,7 +30,7 @@ export interface ProcessArtifactV1 {
   readonly ir: string;
   readonly manifest: ExecutionManifestV1;
   readonly specification: string;
-  readonly policy: EvidencePolicyV1;
+  readonly policy: EvidencePolicy;
   readonly capabilities: readonly CapabilityDescriptor[];
   readonly externals: readonly { symbol: SymbolId; ir: string }[];
   readonly plan: string;
@@ -251,7 +251,7 @@ export class ProcessDeployment implements PromotionDriver {
           if (!options.genesis) throw new Error('trusted genesis artifact is required');
           const candidate = makeArtifact(options.genesis), factory = options.factories.get(candidate.factoryId);
           if (!factory) throw new Error('trusted artifact factory is unavailable');
-          deployment.assertServices(factory(candidate), decodeIR(candidate.ir));
+          deployment.assertServices(factory(candidate), decodeIR(candidate.ir), candidate.policy);
           const artifact = deployment.persistArtifact(candidate);
           const manifest = executionManifestDigest(artifact.manifest), admission = options.coordinator.state();
           if (admission.committedManifest !== manifest || admission.generation !== '0' || admission.pendingProposal !== null) throw new Error('genesis does not match production admission');
@@ -272,7 +272,7 @@ export class ProcessDeployment implements PromotionDriver {
     if (this.closed) throw new Error('deployment is closed');
     const artifact = makeArtifact(input), factory = this.options.factories.get(artifact.factoryId);
     if (!factory) throw new Error('trusted artifact factory is unavailable');
-    this.assertServices(factory(artifact), decodeIR(artifact.ir));
+    this.assertServices(factory(artifact), decodeIR(artifact.ir), artifact.policy);
     return processArtifactDigest(this.persistArtifact(artifact));
   }
   artifact(manifest: Digest): ProcessArtifactV1 { return this.readArtifact(manifest); }
@@ -384,7 +384,7 @@ export class ProcessDeployment implements PromotionDriver {
     if (processArtifactDigest(artifact) !== reference.artifactDigest) throw new TypeError('prepared artifact registry changed');
     const context = processArtifactContext(artifact), factory = this.options.factories.get(artifact.factoryId)!;
     const services = factory(artifact);
-    this.assertServices(services, context.module);
+    this.assertServices(services, context.module, artifact.policy);
     ensureDirectory(join(this.directory(reference.id), 'host'));
     const host = await ProcessHost.open({ ...services, onPhase:(phase,detail)=>{
       if(this.historicalRecovery!==reference.id)this.options.coordinator.assertLineageCurrent(reference.manifest);
@@ -395,7 +395,7 @@ export class ProcessDeployment implements PromotionDriver {
     if (this.closed) { await host.close(); throw new Error('deployment closed during worker preparation'); }
     this.hosts.set(reference.id, host); return host;
   }
-  private assertServices(services: ProcessHostServices, module: Term): void {
+  private assertServices(services: ProcessHostServices, module: Term, evidencePolicy: EvidencePolicy): void {
     const invoked = new Set([...walk(module)].filter(node => node.kind === 'Invoke').map(node => (node as Extract<Term, { kind: 'Invoke' }>).capability));
     if (this.capabilityProfile === 'legacy-sealed-v1' ? !!services.scopedGrants || !!services.signedEffectResourcePolicy || !!services.effectResourcePath : !services.scopedGrants) {
       throw new Error('trusted deployment factory does not match durable capability profile');
@@ -410,10 +410,13 @@ export class ProcessDeployment implements PromotionDriver {
       && services.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/2') {
       throw new Error('artifact deployment profile requires signed code-provenance policy v2');
     }
+    if (this.capabilityProfile === 'scoped-artifact-v4' && evidencePolicy.format !== 'aether.evidence-policy/2') {
+      throw new Error('artifact deployment profile requires process-isolated evidence policy v2');
+    }
   }
   private assertHistoricalServices(state: DeploymentState): void {
     const artifact = this.readArtifact(state.active.manifest), factory = this.options.factories.get(artifact.factoryId)!;
-    this.assertServices(factory(artifact), decodeIR(artifact.ir));
+    this.assertServices(factory(artifact), decodeIR(artifact.ir), artifact.policy);
   }
   issueTokens(symbol: SymbolId, ttlMs?: number): CapabilityToken[] {
     const state = this.readState(); this.assertServing(state);

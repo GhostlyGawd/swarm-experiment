@@ -5,6 +5,7 @@ import { GraphStore } from '../tier1/store.ts';
 import type { CapabilityRegistry } from '../tier2/ocap.ts';
 import { typecheck } from '../tier2/typecheck.ts';
 import { verifyFunction, type VerificationReport } from '../tier2/verify.ts';
+import { V4_SMT_HARD_CUTOFF_MS } from '../tier2/hard-solver.ts';
 import { encodeCanonical, exactObject, identifier } from './encoding.ts';
 import { createExecutionManifest, domainDigest, executionManifestDigest, validateExecutionManifest, validateDigest, type ExecutionManifestV1, type Digest, type DependencyV1 } from './identity.ts';
 
@@ -18,10 +19,16 @@ export interface EvidencePolicyV1 {
   readonly maxDepth: number;
   readonly maxBytes: number;
 }
+export interface EvidencePolicyV2 extends Omit<EvidencePolicyV1, 'format'> {
+  readonly format: 'aether.evidence-policy/2';
+  readonly solverProfile: 'v4-hard/1';
+}
+export type EvidencePolicy = EvidencePolicyV1 | EvidencePolicyV2;
 export const DEFAULT_EVIDENCE_POLICY: EvidencePolicyV1 = Object.freeze({
   format: 'aether.evidence-policy/1', requireFormal: true, budgetMs: 1_500,
   maxPaths: 64, maxNodes: 50_000, maxDepth: 64, maxBytes: 8 * 1024 * 1024,
 });
+export const DEFAULT_EVIDENCE_POLICY_V2: EvidencePolicyV2 = Object.freeze({ ...DEFAULT_EVIDENCE_POLICY, format: 'aether.evidence-policy/2', solverProfile: 'v4-hard/1' });
 export interface EvidenceContext {
   readonly module: Term;
   readonly specification: string;
@@ -30,7 +37,7 @@ export interface EvidenceContext {
   readonly target: ExecutionManifestV1['target'];
   readonly capabilityPolicyDigest: Digest;
   readonly registry: CapabilityRegistry;
-  readonly policy?: EvidencePolicyV1;
+  readonly policy?: EvidencePolicy;
   /** Return actual declaration content; hashes and transitive calls are recomputed here. */
   readonly resolveDeclaration?: (symbol: SymbolId) => Term | undefined;
 }
@@ -102,20 +109,27 @@ export function validateVettedEvidence(value: unknown, expectedManifest: Executi
     if (brand.reports.get(symbol) !== report || !isVettedReport(report, expected) || report.symbol !== symbol) throw new TypeError('vetted evidence report provenance mismatch');
   }
 }
-function policyFor(context: EvidenceContext): EvidencePolicyV1 {
+function policyFor(context: EvidenceContext): EvidencePolicy {
   const policy = context.policy ?? DEFAULT_EVIDENCE_POLICY;
-  exactObject(policy, ['format', 'requireFormal', 'budgetMs', 'maxPaths', 'maxNodes', 'maxDepth', 'maxBytes']);
-  if (policy.format !== 'aether.evidence-policy/1' || typeof policy.requireFormal !== 'boolean') throw new TypeError('invalid evidence policy');
+  const fields = ['format', 'requireFormal', 'budgetMs', 'maxPaths', 'maxNodes', 'maxDepth', 'maxBytes'];
+  if (policy.format === 'aether.evidence-policy/2') {
+    exactObject(policy, [...fields, 'solverProfile']);
+    if (policy.solverProfile !== 'v4-hard/1' || policy.budgetMs > V4_SMT_HARD_CUTOFF_MS) throw new TypeError('invalid v4 hard evidence policy');
+  } else {
+    exactObject(policy, fields);
+    if (policy.format !== 'aether.evidence-policy/1') throw new TypeError('invalid evidence policy');
+  }
+  if (typeof policy.requireFormal !== 'boolean') throw new TypeError('invalid evidence policy');
   for (const key of ['budgetMs', 'maxPaths', 'maxNodes', 'maxDepth', 'maxBytes'] as const) {
     if (!Number.isSafeInteger(policy[key]) || policy[key] < 1) throw new TypeError('invalid evidence resource limit');
   }
   if (policy.maxDepth > 128) throw new RangeError('evidence depth exceeds local checker limit');
   return policy;
 }
-function limits(policy: EvidencePolicyV1) {
+function limits(policy: EvidencePolicy) {
   return { maxFrameBytes: policy.maxBytes, maxDecompressedBytes: policy.maxBytes, maxDepth: Math.min(256, policy.maxDepth + 32), maxObjects: policy.maxNodes * 32 };
 }
-function same(a: unknown, b: unknown, policy: EvidencePolicyV1): boolean {
+function same(a: unknown, b: unknown, policy: EvidencePolicy): boolean {
   return Buffer.compare(encodeCanonical(a, limits(policy)), encodeCanonical(b, limits(policy))) === 0;
 }
 function freeze<T>(value: T): T {
@@ -125,7 +139,7 @@ function freeze<T>(value: T): T {
   }
   return value;
 }
-function walk(term: Term, visit: (term: Term) => void, policy: EvidencePolicyV1): void {
+function walk(term: Term, visit: (term: Term) => void, policy: EvidencePolicy): void {
   let count = 0;
   const active = new Set<Term>();
   const scan = (node: Term, depth: number) => {
@@ -137,7 +151,7 @@ function walk(term: Term, visit: (term: Term) => void, policy: EvidencePolicyV1)
   scan(term, 0);
 }
 /** Bound types, annotations and literals too, before GraphStore's recursive AST encoding. */
-function checkAstInput(value: unknown, policy: EvidencePolicyV1): void {
+function checkAstInput(value: unknown, policy: EvidencePolicy): void {
   let nodes = 0;
   const active = new Set<object>();
   const normalize = (item: unknown, depth: number): unknown => {
@@ -166,7 +180,7 @@ function checkAstInput(value: unknown, policy: EvidencePolicyV1): void {
   };
   encodeCanonical(normalize(value, 0), limits(policy));
 }
-function calls(decl: Term, policy: EvidencePolicyV1): SymbolId[] {
+function calls(decl: Term, policy: EvidencePolicy): SymbolId[] {
   const out = new Set<SymbolId>();
   walk(decl, node => {
     if (node.kind === 'Call' || node.kind === 'SeqMap' || node.kind === 'SeqFold') out.add(node.callee);
@@ -203,7 +217,7 @@ function prepare(context: EvidenceContext) {
   const manifest = createExecutionManifest({
     astRoot: store.intern(context.module), specRoot: domainDigest('aether.specification/1', context.specification, limits(policy)),
     semanticsVersion: context.semanticsVersion, compilerDigest: context.compilerDigest, target: { ...context.target },
-    capabilityPolicyDigest: context.capabilityPolicyDigest, evidencePolicyDigest: domainDigest('aether.evidence-policy/1', policy),
+    capabilityPolicyDigest: context.capabilityPolicyDigest, evidencePolicyDigest: domainDigest(policy.format, policy),
   }, roots, dependency => {
     const decl = resolve(dependency.symbol as SymbolId);
     return { declaration: store.intern(decl), dependencies: calls(decl, policy).map(symbol => ({ symbol, declaration: store.intern(resolve(symbol)) })) };
@@ -217,7 +231,7 @@ function prepare(context: EvidenceContext) {
 export function createEvidenceManifest(context: EvidenceContext): ExecutionManifestV1 { return freeze(prepare(context).manifest); }
 
 /** Reject model gaps that can hide mutations or assume facts without obligations. */
-function assertModelSupported(decl: Declaration, environment: ReadonlyMap<SymbolId, Declaration>, policy: EvidencePolicyV1): void {
+function assertModelSupported(decl: Declaration, environment: ReadonlyMap<SymbolId, Declaration>, policy: EvidencePolicy): void {
   if (!decl.body || decl.contract?.kind !== 'Contract') throw new TypeError('verification requires a body and explicit frame contract');
   const labels = new Set<string>();
   const checkType = (ty: Ty, nested = false): void => {
@@ -281,7 +295,7 @@ function obligations(reports: readonly WireReport[]) {
     results: report.results.map(({ verdict: _verdict, solverStatus: _solver, abstractedTerms: _abstracted, ...obligation }) => obligation),
   }));
 }
-function checkCoverage(decl: Declaration, report: VerificationReport, environment: ReadonlyMap<SymbolId, Declaration>, policy: EvidencePolicyV1): void {
+function checkCoverage(decl: Declaration, report: VerificationReport, environment: ReadonlyMap<SymbolId, Declaration>, policy: EvidencePolicy): void {
   if (report.pathsExplored < 1 || report.pathsExplored > policy.maxPaths || report.unprovenFormalContracts.includes('path exploration truncated')) throw new TypeError('incomplete path exploration');
   if (report.assumptions.length || report.frameViolations.length) throw new TypeError('undeclared modeling assumptions or frame violations');
   const results = report.results;
@@ -308,7 +322,7 @@ function expectedReports(prepared: ReturnType<typeof prepare>): VerificationRepo
     return report;
   });
 }
-function validResult(report: VerificationReport, policy: EvidencePolicyV1): void {
+function validResult(report: VerificationReport, policy: EvidencePolicy): void {
   if (report.budgetExhausted || report.verdict === 'unproven' || report.verdict === 'refuted' || report.unprovenFormalContracts.length) throw new TypeError('verification refuted, incomplete or timed out');
   for (const result of report.results) {
     if (result.obligation.rigor === 'formal') {
@@ -321,7 +335,8 @@ function run(prepared: ReturnType<typeof prepare>, expected: readonly Verificati
   const reports = prepared.declarations.map(decl => {
     const remaining = prepared.policy.budgetMs - (Date.now() - start);
     if (remaining <= 0) throw new TypeError('verification total budget exhausted');
-    const report = verifyFunction(decl, { environment: prepared.environment, budgetMs: remaining, maxPaths: prepared.policy.maxPaths });
+    const report = verifyFunction(decl, { environment: prepared.environment, budgetMs: remaining, maxPaths: prepared.policy.maxPaths,
+      ...(prepared.policy.format === 'aether.evidence-policy/2' ? { solverProfile: prepared.policy.solverProfile } : {}) });
     checkCoverage(decl, report, prepared.environment, prepared.policy); validResult(report, prepared.policy);
     return report;
   });
@@ -346,7 +361,7 @@ export function mintLocalEvidence(context: EvidenceContext): LocalEvidenceV1 {
       format: 'aether.evidence/1', executionManifest: executionManifestDigest(prepared.manifest),
       obligationSetDigest: domainDigest('aether.obligations/1', obligations(encoded), limits(prepared.policy)),
       assumptionsDigest: domainDigest('aether.assumptions/1', encoded.map(report => ({ symbol: report.symbol, assumptions: report.assumptions })), limits(prepared.policy)),
-      evidenceKind: 'local_solver', checker: { id: 'aether.local-verifier', version: '1', semanticsVersion: context.semanticsVersion },
+      evidenceKind: 'local_solver', checker: { id: 'aether.local-verifier', version: prepared.policy.format === 'aether.evidence-policy/2' ? '2' : '1', semanticsVersion: context.semanticsVersion },
       evidenceDigest: domainDigest('aether.evidence-payload/1', encoded, limits(prepared.policy)),
       limits: { bytes: prepared.policy.maxBytes, steps: prepared.policy.maxNodes, depth: prepared.policy.maxDepth },
     },
@@ -365,7 +380,7 @@ export function validateEvidence(value: unknown, context: EvidenceContext): Vett
   for (const key of ['executionManifest', 'obligationSetDigest', 'assumptionsDigest', 'evidenceDigest']) validateDigest(envelope[key]);
   const checker = exactObject(envelope.checker, ['id', 'version', 'semanticsVersion']);
   identifier(checker.id); identifier(checker.version); identifier(checker.semanticsVersion);
-  if (checker.id !== 'aether.local-verifier' || checker.version !== '1' || checker.semanticsVersion !== context.semanticsVersion) throw new TypeError('unsupported evidence checker');
+  if (checker.id !== 'aether.local-verifier' || checker.version !== (policy.format === 'aether.evidence-policy/2' ? '2' : '1') || checker.semanticsVersion !== context.semanticsVersion) throw new TypeError('unsupported evidence checker');
   if (envelope.evidenceKind !== 'local_solver') throw new TypeError(envelope.evidenceKind === 'property_campaign' ? 'property evidence cannot authorize formal proof elision' : 'portable certificate checker is not implemented');
   const resources = exactObject(envelope.limits, ['bytes', 'steps', 'depth']);
   if (!same(resources, { bytes: policy.maxBytes, steps: policy.maxNodes, depth: policy.maxDepth }, policy)) throw new TypeError('evidence resource policy mismatch');
