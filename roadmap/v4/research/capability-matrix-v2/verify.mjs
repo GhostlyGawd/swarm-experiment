@@ -52,6 +52,8 @@ required.push(
   'deployment/direct/replay-revoked',
   'deployment/direct/replay-revoked-after-reopen',
 );
+for (const attack of ['forged', 'wrong-audience', 'wrong-path', 'narrowed', 'duplicate'])
+  required.push('process/effect-grant/' + attack);
 const ids = report.cases.map(row => row.id);
 assert.equal(new Set(ids).size, ids.length, 'duplicate case IDs');
 assert.deepEqual([...ids].sort(), [...required].sort(), 'unexpected or missing cases');

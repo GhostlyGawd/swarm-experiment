@@ -207,6 +207,28 @@ async function processMatrix() {
       record({ id: 'process/direct/' + attack, boundary: 'ProcessHost.call', attack, expected: 'deny-zero-sink-unchanged-heap',
         observed, denied, sinkBefore, sinkAfter: calls, heapBefore: before, heapAfter: await heap() });
     }
+    const effectGrant = valid[1];
+    const effectAttacks = [
+      ['forged', [{ ...effectGrant, signature: '0'.repeat(64) }]],
+      ['wrong-audience', [grants.issue({ capability: CAP_LEDGER_APPEND, audience: ex.symbols.feeFor, path: effectGrant.body.path }, 60_000)]],
+      ['wrong-path', [grants.issue({ capability: CAP_LEDGER_APPEND, audience: ex.symbols.transfer, path: ['wrong'] }, 60_000)]],
+      ['narrowed', [grants.attenuate(effectGrant, { capability: CAP_LEDGER_APPEND, audience: ex.symbols.transfer,
+        path: [...effectGrant.body.path, 'child'] }, 60_000)]],
+      ['duplicate', [effectGrant, effectGrant]],
+    ] as const;
+    for (const [attack, replacement] of effectAttacks) {
+      const tokens = [valid[0], ...replacement], before = await heap(), sinkBefore = calls;
+      let observed = '', denied = false;
+      try {
+        const response = await host.call(ex.symbols.transfer, args, { operationId: 'process-effect-' + attack, tokens });
+        observed = JSON.stringify(response);
+        denied = response.state !== 'completed' || !response.execution.ok;
+      }
+      catch (error) { observed = String(error); denied = /authority_denied|identity mismatch/.test(observed); }
+      record({ id: 'process/effect-grant/' + attack, boundary: 'ProcessHost.call effect authority', attack,
+        expected: 'deny-zero-sink-unchanged-heap', observed, denied,
+        sinkBefore, sinkAfter: calls, heapBefore: before, heapAfter: await heap() });
+    }
     const before = await heap(); epochs.revoke(PROCESS_INVOKE, []);
     let observed = '', denied = false;
     try { await host.call(ex.symbols.transfer, args, { operationId: 'process-revoked', tokens: valid }); observed = 'completed'; }
