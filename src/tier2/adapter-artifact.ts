@@ -12,6 +12,7 @@ import { decodeCanonical, encodeCanonical, exactObject, identifier } from '../fa
 import { domainDigest, validateDigest, type Digest } from '../fabric/identity.ts';
 import { effectAdapterDigest, type EffectAdapter } from '../fabric/effects.ts';
 import { capability, type CapabilityName } from '../tier1/ids.ts';
+import { createIsolatedWasmAdapter } from './isolated-wasm-adapter.ts';
 
 export interface AdapterArtifactV1 {
   readonly format: 'aether.effect-adapter-artifact/1';
@@ -100,6 +101,22 @@ export function wasmAdapterArtifactForBytes(bytes: Uint8Array, capabilityName: C
     semantics: { ...WASM_SEMANTICS }, sourceSha256: createHash('sha256').update(bytes).digest('hex'),
     sourceProfile: 'aether.adapter-wasm-i32-readonly/1', maxMemoryPages: limits.maxMemoryPages, timeoutMs: limits.timeoutMs };
   validateArtifact(artifact); return artifact;
+}
+/** Admit exact Wasm bytes only after an independent policy has approved the
+ * V3 descriptor. The child process receives neither grant nor sink authority. */
+export function admitWasmAdapterBytes(bytes: Uint8Array, artifact: AdapterArtifactV3): EffectAdapter {
+  validateArtifact(artifact);
+  const approved = decodeCanonical(encodeCanonical(artifact)) as unknown as AdapterArtifactV3;
+  validateArtifact(approved); Object.freeze(approved.semantics); Object.freeze(approved);
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength < 8 || bytes.byteLength > MAX_WASM_BYTES) throw new RangeError('Wasm adapter source byte bound');
+  const source = Buffer.from(bytes);
+  if (createHash('sha256').update(source).digest('hex') !== approved.sourceSha256) throw new TypeError('Wasm source does not match approved artifact');
+  const adapter = createIsolatedWasmAdapter({ bytes: source, expectedSha256: approved.sourceSha256,
+    id: approved.id, capability: approved.capability, maxMemoryPages: approved.maxMemoryPages, timeoutMs: approved.timeoutMs });
+  if (effectAdapterDigest(adapter) !== domainDigest('aether.effect-adapter/1', { id: approved.id, semantics: approved.semantics }))
+    throw new TypeError('Wasm adapter implementation differs from approved descriptor');
+  admitted.set(adapter, adapterArtifactDigest(approved));
+  return adapter;
 }
 /** Parse complete module syntax. Strings, comments, and regex text do not count
  * as imports. Unsupported syntax fails closed before any source is evaluated.

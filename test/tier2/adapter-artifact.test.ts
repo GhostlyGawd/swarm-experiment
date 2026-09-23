@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { capability } from '../../src/tier1/ids.ts';
-import { adapterArtifactDigest, adapterArtifactForSource, admitAdapterSource, admittedAdapterArtifactDigest, importFreeAdapterArtifactForSource, legacyAdapterArtifactForSource, wasmAdapterArtifactForBytes } from '../../src/tier2/adapter-artifact.ts';
+import { adapterArtifactDigest, adapterArtifactForSource, admitAdapterSource, admitWasmAdapterBytes, admittedAdapterArtifactDigest, importFreeAdapterArtifactForSource, legacyAdapterArtifactForSource, wasmAdapterArtifactForBytes } from '../../src/tier2/adapter-artifact.ts';
 import { DurableEffectBroker, effectAdapterDigest, effectPayloadDigest } from '../../src/fabric/effects.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
 
@@ -18,6 +18,17 @@ execute(request){globalThis.__aetherAdapterCalls=(globalThis.__aetherAdapterCall
 reconcile(){return{state:'not_committed'};}};`;
 const bytes = (value: string): Uint8Array => new TextEncoder().encode(value);
 const globals = globalThis as Record<string, unknown>;
+function wasmIncrementBytes(): Uint8Array {
+  const length = (n: number) => [n], section = (id: number, body: number[]) => [id, ...length(body.length), ...body];
+  const name = (value: string) => [...length(value.length), ...Buffer.from(value)];
+  const type = section(1, [1, 0x60, 1, 0x7f, 1, 0x7f]);
+  const functions = section(3, [1, 0]);
+  const memory = section(5, [1, 1, 1, 1]);
+  const exports = section(7, [2, ...name('run'), 0, 0, ...name('memory'), 2, 0]);
+  const body = [0, 0x20, 0, 0x41, 1, 0x6a, 0x0b];
+  return Uint8Array.from([0, 97, 115, 109, 1, 0, 0, 0, ...type, ...functions, ...memory, ...exports,
+    ...section(10, [1, body.length, ...body])]);
+}
 
 test('V3 Wasm descriptor binds bytes, fixed read-only semantics and finite resource limits', async () => {
   const wasm = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
@@ -31,6 +42,27 @@ test('V3 Wasm descriptor binds bytes, fixed read-only semantics and finite resou
   assert.throws(() => wasmAdapterArtifactForBytes(wasm, cap, 'wasm-increment/1', { maxMemoryPages: 257, timeoutMs: 250 }), /bounded Wasm adapter descriptor/);
   assert.throws(() => wasmAdapterArtifactForBytes(wasm, cap, 'wasm-increment/1', { maxMemoryPages: 1, timeoutMs: 5001 }), /bounded Wasm adapter descriptor/);
   await assert.rejects(admitAdapterSource(wasm, artifact), /requires isolated Wasm admission/);
+});
+
+test('V3 approved Wasm bytes run through a branded isolated adapter and actual durable broker', () => {
+  const wasm = wasmIncrementBytes(), artifact = wasmAdapterArtifactForBytes(wasm, cap, 'wasm-increment/1', { maxMemoryPages: 1, timeoutMs: 1000 });
+  const admitted = admitWasmAdapterBytes(wasm, artifact);
+  assert.equal(admittedAdapterArtifactDigest(admitted), adapterArtifactDigest(artifact));
+  assert.equal(admittedAdapterArtifactDigest({ ...admitted }), null);
+  wasm[wasm.length - 2] ^= 1;
+  const directory = mkdtempSync(join(tmpdir(), 'aether-admitted-wasm-'));
+  try {
+    const broker = new DurableEffectBroker({ directory, clockDomain: 'adapter-wasm/1', clock: () => 100n, authorize: () => true });
+    const payload = { tag: 'sequence' as const, items: [{ tag: 'string' as const, value: cap }, { tag: 'int' as const, value: '41' }] };
+    const request = { format: 'aether.effect/1' as const, executionId: 'wasm-adapter-test', effectId: 'one', branchId: null,
+      executionManifest: domainDigest('aether.execution/1', 'wasm-adapter-test'), capabilityGrantRef: 'grant:wasm-test', policyEpoch: '1',
+      payloadDigest: effectPayloadDigest(payload), payload, budgetReservationId: null, deadline: '1000' };
+    const first = broker.dispatch(request, admitted);
+    assert.equal(first.state, 'committed'); if (first.state === 'committed') assert.deepEqual(JSON.parse(JSON.stringify(first.value)), { tag: 'int', value: '42' });
+    assert.deepEqual(JSON.parse(JSON.stringify(broker.dispatch(request, admitted))), JSON.parse(JSON.stringify(first)));
+    assert.equal(broker.events().length, 1);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+  assert.throws(() => admitWasmAdapterBytes(wasm, artifact), /does not match approved artifact/);
 });
 
 test('approved exact adapter bytes mint one immutable code-provenance identity', async () => {
