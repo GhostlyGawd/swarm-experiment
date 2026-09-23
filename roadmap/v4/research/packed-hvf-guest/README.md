@@ -21,6 +21,8 @@ npm run typecheck
 
 The test compiles and signs a dedicated controller, links a freestanding AArch64 guest, and checks a real resumable checkpoint with aliases, trapped and successful mutations, and a separately committed host correction. It also runs six seeded 128-operation differential campaigns over local and wide aliases, signed 64-bit edge arithmetic, executable and image tampering, an invalid frame that reaches EL1, and a deliberately hung guest. `results/local-01.json` retains each operation, observation, exact source SHA-256, binary SHA-256, raw timing ticks, guest memory diagnostics, and environment. `verify-evidence.ts` checks source bytes against the pinned Git commit, validates timing arithmetic, rebuilds the exact binaries, and reruns all semantic cases. The evidence has finite scope and must be regenerated after any source change.
 
+The first retained M4 Pro campaign pins source commit `1181a08be6b36a403c406b5df5aaa4399a647c8b`. It contains eight successful guest runs and 779 field operations. Fresh guest creation through validated response ranged from **416,958 to 1,992,500 ns**; the first sample exceeded 1 ms. Each run mapped and observed 65,536 resident guest backing bytes. Process launch through exit ranged from 5.9 to 235.9 ms and is separate from the guest interval. These are raw research observations from eight varied workloads and newly launched controllers, not a 1 ms or 2 MB qualification campaign.
+
 ## Open work
 
 1. Integrate this guest with production native lowering, manifest admission, checkpoint handoff, and authorized correction events. The current driver accepts only a host-derived research frame, and its direct raw CLI does not authenticate checkpoint history.
