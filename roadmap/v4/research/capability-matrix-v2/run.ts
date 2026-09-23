@@ -408,27 +408,26 @@ async function deploymentMatrix() {
 }
 
 async function main() {
+  const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim().length > 0;
+  const sourceHashes = Object.fromEntries(sourcePaths().map(path => [path, hash(readFileSync(join(root, path)))]));
+  const sourceCommitted = Object.entries(sourceHashes).every(([path, fileHash]) => {
+    try { return hash(execFileSync('git', ['show', `${commit}:${path}`], { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] })) === fileHash; }
+    catch { return false; }
+  });
   await topologyMatrix();
   await topologyContinuationMatrix();
   await processMatrix();
   await processRevocationWindows();
   await deploymentMatrix();
-  const sourceHashes = Object.fromEntries(sourcePaths().map(path => [path, hash(readFileSync(join(root, path)))]));
-  let commit = 'unknown', dirty = false;
-  try {
-    commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-    dirty = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim().length > 0;
-  } catch {}
-  const sourceCommitted = Object.entries(sourceHashes).every(([path, fileHash]) => {
-    try { return hash(execFileSync('git', ['show', `HEAD:${path}`], { cwd: root })) === fileHash; }
-    catch { return false; }
-  });
+  const sourceStable = Object.entries(sourceHashes).every(([path, fileHash]) => hash(readFileSync(join(root, path))) === fileHash);
   const output = { format: 'aether.capability-matrix-v2/1', commit, dirty, sourceCommitted,
-    nodeVersion: process.version, platform: process.platform, sourceHashes, cases };
+    sourceStable, nodeVersion: process.version, platform: process.platform, sourceHashes, cases };
   mkdirSync(join(root, 'roadmap/v4/research/capability-matrix-v2/results'), { recursive: true });
   writeFileSync(out, JSON.stringify(output, null, 2) + '\n');
-  console.log(JSON.stringify({ output: out, commit, dirty, sourceCommitted, cases: cases.length,
+  console.log(JSON.stringify({ output: out, commit, dirty, sourceCommitted, sourceStable, cases: cases.length,
     failures: cases.filter(failure).map(item => item.id) }, null, 2));
+  assert.equal(sourceStable, true, 'source changed during campaign');
   assert.equal(cases.filter(failure).length, 0, 'adversarial matrix found a boundary failure');
 }
 await main();

@@ -11,6 +11,7 @@ assert.equal(report.format, 'aether.capability-matrix-v2/1');
 assert.match(report.commit, /^[0-9a-f]{40}$/);
 assert.equal(typeof report.dirty, 'boolean');
 assert.equal(report.sourceCommitted, true, 'source files were not committed at measurement time');
+assert.equal(report.sourceStable, true, 'source files changed during measurement');
 assert.match(report.nodeVersion, /^v\d+\.\d+\.\d+$/);
 assert.ok(['darwin', 'linux', 'win32'].includes(report.platform));
 const expectedSources = [
