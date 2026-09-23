@@ -23,7 +23,7 @@ test('independent signatures form an exact-root, heterogeneous commit certificat
   const certificate = assembleQuorumCertificate(f.body, votes, f.roster);
   assert.equal(quorumRosterDigest(f.roster), f.body.roster);
   assert.equal(verifyQuorumCertificate(certificate, f.roster, f.proposal), true);
-  assert.equal(verifyPromotionCommitCertificate(certificate, f.roster, f.proposal, f.proposal.expectedParent), true);
+  assert.equal(verifyPromotionCommitCertificate(certificate, f.roster, f.proposal, f.proposal.expectedParent, f.body.parentBlock), true);
   assert.equal(certificate.votes.length, 3);
   assert.throws(() => assembleQuorumCertificate(f.body, votes.slice(0, 2), f.roster), /invalid quorum certificate/);
   assert.throws(() => assembleQuorumCertificate(f.body, [votes[0], votes[0], votes[2]], f.roster), /invalid quorum certificate/);
@@ -34,11 +34,12 @@ test('forgery, wrong signer, phase, root, policy and epoch cannot authorize prom
   assert.equal(verifyQuorumVote({ ...votes[0], signature: 'A'.repeat(88) }, f.roster), false);
   assert.equal(verifyQuorumVote({ ...votes[0], signer: 'validator-3' }, f.roster), false);
   assert.equal(verifyQuorumCertificate({ ...certificate, votes: [{ ...votes[0], signature: 'A'.repeat(88) }, ...votes.slice(1)] }, f.roster), false);
-  assert.equal(verifyPromotionCommitCertificate(certificate, f.roster, f.proposal, domainDigest('aether.execution/1', 'stale-parent')), false);
-  assert.equal(verifyPromotionCommitCertificate(certificate, f.roster, { ...f.proposal, candidateManifest: domainDigest('aether.execution/1', 'other') }, f.proposal.expectedParent), false);
+  assert.equal(verifyPromotionCommitCertificate(certificate, f.roster, f.proposal, domainDigest('aether.execution/1', 'stale-parent'), f.body.parentBlock), false);
+  assert.equal(verifyPromotionCommitCertificate(certificate, f.roster, f.proposal, f.proposal.expectedParent, f.d('different-block')), false);
+  assert.equal(verifyPromotionCommitCertificate(certificate, f.roster, { ...f.proposal, candidateManifest: domainDigest('aether.execution/1', 'other') }, f.proposal.expectedParent, f.body.parentBlock), false);
   const prepare = quorumVoteBody(f.roster, f.proposal, '4', 'prepare', f.body.parentBlock);
   const prepared = assembleQuorumCertificate(prepare, [0, 1, 2].map(index => f.vote(index, prepare)), f.roster);
-  assert.equal(verifyPromotionCommitCertificate(prepared, f.roster, f.proposal, f.proposal.expectedParent), false);
+  assert.equal(verifyPromotionCommitCertificate(prepared, f.roster, f.proposal, f.proposal.expectedParent, f.body.parentBlock), false);
   const changedPolicy = { ...f.roster, policyEpoch: '9' };
   assert.equal(verifyQuorumCertificate(certificate, changedPolicy), false);
   const changedEpoch = { ...f.roster, membershipEpoch: '4' };

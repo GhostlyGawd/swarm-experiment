@@ -134,11 +134,12 @@ export function verifyQuorumCertificate(value: unknown, roster: QuorumRosterV1, 
 }
 /** Cryptographic final-phase check against the caller's current production
  * parent. This still does not establish HotStuff vote/lock/view safety. */
-export function verifyPromotionCommitCertificate(value: unknown, roster: QuorumRosterV1, proposal: PromotionProposalV1, currentParent: Digest): value is QuorumCertificateV1 {
+export function verifyPromotionCommitCertificate(value: unknown, roster: QuorumRosterV1, proposal: PromotionProposalV1, currentParent: Digest, expectedParentBlock: Digest): value is QuorumCertificateV1 {
   try {
-    validateDigest(currentParent, 'aether.execution/1');
+    validateDigest(currentParent, 'aether.execution/1'); validateDigest(expectedParentBlock);
     return proposal.expectedParent === currentParent && verifyQuorumCertificate(value, roster, proposal)
       && (value as QuorumCertificateV1).body.phase === 'commit'
-      && (value as QuorumCertificateV1).body.expectedParent === currentParent;
+      && (value as QuorumCertificateV1).body.expectedParent === currentParent
+      && (value as QuorumCertificateV1).body.parentBlock === expectedParentBlock;
   } catch { return false; }
 }
