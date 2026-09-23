@@ -39,6 +39,7 @@ export interface ProcessArtifactV1 {
   readonly schemaDigest: Digest;
 }
 export type ProcessHostServices = Pick<ProcessHostOptions, 'sealer' | 'scopedGrants' | 'effectResourcePath' | 'effectResourcePolicyDigest' | 'signedEffectResourcePolicy' | 'effectResourceSignerKey' | 'currentEffectPolicyEpoch' | 'revocations' | 'effectRouterFactory' | 'authorizeRecovery' | 'timeoutMs' | 'lockWaitMs' | 'maxWorkers' | 'onPhase'>;
+export type CapabilityDeploymentProfile = 'scoped-v2' | 'legacy-sealed-v1';
 export interface ProcessDeploymentOptions {
   readonly directory: string;
   readonly coordinator: PromotionCoordinator;
@@ -49,6 +50,10 @@ export interface ProcessDeploymentOptions {
   readonly phase?: (phase: 'prepared' | 'before-activation' | 'activated' | 'aborted', detail: Readonly<{ proposalDigest: Digest; workerPids: Readonly<Record<string, number>> }>) => void;
   readonly invocationPhase?: (phase: 'after-intent' | 'after-host-result' | 'after-receipt', detail: Readonly<{ operationId: string; workerPids: Readonly<Record<string, number>> }>) => void;
   readonly legacyProfileMigration?: 'adopt-baseline-v1';
+  /** Fresh production deployments default to scoped grants. Legacy authority is explicit. */
+  readonly capabilityProfile?: CapabilityDeploymentProfile;
+  /** Existing v2 histories have no capability-profile field and require explicit adoption. */
+  readonly legacyCapabilityMigration?: 'adopt-legacy-sealed-v1' | 'adopt-scoped-v2';
 }
 interface DeploymentReference {
   readonly id: string;
@@ -57,8 +62,9 @@ interface DeploymentReference {
   readonly generation: string;
 }
 interface DeploymentState {
-  readonly format: 'aether.process-deployment/2';
+  readonly format: 'aether.process-deployment/3';
   readonly admissionProfile: PromotionAdmissionProfile;
+  readonly capabilityProfile: CapabilityDeploymentProfile;
   readonly genesisManifest: Digest;
   readonly active: DeploymentReference;
   readonly readiness: 'ready' | 'preparing' | 'prepared';
@@ -205,6 +211,7 @@ function rebind(snapshot: RuntimeSnapshotV1, manifest: Digest, epoch: string, pl
  */
 export class ProcessDeployment implements PromotionDriver {
   private readonly options: ProcessDeploymentOptions;
+  private readonly capabilityProfile: CapabilityDeploymentProfile;
   private readonly gate: JournalLock;
   private readonly registryGate: JournalLock;
   private readonly stateFile: string;
@@ -213,7 +220,10 @@ export class ProcessDeployment implements PromotionDriver {
   private historicalRecovery: string | null = null;
   private closed = false;
   private constructor(options: ProcessDeploymentOptions) {
-    this.options = options; ensureDirectory(options.directory);
+    this.options = options; this.capabilityProfile = options.capabilityProfile ?? 'scoped-v2';
+    if (!['scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
+      || options.legacyCapabilityMigration !== undefined && !['adopt-legacy-sealed-v1', 'adopt-scoped-v2'].includes(options.legacyCapabilityMigration)) throw new TypeError('invalid capability deployment profile/migration');
+    ensureDirectory(options.directory);
     ensureDirectory(join(options.directory, 'artifacts')); ensureDirectory(join(options.directory, 'deployments'));
     this.stateFile = join(options.directory, 'deployment.json');
     this.gate = new JournalLock({ directory: join(options.directory, 'execution-gate'), domain: 'aether.process-deployment-lock', busyError: 'deployment execution is frozen by another transition' });
@@ -226,17 +236,27 @@ export class ProcessDeployment implements PromotionDriver {
       await deployment.gate.runAsync(async () => {
         if(options.legacyProfileMigration!==undefined&&(options.legacyProfileMigration!=='adopt-baseline-v1'||options.coordinator.admissionProfile!=='baseline-governor-v1'))throw new TypeError('legacy deployment can only be explicitly adopted as baseline');
         if(existsSync(deployment.stateFile)&&(load(deployment.stateFile) as {format?:unknown}).format==='aether.process-deployment/1'){
-          if(options.legacyProfileMigration!=='adopt-baseline-v1')throw new Error('unprofiled deployment history requires explicit baseline migration');
-          save(deployment.stateFile,deployment.readState(true));
+          if(options.legacyProfileMigration!=='adopt-baseline-v1'||deployment.capabilityProfile!=='legacy-sealed-v1')throw new Error('unprofiled deployment history requires explicit baseline migration and legacy capability profile');
+          const migrated = deployment.readState('v1'); deployment.assertHistoricalServices(migrated);
+          await deployment.hostFor(migrated.active); save(deployment.stateFile,migrated);
+        }
+        if(existsSync(deployment.stateFile)&&(load(deployment.stateFile) as {format?:unknown}).format==='aether.process-deployment/2'){
+          const required = deployment.capabilityProfile === 'scoped-v2' ? 'adopt-scoped-v2' : 'adopt-legacy-sealed-v1';
+          if(options.legacyCapabilityMigration!==required)throw new Error('unprofiled capability history requires explicit legacy capability migration');
+          const migrated = deployment.readState('v2'); deployment.assertHistoricalServices(migrated);
+          await deployment.hostFor(migrated.active); save(deployment.stateFile,migrated);
         }
         if (!existsSync(deployment.stateFile)) {
           if (!options.genesis) throw new Error('trusted genesis artifact is required');
-          const artifact = deployment.persistArtifact(makeArtifact(options.genesis));
+          const candidate = makeArtifact(options.genesis), factory = options.factories.get(candidate.factoryId);
+          if (!factory) throw new Error('trusted artifact factory is unavailable');
+          deployment.assertServices(factory(candidate));
+          const artifact = deployment.persistArtifact(candidate);
           const manifest = executionManifestDigest(artifact.manifest), admission = options.coordinator.state();
           if (admission.committedManifest !== manifest || admission.generation !== '0' || admission.pendingProposal !== null) throw new Error('genesis does not match production admission');
           const reference: DeploymentReference = { id: 'genesis', manifest, artifactDigest: processArtifactDigest(artifact), generation: '0' };
           deployment.writePrepared({ format: 'aether.process-deployment-prepared/1', binding: null, reference, source: null, sourceSnapshotDigest: null, seed: null });
-          save(deployment.stateFile, { format: 'aether.process-deployment/2', admissionProfile: options.coordinator.admissionProfile, genesisManifest: manifest, active: reference, readiness: 'ready', pendingProposal: null, invocations: [], allocations: [] });
+          save(deployment.stateFile, { format: 'aether.process-deployment/3', admissionProfile: options.coordinator.admissionProfile, capabilityProfile: deployment.capabilityProfile, genesisManifest: manifest, active: reference, readiness: 'ready', pendingProposal: null, invocations: [], allocations: [] });
         }
         const state = deployment.readState();
         // Pending decisions are recovered explicitly, never by booting the old target.
@@ -286,10 +306,13 @@ export class ProcessDeployment implements PromotionDriver {
     }
     return value as unknown as PreparedRecord;
   }
-  private readState(legacy=false): DeploymentState {
-    const value = exactObject(load(this.stateFile), ['format', ...(legacy?[]:['admissionProfile']), 'genesisManifest', 'active', 'readiness', 'pendingProposal', 'invocations', 'allocations']);
+  private readState(legacy: 'v1' | 'v2' | null = null): DeploymentState {
+    const value = exactObject(load(this.stateFile), ['format', ...(legacy === 'v1' ? [] : ['admissionProfile']), ...(legacy ? [] : ['capabilityProfile']), 'genesisManifest', 'active', 'readiness', 'pendingProposal', 'invocations', 'allocations']);
     validateReference(value.active); validateDigest(value.genesisManifest, 'aether.execution/1');
-    if (value.format !== (legacy?'aether.process-deployment/1':'aether.process-deployment/2') || (!legacy&&value.admissionProfile!==this.options.coordinator.admissionProfile) || !['ready', 'preparing', 'prepared'].includes(value.readiness as string) || (value.readiness === 'ready') !== (value.pendingProposal === null)) throw new TypeError('invalid deployment readiness/profile');
+    if (value.format !== (legacy === 'v1' ? 'aether.process-deployment/1' : legacy === 'v2' ? 'aether.process-deployment/2' : 'aether.process-deployment/3')
+      || (legacy !== 'v1' && value.admissionProfile !== this.options.coordinator.admissionProfile)
+      || (!legacy && value.capabilityProfile !== this.capabilityProfile)
+      || !['ready', 'preparing', 'prepared'].includes(value.readiness as string) || (value.readiness === 'ready') !== (value.pendingProposal === null)) throw new TypeError('invalid deployment readiness/profile');
     if (value.pendingProposal !== null) validateDigest(value.pendingProposal, 'aether.promotion/1');
     if (!Array.isArray(value.invocations)) throw new TypeError('missing durable invocation registry');
     const history = this.options.coordinator.history();
@@ -331,7 +354,7 @@ export class ProcessDeployment implements PromotionDriver {
         if (allocation.result.heapId !== row.heapId || allocation.result.ownerEpoch !== target.generation) throw new TypeError('allocation receipt scope mismatch');
       }
     }
-    return (legacy?{...value,format:'aether.process-deployment/2',admissionProfile:'baseline-governor-v1'}:value) as unknown as DeploymentState;
+    return (legacy ? { ...value, format: 'aether.process-deployment/3', admissionProfile: legacy === 'v1' ? 'baseline-governor-v1' : value.admissionProfile, capabilityProfile: legacy === 'v1' ? 'legacy-sealed-v1' : this.capabilityProfile } : value) as unknown as DeploymentState;
   }
   private assertCommittedSource(state=this.readState()):void {
     if(this.closed)throw new Error('deployment is closed');
@@ -345,10 +368,10 @@ export class ProcessDeployment implements PromotionDriver {
     if (state.readiness !== 'ready' || state.active.manifest !== manifest || state.active.generation !== admission.generation) throw new Error('deployment serving is frozen or does not match committed target');
   }
   servingManifest(): Digest { const state = this.readState(); this.assertServing(state); return state.active.manifest; }
-  status(): { readiness: DeploymentState['readiness']; servingReady:boolean; activeManifest: Digest; generation: string; workerPids: Readonly<Record<string, number>> } {
+  status(): { readiness: DeploymentState['readiness']; servingReady:boolean; capabilityProfile: CapabilityDeploymentProfile; activeManifest: Digest; generation: string; workerPids: Readonly<Record<string, number>> } {
     const state = this.readState(),admission=this.options.coordinator.state();
     const servingReady=!this.closed&&this.options.coordinator.servingReady()&&state.readiness==='ready'&&state.active.manifest===admission.committedManifest&&state.active.generation===admission.generation;
-    return { readiness: state.readiness, servingReady, activeManifest: state.active.manifest, generation: state.active.generation, workerPids: this.hosts.get(state.active.id)?.workerPids ?? {} };
+    return { readiness: state.readiness, servingReady, capabilityProfile: state.capabilityProfile, activeManifest: state.active.manifest, generation: state.active.generation, workerPids: this.hosts.get(state.active.id)?.workerPids ?? {} };
   }
   private async hostFor(reference: DeploymentReference): Promise<ProcessHost> {
     if (this.closed) throw new Error('deployment is closed');
@@ -357,6 +380,7 @@ export class ProcessDeployment implements PromotionDriver {
     if (processArtifactDigest(artifact) !== reference.artifactDigest) throw new TypeError('prepared artifact registry changed');
     const context = processArtifactContext(artifact), factory = this.options.factories.get(artifact.factoryId)!;
     const services = factory(artifact);
+    this.assertServices(services);
     ensureDirectory(join(this.directory(reference.id), 'host'));
     const host = await ProcessHost.open({ ...services, onPhase:(phase,detail)=>{
       if(this.historicalRecovery!==reference.id)this.options.coordinator.assertLineageCurrent(reference.manifest);
@@ -366,6 +390,15 @@ export class ProcessDeployment implements PromotionDriver {
       registry: context.registry, plan: JSON.parse(artifact.plan), initialGeneration: reference.generation, initialSnapshot: record.seed ?? undefined });
     if (this.closed) { await host.close(); throw new Error('deployment closed during worker preparation'); }
     this.hosts.set(reference.id, host); return host;
+  }
+  private assertServices(services: ProcessHostServices): void {
+    if (this.capabilityProfile === 'scoped-v2' ? !services.scopedGrants : !!services.scopedGrants || !!services.signedEffectResourcePolicy || !!services.effectResourcePath) {
+      throw new Error('trusted deployment factory does not match durable capability profile');
+    }
+  }
+  private assertHistoricalServices(state: DeploymentState): void {
+    const artifact = this.readArtifact(state.active.manifest), factory = this.options.factories.get(artifact.factoryId)!;
+    this.assertServices(factory(artifact));
   }
   issueTokens(symbol: SymbolId, ttlMs?: number): CapabilityToken[] {
     const state = this.readState(); this.assertServing(state);

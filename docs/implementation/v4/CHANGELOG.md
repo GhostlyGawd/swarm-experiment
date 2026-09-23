@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Capability deployment profile implementation — 2026-09-22
+
+- ProcessDeployment now persists capability authority as `aether.process-deployment/3`. Fresh deployments default to scoped grants; legacy sealed authority requires an explicit profile.
+- Existing v1/v2 records require an explicit adoption choice. The active factory and existing host configuration are checked before the record is rewritten, retaining old bytes on mismatch or crash.
+- This implements the existing V4-T2-04 containment contract; acceptance gates and specification version 0.1.0 are unchanged. Signed adapter code admission and complete path coverage remain open.
+
 ## Target-profile decision — 2026-09-22
 
 - The user selected fresh guest startup on an already-running hypervisor and guest resident memory for the unchanged 1 ms / 2 MB limits.

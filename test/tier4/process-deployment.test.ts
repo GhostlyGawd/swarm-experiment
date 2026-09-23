@@ -86,7 +86,7 @@ function fixture(signedPolicy = false) {
   const authority = { repositoryId: 'deployment-test', membershipEpoch: '1', policyEpoch: '1', eligibleGovernors: ['governor'] };
   const coordinatorOptions: PromotionCoordinatorOptions = { profile: 'baseline-governor-v1', directory: join(directory, 'coordinator'), repositoryId: authority.repositoryId, genesisManifest, authority: () => authority, governorKey: () => keys.publicKey, clock: () => 100n };
   const coordinator = new PromotionCoordinator(coordinatorOptions);
-  const options: ProcessDeploymentOptions = { directory: join(directory, 'driver'), coordinator, factories: new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => hostFactory(directory, artifact)]]), genesis: { context: original, evidence: originalEvidence, plan: plan(), factoryId: 'ledger-services/1' } };
+  const options: ProcessDeploymentOptions = { directory: join(directory, 'driver'), coordinator, capabilityProfile: 'legacy-sealed-v1', factories: new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => hostFactory(directory, artifact)]]), genesis: { context: original, evidence: originalEvidence, plan: plan(), factoryId: 'ledger-services/1' } };
   const rows = (): any[] => existsSync(join(directory, 'ledger.json')) ? JSON.parse(readFileSync(join(directory, 'ledger.json'), 'utf8')) : [];
   const proposal = async (deployment: ProcessDeployment, ctx = context('v2'), topology = plan(true)): Promise<PromotionInput> => {
     const evidence = mintLocalEvidence(ctx), artifact = deployment.registerArtifact({ context: ctx, evidence, plan: topology, factoryId: 'ledger-services/1' });
@@ -117,7 +117,7 @@ test('strict process deployment carries scoped grants through the production hos
     },
   })]]);
   try {
-    deployment = await ProcessDeployment.open({ ...f.options, factories: strictFactory });
+    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-v2', factories: strictFactory });
     assert.throws(() => deployment!.issueTokens(f.ex.symbols.transfer), /strict ProcessHost/);
     const { alice, bob } = await accounts(deployment), args = [reference(alice), reference(bob), integer(10)];
     await assert.rejects(deployment.call(f.ex.symbols.transfer, args, { operationId: 'wrong-audience', tokens: deployment.issueScopedTokens(f.ex.symbols.settle) }), /authority_denied/);
@@ -134,7 +134,16 @@ test('strict process deployment carries scoped grants through the production hos
     assert.equal(f.rows().length, 1);
     await deployment.close(); deployment = undefined;
     await assert.rejects(ProcessDeployment.open(f.options), /configuration|profile/i);
-    deployment = await ProcessDeployment.open({ ...f.options, factories: strictFactory });
+    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-v2', factories: strictFactory });
+    assert.deepEqual(await balances(deployment), ['90', '10']);
+    await deployment.close(); deployment = undefined;
+    const stateFile = join(f.options.directory, 'deployment.json'), current = JSON.parse(readFileSync(stateFile, 'utf8'));
+    const prior = { ...current, format: 'aether.process-deployment/2' }; delete prior.capabilityProfile;
+    writeFileSync(stateFile, JSON.stringify(prior)); const exactPrior = readFileSync(stateFile, 'utf8');
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-v2', factories: strictFactory, genesis: undefined }), /explicit legacy capability migration/);
+    assert.equal(readFileSync(stateFile, 'utf8'), exactPrior);
+    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-v2', factories: strictFactory, genesis: undefined, legacyCapabilityMigration: 'adopt-scoped-v2' });
+    assert.deepEqual(JSON.parse(readFileSync(stateFile, 'utf8')), current);
     assert.deepEqual(await balances(deployment), ['90', '10']);
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });
@@ -156,7 +165,7 @@ test('process deployment factory serves a signed effect resource policy bound to
       effectResourceSignerKey: keys.publicKey, currentEffectPolicyEpoch: () => epochs.policyEpoch };
   }]]);
   try {
-    deployment = await ProcessDeployment.open({ ...f.options, factories });
+    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-v2', factories });
     const { alice, bob } = await accounts(deployment), args = [reference(alice), reference(bob), integer(10)];
     const aliceScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
     const valid = await deployment.call(f.ex.symbols.transfer, args, { operationId: 'signed-deployment-valid', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, aliceScope) });
@@ -290,7 +299,7 @@ function crashPromotion(f: ReturnType<typeof fixture>, input: PromotionInput, ph
       authority:()=>({repositoryId:'deployment-test',membershipEpoch:'1',policyEpoch:'1',eligibleGovernors:['governor']}),governorKey:()=>createPublicKey(readFileSync(publicKeyFile)),clock:()=>100n,
       fault:point=>{if(point===phase)process.kill(process.pid,'SIGKILL');}});
     let deployment;
-    deployment=await ProcessDeployment.open({directory:join(directory,'driver'),coordinator,factories:new Map([['ledger-services/1',artifact=>({...hostFactory(directory,artifact),onPhase:point=>{if(point===phase)process.kill(process.pid,'SIGKILL');}})]]),
+    deployment=await ProcessDeployment.open({directory:join(directory,'driver'),coordinator,capabilityProfile:'legacy-sealed-v1',factories:new Map([['ledger-services/1',artifact=>({...hostFactory(directory,artifact),onPhase:point=>{if(point===phase)process.kill(process.pid,'SIGKILL');}})]]),
       phase:(point,detail)=>{writeFileSync(join(directory,'promotion-worker-pids.json'),JSON.stringify([...new Set([...Object.values(detail.workerPids),...Object.values(deployment.status().workerPids)])]));}});
     writeFileSync(join(directory,'promotion-worker-pids.json'),JSON.stringify(Object.values(deployment.status().workerPids)));
     const input=JSON.parse(readFileSync(inputFile,'utf8'));
@@ -525,10 +534,48 @@ test('deployment legacy profile adoption is explicit and preserves durable recei
     await deployment.call(f.ex.symbols.feeFor,[integer(100)],{operationId:'legacy-result',tokens:deployment.issueTokens(f.ex.symbols.feeFor)});
     await deployment.close();deployment=undefined;
     const file=join(f.options.directory,'deployment.json'), state=JSON.parse(readFileSync(file,'utf8'));
-    const legacy={...state,format:'aether.process-deployment/1'};delete legacy.admissionProfile;
+    const legacy={...state,format:'aether.process-deployment/1'};delete legacy.admissionProfile;delete legacy.capabilityProfile;
     writeFileSync(file,JSON.stringify(legacy));const original=readFileSync(file,'utf8');
     await assert.rejects(ProcessDeployment.open({...f.options,genesis:undefined}),/explicit baseline migration/);assert.equal(readFileSync(file,'utf8'),original);
     deployment=await ProcessDeployment.open({...f.options,genesis:undefined,legacyProfileMigration:'adopt-baseline-v1'});
     assert.deepEqual(JSON.parse(readFileSync(file,'utf8')),state);assert.equal(deployment.status().servingReady,true);
   } finally {await deployment?.close();rmSync(f.directory,{recursive:true,force:true});}
+});
+
+test('fresh production deployment defaults to scoped authority and refuses a legacy factory', async () => {
+  const f = fixture(); let deployment: ProcessDeployment | undefined;
+  try {
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined }), /trusted deployment factory does not match durable capability profile/);
+    assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false, 'authority mismatch cannot publish a durable genesis');
+    deployment = await ProcessDeployment.open(f.options);
+    const state = JSON.parse(readFileSync(join(f.options.directory, 'deployment.json'), 'utf8'));
+    assert.equal(state.format, 'aether.process-deployment/3');
+    assert.equal(state.capabilityProfile, 'legacy-sealed-v1');
+    await deployment.close(); deployment = undefined;
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined }), /readiness\/profile/);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('v2 capability history needs explicit legacy adoption and retains settled calls', async () => {
+  const f = fixture(); let deployment: ProcessDeployment | undefined;
+  try {
+    deployment = await ProcessDeployment.open(f.options);
+    const result = await deployment.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'v2-receipt', tokens: deployment.issueTokens(f.ex.symbols.feeFor) });
+    await deployment.close(); deployment = undefined;
+    const file = join(f.options.directory, 'deployment.json'), current = JSON.parse(readFileSync(file, 'utf8'));
+    const legacy = { ...current, format: 'aether.process-deployment/2' }; delete legacy.capabilityProfile;
+    writeFileSync(file, JSON.stringify(legacy)); const original = readFileSync(file, 'utf8');
+    await assert.rejects(ProcessDeployment.open({ ...f.options, genesis: undefined }), /explicit legacy capability migration/);
+    assert.equal(readFileSync(file, 'utf8'), original);
+    await assert.rejects(ProcessDeployment.open({ ...f.options, genesis: undefined, capabilityProfile: 'scoped-v2', legacyCapabilityMigration: 'adopt-legacy-sealed-v1' }), /explicit legacy capability migration/);
+    assert.equal(readFileSync(file, 'utf8'), original);
+    const scopedGrants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(49), repositoryId: 'deployment-test', clock: () => 100,
+      policyEpoch: () => '0', revocationEpoch: () => '0', isRevoked: () => false, authorizeIssue: () => true, authorizeDelegate: () => true });
+    await assert.rejects(ProcessDeployment.open({ ...f.options, genesis: undefined, legacyCapabilityMigration: 'adopt-legacy-sealed-v1',
+      factories: new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => ({ ...hostFactory(f.directory, artifact), scopedGrants })]]) }), /trusted deployment factory does not match durable capability profile/);
+    assert.equal(readFileSync(file, 'utf8'), original, 'failed adoption cannot rewrite v2 bytes');
+    deployment = await ProcessDeployment.open({ ...f.options, genesis: undefined, legacyCapabilityMigration: 'adopt-legacy-sealed-v1' });
+    assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), current);
+    assert.deepEqual(await deployment.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'v2-receipt', tokens: deployment.issueTokens(f.ex.symbols.feeFor) }), result);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });

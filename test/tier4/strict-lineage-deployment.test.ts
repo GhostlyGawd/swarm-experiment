@@ -81,7 +81,7 @@ function fixture(){
   const plan=(swapped=false):TopologyPlan=>({shape:'containers',units:[{id:'a',members:[swapped?ex.symbols.feeFor:ex.symbols.transfer],capabilities:swapped?[]:[CAP_LEDGER_APPEND],placement:'container',memoryMb:16},{id:'b',members:[swapped?ex.symbols.transfer:ex.symbols.feeFor],capabilities:swapped?[CAP_LEDGER_APPEND]:[],placement:'container',memoryMb:16}],crossEdges:[],transportLatencyMsPerSecond:0,monthlyCost:0,recombinations:[],blockedMerges:[]});
   const coordinatorOptions:PromotionCoordinatorOptions={directory:join(directory,'coordinator'),repositoryId:'strict-ledger',genesisManifest:genesis.manifest,lineage:ledger.admissionAdapter(),authority:()=>governorAuthority,governorKey:()=>governorKeys.publicKey,clock:()=>100n};
   const coordinator=new PromotionCoordinator(coordinatorOptions);
-  const options:ProcessDeploymentOptions={directory:join(directory,'deployment'),coordinator,factories:new Map([['ledger-services/1',(artifact:ProcessArtifactV1)=>services(directory,artifact)]]),genesis:{context:genesis.context,evidence:genesis.evidence,plan:plan(),factoryId:'ledger-services/1'}};
+  const options:ProcessDeploymentOptions={directory:join(directory,'deployment'),coordinator,capabilityProfile:'legacy-sealed-v1',factories:new Map([['ledger-services/1',(artifact:ProcessArtifactV1)=>services(directory,artifact)]]),genesis:{context:genesis.context,evidence:genesis.evidence,plan:plan(),factoryId:'ledger-services/1'}};
   const input=async(deployment:ProcessDeployment,artifact:ReturnType<typeof prepareArtifact>,swapped=true):Promise<PromotionInput>=>{
     const id=deployment.registerArtifact({context:artifact.context,evidence:artifact.evidence,plan:plan(swapped),factoryId:'ledger-services/1'});
     const migrationPlan=processMigrationPlan(await deployment.snapshotForPromotion(),id),effectPlan=processEffectPlan('ledger-services/1',artifact.evidence.manifest.capabilityPolicyDigest);
@@ -177,7 +177,7 @@ function crashCoordinator(f:ReturnType<typeof fixture>,input:PromotionInput,phas
     const store=new DurableGraphStore({directory:join(directory,'ast')});
     const lineage=new CausalLineageLedger({directory:join(directory,'lineage'),repositoryId:'strict-ledger',store,authority:()=>({policyEpoch:'1',eligibleAuthors:['author']}),authorKey:()=>createPublicKey(readFileSync(join(directory,'author-public.pem')))});
     const coordinator=new PromotionCoordinator({directory:join(directory,'coordinator'),repositoryId:'strict-ledger',genesisManifest,lineage:lineage.admissionAdapter(),authority:()=>({repositoryId:'strict-ledger',membershipEpoch:'1',policyEpoch:'1',eligibleGovernors:['governor']}),governorKey:()=>createPublicKey(readFileSync(join(directory,'governor-public.pem'))),clock:()=>100n,fault:point=>{if(point===phase)process.kill(process.pid,'SIGKILL');}});
-    const deployment=await ProcessDeployment.open({directory:join(directory,'deployment'),coordinator,factories:new Map([['ledger-services/1',artifact=>services(directory,artifact)]])});
+    const deployment=await ProcessDeployment.open({directory:join(directory,'deployment'),coordinator,capabilityProfile:'legacy-sealed-v1',factories:new Map([['ledger-services/1',artifact=>services(directory,artifact)]])});
     const input=JSON.parse(readFileSync(join(directory,'promotion.json'),'utf8'));
     await deployment.promote({...input,context:processArtifactContext(deployment.artifact(input.proposal.candidateManifest))});await deployment.close();
   `;
