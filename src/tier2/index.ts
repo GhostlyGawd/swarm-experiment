@@ -1,6 +1,7 @@
 export * from './ocap.ts';
 export { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2, type GrantBodyV2, type GrantRequestV2, type GrantAuthorityOptions } from './scoped-grants.ts';
 export { DurableGrantEpochs, type GrantEpochOptions } from './grant-epochs.ts';
+export { ResourceBudgetLedger, RESOURCE_BUDGET_PROFILE, type ResourceAmounts, type ResourceBudgetProfile, type ResourceBinding, type ResourceHandleBody, type ResourceHandle, type ResourceOperation, type ResourceRequest, type ResourceReceipt, type ResourceAuthorization, type ResourceSettlement, type ResourceBudgetOptions, type ResourceBudgetFault } from './resource-budget.ts';
 export { validateEffectResourcePolicyBody, effectResourcePolicyDigest, signEffectResourcePolicy, assertSignedEffectResourcePolicy, effectResourcePath, assertEffectResourceAdapter, type EffectResourceRuleV1, type EffectResourcePolicyBodyV1, type SignedEffectResourcePolicyV1 } from './effect-resource-policy.ts';
 export { ProofCache, type ProofCacheStats } from './proof-cache.ts';
 export { verifyIncremental, type IncrementalVerificationResult } from './incremental.ts';
