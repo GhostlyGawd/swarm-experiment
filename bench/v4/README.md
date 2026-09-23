@@ -9,6 +9,15 @@ failed, unmeasured or inconclusive required target. It currently fails. Keep thi
 command as an open release gate; a successful measurement command is not a
 successful release qualification.
 
+`npm run bench:v4:verify -- OUTPUT_DIRECTORY --exact-source` independently
+recounts the saved raw corpus with the pinned tokenizer, reconstructs every
+measurement/verdict and target profile, checks canonical JSON and artifact
+digests, and compares the recorded commit and source bytes with the current
+checkout. Omit `--exact-source` to audit a historical artifact's internal
+arithmetic without claiming that the current checkout is its source. A valid
+failed measurement verifies successfully and reports `releaseEligible: false`;
+verification never turns a missed or unmeasured release target into a pass.
+
 Profiles are selected with `-- --profile NAME`:
 
 - `ledger-baseline/1` measures the default ledger corpus with pinned
