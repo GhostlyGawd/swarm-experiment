@@ -108,6 +108,8 @@ try {
     'src/tier3/packed-heap.ts',
     'src/tier3/resumable-state.ts',
     'src/fabric/encoding.ts',
+    'src/fabric/identity.ts',
+    'src/tier1/ids.ts',
   ];
   const report = { format: 'aether.packed-native-locality/1', preregistration: 'roadmap/v4/research/packed-native-locality/PREREGISTRATION.md',
     timestamp: new Date().toISOString(), source: { gitHead: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', cwd: repository }).trim(),

@@ -36,6 +36,20 @@ assert(report.profile.operationsPerTrial === 100000 && report.profile.warmups ==
   JSON.stringify(report.profile.counts) === '[4096,16384]' && JSON.stringify(report.profile.distributions) === JSON.stringify(distributions) &&
   JSON.stringify(report.profile.patterns) === JSON.stringify(patterns), 'report profile');
 assert(Array.isArray(report.cases) && report.cases.length === 6, 'case count');
+const sourceFiles = [
+  'roadmap/v4/research/packed-native-locality/PREREGISTRATION.md',
+  'roadmap/v4/research/packed-native-locality/run.ts',
+  'roadmap/v4/research/packed-native-locality/native.c',
+  'roadmap/v4/research/packed-native-locality/verify.ts',
+  'roadmap/v4/research/packed-heap/abi.c',
+  'roadmap/v4/research/packed-heap/abi.h',
+  'src/tier3/packed-heap.ts',
+  'src/tier3/resumable-state.ts',
+  'src/fabric/encoding.ts',
+  'src/fabric/identity.ts',
+  'src/tier1/ids.ts',
+];
+assert(JSON.stringify(Object.keys(report.source.sha256).sort()) === JSON.stringify(sourceFiles.sort()), 'source manifest completeness');
 for (const [path, digest] of Object.entries(report.source.sha256)) {
   assert(typeof digest === 'string' && /^[a-f0-9]{64}$/.test(digest), `source hash syntax: ${path}`);
   assert(sha(readFileSync(join(repository, path))) === digest, `source hash mismatch: ${path}`);
