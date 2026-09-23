@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as b from '../../src/tier1/build.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
+import { GraphStore } from '../../src/tier1/store.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { generatePortableCertificate } from '../../src/tier2/portable-proof-producer.ts';
@@ -55,7 +56,7 @@ test('independent scalar Tier 2 proof binds the exact executed declaration and r
 
 test('conservative proof rejects edited body, missing coverage and changed full context', () => {
   const f = fixture();
-  if (f.module.kind !== 'Module') throw new Error('fixture module');
+  if (f.module.kind !== 'Module' || f.proofModule.kind !== 'Module' || f.module.members[0]?.kind !== 'FunctionDecl') throw new Error('fixture module');
   const changed = { ...f.conservative, body: b.ret(b.int(0)) };
   const editedModule = { ...f.module, members: [f.module.members[0], changed] };
   assert.throws(() => checkConservativeFallbackProof(editedModule, f.manifest, f.tier2, f.proof), /module\/manifest mismatch|executed Tier 2/);
@@ -65,4 +66,14 @@ test('conservative proof rejects edited body, missing coverage and changed full 
     { ...f.proof, certificate: { ...f.proof.certificate, certificates: [] } }), /coverage/);
   assert.throws(() => checkConservativeFallbackProof(f.module, f.manifest, f.tier2,
     { ...f.proof, specification: 'false changed specification' }), /specification/);
+  const empty = b.contract({});
+  const fast = { ...f.module.members[0], contract: empty }, conservative = { ...f.conservative, contract: empty };
+  const emptyFull = { ...f.module, members: [fast, conservative] }, emptyProof = { ...f.proofModule, members: [conservative] };
+  const store = new GraphStore();
+  const emptyManifest = { ...f.manifest, astRoot: store.intern(emptyFull) }, emptyProofManifest = { ...f.proof.manifest, astRoot: store.intern(emptyProof) };
+  const certificate = generatePortableCertificate(emptyProof,
+    { manifest: emptyProofManifest, expectedManifest: emptyProofManifest, specification: f.proof.specification });
+  assert.ok(certificate, 'total return alone can be certified');
+  assert.throws(() => checkConservativeFallbackProof(emptyFull, emptyManifest, f.tier2,
+    { module: emptyProof, manifest: emptyProofManifest, specification: f.proof.specification, certificate }), /explicit postcondition/);
 });

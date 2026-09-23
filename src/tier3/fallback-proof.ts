@@ -31,6 +31,8 @@ export function checkConservativeFallbackProof(fullModule: Term, fullManifest: E
   const declaration = matches[0];
   if (matches.length !== 1 || new GraphStore().intern(declaration) !== new GraphStore().intern(module.members[0]))
     throw new TypeError('conservative proof does not bind the executed Tier 2 declaration');
+  if (declaration.kind !== 'FunctionDecl' || declaration.contract?.kind !== 'Contract' || declaration.contract.ensures.length === 0)
+    throw new TypeError('conservative proof requires an explicit postcondition');
   if (new GraphStore().intern(executed) !== full.astRoot || new GraphStore().intern(module) !== manifest.astRoot)
     throw new TypeError('conservative proof module/manifest mismatch');
   const { astRoot: _fullRoot, ...fullContext } = full;
