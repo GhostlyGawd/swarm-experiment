@@ -45,6 +45,7 @@ export { verifyIncremental, type IncrementalVerificationResult } from './tier2/i
 export { TypeChecker, typecheck, tyEqual, tyToString, underlying, type CheckResult, type Diagnostic } from './tier2/typecheck.ts';
 export * as smt from './tier2/smt.ts';
 export { DEFAULT_TIMEOUT_MS, checkSat, prove, type SolverResult, type SolverStatus } from './tier2/solver.ts';
+export { proveWithHardCutoff, V4_SMT_HARD_CUTOFF_MS } from './tier2/hard-solver.ts';
 export { SMT_SOLVER_PROCESS, proveWithExternalFallback, type ExternalSolverOptions } from './tier2/external-solver.ts';
 export { dischargeProof, formatReport, verifyFunction, type Obligation, type VerificationDependency, type VerificationReport, type Verdict } from './tier2/verify.ts';
 export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec, type SpecRule } from './tier2/spec.ts';

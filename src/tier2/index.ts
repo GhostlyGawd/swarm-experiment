@@ -11,6 +11,7 @@ export { verifyIncremental, type IncrementalVerificationResult } from './increme
 export { TypeChecker, typecheck, tyEqual, tyToString, underlying, type CheckResult, type Diagnostic } from './typecheck.ts';
 export * as smt from './smt.ts';
 export { DEFAULT_TIMEOUT_MS, checkSat, prove, type SolverResult, type SolverStatus } from './solver.ts';
+export { proveWithHardCutoff, V4_SMT_HARD_CUTOFF_MS } from './hard-solver.ts';
 export { SMT_SOLVER_PROCESS, proveWithExternalFallback, type ExternalSolverOptions } from './external-solver.ts';
 export {
   dischargeProof, formatReport, verifyFunction,
