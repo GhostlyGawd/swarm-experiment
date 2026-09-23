@@ -166,6 +166,7 @@ export class DurableEffectBroker {
   private readonly trace: readonly EffectEventV1[];
   private readonly buffered: EffectRequestV1[] = [];
   private readonly bufferedHistory = new Map<string, Digest>();
+  readonly #witness: EffectJournalWitness | null;
   #trustedClock: { anchor: TrustedClockAnchor; windows: readonly { issuedAt: number; expiresAt: number }[] } | null = null;
   get executionMode(): ExecutionMode { return this.mode; }
   /** Host-owned independent deadline source for a versioned isolated profile.
@@ -184,13 +185,14 @@ export class DurableEffectBroker {
   constructor(options: EffectBrokerOptions) {
     identifier(options.clockDomain);
     this.options = options; this.limits = encodingLimits(options.limits); this.mode = options.mode ?? 'live';
+    this.#witness = options.witness ?? null;
     if (!['live', 'speculative', 'shadow', 'replay'].includes(this.mode)) throw new TypeError('unknown execution mode');
-    if (options.witness) {
-      assertEffectJournalWitness(options.witness);
-      if (options.witness.clockDomain !== options.clockDomain) throw new TypeError('effect witness clock domain mismatch');
+    if (this.#witness) {
+      assertEffectJournalWitness(this.#witness);
+      if (this.#witness.clockDomain !== options.clockDomain) throw new TypeError('effect witness clock domain mismatch');
       if (existsSync(join(options.directory, 'effects.json'))) throw new Error('legacy effect journal requires explicit offline migration');
     } else if (existsSync(join(options.directory, 'effects-v2.json'))) throw new Error('witnessed effect journal requires its original authority');
-    this.file = join(options.directory, options.witness ? 'effects-v2.json' : 'effects.json');
+    this.file = join(options.directory, this.#witness ? 'effects-v2.json' : 'effects.json');
     mkdirSync(options.directory, { recursive: true });
     if (existsSync(join(options.directory, 'effects.lock')) || existsSync(join(options.directory, 'effects.lock.recovery'))) throw new Error('legacy effect lock layout requires explicit offline migration');
     this.journalLock = new JournalLock({ directory: join(options.directory, 'effect-lock-tickets'), domain: 'aether.effect-lock', limits: this.limits, maxTickets: options.maxLockTickets, fault: options.lockFault, busyError: 'effect_broker_busy: explicit dead-owner recovery required after a crash' });
@@ -203,6 +205,18 @@ export class DurableEffectBroker {
     return time.toString();
   }
   private locked<T>(run: () => T): T { return this.journalLock.run(run); }
+  /** Called nonvirtually by a signed host before invoking or inspecting a
+   * broker. The exact operator object is required, not a matching label. */
+  assertWitness(expected: EffectJournalWitness): void {
+    assertEffectJournalWitness(expected);
+    if (this.#witness !== expected) throw new TypeError('effect broker witness differs from operator authority');
+    if (Object.getPrototypeOf(this) !== DurableEffectBroker.prototype
+      || ['read', 'persist', 'locked', 'find', 'step', 'authorize', 'dispatch', 'reconcile', 'inspectRecorded']
+        .some(name => Object.hasOwn(this, name)))
+      throw new TypeError('witnessed effect broker has a replaceable method boundary');
+    Object.preventExtensions(this);
+    readWitnessHead(expected);
+  }
   recoverDeadWriter(): void { this.journalLock.recoverDeadWriter(); }
   private validateEvent(value: unknown): asserts value is EffectEventV1 {
     const e = exactObject(value, ['format', 'sequence', 'request', 'requestDigest', 'adapterId', 'adapterSemanticsDigest', 'state', 'transitions', 'dispatchStarted', 'prepared', 'observedAt', 'recordedAt', 'outcome']);
@@ -263,8 +277,8 @@ export class DurableEffectBroker {
     }
   }
   private read(): EffectJournal {
-    if (this.options.witness) {
-      const witness = this.options.witness, head = readWitnessHead(witness);
+    if (this.#witness) {
+      const witness = this.#witness, head = readWitnessHead(witness);
       if (head.journal === null) {
         if (existsSync(this.file)) throw new Error('local effect journal is ahead of witness genesis');
         return { format: 'aether.effect-journal/2', clockDomain: this.options.clockDomain,
@@ -311,8 +325,8 @@ export class DurableEffectBroker {
     const encoded = encodeCanonical(next, this.limits);
     this.options.beforePersist?.(immutable(copy(event, this.limits)));
     if (journal.format === 'aether.effect-journal/2') {
-      if (!this.options.witness) throw new Error('effect witness missing at publication');
-      advanceWitnessHead(this.options.witness, journal.revision, Buffer.from(encoded).toString('utf8'));
+      if (!this.#witness) throw new Error('effect witness missing at publication');
+      advanceWitnessHead(this.#witness, journal.revision, Buffer.from(encoded).toString('utf8'));
     }
     atomicWrite(this.file, Buffer.from(encoded).toString('utf8'));
     const fd = openSync(this.options.directory, 'r'); try { fsyncSync(fd); } finally { closeSync(fd); }

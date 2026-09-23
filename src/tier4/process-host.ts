@@ -11,10 +11,11 @@ import { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2 } from '.
 import { assertSignedEffectResourcePolicy, assertSignedEffectResourcePolicyV2, assertSignedEffectResourcePolicyV3, assertSignedEffectResourcePolicyV4, assertEffectResourceAdapter, assertEffectResourceAdapterV2, assertEffectResourceAdapterV3, assertEffectResourceAdapterV4, effectResourcePath as signedEffectResourcePath, effectResourcePathV2, effectResourcePathV3, effectResourcePathV4, effectResourcePolicyDigest, effectResourcePolicyDigestV2, effectResourcePolicyDigestV3, effectResourcePolicyDigestV4, type SignedEffectResourcePolicyV1, type SignedEffectResourcePolicyV2, type SignedEffectResourcePolicyV3, type SignedEffectResourcePolicyV4 } from '../tier2/effect-resource-policy.ts';
 import { assertEffectSignerAnchor, assertAnchoredEffectPolicy, type EffectSignerAnchor } from '../tier2/effect-signer-anchor.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
+import { assertEffectJournalWitnessCatalog, selectEffectJournalWitness, type EffectJournalWitnessCatalog } from '../fabric/effect-journal-witness.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { ProductionRuntime } from '../tier3/compile.ts';
 import { effectPayloadDigest, type EffectEventV1, type EffectRequestV1 } from '../fabric/effects.ts';
-import { EffectInvocationError, brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerInvoke, brokerPinTrustedClock, brokerReconcileLast, brokerReconcileRecorded, brokerInspectRecorded, brokerMode, type RuntimeEffectRouter } from '../tier3/effects.ts';
+import { EffectInvocationError, brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerInvoke, brokerPinTrustedClock, brokerPinWitness, brokerReconcileLast, brokerReconcileRecorded, brokerInspectRecorded, brokerMode, type RuntimeEffectRouter } from '../tier3/effects.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
 import type { Value } from '../tier3/values.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
@@ -140,10 +141,12 @@ export interface ProcessHostOptions {
   readonly effectSignerAnchor?: EffectSignerAnchor;
   /** Independently provisioned time/revision source; required by clocked Wasm V7. */
   readonly trustedClockAnchor?: TrustedClockAnchor;
+  /** Operator-held per-operation witness selection for isolated Wasm V8. */
+  readonly effectJournalWitnessCatalog?: EffectJournalWitnessCatalog;
   /** Explicitly reopen anchored V2 journals under their original host-config/2 identity. */
   readonly legacyAnchoredEffectPolicy?: 'anchored-v2';
   /** New isolated Wasm signed-policy profile with host-config/4 identity. */
-  readonly anchoredEffectPolicyProfile?: 'isolated-wasm-v4' | 'isolated-wasm-v5-clock';
+  readonly anchoredEffectPolicyProfile?: 'isolated-wasm-v4' | 'isolated-wasm-v5-clock' | 'isolated-wasm-v6-witnessed';
   /** Compatibility-only signer authority for explicitly selected old profiles. */
   readonly effectResourceSignerKey?: KeyObject | string;
   readonly currentEffectPolicyEpoch?: () => string;
@@ -234,12 +237,20 @@ export class ProcessHost {
     if (options.effectResourcePolicyDigest) validateDigest(options.effectResourcePolicyDigest, 'aether.effect-resource-policy/1');
     const signed = options.signedEffectResourcePolicy !== undefined;
     const anchored = options.effectSignerAnchor !== undefined;
-    const clockedWasm = options.anchoredEffectPolicyProfile === 'isolated-wasm-v5-clock';
+    const witnessedWasm = options.anchoredEffectPolicyProfile === 'isolated-wasm-v6-witnessed';
+    const clockedWasm = witnessedWasm || options.anchoredEffectPolicyProfile === 'isolated-wasm-v5-clock';
     if (options.anchoredEffectPolicyProfile !== undefined &&
-        !['isolated-wasm-v4', 'isolated-wasm-v5-clock'].includes(options.anchoredEffectPolicyProfile))
+        !['isolated-wasm-v4', 'isolated-wasm-v5-clock', 'isolated-wasm-v6-witnessed'].includes(options.anchoredEffectPolicyProfile))
       throw new TypeError('invalid isolated Wasm anchored effect policy profile');
     if (clockedWasm) assertTrustedClockAnchor(options.trustedClockAnchor);
     else if (options.trustedClockAnchor !== undefined) throw new TypeError('trusted clock requires clocked Wasm profile');
+    if (witnessedWasm) {
+      assertEffectJournalWitnessCatalog(options.effectJournalWitnessCatalog);
+      if (options.effectJournalWitnessCatalog.repositoryId !== options.effectSignerAnchor?.repositoryId
+        || options.effectJournalWitnessCatalog.clockDomain !== options.trustedClockAnchor?.clockDomain)
+        throw new TypeError('effect witness catalog differs from signed repository/clock');
+    } else if (options.effectJournalWitnessCatalog !== undefined)
+      throw new TypeError('effect witness catalog requires witnessed Wasm profile');
     if (options.anchoredEffectPolicyProfile && (!anchored || options.legacyAnchoredEffectPolicy
       || options.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/4'))
       throw new TypeError('isolated Wasm policy requires an independent anchor and signed policy v4');
@@ -303,14 +314,15 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest(anchored ? clockedWasm ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+    this.configuration = domainDigest(anchored ? witnessedWasm ? 'aether.process-host-config/6' : clockedWasm ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
       ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4' ? effectResourcePolicyDigestV4(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/3' ? effectResourcePolicyDigestV3(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2' ? effectResourcePolicyDigestV2(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy ? effectResourcePolicyDigest(this.signedEffectResourcePolicy.body) : options.effectResourcePolicyDigest ?? null,
         effectResourcePolicySigner: this.signedEffectResourcePolicy?.signer ?? null } : {}),
       ...(anchored ? { effectSignerAnchor: options.effectSignerAnchor!.digest } : {}),
-      ...(clockedWasm ? { trustedClockAnchor: options.trustedClockAnchor!.digest } : {}) });
+      ...(clockedWasm ? { trustedClockAnchor: options.trustedClockAnchor!.digest } : {}),
+      ...(witnessedWasm ? { effectJournalWitnessCatalog: options.effectJournalWitnessCatalog!.digest } : {}) });
     ensureDurableDirectory(options.directory);
     this.file = join(options.directory, 'host.json');
     this.lock = new JournalLock({ directory: join(options.directory, 'host-lock'), domain: 'aether.process-host-lock', busyError: 'process_host_busy: another state transition is active' });
@@ -372,6 +384,8 @@ export class ProcessHost {
       brokerAttestContext(router, { executionId: operationId, manifestDigest, mode: 'live',
         policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
         capability: rule.capability, grantRef });
+      if (this.options.effectJournalWitnessCatalog)
+        brokerPinWitness(router, selectEffectJournalWitness(this.options.effectJournalWitnessCatalog, operationId));
     }
     for (const call of journal.calls) this.assertV4TerminalEffects(journal, call);
   }
@@ -812,6 +826,8 @@ export class ProcessHost {
     brokerAttestContext(router, { executionId: id, manifestDigest: executionManifestDigest(this.manifest),
       mode: active.mode, policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
       capability: request.capability, grantRef });
+    if (this.options.effectJournalWitnessCatalog)
+      brokerPinWitness(router, selectEffectJournalWitness(this.options.effectJournalWitnessCatalog, id));
     if (this.options.trustedClockAnchor && active.mode === 'live')
       brokerPinTrustedClock(router, this.options.trustedClockAnchor, active.tokens.map(token => {
         const body = (token as ScopedGrantV2).body;
@@ -845,6 +861,8 @@ export class ProcessHost {
     brokerAttestContext(router, { executionId: effect.id, manifestDigest: executionManifestDigest(this.manifest),
       mode: 'live', policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
       capability: effect.capability, grantRef });
+    if (this.options.effectJournalWitnessCatalog)
+      brokerPinWitness(router, selectEffectJournalWitness(this.options.effectJournalWitnessCatalog, effect.id));
     const payload: TaggedValueV1 = { tag: 'sequence', items: [{ tag: 'string', value: effect.capability }, ...copy(effect.args)] };
     const request: EffectRequestV1 = { format: 'aether.effect/1', executionId: effect.id, effectId: 'operation-0',
       branchId: null, executionManifest: executionManifestDigest(this.manifest), capabilityGrantRef: grantRef,

@@ -2,6 +2,7 @@ import type { CapabilityName, NodeRef } from '../tier1/ids.ts';
 import { decodeExecutionManifest, encodeExecutionManifest, executionManifestDigest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import { validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { DurableEffectBroker, effectPayloadDigest, effectAdapterDigest, type EffectAdapter, type EffectOutcome, type EffectRequestV1, type ExecutionMode } from '../fabric/effects.ts';
+import { assertEffectJournalWitness, type EffectJournalWitness } from '../fabric/effect-journal-witness.ts';
 import { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from '../tier2/adapter-artifact.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 import { isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
@@ -62,6 +63,7 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   #bound = false;
   #attested: Readonly<{ capability: CapabilityName; grantRef: string }> | null = null;
   #trustedClock: { anchor: TrustedClockAnchor; windows: readonly { issuedAt: number; expiresAt: number }[] } | null = null;
+  #trustedWitness: EffectJournalWitness | null = null;
   get mode(): ExecutionMode { return this.#options.broker.executionMode; }
 
   constructor(options: RuntimeEffectRouterOptions) {
@@ -108,6 +110,13 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     DurableEffectBroker.prototype.pinTrustedClock.call(this.#options.broker, anchor, checked);
     this.#trustedClock = { anchor, windows: Object.freeze(checked) };
   }
+  pinWitness(witness: EffectJournalWitness): void {
+    assertEffectJournalWitness(witness);
+    if (!this.#attested || this.#sequence !== 0n || this.#trustedWitness)
+      throw new TypeError('effect witness must bind one fresh attested router');
+    DurableEffectBroker.prototype.assertWitness.call(this.#options.broker, witness);
+    this.#trustedWitness = witness;
+  }
   fork(): RuntimeEffectRouter {
     if (!this.#options.isolatedFork) throw new Error('broker-backed fork requires an isolated effect router');
     const child = this.#options.isolatedFork();
@@ -124,7 +133,10 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     }
     const adapter = this.#options.adapters.get(capability);
     if (!adapter) throw new Error(`no broker adapter for ${capability}`);
-    const outcome = this.#options.broker.dispatch(this.#request(capability, args, `operation-${this.#sequence++}`), adapter);
+    const request = this.#request(capability, args, `operation-${this.#sequence++}`);
+    const outcome = this.#trustedWitness
+      ? DurableEffectBroker.prototype.dispatch.call(this.#options.broker, request, adapter)
+      : this.#options.broker.dispatch(request, adapter);
     if (outcome.state !== 'committed') throw new EffectInvocationError(outcome);
     return this.#decode(outcome.value);
   }
@@ -133,7 +145,10 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
       || this.#options.broker.executionMode !== 'live') throw new TypeError('no attested live Wasm effect to reconcile');
     const adapter = this.#options.adapters.get(capability);
     if (!adapter || !adapter.semantics.readOnly || !adapter.semantics.reconciliation) throw new TypeError('Wasm reconciliation requires a read-only adapter');
-    const outcome = this.#options.broker.reconcile(this.#request(capability, args, `operation-${this.#sequence - 1n}`), adapter);
+    const request = this.#request(capability, args, `operation-${this.#sequence - 1n}`);
+    const outcome = this.#trustedWitness
+      ? DurableEffectBroker.prototype.reconcile.call(this.#options.broker, request, adapter)
+      : this.#options.broker.reconcile(request, adapter);
     if (outcome.state !== 'committed') throw new EffectInvocationError(outcome);
     return this.#decode(outcome.value);
   }
@@ -141,12 +156,16 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     this.#assertRecorded(capability, request);
     const adapter = this.#options.adapters.get(capability)!;
     if (!adapter.semantics.readOnly || !adapter.semantics.reconciliation) throw new TypeError('recorded Wasm effect lacks read-only reconciliation');
-    return this.#options.broker.reconcile(request, adapter);
+    return this.#trustedWitness
+      ? DurableEffectBroker.prototype.reconcile.call(this.#options.broker, request, adapter)
+      : this.#options.broker.reconcile(request, adapter);
   }
   inspectRecorded(capability: CapabilityName, request: EffectRequestV1): EffectOutcome | null {
     this.#assertRecorded(capability, request);
     const adapter = this.#options.adapters.get(capability)!;
-    return this.#options.broker.inspectRecorded(request, adapter);
+    return this.#trustedWitness
+      ? DurableEffectBroker.prototype.inspectRecorded.call(this.#options.broker, request, adapter)
+      : this.#options.broker.inspectRecorded(request, adapter);
   }
   #assertRecorded(capability: CapabilityName, request: EffectRequestV1): void {
     if (!this.#bound || !this.#attested || this.#attested.capability !== capability || this.#options.broker.executionMode !== 'live'
@@ -234,6 +253,10 @@ export function brokerPinTrustedClock(router: RuntimeEffectRouter, anchor: Trust
   windows: readonly { issuedAt: number; expiresAt: number }[]): void {
   if (!brokerRouters.has(router)) throw new TypeError('trusted clock requires a broker-backed router');
   BrokerEffectRouter.prototype.pinTrustedClock.call(router, anchor, windows);
+}
+export function brokerPinWitness(router: RuntimeEffectRouter, witness: EffectJournalWitness): void {
+  if (!brokerRouters.has(router)) throw new TypeError('effect witness requires a broker-backed router');
+  BrokerEffectRouter.prototype.pinWitness.call(router, witness);
 }
 export function brokerReconcileLast(router: RuntimeEffectRouter, capability: CapabilityName, args: readonly Value[]): Value {
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');

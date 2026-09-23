@@ -28,6 +28,56 @@ interface Source {
   lastJournal: string | null;
 }
 const sources = new WeakMap<object, Source>();
+interface CatalogSource {
+  readonly witnessFor: (operationId: string) => EffectJournalWitness;
+  readonly selected: Map<string, EffectJournalWitness>;
+}
+const catalogs = new WeakMap<object, CatalogSource>();
+
+/** An operator-selected namespace of per-operation witnesses. Its callback
+ * must recover the same external durable head after controller restart. */
+export interface EffectJournalWitnessCatalog {
+  readonly format: 'aether.effect-journal-witness-catalog/1';
+  readonly authorityId: string;
+  readonly repositoryId: string;
+  readonly deploymentId: string;
+  readonly clockDomain: string;
+  readonly digest: Digest;
+}
+export function createEffectJournalWitnessCatalog(options: Readonly<{
+  authorityId: string;
+  repositoryId: string;
+  deploymentId: string;
+  clockDomain: string;
+  witnessFor: (operationId: string) => EffectJournalWitness;
+}>): EffectJournalWitnessCatalog {
+  for (const id of [options.authorityId, options.repositoryId, options.deploymentId, options.clockDomain]) identifier(id);
+  if (typeof options.witnessFor !== 'function') throw new TypeError('journal witness catalog requires an operator source');
+  const body = { format: 'aether.effect-journal-witness-catalog/1' as const,
+    authorityId: options.authorityId, repositoryId: options.repositoryId,
+    deploymentId: options.deploymentId, clockDomain: options.clockDomain };
+  const catalog = Object.freeze({ ...body, digest: domainDigest(body.format, body) });
+  catalogs.set(catalog, { witnessFor: options.witnessFor, selected: new Map() });
+  return catalog;
+}
+export function assertEffectJournalWitnessCatalog(value: unknown): asserts value is EffectJournalWitnessCatalog {
+  if (value === null || typeof value !== 'object' || !catalogs.has(value))
+    throw new TypeError('independently supplied effect journal witness catalog required');
+}
+export function selectEffectJournalWitness(catalog: EffectJournalWitnessCatalog, operationId: string): EffectJournalWitness {
+  assertEffectJournalWitnessCatalog(catalog); identifier(operationId);
+  const source = catalogs.get(catalog)!;
+  const witness = source.witnessFor(operationId);
+  assertEffectJournalWitness(witness);
+  if (witness.authorityId !== catalog.authorityId || witness.repositoryId !== catalog.repositoryId
+    || witness.clockDomain !== catalog.clockDomain || witness.deploymentId !== operationId)
+    throw new TypeError('effect journal witness is outside operator catalog');
+  const selected = source.selected.get(operationId);
+  if (selected && selected !== witness) throw new Error('effect journal witness swapped during catalog lifetime');
+  source.selected.set(operationId, witness);
+  readWitnessHead(witness);
+  return witness;
+}
 
 export function createEffectJournalWitness(options: Readonly<{
   authorityId: string;

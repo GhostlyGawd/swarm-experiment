@@ -19,6 +19,8 @@ import { assertEffectResourceAdapterV4 } from '../tier2/effect-resource-policy.t
 import type { ScopedGrantV2 } from '../tier2/scoped-grants.ts';
 import { assertEffectSignerAnchor, assertAnchoredEffectPolicy, type EffectSignerAnchor } from '../tier2/effect-signer-anchor.ts';
 import { assertBeforeDeadline, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
+import { assertEffectJournalWitnessCatalog, selectEffectJournalWitness, type EffectJournalWitnessCatalog } from '../fabric/effect-journal-witness.ts';
+import { brokerPinWitness } from '../tier3/effects.ts';
 import { validateProcessAllocation, validateProcessArguments } from './process-type-validation.ts';
 import type { TopologyPlan } from './topology.ts';
 
@@ -43,15 +45,18 @@ export interface ProcessArtifactV1 {
   readonly schemaDigest: Digest;
 }
 export type ProcessHostServices = Pick<ProcessHostOptions, 'sealer' | 'scopedGrants' | 'effectResourcePath' | 'effectResourcePolicyDigest' | 'signedEffectResourcePolicy' | 'effectResourceSignerKey' | 'currentEffectPolicyEpoch' | 'revocations' | 'effectRouterFactory' | 'authorizeRecovery' | 'timeoutMs' | 'lockWaitMs' | 'maxWorkers' | 'onPhase'>;
-export type CapabilityDeploymentProfile = 'scoped-anchored-wasm-v7' | 'scoped-anchored-wasm-v6' | 'scoped-anchored-v5' | 'scoped-anchored-v4' | 'scoped-artifact-v4' | 'scoped-signed-v3' | 'scoped-v2' | 'legacy-sealed-v1';
-const clockedProfile = (profile: CapabilityDeploymentProfile): boolean => profile === 'scoped-anchored-wasm-v7';
+export type CapabilityDeploymentProfile = 'scoped-anchored-wasm-v8' | 'scoped-anchored-wasm-v7' | 'scoped-anchored-wasm-v6' | 'scoped-anchored-v5' | 'scoped-anchored-v4' | 'scoped-artifact-v4' | 'scoped-signed-v3' | 'scoped-v2' | 'legacy-sealed-v1';
+const witnessedProfile = (profile: CapabilityDeploymentProfile): boolean => profile === 'scoped-anchored-wasm-v8';
+const clockedProfile = (profile: CapabilityDeploymentProfile): boolean => witnessedProfile(profile) || profile === 'scoped-anchored-wasm-v7';
 const wasmProfile = (profile: CapabilityDeploymentProfile): boolean => clockedProfile(profile) || profile === 'scoped-anchored-wasm-v6';
 const anchoredProfile = (profile: CapabilityDeploymentProfile): boolean => wasmProfile(profile) || profile === 'scoped-anchored-v5' || profile === 'scoped-anchored-v4';
-const preparedFormat = (profile: CapabilityDeploymentProfile) => clockedProfile(profile) ? 'aether.process-deployment-prepared/5' as const
+const preparedFormat = (profile: CapabilityDeploymentProfile) => witnessedProfile(profile) ? 'aether.process-deployment-prepared/6' as const
+  : clockedProfile(profile) ? 'aether.process-deployment-prepared/5' as const
   : profile === 'scoped-anchored-wasm-v6' ? 'aether.process-deployment-prepared/4' as const
   : profile === 'scoped-anchored-v5' ? 'aether.process-deployment-prepared/3' as const
     : profile === 'scoped-anchored-v4' ? 'aether.process-deployment-prepared/2' as const : 'aether.process-deployment-prepared/1' as const;
-const stateFormat = (profile: CapabilityDeploymentProfile) => clockedProfile(profile) ? 'aether.process-deployment/7' as const
+const stateFormat = (profile: CapabilityDeploymentProfile) => witnessedProfile(profile) ? 'aether.process-deployment/8' as const
+  : clockedProfile(profile) ? 'aether.process-deployment/7' as const
   : profile === 'scoped-anchored-wasm-v6' ? 'aether.process-deployment/6' as const
   : profile === 'scoped-anchored-v5' ? 'aether.process-deployment/5' as const
     : profile === 'scoped-anchored-v4' ? 'aether.process-deployment/4' as const : 'aether.process-deployment/3' as const;
@@ -71,6 +76,8 @@ export interface ProcessDeploymentOptions {
   readonly effectSignerAnchor?: EffectSignerAnchor;
   /** Trusted clock authority is independent of reloadable adapter factories. */
   readonly trustedClockAnchor?: TrustedClockAnchor;
+  /** Operator-held catalog; factories must not supply or replace it. */
+  readonly effectJournalWitnessCatalog?: EffectJournalWitnessCatalog;
   /** Existing v2 histories have no capability-profile field and require explicit adoption. */
   readonly legacyCapabilityMigration?: 'adopt-legacy-sealed-v1' | 'adopt-scoped-v2';
 }
@@ -81,11 +88,12 @@ interface DeploymentReference {
   readonly generation: string;
 }
 interface DeploymentState {
-  readonly format: 'aether.process-deployment/3' | 'aether.process-deployment/4' | 'aether.process-deployment/5' | 'aether.process-deployment/6' | 'aether.process-deployment/7';
+  readonly format: 'aether.process-deployment/3' | 'aether.process-deployment/4' | 'aether.process-deployment/5' | 'aether.process-deployment/6' | 'aether.process-deployment/7' | 'aether.process-deployment/8';
   readonly admissionProfile: PromotionAdmissionProfile;
   readonly capabilityProfile: CapabilityDeploymentProfile;
   readonly effectSignerAnchorDigest?: Digest;
   readonly trustedClockAnchorDigest?: Digest;
+  readonly effectJournalWitnessCatalogDigest?: Digest;
   readonly genesisManifest: Digest;
   readonly active: DeploymentReference;
   readonly readiness: 'ready' | 'preparing' | 'prepared';
@@ -112,9 +120,10 @@ interface DeploymentInvocation {
   readonly receiptDigest: Digest | null;
 }
 interface PreparedRecord {
-  readonly format: 'aether.process-deployment-prepared/1' | 'aether.process-deployment-prepared/2' | 'aether.process-deployment-prepared/3' | 'aether.process-deployment-prepared/4' | 'aether.process-deployment-prepared/5';
+  readonly format: 'aether.process-deployment-prepared/1' | 'aether.process-deployment-prepared/2' | 'aether.process-deployment-prepared/3' | 'aether.process-deployment-prepared/4' | 'aether.process-deployment-prepared/5' | 'aether.process-deployment-prepared/6';
   readonly effectSignerAnchorDigest?: Digest;
   readonly trustedClockAnchorDigest?: Digest;
+  readonly effectJournalWitnessCatalogDigest?: Digest;
   readonly binding: PromotionBindingV1 | null;
   readonly reference: DeploymentReference;
   readonly source: DeploymentReference | null;
@@ -189,6 +198,17 @@ export function processClockedWasmEffectPlan(factoryId: string, capabilityPolicy
   return { tag: 'sequence', items: [{ tag: 'string', value: 'aether.process-effect-factory/5' },
     { tag: 'string', value: factoryId }, { tag: 'string', value: capabilityPolicyDigest },
     { tag: 'string', value: signerAnchorDigest }, { tag: 'string', value: clockAnchorDigest }] };
+}
+export function processWitnessedWasmEffectPlan(factoryId: string, capabilityPolicyDigest: Digest,
+  signerAnchorDigest: Digest, clockAnchorDigest: Digest, witnessCatalogDigest: Digest): TaggedValueV1 {
+  identifier(factoryId); validateDigest(capabilityPolicyDigest, 'aether.effect-resource-policy/4');
+  validateDigest(signerAnchorDigest, 'aether.effect-signer-anchor/1');
+  validateDigest(clockAnchorDigest, 'aether.trusted-clock-anchor/1');
+  validateDigest(witnessCatalogDigest, 'aether.effect-journal-witness-catalog/1');
+  return { tag: 'sequence', items: [{ tag: 'string', value: 'aether.process-effect-factory/6' },
+    { tag: 'string', value: factoryId }, { tag: 'string', value: capabilityPolicyDigest },
+    { tag: 'string', value: signerAnchorDigest }, { tag: 'string', value: clockAnchorDigest },
+    { tag: 'string', value: witnessCatalogDigest }] };
 }
 function schemaDigest(module: Term): Digest {
   const signatures: unknown[] = [], types = new Map<string, Ty>();
@@ -268,12 +288,19 @@ export class ProcessDeployment implements PromotionDriver {
   private closed = false;
   private constructor(options: ProcessDeploymentOptions) {
     this.options = options; this.capabilityProfile = options.capabilityProfile ?? 'scoped-anchored-v5';
-    if (!['scoped-anchored-wasm-v7', 'scoped-anchored-wasm-v6', 'scoped-anchored-v5', 'scoped-anchored-v4', 'scoped-artifact-v4', 'scoped-signed-v3', 'scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
+    if (!['scoped-anchored-wasm-v8', 'scoped-anchored-wasm-v7', 'scoped-anchored-wasm-v6', 'scoped-anchored-v5', 'scoped-anchored-v4', 'scoped-artifact-v4', 'scoped-signed-v3', 'scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
       || options.legacyCapabilityMigration !== undefined && !['adopt-legacy-sealed-v1', 'adopt-scoped-v2'].includes(options.legacyCapabilityMigration)) throw new TypeError('invalid capability deployment profile/migration');
     if (anchoredProfile(this.capabilityProfile)) assertEffectSignerAnchor(options.effectSignerAnchor);
     else if (options.effectSignerAnchor !== undefined) throw new TypeError('independent effect signer anchor requires anchored deployment profile');
     if (clockedProfile(this.capabilityProfile)) assertTrustedClockAnchor(options.trustedClockAnchor);
     else if (options.trustedClockAnchor !== undefined) throw new TypeError('trusted clock anchor requires clocked Wasm deployment profile');
+    if (witnessedProfile(this.capabilityProfile)) {
+      assertEffectJournalWitnessCatalog(options.effectJournalWitnessCatalog);
+      if (options.effectJournalWitnessCatalog.repositoryId !== options.effectSignerAnchor?.repositoryId
+        || options.effectJournalWitnessCatalog.clockDomain !== options.trustedClockAnchor?.clockDomain)
+        throw new TypeError('effect witness catalog differs from operator signer/clock');
+    } else if (options.effectJournalWitnessCatalog !== undefined)
+      throw new TypeError('effect witness catalog requires witnessed Wasm deployment profile');
     ensureDirectory(options.directory);
     ensureDirectory(join(options.directory, 'artifacts')); ensureDirectory(join(options.directory, 'deployments'));
     this.stateFile = join(options.directory, 'deployment.json');
@@ -310,17 +337,22 @@ export class ProcessDeployment implements PromotionDriver {
           deployment.writePrepared({ format: preparedFormat(deployment.capabilityProfile),
             ...(anchoredProfile(deployment.capabilityProfile) ? { effectSignerAnchorDigest: options.effectSignerAnchor!.digest } : {}),
             ...(clockedProfile(deployment.capabilityProfile) ? { trustedClockAnchorDigest: options.trustedClockAnchor!.digest } : {}),
+            ...(witnessedProfile(deployment.capabilityProfile) ? { effectJournalWitnessCatalogDigest: options.effectJournalWitnessCatalog!.digest } : {}),
             binding: null, reference, source: null, sourceSnapshotDigest: null, seed: null });
           save(deployment.stateFile, { format: stateFormat(deployment.capabilityProfile),
             admissionProfile: options.coordinator.admissionProfile, capabilityProfile: deployment.capabilityProfile,
             ...(anchoredProfile(deployment.capabilityProfile) ? { effectSignerAnchorDigest: options.effectSignerAnchor!.digest } : {}),
             ...(clockedProfile(deployment.capabilityProfile) ? { trustedClockAnchorDigest: options.trustedClockAnchor!.digest } : {}),
+            ...(witnessedProfile(deployment.capabilityProfile) ? { effectJournalWitnessCatalogDigest: options.effectJournalWitnessCatalog!.digest } : {}),
             genesisManifest: manifest, active: reference, readiness: 'ready', pendingProposal: null, invocations: [], allocations: [] });
         }
         const state = deployment.readState();
         // Pending decisions are recovered explicitly, never by booting the old target.
         if (state.readiness === 'ready' && options.coordinator.servingReady()) {
           deployment.assertServing(state); await deployment.hostFor(state.active);
+          if (witnessedProfile(deployment.capabilityProfile))
+            for (const invocation of state.invocations.filter(row => row.phase === 'settled' && row.deployment.id === state.active.id))
+              await deployment.assertWitnessedInvocationReceipt(invocation);
         }
       }, options.lockWaitMs ?? 5000);
       return deployment;
@@ -361,12 +393,16 @@ export class ProcessDeployment implements PromotionDriver {
     const raw = load(join(this.directory(reference.id), 'prepared.json')) as { format?: unknown };
     const anchored = anchoredProfile(this.capabilityProfile);
     const value = exactObject(raw, ['format', ...(anchored ? ['effectSignerAnchorDigest'] : []),
-      ...(clockedProfile(this.capabilityProfile) ? ['trustedClockAnchorDigest'] : []), 'binding', 'reference', 'source', 'sourceSnapshotDigest', 'seed']);
+      ...(clockedProfile(this.capabilityProfile) ? ['trustedClockAnchorDigest'] : []),
+      ...(witnessedProfile(this.capabilityProfile) ? ['effectJournalWitnessCatalogDigest'] : []),
+      'binding', 'reference', 'source', 'sourceSnapshotDigest', 'seed']);
     const expected = preparedFormat(this.capabilityProfile);
     if (value.format !== expected || !equal(value.reference, reference)) throw new TypeError('prepared deployment identity mismatch');
     if (anchored && value.effectSignerAnchorDigest !== this.options.effectSignerAnchor!.digest) throw new TypeError('prepared effect signer anchor mismatch');
     if (clockedProfile(this.capabilityProfile) && value.trustedClockAnchorDigest !== this.options.trustedClockAnchor!.digest)
       throw new TypeError('prepared trusted clock anchor mismatch');
+    if (witnessedProfile(this.capabilityProfile) && value.effectJournalWitnessCatalogDigest !== this.options.effectJournalWitnessCatalog!.digest)
+      throw new TypeError('prepared effect witness catalog mismatch');
     if (value.source !== null) validateReference(value.source);
     if (value.sourceSnapshotDigest !== null) validateDigest(value.sourceSnapshotDigest, 'aether.state/1');
     if (value.seed !== null) {
@@ -378,7 +414,9 @@ export class ProcessDeployment implements PromotionDriver {
   private readState(legacy: 'v1' | 'v2' | null = null): DeploymentState {
     const anchored = !legacy && anchoredProfile(this.capabilityProfile);
     const value = exactObject(load(this.stateFile), ['format', ...(legacy === 'v1' ? [] : ['admissionProfile']), ...(legacy ? [] : ['capabilityProfile']), ...(anchored ? ['effectSignerAnchorDigest'] : []),
-      ...(!legacy && clockedProfile(this.capabilityProfile) ? ['trustedClockAnchorDigest'] : []), 'genesisManifest', 'active', 'readiness', 'pendingProposal', 'invocations', 'allocations']);
+      ...(!legacy && clockedProfile(this.capabilityProfile) ? ['trustedClockAnchorDigest'] : []),
+      ...(!legacy && witnessedProfile(this.capabilityProfile) ? ['effectJournalWitnessCatalogDigest'] : []),
+      'genesisManifest', 'active', 'readiness', 'pendingProposal', 'invocations', 'allocations']);
     validateReference(value.active); validateDigest(value.genesisManifest, 'aether.execution/1');
     if (value.format !== (legacy === 'v1' ? 'aether.process-deployment/1' : legacy === 'v2' ? 'aether.process-deployment/2'
       : stateFormat(this.capabilityProfile))
@@ -388,6 +426,8 @@ export class ProcessDeployment implements PromotionDriver {
     if (anchored && value.effectSignerAnchorDigest !== this.options.effectSignerAnchor!.digest) throw new TypeError('durable effect signer anchor mismatch');
     if (!legacy && clockedProfile(this.capabilityProfile) && value.trustedClockAnchorDigest !== this.options.trustedClockAnchor!.digest)
       throw new TypeError('durable trusted clock anchor mismatch');
+    if (!legacy && witnessedProfile(this.capabilityProfile) && value.effectJournalWitnessCatalogDigest !== this.options.effectJournalWitnessCatalog!.digest)
+      throw new TypeError('durable effect witness catalog mismatch');
     if (value.pendingProposal !== null) validateDigest(value.pendingProposal, 'aether.promotion/1');
     if (!Array.isArray(value.invocations)) throw new TypeError('missing durable invocation registry');
     const history = this.options.coordinator.history();
@@ -460,8 +500,10 @@ export class ProcessDeployment implements PromotionDriver {
     const host = await ProcessHost.open({ ...services,
       ...(anchoredProfile(this.capabilityProfile) ? { effectSignerAnchor: this.options.effectSignerAnchor } : {}),
       ...(clockedProfile(this.capabilityProfile) ? { trustedClockAnchor: this.options.trustedClockAnchor } : {}),
+      ...(witnessedProfile(this.capabilityProfile) ? { effectJournalWitnessCatalog: this.options.effectJournalWitnessCatalog } : {}),
       ...(this.capabilityProfile === 'scoped-anchored-v4' ? { legacyAnchoredEffectPolicy: 'anchored-v2' as const } : {}),
-      ...(clockedProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'isolated-wasm-v5-clock' as const }
+      ...(witnessedProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'isolated-wasm-v6-witnessed' as const }
+        : clockedProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'isolated-wasm-v5-clock' as const }
         : this.capabilityProfile === 'scoped-anchored-wasm-v6' ? { anchoredEffectPolicyProfile: 'isolated-wasm-v4' as const } : {}),
       ...(services.signedEffectResourcePolicy && !anchoredProfile(this.capabilityProfile)
         ? { legacyEffectSignerTrust: 'factory-v1' as const } : {}),
@@ -473,6 +515,17 @@ export class ProcessDeployment implements PromotionDriver {
       registry: context.registry, plan: JSON.parse(artifact.plan), initialGeneration: reference.generation, initialSnapshot: record.seed ?? undefined });
     if (this.closed) { await host.close(); throw new Error('deployment closed during worker preparation'); }
     this.hosts.set(reference.id, host); return host;
+  }
+  private async assertWitnessedInvocationReceipt(invocation: DeploymentInvocation): Promise<void> {
+    if (!witnessedProfile(this.capabilityProfile) || invocation.phase !== 'settled' || !invocation.result) return;
+    const host = await this.hostFor(invocation.deployment);
+    const inner = host.operationResult(invocation.operationId);
+    if (inner === null) {
+      const expected: ProcessHostCallResult = { state: 'aborted', operationId: invocation.operationId,
+        generation: invocation.deployment.generation, unit: invocation.unit,
+        reason: 'authorized abort: durable host journal confirms no execution intent was created' };
+      if (!equal(invocation.result, expected)) throw new Error('deployment receipt lacks an exact inner host outcome');
+    } else if (!equal(inner, invocation.result)) throw new Error('deployment receipt differs from witnessed inner host outcome');
   }
   private assertTrustedServices(reference: DeploymentReference): void {
     if (!anchoredProfile(this.capabilityProfile)) return;
@@ -512,6 +565,8 @@ export class ProcessDeployment implements PromotionDriver {
       assertEffectSignerAnchor(anchor);
       if ((services as ProcessHostOptions).trustedClockAnchor !== undefined)
         throw new TypeError('trusted clock authority must be independently provisioned');
+      if ((services as ProcessHostOptions).effectJournalWitnessCatalog !== undefined)
+        throw new TypeError('effect witness catalog must be independently provisioned');
       if (services.effectResourceSignerKey !== undefined || services.currentEffectPolicyEpoch !== undefined
         || (services as ProcessHostOptions).effectSignerAnchor !== undefined
         || (services as ProcessHostOptions).legacyEffectSignerTrust !== undefined
@@ -559,6 +614,8 @@ export class ProcessDeployment implements PromotionDriver {
         brokerAttestContext(router, { executionId: operationId, manifestDigest, mode: 'live',
           policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
           capability: rule.capability, grantRef });
+        if (witnessedProfile(this.capabilityProfile))
+          brokerPinWitness(router, selectEffectJournalWitness(this.options.effectJournalWitnessCatalog!, operationId));
       }
     }
   }
@@ -634,6 +691,7 @@ export class ProcessDeployment implements PromotionDriver {
         if(!before||!after||historical.manifest.capabilityPolicyDigest!==current.manifest.capabilityPolicyDigest||before.capabilities.some(cap=>!after.capabilities.includes(cap)))throw new Error('historical invocation requires authority unavailable in the current declaration/policy; durable receipt retained without redispatch');
         this.assertServing();
         host.authorizeInvocation(symbol, options.tokens);
+        await this.assertWitnessedInvocationReceipt(old);
         return copy(old.result ?? { state: 'indeterminate', operationId: old.operationId, generation: old.deployment.generation, unit: old.unit, reason: 'durable invocation has no completed receipt; recover original deployment' });
       }
       if (state.invocations.some(invocation => invocation.phase === 'pending')) throw new Error('unresolved deployment invocation blocks new execution');
@@ -659,10 +717,12 @@ export class ProcessDeployment implements PromotionDriver {
         this.options.invocationPhase?.('after-receipt', { operationId: options.operationId, workerPids: host.workerPids });
         if(result.state==='completed')this.assertServing();
         host.authorizeInvocation(symbol, options.tokens);
+        await this.assertWitnessedInvocationReceipt({ ...invocation, result,
+          phase: result.state === 'indeterminate' ? 'pending' : 'settled' });
         return result;
       } catch (error) {
         const durable = this.readState().invocations.find(record => record.operationId === invocation.operationId)!;
-        if (durable.phase === 'settled' && durable.result) { if(durable.result.state==='completed')this.assertServing();host.authorizeInvocation(symbol, options.tokens); return copy(durable.result); }
+        if (durable.phase === 'settled' && durable.result) { if(durable.result.state==='completed')this.assertServing();host.authorizeInvocation(symbol, options.tokens);await this.assertWitnessedInvocationReceipt(durable); return copy(durable.result); }
         this.recordInvocation({ ...invocation, result: { state: 'indeterminate', operationId: invocation.operationId, generation: invocation.deployment.generation, unit: invocation.unit, reason: 'inner execution outcome requires original-deployment recovery' } });
         throw error;
       }
@@ -684,7 +744,7 @@ export class ProcessDeployment implements PromotionDriver {
         if (services?.authorizeRecovery?.(operationId, strategy) !== true) throw new Error('deployment recovery authorization denied');
       };
       authorize();
-      if (invocation.phase === 'settled' && invocation.result) { authorize(); return copy(invocation.result); }
+      if (invocation.phase === 'settled' && invocation.result) { authorize(); await this.assertWitnessedInvocationReceipt(invocation); return copy(invocation.result); }
       if (invocation.deployment.manifest !== state.active.manifest || invocation.deployment.generation !== state.active.generation) throw new Error('cannot recover unresolved predecessor execution after another target committed');
       const host = await this.hostFor(invocation.deployment);
       authorize();
@@ -698,6 +758,8 @@ export class ProcessDeployment implements PromotionDriver {
       }
       authorize();
       this.recordInvocation({ ...invocation, result, phase: result.state === 'indeterminate' ? 'pending' : 'settled' });
+      await this.assertWitnessedInvocationReceipt({ ...invocation, result,
+        phase: result.state === 'indeterminate' ? 'pending' : 'settled' });
       return result;
     }, this.options.lockWaitMs ?? 5000);
   }
@@ -740,7 +802,11 @@ export class ProcessDeployment implements PromotionDriver {
     if (sourceHost.status().unresolved.length || state.invocations.some(invocation => invocation.phase === 'pending') || state.allocations.some(allocation => allocation.result === null)) throw new Error('unresolved source execution prevents deployment');
     const snapshot = await sourceHost.snapshot(), artifactDigest = processArtifactDigest(candidate);
     if (!equal(binding.migrationPlan, processMigrationPlan(snapshot, artifactDigest))) throw new Error('approved migration source snapshot/artifact is stale');
-    const expectedEffectPlan = this.capabilityProfile === 'scoped-anchored-wasm-v6'
+    const expectedEffectPlan = witnessedProfile(this.capabilityProfile)
+      ? processWitnessedWasmEffectPlan(candidate.factoryId, candidate.manifest.capabilityPolicyDigest,
+        this.options.effectSignerAnchor!.digest, this.options.trustedClockAnchor!.digest,
+        this.options.effectJournalWitnessCatalog!.digest)
+      : this.capabilityProfile === 'scoped-anchored-wasm-v6'
       ? processIsolatedWasmEffectPlan(candidate.factoryId, candidate.manifest.capabilityPolicyDigest, this.options.effectSignerAnchor!.digest)
       : clockedProfile(this.capabilityProfile)
       ? processClockedWasmEffectPlan(candidate.factoryId, candidate.manifest.capabilityPolicyDigest,
@@ -755,6 +821,7 @@ export class ProcessDeployment implements PromotionDriver {
     const record: PreparedRecord = { format: preparedFormat(this.capabilityProfile),
       ...(anchoredProfile(this.capabilityProfile) ? { effectSignerAnchorDigest: this.options.effectSignerAnchor!.digest } : {}),
       ...(clockedProfile(this.capabilityProfile) ? { trustedClockAnchorDigest: this.options.trustedClockAnchor!.digest } : {}),
+      ...(witnessedProfile(this.capabilityProfile) ? { effectJournalWitnessCatalogDigest: this.options.effectJournalWitnessCatalog!.digest } : {}),
       binding, reference, source: state.active, sourceSnapshotDigest: runtimeSnapshotDigest(snapshot), seed: rebind(snapshot, reference.manifest, reference.generation, JSON.parse(candidate.plan)) };
     save(this.stateFile, { ...state, readiness: 'preparing', pendingProposal: binding.proposalDigest });
     this.writePrepared(record);

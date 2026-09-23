@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Opt-in operator witness catalog profile — 2026-09-23
+
+- Added `scoped-anchored-wasm-v8` and `isolated-wasm-v6-witnessed`. Operator-supplied catalog identity is bound into deployment `/8`, prepared `/6`, host configuration `/6` and effect plan `/6`; the exact per-operation witness is checked before broker use. V7 histories retain their original formats and clock-only authority.
+- The real-worker V8 campaign exposed a deployment settled-receipt shortcut that bypassed host/broker inspection. Settled deployment results now recheck the inner host on retry, recovery, initial response and reopen. Wrong witness, wrong catalog, replaceable broker methods, factory-supplied catalog and V7 adoption are refused; signed promotion and reopen pass.
+- The test witness remains in-process, and external sink status, hostile-factory confinement and independently witnessed replay remain open. T2-04 and NFR-16 are not verified.
+
 ## Signed Wasm host-cache broker comparison — 2026-09-23
 
 - Signed V4 Wasm ProcessHost now reconstructs the exact historical broker request and compares terminal effects through a nonvirtual, read-only broker inspection path. It applies on reopen, same-ID retries, public cached result/disposition reads, worker replay and recovery. Missing or mismatched broker outcomes refuse cached publication.
