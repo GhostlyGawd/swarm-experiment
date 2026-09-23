@@ -1,0 +1,126 @@
+{
+  "format": "aether.v4-integration-acceptance/1",
+  "subjectCommit": "35d989782aa39132ad77db63af90a1b84590d203",
+  "specVersion": "0.1.0",
+  "workingTreeDirty": false,
+  "recordedAt": "2026-09-23T03:24:12.217177+00:00",
+  "checks": [
+    {
+      "command": "npm ci --ignore-scripts",
+      "exitCode": 0,
+      "artifact": "install.log"
+    },
+    {
+      "command": "npm test (includes build)",
+      "exitCode": 0,
+      "tests": 630,
+      "passed": 630,
+      "failed": 0,
+      "artifact": "tests.log"
+    },
+    {
+      "command": "npm run build (after dependency install)",
+      "exitCode": 0,
+      "artifact": "build.log"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "artifact": "typecheck.log"
+    },
+    {
+      "command": "npm run roadmap:check",
+      "exitCode": 0,
+      "artifact": "roadmap.log"
+    },
+    {
+      "command": "npm run roadmap:v4:check",
+      "exitCode": 0,
+      "artifact": "roadmap-v4.log"
+    },
+    {
+      "command": "npm run bench:v4:enforce -- --output <evidence>/benchmark",
+      "exitCode": 1,
+      "requiredTargetsUnsatisfied": 17,
+      "artifact": "benchmark-enforce.log"
+    },
+    {
+      "command": "npm run build accidentally concurrent with npm ci",
+      "exitCode": 2,
+      "artifact": "build-concurrent-install.failed.log",
+      "cause": "verification orchestration removed dependencies during tsc; subsequent sequential build passed"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "REVIEW.md",
+      "sha256": "7a4aaf7cf8153e804713b57c3b73d4030026bda33901c2f6f2b30146fe613f02",
+      "bytes": 5078
+    },
+    {
+      "path": "V4-F07.json",
+      "sha256": "a5c53410fc18dccf1319ca6ad96a4cdc9375a4f8677f1c12c428cc86ebfc83c8",
+      "bytes": 1302
+    },
+    {
+      "path": "V4-F08.json",
+      "sha256": "bd67d6c5e20adb5b12f18a67e94a31e16c2e96ec231d259ac644adc0a95ca8db",
+      "bytes": 1216
+    },
+    {
+      "path": "V4-T3-01.json",
+      "sha256": "c506461a49e984094da5433fe5753d17a5a6433086e4b05808ddf30c6b38e25c",
+      "bytes": 960
+    },
+    {
+      "path": "install.log",
+      "sha256": "fd780e5c6bfe9ae6fa26acbc668114f7157bb534caad73c3e262e04121918aca",
+      "bytes": 139
+    },
+    {
+      "path": "build.log",
+      "sha256": "8363fdc26e2d313e30ef5063fc39a96098798d351fa3e2f8de82828d0efdbbfe",
+      "bytes": 59
+    },
+    {
+      "path": "build-concurrent-install.failed.log",
+      "sha256": "2ce44675708ec8d414fa541f15f808c9b518804a1d7320278c90497938aa5323",
+      "bytes": 949
+    },
+    {
+      "path": "tests.log",
+      "sha256": "44ed8ad8fd006e227fcddb4190b26a56c209462fe5c59388dd73978b9a826c9c",
+      "bytes": 63647
+    },
+    {
+      "path": "typecheck.log",
+      "sha256": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a",
+      "bytes": 69
+    },
+    {
+      "path": "roadmap.log",
+      "sha256": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+      "bytes": 135
+    },
+    {
+      "path": "roadmap-v4.log",
+      "sha256": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+      "bytes": 182
+    },
+    {
+      "path": "benchmark-enforce.log",
+      "sha256": "d5673d76ed008c0f606dcbac72bd702599dad38c6cce945183b79aac2960b43a",
+      "bytes": 2297
+    },
+    {
+      "path": "benchmark/manifest.json",
+      "sha256": "320206e8c0f2ca7ec914bc947488b5a93a84c834dbaf1d234d48149ff487b770",
+      "bytes": 13620
+    },
+    {
+      "path": "benchmark/samples.json",
+      "sha256": "daa6f9e16f2cc1e460aebc1b76566f67b7923a81d392bc4f3638bc9564184fe1",
+      "bytes": 37325
+    }
+  ]
+}

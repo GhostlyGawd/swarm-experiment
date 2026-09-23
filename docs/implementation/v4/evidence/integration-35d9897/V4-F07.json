@@ -1,0 +1,26 @@
+{
+  "task": "V4-F07",
+  "specVersion": "0.1.0",
+  "subjectCommit": "35d989782aa39132ad77db63af90a1b84590d203",
+  "recordedAt": "2026-09-23T03:23:47.240185+00:00",
+  "checks": [
+    {
+      "gate": "V4-F07/G1",
+      "result": "pass",
+      "method": "Clean 630-test suite repeats actual multiworker migration, nested calls, aliases, restart and crash boundaries; new legacy/strict live-closure regression denies before effect dispatch. See REVIEW.md and exact-source logs.",
+      "artifact": "docs/implementation/v4/evidence/integration-35d9897/REVIEW.md"
+    },
+    {
+      "gate": "V4-F07/G2",
+      "result": "pass",
+      "method": "Real concurrent hosts, stale ownership generations and unauthorized transport/grant cases rechecked; strict and legacy process profiles preserve one authoritative owner. See REVIEW.md and exact-source logs.",
+      "artifact": "docs/implementation/v4/evidence/integration-35d9897/REVIEW.md"
+    },
+    {
+      "gate": "V4-F07/G3",
+      "result": "pass",
+      "method": "Heap identity, idempotent effect receipts, timeout reconciliation and zero-sink closure refusal rechecked; failed no-commit effects publish the pre-call heap. See REVIEW.md and exact-source logs.",
+      "artifact": "docs/implementation/v4/evidence/integration-35d9897/REVIEW.md"
+    }
+  ]
+}

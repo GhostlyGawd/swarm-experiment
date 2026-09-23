@@ -321,7 +321,7 @@ export const PLAN: Plan = {
       : ['V4-R01', 'V4-R02', 'V4-R03', 'V4-R04'].includes(task.id)
         ? { ...task, status: 'verified' as const, evidence: `docs/implementation/v4/evidence/research-749ce8b/${task.id}.json` }
         : ['V4-F07', 'V4-F08'].includes(task.id)
-          ? { ...task, status: 'verified' as const, evidence: `docs/implementation/v4/evidence/process-4129dfc/${task.id}.json` }
+          ? { ...task, status: 'verified' as const, evidence: `docs/implementation/v4/evidence/integration-35d9897/${task.id}.json` }
           : task.id === 'V4-M0'
             ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/baseline-4129dfc/V4-M0.json' }
             : task.id === 'V4-T1-01'
@@ -336,6 +336,8 @@ export const PLAN: Plan = {
                       ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/blackboard-4ee51cf/V4-T1-09.json' }
                     : task.id === 'V4-T1-04'
                       ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/index-e71627b/V4-T1-04.json' }
-                    : ['V4-T1-02', 'V4-T1-05', 'V4-T2-04', 'V4-T2-06', 'V4-T3-01'].includes(task.id) ? { ...task, status: 'in_progress' as const } : task),
+                    : task.id === 'V4-T3-01'
+                      ? { ...task, status: 'verified' as const, evidence: 'docs/implementation/v4/evidence/integration-35d9897/V4-T3-01.json' }
+                    : ['V4-T1-02', 'V4-T1-05', 'V4-T2-04', 'V4-T2-06'].includes(task.id) ? { ...task, status: 'in_progress' as const } : task),
   firstSlice: ['V4-F01', 'V4-F02', 'V4-F03', 'V4-F04', 'V4-F05', 'V4-F06', 'V4-F07', 'V4-F08'],
 };

@@ -6,7 +6,7 @@ Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) f
 
 > This is implementation status. Publishing the specification does not complete runtime work. A verified task needs evidence for every gate; functional delivery does not imply that the release NFR/KPI gates passed.
 
-**19/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
+**20/62 tasks verified; 71 source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**
 
 ## First implementation slice
 
@@ -23,14 +23,14 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** none.
+**Ready now:** [V4-T3-03](#v4-t3-03), [V4-T3-07](#v4-t3-07), [V4-T3-10](#v4-t3-10).
 
 ## Milestones
 
 | Milestone | Verified | Total | Release gate |
 |---|---:|---:|---|
 | baseline | 13 | 13 | [V4-M0](#v4-m0) |
-| v2 | 6 | 20 | [V4-M2](#v4-m2) |
+| v2 | 7 | 20 | [V4-M2](#v4-m2) |
 | v3 | 0 | 14 | [V4-M3](#v4-m3) |
 | v4 | 0 | 15 | [V4-M4](#v4-m4) |
 
@@ -73,7 +73,7 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-T2-10](#v4-t2-10) | Portable AST proof certificates | verification | v2 | verified | [V4-R03](#v4-r03), [V4-F06](#v4-f06) |
 | [V4-T2-11](#v4-t2-11) | Metamorphic relation synthesis | verification | v3 | planned | [V4-T2-03](#v4-t2-03), [V4-T3-03](#v4-t3-03) |
 | [V4-T2-12](#v4-t2-12) | Multimodal intent anchors | language | v3 | planned | [V4-T2-08](#v4-t2-08), [V4-T3-08](#v4-t3-08) |
-| [V4-T3-01](#v4-t3-01) | Reversible execution and resumable checkpoints | runtime | v2 | in_progress | [V4-F07](#v4-f07) |
+| [V4-T3-01](#v4-t3-01) | Reversible execution and resumable checkpoints | runtime | v2 | verified | [V4-F07](#v4-f07) |
 | [V4-T3-02](#v4-t3-02) | MCTS over copy-on-write heaps | synthesis | v3 | planned | [V4-T3-01](#v4-t3-01), [V4-T2-05](#v4-t2-05), [V4-T3-03](#v4-t3-03), [V4-F08](#v4-f08) |
 | [V4-T3-03](#v4-t3-03) | Living micro-world campaigns | verification | v2 | planned | [V4-F04](#v4-f04), [V4-T3-01](#v4-t3-01), [V4-R04](#v4-r04) |
 | [V4-T3-04](#v4-t3-04) | Historical counterfactual replay | runtime | v2 | planned | [V4-T3-01](#v4-t3-01), [V4-T3-03](#v4-t3-03) |
@@ -335,7 +335,7 @@ Acceptance gates:
 - **V4-F07/G2** — At most one ownership epoch may write; stale owner calls and unauthorized transport calls fail.
 - **V4-F07/G3** — No heap address is mistaken for a record in another heap; in-flight effects cannot be duplicated by migration or timeout retries.
 
-Evidence: [manifest](../../../docs/implementation/v4/evidence/process-4129dfc/V4-F07.json).
+Evidence: [manifest](../../../docs/implementation/v4/evidence/integration-35d9897/V4-F07.json).
 
 ### V4-F08
 
@@ -352,7 +352,7 @@ Acceptance gates:
 - **V4-F08/G2** — Crash/restart at every state converges to the durable decision, with one active root and an auditable recovery record.
 - **V4-F08/G3** — End-to-end ledger flow uses two processes, a recorded effect, migration, candidate rejection, promotion and rollback without duplicate appends.
 
-Evidence: [manifest](../../../docs/implementation/v4/evidence/process-4129dfc/V4-F08.json).
+Evidence: [manifest](../../../docs/implementation/v4/evidence/integration-35d9897/V4-F08.json).
 
 ### V4-R01
 
@@ -758,7 +758,7 @@ Evidence: not yet produced.
 
 ### V4-T3-01
 
-**Reversible execution and resumable checkpoints** · implementation · v2 · owner: runtime · **in_progress**
+**Reversible execution and resumable checkpoints** · implementation · v2 · owner: runtime · **verified**
 
 Prerequisites: [V4-F07](#v4-f07).
 
@@ -769,7 +769,7 @@ Acceptance gates:
 - **V4-T3-01/G1** — Rewind and resume at declared safe points produces the same logical state and effect sequence as uninterrupted execution.
 - **V4-T3-01/G2** — Reopen durable checkpoints after restart; invalid code/state/event versions fail explicitly.
 
-Evidence: not yet produced.
+Evidence: [manifest](../../../docs/implementation/v4/evidence/integration-35d9897/V4-T3-01.json).
 
 ### V4-T3-02
 

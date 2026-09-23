@@ -1,0 +1,20 @@
+{
+  "task": "V4-T3-01",
+  "specVersion": "0.1.0",
+  "subjectCommit": "35d989782aa39132ad77db63af90a1b84590d203",
+  "recordedAt": "2026-09-23T03:23:47.240185+00:00",
+  "checks": [
+    {
+      "gate": "V4-T3-01/G1",
+      "result": "pass",
+      "method": "Standalone step rewind/reexecution and production lease correction/retained rewind/replay-debt tests show same logical state and one durable effect sequence without redispatch. See REVIEW.md and exact-source logs.",
+      "artifact": "docs/implementation/v4/evidence/integration-35d9897/REVIEW.md"
+    },
+    {
+      "gate": "V4-T3-01/G2",
+      "result": "pass",
+      "method": "Durable checkpoint and ProcessHost reopen after actual SIGKILL at checkpoint, sink receipt, publication and control boundaries; stale code/state/event versions and ownership fail explicitly. See REVIEW.md and exact-source logs.",
+      "artifact": "docs/implementation/v4/evidence/integration-35d9897/REVIEW.md"
+    }
+  ]
+}

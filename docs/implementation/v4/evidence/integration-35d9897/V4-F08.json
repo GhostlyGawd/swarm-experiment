@@ -1,0 +1,26 @@
+{
+  "task": "V4-F08",
+  "specVersion": "0.1.0",
+  "subjectCommit": "35d989782aa39132ad77db63af90a1b84590d203",
+  "recordedAt": "2026-09-23T03:23:47.240185+00:00",
+  "checks": [
+    {
+      "gate": "V4-F08/G1",
+      "result": "pass",
+      "method": "Clean suite rechecks composed-root verification, signed lineage default, stale parent/policy/evidence rejection and exact-root admission. See REVIEW.md and exact-source logs.",
+      "artifact": "docs/implementation/v4/evidence/integration-35d9897/REVIEW.md"
+    },
+    {
+      "gate": "V4-F08/G2",
+      "result": "pass",
+      "method": "Actual coordinator/deployment process-death cases and retained promotion decisions/recovery receipts pass against changed process host. See REVIEW.md and exact-source logs.",
+      "artifact": "docs/implementation/v4/evidence/integration-35d9897/REVIEW.md"
+    },
+    {
+      "gate": "V4-F08/G3",
+      "result": "pass",
+      "method": "End-to-end real-process ledger promotion/migration/rollback and exactly-once external append tests pass; optional strict grant deployment also exercised. See REVIEW.md and exact-source logs.",
+      "artifact": "docs/implementation/v4/evidence/integration-35d9897/REVIEW.md"
+    }
+  ]
+}
