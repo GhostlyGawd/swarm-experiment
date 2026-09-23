@@ -4,7 +4,7 @@
 
 `aether.packed-heap/1` remains the format for layouts without string fields. Its shape, bit widths, digest domains, and decoder are retained. `PackedHeap.fromImage` reads both versions. A string `set` validates the new value, repacks the logical records, and installs the new bytes and dictionary only after success, so stale entries disappear and a failed update leaves the image unchanged. Layout migration also repacks through logical values. The resumable checkpoint bridge labels a string heap `/2`, binds the trusted logical checkpoint digest, validates the reconstructed runtime snapshot, and preserves record IDs, epochs, versions and aliases.
 
-The native process bridge explicitly rejects `/2` string images. The [HVF EL1 research guest](../packed-hvf-guest/README.md) now reads and compares bounded UTF-8 dictionary strings from an authenticated `/2` checkpoint. It does not mutate strings or execute the complete runtime, and its 1,000-fresh-guest string campaign misses the unchanged 1 ms maximum with a 1.364 ms outlier. V4-T3-10 remains open.
+The [native C process bridge](../packed-native-bridge/README.md) and [HVF EL1 research guest](../packed-hvf-guest/README.md) now read and compare bounded UTF-8 dictionary strings from authenticated `/2` checkpoints. Neither performs native string mutation or executes the complete runtime. The C bridge's 30 process round trips measured a 58.4 ms median, which includes process launch and checkpoint validation; the EL1 guest's 1,000-fresh-guest campaign misses the unchanged 1 ms maximum with a 1.364 ms outlier. V4-T3-10 remains open.
 
 ## Verification
 

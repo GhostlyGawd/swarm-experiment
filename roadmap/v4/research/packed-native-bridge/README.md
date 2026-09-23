@@ -38,6 +38,6 @@ AETHER_PACKED_NATIVE_STRING_EVIDENCE=roadmap/v4/research/packed-native-bridge/re
 ## Open before V4-T3-10
 
 1. Put the authenticated packed image and checked C ABI in the actual lowered native guest/checkpoint path, with manifest-bound ABI/layout version and executable identity.
-2. Reconcile native mutations through the durable runtime event and authorization protocol; do not publish a candidate heap as a checkpoint.
+2. Integrate candidate-specific correction into durable ProcessHost/guest publication with crash recovery. The bounded `/1` local `commitPackedCandidate` test proves one authorized, replayable runtime event, but does not yet provide distributed or production publication.
 3. Support the declared production value domain, including historical heaps, composites, closures and tasks, or establish a complete narrower profile and reject everything else. This `/2` bridge only adds bounded string reads/equality; it does not implement native string mutation or garbage collection.
 4. Measure full native guest locality, resident memory, throughput, migration, and recovery on the qualified target hardware. The current JS packed reader is much slower than the baseline; this bridge makes no speed claim.

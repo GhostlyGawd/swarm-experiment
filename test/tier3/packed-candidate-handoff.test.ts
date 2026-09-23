@@ -82,6 +82,11 @@ test('stale, altered, unauthorised and identity-changing candidates leave runtim
   assert.throws(() => f.runtime.commitPackedCandidate(f.packed, f.candidate, f.sourceDigest, f.packed.heap.layoutDigest), /did not authorize/);
   assert.equal(checkpointDigest(f.runtime.snapshot()), before);
   f.expectedCandidate = f.candidate.imageDigest;
+  const asyncAuthority = new ResumableRuntime(f.module, {...f.options,
+    authorizePackedCandidate: () => Promise.resolve(true) as never});
+  asyncAuthority.restore(f.before, f.sourceDigest);
+  assert.throws(() => asyncAuthority.commitPackedCandidate(f.packed, f.candidate, f.sourceDigest, f.packed.heap.layoutDigest), /did not authorize/);
+  assert.equal(checkpointDigest(asyncAuthority.snapshot()), f.sourceDigest);
   assert.throws(() => f.runtime.commitPackedCandidate(f.packed, f.candidate,
     domainDigest('aether.packed-candidate-test/1', 'wrong'), f.packed.heap.layoutDigest), /trusted digest|stale|mismatch/);
   assert.equal(checkpointDigest(f.runtime.snapshot()), before);
