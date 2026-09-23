@@ -8,8 +8,10 @@ Run from the repository root:
 
 ```sh
 node --experimental-strip-types roadmap/v4/research/packed-fused-locality/run.ts roadmap/v4/research/packed-fused-locality/results/local-02
-node --experimental-strip-types roadmap/v4/research/packed-fused-locality/verify.ts roadmap/v4/research/packed-fused-locality/results/local-02/report.json
+node --experimental-strip-types roadmap/v4/research/packed-fused-locality/verify-historical.ts roadmap/v4/research/packed-fused-locality/results/local-02/report.json
 ```
+
+The historical wrapper checks out the report's pinned source and runs its original verifier, preserving the measured C binary after later runtime changes.
 
 ## Apple M4 Pro result
 
