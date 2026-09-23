@@ -7,6 +7,7 @@ import { slice } from '../../src/tier4/topology.ts';
 import * as b from '../../src/tier1/build.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
+import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 
 const setup = () => {
   const ex = buildLedgerExample('distributed-host');
@@ -48,6 +49,36 @@ test('D2/D3: wire calls require sealed authority and expose partition semantics'
     assert.equal(partitioned.fault.retryable, true);
     assert.equal(partitioned.fault.committed, false);
   }
+});
+
+test('v2 topology dispatch binds grants to target function, generation and current epoch', () => {
+  const ex = buildLedgerExample('distributed-v2-grants'), plan = slice(ex.module, ledgerTelemetry(ex), { symbols: ex.syms });
+  let epoch = '0', revoked = false;
+  const scopedGrants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(17), repositoryId: 'repository',
+    clock: () => 100, policyEpoch: () => '0', revocationEpoch: () => epoch, isRevoked: () => revoked,
+    authorizeIssue: () => true, authorizeDelegate: () => true });
+  const host = new TopologyHost(ex.module, plan, { registry: ex.capabilities, symbols: ex.syms, scopedGrants, clock: () => 100 });
+  const alice = host.allocateRecord(ACCOUNT, { id: 'alice', balance: 100n });
+  const bob = host.allocateRecord(ACCOUNT, { id: 'bob', balance: 0n });
+  const request = { id: 'v2-transfer', from: ex.symbols.settle, to: ex.symbols.transfer, args: [alice, bob, 10n] } as const;
+  const wrongAudience = host.dispatch({ ...request, capabilities: host.issueTokens(ex.symbols.settle) });
+  assert.equal(wrongAudience.ok, false); if (!wrongAudience.ok) assert.equal(wrongAudience.fault.kind, 'authority');
+  const malformed = host.dispatch({ ...request, capabilities: null } as unknown as Parameters<typeof host.dispatch>[0]);
+  assert.equal(malformed.ok, false); if (!malformed.ok) assert.equal(malformed.fault.kind, 'authority');
+  const tokens = host.issueTokens(ex.symbols.transfer);
+  const authorized = host.dispatch({ ...request, capabilities: tokens });
+  assert.equal(authorized.ok, true);
+  host.move(ex.symbols.accrue, host.unitFor(ex.symbols.settle)!);
+  const oldGeneration = host.dispatch({ ...request, id: 'v2-old-generation', capabilities: tokens });
+  assert.equal(oldGeneration.ok, false); if (!oldGeneration.ok) assert.equal(oldGeneration.fault.kind, 'authority');
+  const currentGeneration = host.issueTokens(ex.symbols.transfer);
+  epoch = '1';
+  const stale = host.dispatch({ ...request, id: 'v2-stale', capabilities: currentGeneration });
+  assert.equal(stale.ok, false); if (!stale.ok) assert.equal(stale.fault.kind, 'authority');
+  const renewed = host.issueTokens(ex.symbols.transfer);
+  revoked = true;
+  const denied = host.dispatch({ ...request, id: 'v2-revoked', capabilities: renewed });
+  assert.equal(denied.ok, false); if (!denied.ok) assert.equal(denied.fault.kind, 'authority');
 });
 
 test('D4/D5: a quiescent function moves live and host traffic becomes slicer telemetry', () => {

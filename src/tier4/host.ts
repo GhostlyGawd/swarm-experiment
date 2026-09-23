@@ -1,6 +1,8 @@
 import type { Term, Ty } from '../tier1/ast.ts';
 import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
 import { CapabilitySealer, type CapabilityToken } from '../tier2/ocap.ts';
+import { ScopedGrantAuthority, type ScopedGrantV2 } from '../tier2/scoped-grants.ts';
+import { domainDigest } from '../fabric/identity.ts';
 import { ProductionRuntime, type CompileOptions } from '../tier3/compile.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
 import { type Ref, type Value } from '../tier3/values.ts';
@@ -11,7 +13,7 @@ export interface WireRequest {
   readonly from: SymbolId | null;
   readonly to: SymbolId;
   readonly args: readonly Value[];
-  readonly capabilities: readonly CapabilityToken[];
+  readonly capabilities: readonly (CapabilityToken | ScopedGrantV2)[];
   readonly timeoutMs?: number;
 }
 
@@ -70,6 +72,8 @@ export class TelemetryCollector {
 
 export interface TopologyHostOptions extends CompileOptions {
   readonly sealer?: CapabilitySealer;
+  /** Opt-in v2 boundary; issuer policy and durable epochs are supplied by host. */
+  readonly scopedGrants?: ScopedGrantAuthority;
   readonly telemetry?: TelemetryCollector;
   readonly clock?: () => number;
 }
@@ -85,6 +89,7 @@ export class TopologyHost {
   private readonly partitioned = new Set<string>();
   private readonly active = new Map<SymbolId, number>();
   private readonly sealer: CapabilitySealer;
+  private readonly scopedGrants: ScopedGrantAuthority | null;
   private readonly telemetry: TelemetryCollector;
   private readonly clock: () => number;
   // One synchronous local state domain, with isolated runtime copies. The last
@@ -100,6 +105,7 @@ export class TopologyHost {
     this.module = module;
     this.compileOptions = opts;
     this.sealer = opts.sealer ?? new CapabilitySealer();
+    this.scopedGrants = opts.scopedGrants ?? null;
     this.telemetry = opts.telemetry ?? new TelemetryCollector();
     this.clock = opts.clock ?? (() => Date.now());
     for (const unit of plan.units) for (const symbol of unit.members) this.units.set(symbol, unit.id);
@@ -153,10 +159,16 @@ export class TopologyHost {
     const unit = this.unitFor(request.to);
     if (!unit) return { ok: false, unit: null, fault: fault('remote_fault', 'target is not placed', false, false) };
     if (this.partitioned.has(unit)) return { ok: false, unit, fault: fault('partition', `unit ${unit} is partitioned`, true, false) };
+    if (!Array.isArray(request.capabilities)) return { ok: false, unit, fault: fault('authority', 'malformed capability grant list', false, false) };
     const declaration = this.declarations.get(request.to);
     for (const capability of declaration?.capabilities ?? []) {
-      const token = request.capabilities.find((candidate) => candidate.capability === capability);
-      if (!token || !this.sealer.verify(token, unit)) {
+      const valid = this.scopedGrants
+        ? request.capabilities.some(token => this.scopedGrants!.verify(token, { capability, audience: request.to, path: this.grantPath(unit) }))
+        : request.capabilities.some(token => {
+          try { return token !== null && typeof token === 'object' && !('body' in token) && token.capability === capability && this.sealer.verify(token, unit); }
+          catch { return false; }
+        });
+      if (!valid) {
         return { ok: false, unit, fault: fault('authority', `missing valid ${capability} token`, false, false) };
       }
     }
@@ -177,11 +189,14 @@ export class TopologyHost {
     return { ok: true, execution, unit };
   }
 
-  issueTokens(symbol: SymbolId, ttlMs = 60_000): CapabilityToken[] {
+  private grantPath(unit: string): readonly string[] { return ['topology', String(this.generationValue), domainDigest('aether.topology-unit/1', unit).split(':').at(-1)!]; }
+  issueTokens(symbol: SymbolId, ttlMs = 60_000): (CapabilityToken | ScopedGrantV2)[] {
     const unit = this.unitFor(symbol);
     if (!unit) throw new ReferenceError(`unplaced function ${symbol}`);
     return (this.declarations.get(symbol)?.capabilities ?? [])
-      .map((capability) => this.sealer.issue(capability, unit, ttlMs));
+      .map((capability) => this.scopedGrants
+        ? this.scopedGrants.issue({ capability, audience: symbol, path: this.grantPath(unit) }, ttlMs)
+        : this.sealer.issue(capability, unit, ttlMs));
   }
 
   /** Move a quiescent function to an existing unit and publish a new plan generation. */
