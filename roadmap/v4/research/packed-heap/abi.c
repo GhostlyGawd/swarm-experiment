@@ -78,3 +78,36 @@ ae_packed_status ae_packed_add_i64(int64_t value, int64_t increment,
   *out = (int64_t)requested;
   return AE_PACKED_OK;
 }
+
+ae_packed_status ae_packed_read_bounded_row(const uint8_t *bytes,
+    size_t byte_length, size_t valid_bits, size_t bit_offset,
+    unsigned ref_width, size_t source_ordinal, size_t row_count,
+    size_t max_relative, ae_packed_bounded_row *out) {
+  if (bytes == NULL || out == NULL) return AE_PACKED_BOUNDS;
+  if (ref_width < 1 || ref_width > 16) return AE_PACKED_WIDTH;
+  const unsigned row_bits = 11 + ref_width;
+  ae_packed_status status = range(byte_length, valid_bits, bit_offset, row_bits);
+  if (status != AE_PACKED_OK) return status;
+
+  /* The complete row fits in at most five bytes. Assemble it once rather
+   * than running three separate per-bit readers over the same payload. */
+  const size_t first_byte = bit_offset / 8;
+  const unsigned shift = (unsigned)(bit_offset % 8);
+  const unsigned bytes_needed = (shift + row_bits + 7) / 8;
+  uint64_t word = 0;
+  for (unsigned i = 0; i < bytes_needed; i++)
+    word |= (uint64_t)bytes[first_byte + i] << (8 * i);
+  word >>= shift;
+
+  const uint16_t value = (uint16_t)(word & UINT64_C(1023));
+  if (value > 1000) return AE_PACKED_BOUNDS;
+  const uint8_t alive = (uint8_t)((word >> 10) & 1u);
+  const uint64_t code = (word >> 11) & ((UINT64_C(1) << ref_width) - 1);
+  size_t target;
+  int is_null;
+  status = ae_packed_ref_target(code, source_ordinal, row_count,
+      max_relative, &target, &is_null);
+  if (status != AE_PACKED_OK) return status;
+  *out = (ae_packed_bounded_row){ value, alive, target, is_null };
+  return AE_PACKED_OK;
+}
