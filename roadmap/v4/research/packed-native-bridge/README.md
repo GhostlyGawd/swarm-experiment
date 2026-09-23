@@ -16,9 +16,10 @@ This is **native process execution, not an Apple Hypervisor.framework guest**. T
 ```sh
 node --test --experimental-strip-types roadmap/v4/research/packed-native-bridge/bridge.test.ts
 npm run typecheck
+node --experimental-strip-types roadmap/v4/research/packed-native-bridge/verify-evidence.ts
 ```
 
-The first test compiles the C executable with `cc -std=c11 -O2 -Wall -Wextra -Werror`, moves an authenticated 3-record checkpoint into the native process, checks alias reads, a trapped overflow, an integer mutation, a reference rewrite, and rejection of changed binary or malformed frames. It proves the resulting heap image cannot simply replace the event-bound checkpoint. The second test runs a preregistered xorshift32 seed `0x62d8a441` over six combinations: 16 records and 128 operations each, local (`maxRelative=1`) and wide (`maxRelative=15`) links crossed with trap, wrap, and saturate arithmetic. Total: 768 native operations and exact differential checks. `results/local-01.json` retains every operation and observed line, image digests, binary hash, source file hashes, compiler, and host profile. The file was generated with:
+The first test compiles the C executable with `cc -std=c11 -O2 -Wall -Wextra -Werror`, moves an authenticated 3-record checkpoint into the native process, checks alias reads, a trapped overflow, an integer mutation, a reference rewrite, and rejection of changed binary or malformed frames. It proves the resulting heap image cannot simply replace the event-bound checkpoint. The second test runs a preregistered xorshift32 seed `0x62d8a441` over six combinations: 16 records and 128 operations each, local (`maxRelative=1`) and wide (`maxRelative=15`) links crossed with trap, wrap, and saturate arithmetic. Total: 768 native operations and exact differential checks. `results/local-01.json` retains every operation and observed line, image digests, binary hash, source file hashes, compiler, and host profile. It pins source commit `3ddd99bf6fab73ae7c28655699a225114c0c28dd`. `verify-evidence.ts` checks the pinned Git blobs and current files, then reruns all 768 cases and compares raw results and executable hash. The file was generated with:
 
 ```sh
 AETHER_PACKED_NATIVE_EVIDENCE=roadmap/v4/research/packed-native-bridge/results/local-01.json \
