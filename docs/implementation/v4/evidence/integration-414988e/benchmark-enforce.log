@@ -1,0 +1,29 @@
+
+> @ghostlygawd/aether@0.1.0 bench:v4:enforce
+> node --experimental-strip-types bench/v4/cli.ts --enforce --output /Users/rhenmcleod/Repositories/swarm-experiment/docs/implementation/v4/evidence/integration-414988e/benchmark
+
+fail         V4-NFR-11 aggregate:warmMessage: 1.8613333333333333 baseline/candidate tokens [required]
+fail         V4-NFR-11 aggregate:warmBody: 2.0349854227405246 baseline/candidate tokens [diagnostic]
+fail         V4-NFR-11 aggregate:cold: 0.9410503751339764 baseline/candidate tokens [diagnostic]
+fail         V4-NFR-11 aggregate:fullSession: 1.1101141924959217 baseline/candidate tokens [diagnostic]
+fail         V4-NFR-11 ledger-baseline/1:warmMessage: 1.8613333333333333 baseline/candidate tokens [required]
+fail         V4-NFR-11 ledger-baseline/1:warmBody: 2.0349854227405246 baseline/candidate tokens [diagnostic]
+fail         V4-NFR-11 ledger-baseline/1:cold: 0.9410503751339764 baseline/candidate tokens [diagnostic]
+fail         V4-NFR-11 ledger-baseline/1:fullSession: 1.1101141924959217 baseline/candidate tokens [diagnostic]
+not_measured V4-NFR-01 ast.retrieval: unmeasured ms [required]
+not_measured V4-NFR-02 replication.convergence: unmeasured ms [required]
+not_measured V4-NFR-03 checkpoint.rollback: unmeasured ms [required]
+not_measured V4-NFR-04 fallback.dispatch: unmeasured ns [required]
+not_measured V4-NFR-05 certificate.check: unmeasured µs [required]
+not_measured V4-NFR-06 unikernel.boot: unmeasured ms/MB [required]
+not_measured V4-NFR-07 state_lens.overhead: unmeasured % [required]
+not_measured V4-NFR-08 smt.cutoff: unmeasured ms [required]
+not_measured V4-NFR-09 projection.throughput: unmeasured lines/sec [required]
+not_measured V4-NFR-10 zk.verification: unmeasured ms [required]
+not_measured V4-NFR-12 multimodal.extraction: unmeasured ms [required]
+not_measured V4-NFR-13 mutation.safety: unmeasured agents [required]
+not_measured V4-NFR-14 graph.capacity: unmeasured nodes [required]
+not_measured V4-NFR-15 execution.determinism: unmeasured identity [required]
+not_measured V4-NFR-16 capability.containment: unmeasured probability [required]
+Evidence: /Users/rhenmcleod/Repositories/swarm-experiment/docs/implementation/v4/evidence/integration-414988e/benchmark/manifest.json
+17 required targets remain unsatisfied; mode=enforce.

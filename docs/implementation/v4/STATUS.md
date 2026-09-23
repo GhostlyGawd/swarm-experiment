@@ -6,6 +6,8 @@ Goal: implement the complete v4 specification, all 40 functional requirements an
 
 The user resumed the build after the pushed stopping point. **19 of 62 tracked tasks are verified** (baseline 13/13, v2 6/20); full v4 completion and the release performance gates remain open. The current branch has new local source/evidence commits, with Agent-IR v2, resumable ProcessHost integration and semantic GC work in progress.
 
+Clean integrated source `414988e` passed **581 tests**, build, typecheck and both roadmap checks. [Checkpoint evidence](evidence/integration-414988e/REVIEW.md) records the work-in-progress boundaries. Release benchmark enforcement still exits 1 with **17 required targets failed or unmeasured**.
+
 - **V4-T1-04 verified:** a clean exact-source MiniLM campaign at `e71627b` passes the structural/semantic index task gates. The [acceptance audit](evidence/index-e71627b/REVIEW.md) compares labeled recall against exact search, checks all 175 persisted embeddings against raw inference, verifies pinned model bytes, and measures index/backfill/update/query costs. Exact remains default: recall@3 is 93.75% versus 79.17% for explicit LSH. The separately measured default exact text-query median is 3.150 ms, maximum 14.684 ms; the distinct 100M-node/2 ms hash-retrieval release target remains unmeasured and unmet.
 - **V4-T1-09 verified after reopening:** a durable typed cognitive blackboard attaches claim, hypothesis, decision, delegation and evidence sidecars to an exact admitted AST node. A security review found that asynchronous host authorization/verifier callbacks could have been treated as truthy approvals; the code now requires literal `true` and checks creation authority before revealing AST subject state. The new [acceptance evidence](evidence/blackboard-4ee51cf/REVIEW.md) binds clean source `4ee51cf` and 549 passing tests. Restart discovery, signed-lineage invalidation, ACLs, bounded retention and stable executable hashes pass the declared gates. Host identity, creation authority, verifier and clock remain explicit trust boundaries. The older `870b438` evidence is superseded.
 - **V4-T3-01 still active:** the resumable backend now has a versioned ProcessHost checkpoint lease and a conservative single-unit scalar/reference heap bridge. Six bridge tests pass, including real worker restart, effect reconciliation and three controller SIGKILL boundaries; existing resumable tests pass. The private continuation preserves frames/tasks, while C1 workers receive the committed heap. Production leased correction/rewind, multi-unit frame transport and exact-source acceptance closure remain open; no performance claim is made.
@@ -76,8 +78,8 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 
 ## Current next actions
 
-1. Complete the ProcessHost ownership bridge and verify V4-T3-01 at an exact clean source commit.
-2. Complete native Agent-IR projections/parsers, target-language fixtures and corpus token accounting for V4-T1-02.
-3. Continue eligible v2/v3 tasks while preserving all later functional, performance and governance requirements.
+1. Extend the ProcessHost lease with authorized correction/rewind and replay debt, then audit multi-unit and unsupported value boundaries for V4-T3-01.
+2. Expand lossless native projections beyond the scalar profile and improve actual token density for V4-T1-02 and V4-Q03.
+3. Extend semantic GC to dead branches/general shims/adapter retirement; integrate v2 grants through production ProcessHost and effect sinks; continue the remaining dependency graph.
 
 Current classification: active implementation. Baseline, durable AST persistence, portable scalar certificates, strict signed lineage, Tree-CRDT, semantic retrieval and typed scratchpads are verified at their declared task boundaries. Full v4 remains open. No global blocker has been established.

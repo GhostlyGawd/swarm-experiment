@@ -1,0 +1,98 @@
+{
+  "format": "aether.v4-integration-checkpoint/1",
+  "subjectCommit": "414988e0438d79deb649cc8b0d91d7c9748b016e",
+  "specVersion": "0.1.0",
+  "workingTreeDirty": false,
+  "recordedAt": "2026-09-23T02:23:36.848238+00:00",
+  "checks": [
+    {
+      "command": "npm ci --ignore-scripts",
+      "exitCode": 0,
+      "artifact": "install.log"
+    },
+    {
+      "command": "npm test (includes build)",
+      "exitCode": 0,
+      "passedTests": 581,
+      "artifact": "tests.log"
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "artifact": "build.log"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "artifact": "typecheck.log"
+    },
+    {
+      "command": "npm run roadmap:check",
+      "exitCode": 0,
+      "artifact": "roadmap.log"
+    },
+    {
+      "command": "npm run roadmap:v4:check",
+      "exitCode": 0,
+      "artifact": "roadmap-v4.log"
+    },
+    {
+      "command": "npm run bench:v4:enforce -- --output <evidence>/benchmark",
+      "exitCode": 1,
+      "requiredTargetsUnsatisfied": 17,
+      "artifact": "benchmark-enforce.log"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "REVIEW.md",
+      "sha256": "f560c361b6c4089d2fd8e41466a98d9a49e14f81b73f7c0eb555b0fbd9c02ac9",
+      "bytes": 2373
+    },
+    {
+      "path": "install.log",
+      "sha256": "0a048fbb9d916021ca8755ece5555e8b42ef6bcdf7a6dfdb4e7d57dcedb347b3",
+      "bytes": 139
+    },
+    {
+      "path": "build.log",
+      "sha256": "8363fdc26e2d313e30ef5063fc39a96098798d351fa3e2f8de82828d0efdbbfe",
+      "bytes": 59
+    },
+    {
+      "path": "tests.log",
+      "sha256": "2df28b5fe0d7544760671d83a0b99ff054e6a5942380f62959a8a07679dcd715",
+      "bytes": 57923
+    },
+    {
+      "path": "typecheck.log",
+      "sha256": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a",
+      "bytes": 69
+    },
+    {
+      "path": "roadmap.log",
+      "sha256": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+      "bytes": 135
+    },
+    {
+      "path": "roadmap-v4.log",
+      "sha256": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+      "bytes": 182
+    },
+    {
+      "path": "benchmark-enforce.log",
+      "sha256": "8b8a7427e420cad668c4fc9452bf73c57ff96fb631d65ae13a07c9c3280a48e1",
+      "bytes": 2297
+    },
+    {
+      "path": "benchmark/manifest.json",
+      "sha256": "ccc0df9355a5e4610f778d97fc552594b65ea448e0586ee8c0fffccadcac626f",
+      "bytes": 13620
+    },
+    {
+      "path": "benchmark/samples.json",
+      "sha256": "fe1a77235e75fde3c72e7e7503c68a5f8ab3bc0203d11a612ab75d9f5adffdd2",
+      "bytes": 36724
+    }
+  ]
+}

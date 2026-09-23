@@ -1,0 +1,5 @@
+
+> @ghostlygawd/aether@0.1.0 roadmap:check
+> node --experimental-strip-types roadmap/render.ts --check
+
+docs/ROADMAP.md is up to date.
