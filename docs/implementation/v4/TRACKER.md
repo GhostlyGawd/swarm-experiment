@@ -23,7 +23,7 @@ Recommended order (closed under prerequisites). Order among independent items re
 
 The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
 
-**Ready now:** [V4-T3-10](#v4-t3-10).
+**Ready now:** none.
 
 ## Milestones
 
@@ -82,7 +82,7 @@ The four research tasks can produce decisions early; the baseline release gate a
 | [V4-T3-07](#v4-t3-07) | Three-level runtime fallback trees | runtime | v2 | in_progress | [V4-F04](#v4-f04), [V4-F06](#v4-f06), [V4-T3-01](#v4-t3-01) |
 | [V4-T3-08](#v4-t3-08) | Spatial-semantic UI runtime | language | v3 | planned | [V4-T1-02](#v4-t1-02), [V4-T2-01](#v4-t2-01) |
 | [V4-T3-09](#v4-t3-09) | Persona and accessibility evaluation | verification | v3 | planned | [V4-T3-08](#v4-t3-08), [V4-T3-03](#v4-t3-03) |
-| [V4-T3-10](#v4-t3-10) | Packed heap and native value ABI | compiler | v4 | planned | [V4-R02](#v4-r02), [V4-R04](#v4-r04), [V4-T3-01](#v4-t3-01) |
+| [V4-T3-10](#v4-t3-10) | Packed heap and native value ABI | compiler | v4 | in_progress | [V4-R02](#v4-r02), [V4-R04](#v4-r04), [V4-T3-01](#v4-t3-01) |
 | [V4-T3-11](#v4-t3-11) | Gradient-directed fuzzing | verification | v3 | planned | [V4-R04](#v4-r04), [V4-T3-03](#v4-t3-03) |
 | [V4-T3-12](#v4-t3-12) | Bayesian failure risk surfaces | measurement | v3 | planned | [V4-T1-03](#v4-t1-03), [V4-T3-03](#v4-t3-03), [V4-F08](#v4-f08) |
 | [V4-T4-01](#v4-t4-01) | Fluid production topology | distribution | v3 | planned | [V4-T2-04](#v4-t2-04), [V4-T2-07](#v4-t2-07), [V4-T2-06](#v4-t2-06), [V4-F07](#v4-f07) |
@@ -893,7 +893,7 @@ Evidence: not yet produced.
 
 ### V4-T3-10
 
-**Packed heap and native value ABI** · implementation · v4 · owner: compiler · **planned**
+**Packed heap and native value ABI** · implementation · v4 · owner: compiler · **in_progress**
 
 Prerequisites: [V4-R02](#v4-r02), [V4-R04](#v4-r04), [V4-T3-01](#v4-t3-01).
 

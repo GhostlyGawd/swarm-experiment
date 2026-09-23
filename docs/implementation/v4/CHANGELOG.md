@@ -4,6 +4,7 @@
 
 - The compiled C process bridge now reads and compares bounded UTF-8 dictionary strings from authenticated `/2` packed checkpoints. Its `/1` textual frame remains unchanged; `/2` adds checked dictionary offsets, UTF-8 validation, field bounds and exact differential output. A source-pinned campaign retains 256 string operations and 30 process round trips. It does not measure guest boot.
 - `ResumableRuntime.commitPackedCandidate` now validates exact source snapshot, layout and logical row identities, obtains candidate-specific trusted authorization, and publishes all changed fields in one reversible host event. Checkpoint replay checks the event's row identities and versions. A real C `/1` candidate passes this handoff and survives restore/rewind. Durable ProcessHost publication and full T3-10 remain open.
+- The preregistered Apple M4 Pro native locality comparison retained 61,440 mapped records and 378 raw trials across three link distributions and three access patterns. Allocation shrank 11.9–14.4%, but checked packed reads were 3.36–9.27× slower and a prevalidated fast reader was 1.40–3.11× slower than the pointer baseline. T3-10 is marked in progress; G2 and release performance remain open.
 
 ## V8 nested imports and packed string guest — 2026-09-23
 
