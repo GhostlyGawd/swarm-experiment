@@ -270,7 +270,10 @@ export class ProcessDeployment implements PromotionDriver {
   }
   registerArtifact(input: ProcessArtifactInput): Digest {
     if (this.closed) throw new Error('deployment is closed');
-    return processArtifactDigest(this.persistArtifact(makeArtifact(input)));
+    const artifact = makeArtifact(input), factory = this.options.factories.get(artifact.factoryId);
+    if (!factory) throw new Error('trusted artifact factory is unavailable');
+    this.assertServices(factory(artifact), decodeIR(artifact.ir));
+    return processArtifactDigest(this.persistArtifact(artifact));
   }
   artifact(manifest: Digest): ProcessArtifactV1 { return this.readArtifact(manifest); }
   private artifactPath(manifest: Digest): string { validateDigest(manifest, 'aether.execution/1'); return join(this.options.directory, 'artifacts', `${suffix(manifest)}.json`); }

@@ -197,7 +197,9 @@ test('fresh production deployment serves exact loader-admitted adapter bytes und
     policyEpoch: () => epochs.policyEpoch, revocationEpoch: () => epochs.epoch,
     isRevoked: (cap, path) => epochs.isRevoked(cap, path), authorizeIssue: () => true, authorizeDelegate: () => true });
   const keys = generateKeyPairSync('ed25519'), adapter = await admitAdapterSource(ARTIFACT_SINK_SOURCE, ARTIFACT_SINK_DESCRIPTOR);
+  let downgradeCandidate = false;
   const factories = new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => {
+    if (downgradeCandidate) return { ...hostFactory(f.directory, artifact, adapter), scopedGrants };
     const body: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: scopedGrants.repositoryId,
       astRoot: artifact.manifest.astRoot, policyEpoch: epochs.policyEpoch,
       rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR.id,
@@ -216,6 +218,10 @@ test('fresh production deployment serves exact loader-admitted adapter bytes und
       { operationId: 'artifact-approved', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) });
     assert.equal(result.state, 'completed'); assert.equal(globals.__deploymentArtifactCalls, 1);
     assert.deepEqual(await balances(deployment), ['90', '10']);
+    const candidate = f.context('v2'), evidence = mintLocalEvidence(candidate), candidatePath = join(f.options.directory, 'artifacts', `${executionManifestDigest(evidence.manifest).split(':').at(-1)}.json`);
+    downgradeCandidate = true;
+    assert.throws(() => deployment!.registerArtifact({ context: candidate, evidence, plan: f.plan(), factoryId: 'ledger-services/1' }), /signed deployment profile requires complete manifest-bound effect policy/);
+    assert.equal(existsSync(candidatePath), false, 'untrusted effect factory cannot persist a candidate artifact');
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); delete globals.__deploymentArtifactCalls; }
 });
 
