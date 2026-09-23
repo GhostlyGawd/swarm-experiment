@@ -55,6 +55,7 @@ import { EffectInvocationError, type RuntimeEffectRouter } from './effects.ts';
 import { validateVettedEvidence, type VettedEvidence } from '../fabric/evidence.ts';
 import type { ExecutionManifestV1 } from '../fabric/identity.ts';
 import { validateCheckedPortableCertificate, type CheckedPortableCertificate } from '../tier2/portable-proof-checker.ts';
+import { ResumableRuntime, type ResumableRuntimeOptions } from './resumable-runtime.ts';
 
 // ---------------------------------------------------------------------------
 // compiled representation
@@ -198,6 +199,11 @@ export class ProductionRuntime {
 
   private constructor(opts: CompileOptions) {
     this.opts = opts;
+  }
+
+  /** Compile explicit bytecode with instruction safe points and resumable frames. */
+  static compileResumable(module: Term, options: ResumableRuntimeOptions): ResumableRuntime {
+    return new ResumableRuntime(module, options);
   }
 
   /**

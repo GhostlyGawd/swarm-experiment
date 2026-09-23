@@ -1,0 +1,198 @@
+{
+  "format": "aether.retrieval-preregistration/1",
+  "createdAt": "2026-09-22T23:26:56.452Z",
+  "phase": "before-first-model-inference",
+  "corpusFile": "roadmap/v4/research/retrieval/corpus.ts",
+  "corpusSha256": "f9bdcbf8474c3ed494573cb171d08f22a01d2793b48bf160ea13ee1e5508d99a",
+  "corpusScope": "28 authored AST utility functions: 24 pure relevant functions and 4 effectful distractors; every reachable AST node embedded.",
+  "model": {
+    "name": "Xenova/all-MiniLM-L6-v2",
+    "revision": "751bff37182d3f1213fa05d7196b954e230abad9",
+    "dimensions": 384,
+    "pooling": "attention-mask mean",
+    "normalization": "l2",
+    "dtype": "fp32",
+    "maxTokens": 256,
+    "inference": "CPU ONNX Runtime, 1 intra-op and 1 inter-op thread",
+    "library": "@huggingface/transformers@4.3.0"
+  },
+  "algorithm": {
+    "format": "aether.cosine-lsh/1",
+    "seed": "aether-t104-lsh-campaign-v1",
+    "tables": 8,
+    "bits": 6,
+    "probes": 1
+  },
+  "queries": [
+    {
+      "text": "calculate a percentage transaction fee",
+      "relevant": [
+        "percentageFee"
+      ]
+    },
+    {
+      "text": "add a service charge to the purchase price",
+      "relevant": [
+        "addServiceFee"
+      ]
+    },
+    {
+      "text": "subtract a discount from the total price",
+      "relevant": [
+        "discountedTotal"
+      ]
+    },
+    {
+      "text": "how many rate limit tokens remain after a request",
+      "relevant": [
+        "remainingRequestTokens"
+      ]
+    },
+    {
+      "text": "replenish a token bucket according to elapsed time",
+      "relevant": [
+        "refillRequestTokens"
+      ]
+    },
+    {
+      "text": "check whether the request has enough available tokens",
+      "relevant": [
+        "allowedRequestCost"
+      ]
+    },
+    {
+      "text": "prevent a number from going below a lower bound",
+      "relevant": [
+        "clipToLowerBound",
+        "clampToRange"
+      ]
+    },
+    {
+      "text": "limit a number to a maximum upper bound",
+      "relevant": [
+        "clipToUpperBound",
+        "clampToRange"
+      ]
+    },
+    {
+      "text": "clamp an integer inside a minimum and maximum range",
+      "relevant": [
+        "clampToRange"
+      ]
+    },
+    {
+      "text": "convert seconds into milliseconds",
+      "relevant": [
+        "millisecondsFromSeconds"
+      ]
+    },
+    {
+      "text": "convert minutes into seconds",
+      "relevant": [
+        "secondsFromMinutes"
+      ]
+    },
+    {
+      "text": "convert days into hours",
+      "relevant": [
+        "hoursFromDays"
+      ]
+    },
+    {
+      "text": "make all letters in a string lowercase",
+      "relevant": [
+        "stringToLowercase"
+      ]
+    },
+    {
+      "text": "capitalize all letters in text",
+      "relevant": [
+        "stringToUppercase"
+      ]
+    },
+    {
+      "text": "remove surrounding whitespace from a string",
+      "relevant": [
+        "trimWhitespace"
+      ]
+    },
+    {
+      "text": "concatenate a string prefix and suffix",
+      "relevant": [
+        "joinStrings"
+      ]
+    },
+    {
+      "text": "test if text includes a substring",
+      "relevant": [
+        "textContains"
+      ]
+    },
+    {
+      "text": "count characters in text",
+      "relevant": [
+        "textLength"
+      ]
+    },
+    {
+      "text": "count the number of items in a list",
+      "relevant": [
+        "sequenceItemCount"
+      ]
+    },
+    {
+      "text": "retrieve the first element of a sequence",
+      "relevant": [
+        "firstSequenceItem"
+      ]
+    },
+    {
+      "text": "sum two integer numbers",
+      "relevant": [
+        "sumTwoIntegers"
+      ]
+    },
+    {
+      "text": "convert a temperature from Celsius to Fahrenheit",
+      "relevant": [
+        "celsiusToFahrenheit"
+      ]
+    },
+    {
+      "text": "multiply a number by itself",
+      "relevant": [
+        "squareInteger"
+      ]
+    },
+    {
+      "text": "find the absolute magnitude of a signed integer",
+      "relevant": [
+        "absoluteInteger"
+      ]
+    }
+  ],
+  "k": 3,
+  "repetitionsPerTextQuery": 3,
+  "filter": {
+    "kinds": [
+      "FunctionDecl"
+    ],
+    "declaredPurity": "pure"
+  },
+  "metrics": [
+    "labeled recall@3 and reciprocal rank for exact and LSH",
+    "LSH overlap recall against exact top3",
+    "typed-filter violations",
+    "candidate/scored counts",
+    "raw warm vector-ready query wall times",
+    "raw full text-query wall times including fresh model inference",
+    "first model initialization and first query retained",
+    "backfill/update wall time and embedded/reused inputs",
+    "cold index open time",
+    "actual index/CAS/model file bytes",
+    "process RSS and host load diagnostics",
+    "cosine>=0.85 hit counts (example threshold, not quality calibration)"
+  ],
+  "updates": "Rename addServiceFee in symbol context, preserve its executable FunctionDecl hash, rebuild complete scope and reject prior snapshot/input IDs.",
+  "evaluation": "Descriptive bounded evidence, no invented recall pass threshold; retain misses, first samples and all raw outputs. No 100M-node or 2ms production qualification. Labels and query text remain frozen; no training/tuning on evaluation outputs."
+}

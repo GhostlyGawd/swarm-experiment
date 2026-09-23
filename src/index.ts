@@ -17,6 +17,8 @@ export { DurableTreeWorkspace, type TreeWorkspaceOptions, type TreePlacement, ty
 export { allocateFractionalPosition, compareFractionalPositions, parseFractionalPosition } from './tier1/fractional-position.ts';
 export { projectOccurrences, occurrenceIdForInsert, type OccurrenceNode, type OccurrenceProjection, type TreeDiagnostic } from './tier1/occurrence-tree.ts';
 export { materializeOccurrences, type TreeMaterialization, type MaterializationDiagnostic } from './tier1/tree-materialization.ts';
+export { HybridGraphIndex, embeddingModelDigest, canonicalVector, decodeVector, type HybridIndexOptions, type HybridQuery, type HybridQueryResult, type EmbeddingModelProfile, type EmbeddingProvider, type QueryEmbedding, type CanonicalVector, type StructuralFilter } from './tier1/semantic-index.ts';
+export { embeddingInputs, type IndexScope, type EmbeddingInput, type StructuralEdge } from './tier1/embedding-input.ts';
 export { AetherRepository, type CommitOptions, type CommitRecord, type FsckIssue, type GarbageCollectionResult, type Packfile } from './tier1/repository.ts';
 export { ModuleResolver, type ResolvedModule } from './tier1/modules.ts';
 export { merge3, type MergeConflict, type MergeResult } from './tier1/merge.ts';
@@ -39,6 +41,10 @@ export { dischargeProof, formatReport, verifyFunction, type Obligation, type Ver
 export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec, type SpecRule } from './tier2/spec.ts';
 
 // --- Tier 3: execution and simulation ---------------------------------------
+export { ResumableRuntime, type ResumableRuntimeOptions, type ResumableRunResult, type ResumableRef, type ResumableEffects } from './tier3/resumable-runtime.ts';
+export { ResumableCheckpointStore, type ResumableCheckpointOptions, type CheckpointHead, type CheckpointPersistenceFault } from './tier3/resumable-checkpoint.ts';
+export { compileResumableProgram, type ResumableProgram, type ResumableCode } from './tier3/resumable-program.ts';
+export { checkpointDigest, type ResumableSnapshot, type MachineCore, type MachineEvent, type MachineValue } from './tier3/resumable-state.ts';
 export { AetherFault, Runtime, type Checkpoint, type ExecutionResult, type Fault, type FaultKind, type TraceEvent } from './tier3/runtime.ts';
 export { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type ClosureValue, type Ref, type ResultValue, type SeqValue, type TaskValue, type Value } from './tier3/values.ts';
 export { ProductionRuntime, formatCompilation, type ClauseDecision, type CompilationReport, type CompileOptions, type ElisionPolicy, type ProductionSampling, type TelemetrySample } from './tier3/compile.ts';

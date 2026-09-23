@@ -1,0 +1,1 @@
+{"format":"aether.ast-object/1","node":["object",[["args",["array",[["string","ast:b3:5686bb2bf2bc762de207634db3f0e274be6768311d1a967205232a870e33e624"]]]],["kind",["string","StringOp"]],["op",["string","trim"]]]]}

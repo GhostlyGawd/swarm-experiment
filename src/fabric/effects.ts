@@ -24,6 +24,15 @@ export type EffectOutcome =
   | { readonly state: 'committed'; readonly receiptDigest: Digest; readonly value: TaggedValueV1 }
   | { readonly state: 'rejected' | 'aborted'; readonly code: string }
   | { readonly state: 'indeterminate'; readonly recoveryId: string };
+export interface EffectIsolatedState { readonly prefix: readonly EffectReplayPrefixEntry[]; readonly bufferedIntents: readonly EffectRequestV1[] }
+export interface EffectReplayPrefixEntry { readonly requestDigest: Digest; readonly outcomeDigest: Digest }
+export function effectReplayOutcomeDigest(outcome: EffectOutcome): Digest {
+  if (outcome.state === 'committed') { exactObject(outcome, ['state', 'receiptDigest', 'value']); validateDigest(outcome.receiptDigest); validateTaggedValue(outcome.value); }
+  else if (outcome.state === 'rejected' || outcome.state === 'aborted') { exactObject(outcome, ['state', 'code']); identifier(outcome.code); }
+  else if (outcome.state === 'indeterminate') { exactObject(outcome, ['state', 'recoveryId']); identifier(outcome.recoveryId); }
+  else throw new TypeError('invalid replay outcome');
+  return domainDigest('aether.effect-replay-outcome/1', outcome);
+}
 export interface EffectAdapter {
   readonly id: string;
   readonly semantics: {
@@ -144,6 +153,7 @@ export class DurableEffectBroker {
   private cursor = 0;
   private readonly trace: readonly EffectEventV1[];
   private readonly buffered: EffectRequestV1[] = [];
+  private readonly bufferedHistory = new Map<string, Digest>();
   get executionMode(): ExecutionMode { return this.mode; }
   constructor(options: EffectBrokerOptions) {
     identifier(options.clockDomain);
@@ -262,6 +272,50 @@ export class DurableEffectBroker {
     if (!event || event.requestDigest !== effectRequestDigest(request, this.limits) || event.adapterId !== adapter.id || event.adapterSemanticsDigest !== adapterDigest(adapter) || event.outcome === null || event.outcome.state === 'indeterminate') throw new Error('replay_mismatch');
     this.cursor++; return immutable(copy(event.outcome, this.limits));
   }
+  /** Restore only an isolated immutable trace cursor. No live adapter, grant,
+   * reservation or reconciliation callback is evaluated. Validate the complete
+   * ordered prefix before publishing the new cursor, including backwards moves. */
+  private validateReplayPrefix(prefix: readonly EffectReplayPrefixEntry[]): void {
+    if (this.mode === 'live') throw new TypeError('live broker cannot restore a replay cursor');
+    if (!Array.isArray(prefix) || prefix.length > this.trace.length || prefix.length > this.limits.maxObjects) throw new RangeError('replay prefix size mismatch');
+    encodeCanonical(prefix, this.limits);
+    const seen = new Set<string>();
+    for (let index = 0; index < prefix.length; index++) {
+      const entry = exactObject(prefix[index], ['requestDigest', 'outcomeDigest']);
+      validateDigest(entry.requestDigest, 'aether.effect/1'); validateDigest(entry.outcomeDigest, 'aether.effect-replay-outcome/1');
+      if (seen.has(entry.requestDigest)) throw new TypeError('duplicate replay prefix event'); seen.add(entry.requestDigest);
+      const event = this.trace[index];
+      if (event.requestDigest !== entry.requestDigest || event.outcome === null || event.outcome.state === 'indeterminate' || effectReplayOutcomeDigest(event.outcome) !== entry.outcomeDigest) throw new TypeError('replay prefix request/outcome mismatch');
+    }
+  }
+  restoreReplayPrefix(prefix: readonly EffectReplayPrefixEntry[]): void { this.validateReplayPrefix(prefix); this.cursor = prefix.length; }
+  /** Restores isolated branch drafts, never live-dispatch authority. Historical
+   * ID/payload bindings remain reserved even when an earlier active buffer is
+   * restored. Validation is complete before either cursor or buffer changes. */
+  restoreIsolatedState(value: EffectIsolatedState): void {
+    if (this.mode === 'live') throw new TypeError('live broker cannot restore isolated state');
+    exactObject(value, ['prefix', 'bufferedIntents']); this.validateReplayPrefix(value.prefix);
+    if (!Array.isArray(value.bufferedIntents) || value.bufferedIntents.length > this.limits.maxObjects || value.bufferedIntents.length && (this.mode === 'replay' || value.prefix.length !== this.trace.length)) throw new TypeError('invalid isolated buffer position or size');
+    encodeCanonical(value, this.limits);
+    const seen = new Set<string>(), additions = new Map<string, Digest>();
+    let context: string | null = null;
+    for (const request of value.bufferedIntents) {
+      validateEffectRequest(request, this.limits); if (request.branchId === null) throw new TypeError('isolated buffer requires branch context');
+      const scope = JSON.stringify([request.executionId, request.executionManifest, request.branchId]); if (context !== null && context !== scope) throw new TypeError('mixed isolated buffer context'); context = scope;
+      const key = this.key(request), digest = effectRequestDigest(request, this.limits);
+      if (seen.has(key)) throw new TypeError('duplicate isolated buffer identity'); seen.add(key);
+      if (this.bufferedHistory.has(key) && this.bufferedHistory.get(key) !== digest) throw new TypeError('isolated buffer historical identity conflict'); additions.set(key, digest);
+      if (this.trace.some(event => this.key(event.request) === key)) throw new TypeError('buffered intent duplicates a recorded event');
+    }
+    const requestedKnown = value.bufferedIntents.map(request => this.key(request)).filter(key => this.bufferedHistory.has(key));
+    const historicalKnown = [...this.bufferedHistory.keys()].filter(key => seen.has(key));
+    if (JSON.stringify(requestedKnown) !== JSON.stringify(historicalKnown)) throw new TypeError('reordered isolated intent history');
+    if (context !== null && this.trace.length && this.trace.some(event => JSON.stringify([event.request.executionId, event.request.executionManifest, event.request.branchId]) !== context)) throw new TypeError('isolated buffer/trace context mismatch');
+    if (this.bufferedHistory.size + [...additions.keys()].filter(key => !this.bufferedHistory.has(key)).length > this.limits.maxObjects) throw new RangeError('isolated intent history limit');
+    const restored = immutable(copy(value.bufferedIntents, this.limits));
+    this.cursor = value.prefix.length; this.buffered.splice(0, this.buffered.length, ...restored); for (const [key, digest] of additions) this.bufferedHistory.set(key, digest);
+  }
+  get recordedEventCount(): number { return this.trace.length; }
   get replayRemaining(): number { return this.trace.length - this.cursor; }
   assertReplayComplete(): void { if (this.replayRemaining !== 0) throw new Error('replay_mismatch: unconsumed events'); }
   intents(): readonly EffectRequestV1[] { return immutable(copy(this.buffered, this.limits)); }
@@ -275,8 +329,12 @@ export class DurableEffectBroker {
       // Inputs are consumed from an isolated recorded snapshot; no adapter is invoked.
       if (this.trace[this.cursor]) return this.replay(request, adapter);
       if (request.branchId === null) return { state: 'rejected', code: 'isolated_branch_required' };
-      if (this.buffered.some(r => this.key(r) === this.key(request) && effectRequestDigest(r, this.limits) !== effectRequestDigest(request, this.limits))) throw new Error('effect_identity_conflict');
-      if (!this.buffered.some(r => this.key(r) === this.key(request))) this.buffered.push(request);
+      const key = this.key(request), digest = effectRequestDigest(request, this.limits);
+      if (this.bufferedHistory.has(key) && this.bufferedHistory.get(key) !== digest) throw new Error('effect_identity_conflict');
+      if (!this.bufferedHistory.has(key) && this.bufferedHistory.size >= this.limits.maxObjects) throw new RangeError('isolated intent history limit');
+      if (!this.buffered.some(r => this.key(r) === key)) encodeCanonical([...this.buffered, request], this.limits);
+      this.bufferedHistory.set(key, digest);
+      if (!this.buffered.some(r => this.key(r) === key)) this.buffered.push(request);
       return { state: 'rejected', code: 'isolated_intent_buffered' };
     }
     const semanticsDigest = adapterDigest(adapter);

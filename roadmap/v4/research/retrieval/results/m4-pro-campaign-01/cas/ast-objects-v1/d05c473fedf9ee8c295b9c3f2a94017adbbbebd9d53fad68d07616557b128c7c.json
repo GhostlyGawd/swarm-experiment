@@ -1,0 +1,1 @@
+{"format":"aether.ast-object/1","node":["object",[["kind",["string","Bin"]],["left",["string","ast:b3:225a84f73f4e1b2c246b693c796e3a0c20257a2d98d1da82ff73eca0f73a166f"]],["op",["string","sub"]],["right",["string","ast:b3:8098842ecffbc8826ffba47eb0c688ec3794b72bcdaa069593a22e4e1102fe39"]]]]}

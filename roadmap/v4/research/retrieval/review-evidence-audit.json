@@ -1,0 +1,13 @@
+{
+  "format": "aether.retrieval-evidence-audit/1",
+  "passed": true,
+  "auditorSha256": "19ff0d0abd2c7e0d4d38ae676ec87b4c779aa05dfed430d7fbc227300ac223f9",
+  "scoredQueries": 72,
+  "embeddingBatches": 157,
+  "maximumRepeatedInputComponentDrift": 1.341104507446289e-7,
+  "modelArtifactBytesChecked": 91100283,
+  "sourceSnapshotsChecked": 8,
+  "persistedInferenceLinksChecked": 175,
+  "exactRecallAt3": 0.9375,
+  "approximateRecallAt3": 0.7916666666666666
+}

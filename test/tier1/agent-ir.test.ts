@@ -9,6 +9,8 @@ import * as b from '../../src/tier1/build.ts';
 import { typeName } from '../../src/tier1/ids.ts';
 import type { Term } from '../../src/tier1/ast.ts';
 import { walk } from '../../src/tier1/ast.ts';
+import { encodeAgentIrBinary, decodeAgentIrBinary, encodeAgentIrModel, decodeAgentIrModel } from '../../src/tier1/agent-ir-v2.ts';
+import { GraphStore } from '../../src/tier1/store.ts';
 
 test('every node kind survives an Agent-IR round trip', () => {
   const syms = new SymbolSpace('ir-kinds');
@@ -89,6 +91,9 @@ test('every node kind survives an Agent-IR round trip', () => {
 
   const ir = encode(term);
   assert.deepEqual(decode(ir.text), term);
+  const store = new GraphStore();
+  assert.equal(store.intern(decodeAgentIrBinary(encodeAgentIrBinary(term))), store.intern(term));
+  assert.equal(store.intern(decodeAgentIrModel(encodeAgentIrModel(term))), store.intern(term));
 
   // The fixture is meant to be exhaustive; fail loudly if a kind is missing.
   const covered = new Set([...walk(term)].map((n) => n.kind));

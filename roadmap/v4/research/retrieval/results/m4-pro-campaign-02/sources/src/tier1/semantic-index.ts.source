@@ -1,0 +1,280 @@
+/** Native bounded hybrid index: durable embedding sidecars, typed AST predicates,
+ * deterministic random-hyperplane candidates and exact cosine reranking. */
+import { createHash, randomUUID } from 'node:crypto';
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { types as nodeTypes } from 'node:util';
+import { dirname, join } from 'node:path';
+import { domainDigest, metadataSidecar, validateDigest, type Digest, type MetadataSidecarV1 } from '../fabric/identity.ts';
+import { decodeCanonical, encodeCanonical, exactObject, identifier } from '../fabric/encoding.ts';
+import { JournalLock } from '../fabric/journal-lock.ts';
+import { atomicWrite } from './persistence.ts';
+import type { NodeRef } from './ids.ts';
+import { LINK_SCHEMA, type NodeKind, type Purity, type Term, type Ty } from './ast.ts';
+import { DurableGraphStore } from './durable-store.ts';
+import { EMBEDDING_INPUT_VERSION, embeddingInputs, scopeDigest, typeDigest, type EmbeddingInput, type IndexScope } from './embedding-input.ts';
+
+export interface EmbeddingModelProfile {
+  readonly format: 'aether.embedding-model/1'; readonly name: string; readonly revision: string;
+  readonly artifactDigest: Digest; readonly tokenizerDigest: Digest; readonly dimensions: number;
+  readonly pooling: 'mean'; readonly normalization: 'l2'; readonly dtype: 'fp32' | 'q8'; readonly maxTokens: number;
+  readonly runtime: { readonly name: string; readonly version: string };
+}
+export interface EmbeddingProvider {
+  readonly modelDigest: Digest;
+  /** One vector per input in order. Implementations must use the pinned profile;
+   * this boundary validates shape/identity, not remote model attestation. */
+  embed(texts: readonly string[]): Promise<readonly (readonly number[])[]>;
+}
+export interface CanonicalVector { readonly format: 'aether.float32-vector/1'; readonly dimensions: number; readonly bytes: string }
+export interface QueryEmbedding { readonly format: 'aether.query-embedding/1'; readonly modelDigest: Digest; readonly inputDigest: Digest; readonly vector: CanonicalVector }
+export interface StructuralFilter {
+  readonly kinds?: readonly NodeKind[]; readonly declaredPurity?: Purity; readonly returnType?: Ty;
+  readonly declaredType?: Ty; readonly typeName?: string; readonly typeDependency?: NodeRef;
+  readonly capabilitiesAll?: readonly string[]; readonly scopeDigest?: Digest;
+  readonly parent?: { readonly node?: NodeRef; readonly kind?: NodeKind; readonly field?: string };
+  readonly child?: { readonly node?: NodeRef; readonly kind?: NodeKind; readonly field?: string };
+}
+export interface LshProfile { readonly format: 'aether.cosine-lsh/1'; readonly seed: string; readonly tables: number; readonly bits: number }
+export interface HybridIndexOptions {
+  readonly directory: string; readonly store: DurableGraphStore; readonly model: EmbeddingModelProfile;
+  readonly lsh?: LshProfile; readonly maxEntries?: number; readonly maxGenerationBytes?: number;
+  readonly fault?: (phase: 'after-embeddings' | 'before-generation-commit' | 'after-generation-commit') => void;
+}
+interface IndexRecord { readonly input: EmbeddingInput; readonly vector: CanonicalVector; readonly sidecar: MetadataSidecarV1; readonly sidecarDigest: Digest }
+interface Generation {
+  format: 'aether.hybrid-generation/1'; configuration: Digest; generation: number; scopes: IndexScope[]; records: IndexRecord[];
+}
+interface Head { format: 'aether.hybrid-head/1'; configuration: Digest; generation: number; digest: Digest }
+interface Cached { headText: string; head: Head; state: Generation; vectors: Map<Digest, Float32Array>; buckets: Array<Map<string, Digest[]>>; byId: Map<Digest, IndexRecord>; byScopeNode: Map<string, IndexRecord> }
+export interface HybridQuery {
+  readonly snapshot: Digest; readonly embedding: QueryEmbedding; readonly filter?: StructuralFilter;
+  readonly k: number; readonly minimumCosine?: number; readonly mode?: 'exact' | 'lsh'; readonly probes?: 0 | 1;
+  readonly expectedInput?: { readonly entryId: Digest; readonly inputDigest: Digest };
+}
+export interface HybridQueryResult {
+  readonly snapshot: Digest; readonly generation: number; readonly mode: 'exact' | 'lsh';
+  readonly structuralMatches: number; readonly candidates: number; readonly scored: number;
+  readonly hits: ReadonlyArray<{ readonly entryId: Digest; readonly subject: NodeRef; readonly scopeDigest: Digest; readonly inputDigest: Digest; readonly cosine: number }>;
+}
+const limits = (bytes: number) => ({ maxFrameBytes: bytes, maxDecompressedBytes: bytes, maxObjects: 2_000_000 });
+const clone = <T>(value: T, bytes = 128 * 1024 * 1024): T => decodeCanonical(encodeCanonical(value, limits(bytes)), limits(bytes)) as T;
+function cloneQuery<T extends { readonly minimumCosine?: number }>(request: T): T {
+  if (nodeTypes.isProxy(request)) throw new TypeError('proxy query');
+  exactObject(request, Object.getOwnPropertyNames(request));
+  if (!Object.hasOwn(request, 'minimumCosine')) return clone(request);
+  const threshold = request.minimumCosine;
+  if (typeof threshold !== 'number' || !Number.isFinite(threshold) || threshold < -1 || threshold > 1) throw new Error('invalid cosine threshold');
+  const bytes = Buffer.alloc(8); bytes.writeDoubleLE(threshold || 0);
+  const detached = clone({ ...request, minimumCosine: bytes.toString('hex') });
+  return { ...detached, minimumCosine: Buffer.from(detached.minimumCosine, 'hex').readDoubleLE() } as T;
+}
+function durableDirectory(path: string): void {
+  if (existsSync(path)) return; const parent = dirname(path); if (parent !== path) durableDirectory(parent);
+  try { mkdirSync(path); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
+  for (const dir of [parent, path]) { const fd = openSync(dir, 'r'); try { fsyncSync(fd); } finally { closeSync(fd); } }
+}
+function write(path: string, bytes: Uint8Array): void { atomicWrite(path, Buffer.from(bytes).toString('utf8')); const fd = openSync(dirname(path), 'r'); try { fsyncSync(fd); } finally { closeSync(fd); } }
+export function embeddingModelDigest(model: EmbeddingModelProfile): Digest {
+  encodeCanonical(model); exactObject(model, ['format', 'name', 'revision', 'artifactDigest', 'tokenizerDigest', 'dimensions', 'pooling', 'normalization', 'dtype', 'maxTokens', 'runtime']);
+  exactObject(model.runtime, ['name', 'version']); identifier(model.name); identifier(model.runtime.name); identifier(model.runtime.version);
+  if (model.format !== 'aether.embedding-model/1' || !/^[a-f0-9]{40}$/.test(model.revision) || model.pooling !== 'mean' || model.normalization !== 'l2' || !['fp32', 'q8'].includes(model.dtype)) throw new Error('unsupported embedding model profile');
+  if (!Number.isSafeInteger(model.dimensions) || model.dimensions < 1 || model.dimensions > 4096 || !Number.isSafeInteger(model.maxTokens) || model.maxTokens < 1 || model.maxTokens > 32768) throw new RangeError('embedding model shape limit');
+  validateDigest(model.artifactDigest); validateDigest(model.tokenizerDigest); return domainDigest('aether.embedding-model/1', model);
+}
+/** Canonical little-endian finite float32, normalized before serialization. */
+export function canonicalVector(values: readonly number[], dimensions = values.length): CanonicalVector {
+  if (!Array.isArray(values) || values.length !== dimensions || !Number.isInteger(dimensions) || dimensions < 1 || dimensions > 4096 || values.some(value => typeof value !== 'number' || !Number.isFinite(value))) throw new Error('invalid embedding vector');
+  const norm = Math.hypot(...values); if (!Number.isFinite(norm) || norm === 0) throw new Error('zero or unbounded embedding norm');
+  const bytes = Buffer.alloc(dimensions * 4); values.forEach((value, index) => bytes.writeFloatLE(Math.fround(value / norm) || 0, index * 4));
+  return { format: 'aether.float32-vector/1', dimensions, bytes: bytes.toString('base64') };
+}
+export function decodeVector(vector: CanonicalVector, dimensions: number): Float32Array {
+  exactObject(vector, ['format', 'dimensions', 'bytes']);
+  if (vector.format !== 'aether.float32-vector/1' || vector.dimensions !== dimensions || typeof vector.bytes !== 'string') throw new Error('stale or malformed vector dimensions');
+  const bytes = Buffer.from(vector.bytes, 'base64'); if (bytes.length !== dimensions * 4 || bytes.toString('base64') !== vector.bytes) throw new Error('noncanonical vector encoding');
+  const values = new Float32Array(dimensions); for (let i = 0; i < dimensions; i++) { values[i] = bytes.readFloatLE(i * 4); if (!Number.isFinite(values[i]) || Object.is(values[i], -0)) throw new Error('nonfinite/noncanonical vector'); }
+  const norm = Math.hypot(...values); if (Math.abs(norm - 1) > 0.00001) throw new Error('embedding is not normalized'); return values;
+}
+function cosine(a: Float32Array, b: Float32Array): number { let dot = 0, an = 0, bn = 0; for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; an += a[i] ** 2; bn += b[i] ** 2; } return Math.max(-1, Math.min(1, dot / Math.sqrt(an * bn))); }
+function payload(input: EmbeddingInput, model: Digest, vector: CanonicalVector) { return { format: 'aether.ast-embedding/1', modelDigest: model, inputDigest: input.inputDigest, contextDigest: input.contextDigest, vector }; }
+
+export class HybridGraphIndex {
+  readonly model: EmbeddingModelProfile; readonly modelDigest: Digest;
+  private readonly options: HybridIndexOptions; private readonly lsh: LshProfile; private readonly maxEntries: number; private readonly maxBytes: number;
+  private readonly configuration: Digest; private readonly lock: JournalLock; private readonly lease: string; private readonly planes: Float64Array[][];
+  private cache: Cached | null = null;
+  constructor(options: HybridIndexOptions) {
+    this.options = { ...options }; this.model = clone(options.model); Object.freeze(this.model.runtime); Object.freeze(this.model); this.modelDigest = embeddingModelDigest(this.model);
+    this.lsh = clone(options.lsh ?? { format: 'aether.cosine-lsh/1', seed: 'aether-lsh-v1', tables: 8, bits: 6 });
+    exactObject(this.lsh, ['format', 'seed', 'tables', 'bits']); identifier(this.lsh.seed);
+    if (this.lsh.format !== 'aether.cosine-lsh/1' || !Number.isInteger(this.lsh.tables) || this.lsh.tables < 1 || this.lsh.tables > 32 || !Number.isInteger(this.lsh.bits) || this.lsh.bits < 1 || this.lsh.bits > 16) throw new RangeError('LSH profile limit');
+    this.maxEntries = options.maxEntries ?? 10000; this.maxBytes = options.maxGenerationBytes ?? 128 * 1024 * 1024;
+    if (!Number.isSafeInteger(this.maxEntries) || this.maxEntries < 1 || this.maxEntries > 100000 || !Number.isSafeInteger(this.maxBytes) || this.maxBytes < 1024 || this.maxBytes > 512 * 1024 * 1024) throw new RangeError('index resource profile');
+    this.configuration = domainDigest('aether.hybrid-index-config/1', { model: this.model, inputVersion: EMBEDDING_INPUT_VERSION, lsh: this.lsh, maxEntries: this.maxEntries, maxGenerationBytes: this.maxBytes });
+    durableDirectory(options.directory); durableDirectory(join(options.directory, 'generations'));
+    this.lock = new JournalLock({ directory: join(options.directory, 'index-lock'), domain: 'aether.hybrid-index-lock', maxTickets: 100000 });
+    this.lease = this.lock.run(() => {
+      const profilePath = join(options.directory, 'profile.json');
+      if (!existsSync(profilePath)) {
+        if (existsSync(this.headPath()) || readdirSync(join(options.directory, 'generations')).length) throw new Error('missing initialized index profile');
+        write(profilePath, encodeCanonical({ format: 'aether.hybrid-index-profile/1', configuration: this.configuration, indexId: randomUUID() }));
+      }
+      const profile = exactObject(decodeCanonical(readFileSync(profilePath)), ['format', 'configuration', 'indexId']);
+      if (profile.format !== 'aether.hybrid-index-profile/1' || profile.configuration !== this.configuration) throw new Error('stale model/index profile; rebuild in a distinct profile directory'); identifier(profile.indexId);
+      if (!existsSync(this.headPath())) {
+        if (readdirSync(join(options.directory, 'generations')).length) throw new Error('missing initialized index head');
+        this.publish({ format: 'aether.hybrid-generation/1', configuration: this.configuration, generation: 0, scopes: [], records: [] });
+      }
+      return domainDigest('aether.hybrid-index-lease/1', { configuration: this.configuration, indexId: profile.indexId });
+    }, 5000);
+    this.planes = this.makePlanes(); this.load();
+  }
+  get snapshot(): Digest { return this.load().head.digest; }
+  get generation(): number { return this.load().head.generation; }
+  scopes(): readonly IndexScope[] { return clone(this.load().state.scopes); }
+  entries(): readonly EmbeddingInput[] { return clone(this.load().state.records.map(record => record.input)); }
+  vectorFor(entryId: Digest, expectedInputDigest: Digest): QueryEmbedding {
+    const record = this.load().byId.get(entryId); if (!record || record.input.inputDigest !== expectedInputDigest) throw new Error('stale or missing embedding input');
+    this.options.store.get(record.input.subject);
+    return clone({ format: 'aether.query-embedding/1', modelDigest: this.modelDigest, inputDigest: record.input.inputDigest, vector: record.vector });
+  }
+  async embedQuery(text: string, provider: EmbeddingProvider): Promise<QueryEmbedding> {
+    if (typeof text !== 'string' || !text.trim() || Buffer.byteLength(text) > 65536) throw new RangeError('query text limit');
+    this.checkProvider(provider); const values = await provider.embed([text]); this.checkProvider(provider);
+    if (values.length !== 1) throw new Error('embedding provider result cardinality');
+    return { format: 'aether.query-embedding/1', modelDigest: this.modelDigest, inputDigest: domainDigest('aether.query-input/1', { text }), vector: canonicalVector(values[0], this.model.dimensions) };
+  }
+  /** Compute all newly exposed inputs before atomically publishing a generation.
+   * Existing scopes are replaced by the explicit complete scope set. */
+  async backfill(scopes: readonly IndexScope[], provider: EmbeddingProvider, expectedSnapshot = this.snapshot): Promise<{ snapshot: Digest; generation: number; embedded: number; reused: number }> {
+    scopes = clone(scopes, this.maxBytes);
+    return this.lock.runAsync(async () => this.update(scopes, provider, expectedSnapshot), 5000);
+  }
+  async indexRoot(scope: IndexScope, provider: EmbeddingProvider, expectedSnapshot = this.snapshot) {
+    scope = clone(scope); return this.lock.runAsync(async () => {
+      const scopes = this.scopes(); if (scopes.some(existing => scopeDigest(existing) === scopeDigest(scope))) return this.update(scopes, provider, expectedSnapshot);
+      return this.update([...scopes, scope], provider, expectedSnapshot);
+    }, 5000);
+  }
+  /** Indexed creation preserves AST addresses. Inference failure leaves retained
+   * CAS input available for backfill and keeps the previous complete generation. */
+  async intern(term: Term, context: IndexScope['context'], provider: EmbeddingProvider, expectedSnapshot = this.snapshot) {
+    context = clone(context);
+    return this.lock.runAsync(async () => {
+      if (this.snapshot !== expectedSnapshot) throw new Error('stale index generation');
+      this.checkProvider(provider); const root = this.options.store.intern(term, { leaseId: this.lease });
+      const scope = { root, context }; const scopes = this.scopes().filter(existing => scopeDigest(existing) !== scopeDigest(scope));
+      return { root, ...await this.update([...scopes, scope], provider, expectedSnapshot) };
+    }, 5000);
+  }
+  async queryText(text: string, provider: EmbeddingProvider, options: Omit<HybridQuery, 'embedding'>): Promise<HybridQueryResult> {
+    const frozen = cloneQuery(options); const embedding = await this.embedQuery(text, provider); return this.query({ ...frozen, embedding });
+  }
+  query(request: HybridQuery): HybridQueryResult {
+    request = cloneQuery(request); this.validateQuery(request);
+    const current = this.load(); if (request.snapshot !== current.head.digest) throw new Error('stale index generation');
+    if (request.embedding.modelDigest !== this.modelDigest) throw new Error('stale embedding model');
+    if (request.expectedInput) { const found = current.byId.get(request.expectedInput.entryId); if (!found || found.input.inputDigest !== request.expectedInput.inputDigest) throw new Error('stale embedding input'); }
+    const vector = decodeVector(request.embedding.vector, this.model.dimensions), mode = request.mode ?? 'lsh';
+    const allowed = current.state.records.filter(record => this.matches(record.input, request.filter ?? {}, current));
+    const candidates = mode === 'exact' ? new Set(allowed.map(record => record.input.entryId)) : this.candidates(vector, current, request.probes ?? 1);
+    const selected = allowed.filter(record => candidates.has(record.input.entryId));
+    const hits = selected.map(record => {
+      this.options.store.get(record.input.subject);
+      return { entryId: record.input.entryId, subject: record.input.subject, scopeDigest: record.input.scopeDigest, inputDigest: record.input.inputDigest, cosine: cosine(vector, current.vectors.get(record.input.entryId)!) };
+    }).filter(hit => hit.cosine >= (request.minimumCosine ?? -1)).sort((a, b) => b.cosine - a.cosine || (a.entryId < b.entryId ? -1 : 1)).slice(0, request.k);
+    return { snapshot: current.head.digest, generation: current.head.generation, mode, structuralMatches: allowed.length, candidates: selected.length, scored: selected.length, hits };
+  }
+  private checkProvider(provider: EmbeddingProvider): void { if (provider.modelDigest !== this.modelDigest) throw new Error('stale embedding provider model'); }
+  private async update(scopes: readonly IndexScope[], provider: EmbeddingProvider, expectedSnapshot: Digest) {
+    this.checkProvider(provider); const previous = this.load(); if (previous.head.digest !== expectedSnapshot) throw new Error('stale index generation');
+    const ordered = [...scopes].sort((a, b) => scopeDigest(a).localeCompare(scopeDigest(b)));
+    this.options.store.retain(this.lease, ordered.map(scope => scope.root));
+    const inputs = embeddingInputs(this.options.store, ordered, this.maxEntries), records: IndexRecord[] = []; let embedded = 0, reused = 0;
+    for (let offset = 0; offset < inputs.length; offset += 32) {
+      const batch = inputs.slice(offset, offset + 32), missing = batch.filter(input => previous.byId.get(input.entryId)?.input.inputDigest !== input.inputDigest);
+      const vectors = missing.length ? await provider.embed(missing.map(input => input.text)) : [];
+      this.checkProvider(provider); if (vectors.length !== missing.length) throw new Error('embedding provider result cardinality');
+      const fresh = new Map(missing.map((input, i) => [input.entryId, canonicalVector(vectors[i], this.model.dimensions)]));
+      for (const input of batch) {
+        const vector = fresh.get(input.entryId) ?? previous.byId.get(input.entryId)!.vector;
+        const metadata = metadataSidecar(input.subject, 'embedding', 'aether.ast-embedding/1', payload(input, this.modelDigest, vector));
+        records.push({ input, vector, sidecar: metadata.sidecar, sidecarDigest: metadata.digest });
+        if (fresh.has(input.entryId)) embedded++; else reused++;
+      }
+    }
+    this.options.fault?.('after-embeddings');
+    if (this.load().head.digest !== expectedSnapshot) throw new Error('stale index generation after inference');
+    if (previous.head.generation >= Number.MAX_SAFE_INTEGER) throw new Error('index generation exhausted');
+    const state: Generation = { format: 'aether.hybrid-generation/1', configuration: this.configuration, generation: previous.head.generation + 1, scopes: ordered, records };
+    this.options.fault?.('before-generation-commit'); const head = this.publish(state); this.cache = null; this.options.fault?.('after-generation-commit');
+    return { snapshot: head.digest, generation: head.generation, embedded, reused };
+  }
+  private headPath(): string { return join(this.options.directory, 'head.json'); }
+  private generationPath(digest: Digest): string { validateDigest(digest, 'aether.hybrid-generation/1'); return join(this.options.directory, 'generations', `${digest.split(':').at(-1)}.json`); }
+  private publish(state: Generation): Head {
+    const bytes = encodeCanonical(state, limits(this.maxBytes)), digest = domainDigest('aether.hybrid-generation/1', state, limits(this.maxBytes));
+    const path = this.generationPath(digest); if (!existsSync(path)) write(path, bytes); else if (!readFileSync(path).equals(Buffer.from(bytes))) throw new Error('index generation artifact conflict');
+    const head: Head = { format: 'aether.hybrid-head/1', configuration: this.configuration, generation: state.generation, digest };
+    write(this.headPath(), encodeCanonical(head)); return head;
+  }
+  private load(): Cached {
+    const headText = readFileSync(this.headPath(), 'utf8'); if (this.cache?.headText === headText) return this.cache;
+    const head = decodeCanonical(Buffer.from(headText)) as unknown as Head; exactObject(head, ['format', 'configuration', 'generation', 'digest']);
+    if (head.format !== 'aether.hybrid-head/1' || head.configuration !== this.configuration || !Number.isSafeInteger(head.generation) || head.generation < 0) throw new Error('corrupt index head');
+    const path = this.generationPath(head.digest); if (statSync(path).size > this.maxBytes) throw new RangeError('index generation bytes');
+    const state = decodeCanonical(readFileSync(path), limits(this.maxBytes)) as unknown as Generation; exactObject(state, ['format', 'configuration', 'generation', 'scopes', 'records']);
+    if (state.format !== 'aether.hybrid-generation/1' || state.configuration !== this.configuration || state.generation !== head.generation || domainDigest('aether.hybrid-generation/1', state, limits(this.maxBytes)) !== head.digest || !Array.isArray(state.records) || state.records.length > this.maxEntries) throw new Error('corrupt index generation');
+    const expected = embeddingInputs(this.options.store, state.scopes, this.maxEntries);
+    if (expected.length !== state.records.length) throw new Error('incomplete embedding generation');
+    const vectors = new Map<Digest, Float32Array>(), byId = new Map<Digest, IndexRecord>(), byScopeNode = new Map<string, IndexRecord>();
+    state.records.forEach((record, index) => {
+      exactObject(record, ['input', 'vector', 'sidecar', 'sidecarDigest']);
+      if (!Buffer.from(encodeCanonical(record.input)).equals(Buffer.from(encodeCanonical(expected[index])))) throw new Error('stale embedding input or structural metadata');
+      const metadata = metadataSidecar(record.input.subject, 'embedding', 'aether.ast-embedding/1', payload(record.input, this.modelDigest, record.vector));
+      if (metadata.digest !== record.sidecarDigest || !Buffer.from(encodeCanonical(metadata.sidecar)).equals(Buffer.from(encodeCanonical(record.sidecar)))) throw new Error('stale or corrupt embedding sidecar');
+      vectors.set(record.input.entryId, decodeVector(record.vector, this.model.dimensions)); byId.set(record.input.entryId, record); byScopeNode.set(`${record.input.scopeDigest}|${record.input.subject}`, record);
+    });
+    const buckets = Array.from({ length: this.lsh.tables }, () => new Map<string, Digest[]>());
+    for (const record of state.records) this.signatures(vectors.get(record.input.entryId)!).forEach((signature, table) => { const group = buckets[table].get(signature) ?? []; group.push(record.input.entryId); buckets[table].set(signature, group); });
+    this.cache = { headText, head, state, vectors, buckets, byId, byScopeNode }; return this.cache;
+  }
+  private makePlanes(): Float64Array[][] {
+    return Array.from({ length: this.lsh.tables }, (_, table) => Array.from({ length: this.lsh.bits }, (_, bit) => {
+      const plane = new Float64Array(this.model.dimensions);
+      for (let offset = 0; offset < plane.length; offset += 8) { const bytes = createHash('sha256').update(`${this.lsh.seed}:${table}:${bit}:${offset}`).digest(); for (let i = 0; i < 8 && offset + i < plane.length; i += 2) { const u = (bytes.readUInt32LE(i * 4) + 0.5) / 4294967296, v = (bytes.readUInt32LE((i + 1) * 4) + 0.5) / 4294967296; const radius = Math.sqrt(-2 * Math.log(u)); plane[offset + i] = radius * Math.cos(2 * Math.PI * v); if (offset + i + 1 < plane.length) plane[offset + i + 1] = radius * Math.sin(2 * Math.PI * v); } }
+      return plane;
+    }));
+  }
+  private signatures(vector: Float32Array): string[] { return this.planes.map(table => table.map(plane => { let dot = 0; for (let i = 0; i < vector.length; i++) dot += plane[i] * vector[i]; return dot >= 0 ? '1' : '0'; }).join('')); }
+  private candidates(vector: Float32Array, state: Cached, probes: 0 | 1): Set<Digest> {
+    const result = new Set<Digest>(); this.signatures(vector).forEach((signature, table) => {
+      const keys = [signature]; if (probes) for (let i = 0; i < signature.length; i++) keys.push(signature.slice(0, i) + (signature[i] === '0' ? '1' : '0') + signature.slice(i + 1));
+      for (const key of keys) for (const id of state.buckets[table].get(key) ?? []) result.add(id);
+    }); return result;
+  }
+  private matches(input: EmbeddingInput, filter: StructuralFilter, state: Cached): boolean {
+    const s = input.structure;
+    if (filter.kinds && !filter.kinds.includes(s.kind) || filter.declaredPurity && filter.declaredPurity !== s.declaredPurity || filter.returnType && typeDigest(filter.returnType) !== s.declaredReturnType || filter.declaredType && !s.declaredTypes.includes(typeDigest(filter.declaredType)) || filter.typeName && !s.typeNames.includes(filter.typeName) || filter.typeDependency && !s.typeDependencies.includes(filter.typeDependency) || filter.scopeDigest && filter.scopeDigest !== input.scopeDigest || filter.capabilitiesAll?.some(capability => !s.capabilities.includes(capability))) return false;
+    const relation = (edge: NonNullable<StructuralFilter['parent']>, candidates: EmbeddingInput['structure']['parents']) => candidates.some(candidate => (!edge.node || candidate.node === edge.node) && (!edge.field || candidate.field === edge.field) && (!edge.kind || state.byScopeNode.get(`${input.scopeDigest}|${candidate.node}`)?.input.structure.kind === edge.kind));
+    return (!filter.parent || relation(filter.parent, s.parents)) && (!filter.child || relation(filter.child, s.children));
+  }
+  private validateQuery(request: HybridQuery): void {
+    const allowed = ['snapshot', 'embedding', 'filter', 'k', 'minimumCosine', 'mode', 'probes', 'expectedInput'];
+    if (Object.keys(request).some(key => !allowed.includes(key))) throw new Error('unknown hybrid query field');
+    validateDigest(request.snapshot, 'aether.hybrid-generation/1'); exactObject(request.embedding, ['format', 'modelDigest', 'inputDigest', 'vector']);
+    if (request.embedding.format !== 'aether.query-embedding/1') throw new Error('unsupported query embedding'); validateDigest(request.embedding.modelDigest); validateDigest(request.embedding.inputDigest);
+    if (!Number.isSafeInteger(request.k) || request.k < 1 || request.k > 1000 || request.minimumCosine !== undefined && (!Number.isFinite(request.minimumCosine) || request.minimumCosine < -1 || request.minimumCosine > 1) || request.mode !== undefined && !['exact', 'lsh'].includes(request.mode) || request.probes !== undefined && request.probes !== 0 && request.probes !== 1) throw new Error('invalid hybrid query bounds');
+    if (request.expectedInput) { exactObject(request.expectedInput, ['entryId', 'inputDigest']); validateDigest(request.expectedInput.entryId); validateDigest(request.expectedInput.inputDigest); }
+    if (Object.hasOwn(request, 'filter')) {
+      const filter = request.filter!; exactObject(filter, Object.getOwnPropertyNames(filter)); const keys = ['kinds', 'declaredPurity', 'returnType', 'declaredType', 'typeName', 'typeDependency', 'capabilitiesAll', 'scopeDigest', 'parent', 'child'];
+      if (Object.keys(filter).some(key => !keys.includes(key))) throw new Error('unknown structural filter');
+      if (Object.hasOwn(filter, 'kinds') && (!Array.isArray(filter.kinds) || filter.kinds.some(kind => !Object.hasOwn(LINK_SCHEMA, kind)))) throw new Error('invalid node kind filter');
+      if (Object.hasOwn(filter, 'declaredPurity') && !['pure', 'effectful'].includes(filter.declaredPurity!)) throw new Error('invalid purity filter');
+      if (Object.hasOwn(filter, 'returnType')) typeDigest(filter.returnType!); if (Object.hasOwn(filter, 'declaredType')) typeDigest(filter.declaredType!);
+      if (Object.hasOwn(filter, 'typeName')) identifier(filter.typeName); if (Object.hasOwn(filter, 'typeDependency')) validateDigest(filter.typeDependency, 'ast'); if (Object.hasOwn(filter, 'scopeDigest')) validateDigest(filter.scopeDigest, 'aether.index-scope/1');
+      if (Object.hasOwn(filter, 'capabilitiesAll')) { if (!Array.isArray(filter.capabilitiesAll)) throw new Error('invalid capability filter'); filter.capabilitiesAll.forEach(identifier); }
+      for (const key of ['parent', 'child'] as const) if (Object.hasOwn(filter, key)) { const edge = filter[key]!; exactObject(edge, Object.getOwnPropertyNames(edge)); if (!Object.keys(edge).length || Object.keys(edge).some(key => !['node', 'kind', 'field'].includes(key))) throw new Error('invalid structural relation'); if (Object.hasOwn(edge, 'node')) validateDigest(edge.node, 'ast'); if (Object.hasOwn(edge, 'field')) identifier(edge.field); if (Object.hasOwn(edge, 'kind') && !Object.hasOwn(LINK_SCHEMA, edge.kind!)) throw new Error('invalid related kind'); }
+    }
+  }
+}

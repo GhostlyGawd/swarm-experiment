@@ -2,6 +2,20 @@
 
 Goal: implement the complete v4 specification, all 40 functional requirements and all NFR/governance/KPI gates. Full completion remains unproven.
 
+## Requested stopping point — 2026-09-22
+
+The user requested a coherent stopping point with all work committed and pushed. All agents are frozen. Goal work is paused after final validation/publication.
+
+- Last verified integration before this checkpoint: 477 passing tests at `8020327`. Baseline M0, durable AST storage, portable scalar proofs, strict lineage and Tree-CRDT gates are verified.
+- Structural/vector index implementation and real MiniLM campaign are complete and independently reviewed; exact-source acceptance closure remains pending. Exact search is the default. Recorded recall@3 is 93.75% exact / 79.17% LSH; full text-query median 2.712 ms is not a 2 ms release pass.
+- Resumable backend, broker isolated-state restoration, production factory and public exports are implemented. Focused review fixes/tests pass; exact-source acceptance closure and the ProcessHost ownership-profile bridge remain pending.
+- Agent-IR v2 binary/model codec is preserved as isolated work in progress. Existing exhaustive round-trip assertions pass. Native TS/Rust/Python projection completion, malformed-wire campaigns, public codec integration and token accounting remain unfinished. No Rust implementation or dependencies were added.
+- Native approved-boundary clean campaign remains a bounded prototype pass: 1,000 fresh guests, maximum 159.542 µs, 65,536 bytes guest residency. Full native runtime/driver qualification remains open.
+- No full-v4 completion claim. Existing failed/unmeasured release targets remain visible.
+
+Final validation and the exact checkpoint commit are recorded in `evidence/stopping-point-2026-09-22/REVIEW.md`.
+
+
 Branch: `aether/v4-implementation`. Planning checkpoint: `9f23a7b`. First implementation checkpoint: `4a9b0776276251cf92ca647baa114c638a2559bf`.
 
 ## Current work
@@ -49,10 +63,10 @@ The next clean checkpoint, `3dce2d61686129cff45a76d256d3e2681c897fcc`, passed **
 - No 100M-node or 1,000-agent production result exists. No task is verified merely because related unit tests pass.
 - No external blocker has been established; substantial local work remains.
 
-## Next executable actions
+## Next actions when resumed
 
 1. Finish resumable-runtime review fixes and production factory integration, then verify exact source with real frame/task/effect restart cases.
 2. Independently review structural/vector retrieval and preserve actual MiniLM campaign evidence, including exact-versus-LSH quality and complete text-query cost.
 3. Continue remaining eligible v2 tasks and preserve all later functional, performance and governance requirements.
 
-Goal-turn classification: progress — the baseline, durable AST persistence, portable scalar certificates, strict signed lineage and Tree-CRDT are verified. Resumable execution and semantic retrieval are progressing; full v4 remains open. No global blocker has been established.
+Goal-turn classification: user-requested stopping point — the baseline, durable AST persistence, portable scalar certificates, strict signed lineage and Tree-CRDT are verified. Resumable execution and semantic retrieval are progressing; full v4 remains open. No global blocker has been established.

@@ -1,0 +1,1 @@
+{"format":"aether.ast-object/1","node":["object",[["cond",["string","ast:b3:25e40684968246654a663764cd2ef4edace7b3ee252f34bc945d09ea1edd97f0"]],["kind",["string","Cond"]],["otherwise",["string","ast:b3:e3e1abf48d7c0463199bd11d2cf586d1229a19540ca2db44616b42fab7946e12"]],["then",["string","ast:b3:0dcc99d714dab85ea07ba8c48e9d37c1822c732b87df9dccf9ce7885e1cbde6c"]]]]}

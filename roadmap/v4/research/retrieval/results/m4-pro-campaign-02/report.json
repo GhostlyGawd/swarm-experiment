@@ -1,0 +1,249 @@
+{
+  "format": "aether.retrieval-campaign-result/1",
+  "completedAt": "2026-09-22T23:36:20.133Z",
+  "scope": "Descriptive bounded evidence, no invented recall pass threshold; retain misses, first samples and all raw outputs. No 100M-node or 2ms production qualification. Labels and query text remain frozen; no training/tuning on evaluation outputs.",
+  "profile": {
+    "format": "aether.embedding-model/1",
+    "name": "Xenova/all-MiniLM-L6-v2",
+    "revision": "751bff37182d3f1213fa05d7196b954e230abad9",
+    "artifactDigest": "aether.embedding-artifact/1:b3:bcd3dab3cfc65e2eea4e155a7a2ff5439fa0c32099536a4925bd6c4cde48203e",
+    "tokenizerDigest": "aether.embedding-tokenizer/1:b3:df9b23609fd23468ca86118fb548854224a7fd534b8b63508dbaf4a0f9450ae1",
+    "dimensions": 384,
+    "pooling": "mean",
+    "normalization": "l2",
+    "dtype": "fp32",
+    "maxTokens": 256,
+    "runtime": {
+      "name": "@huggingface/transformers",
+      "version": "4.3.0"
+    }
+  },
+  "declarations": 28,
+  "indexedInputs": 175,
+  "labeledQueries": 24,
+  "repetitions": 3,
+  "inferenceCalls": 157,
+  "inferredInputs": 495,
+  "truncatedInputs": 4,
+  "initializeMs": 331.583959,
+  "coldOpenMs": 62.30775,
+  "backfill": {
+    "snapshot": "aether.hybrid-generation/1:b3:122d10e4249e74d566d919e1dae27659818cd24929b0ab9e5e50976c7d5ab04c",
+    "generation": 1,
+    "embedded": 175,
+    "reused": 0,
+    "elapsedMs": 1775.434209
+  },
+  "update": {
+    "snapshot": "aether.hybrid-generation/1:b3:b6b575be8b2220fd03492b8e455d64985d7ee6df3014d95952815932bd7d90c6",
+    "generation": 2,
+    "embedded": 175,
+    "reused": 0,
+    "elapsedMs": 1726.56475,
+    "staleRejected": true,
+    "staleInputRejected": true,
+    "originalExecutableRef": "ast:b3:a11827cf8dfc7c6c84a4f54b568d67118323927ba6b46b415a45df584a661eb5",
+    "oldScopeRoot": "ast:b3:081f3217073e217085925191d743c49aa3e4daee5763582b53fd5a263ff3afde",
+    "newScopeRoot": "ast:b3:f84c8db746a80958df53f95ddd0bc3a66967eefff46f636a32f91e5989ad473d"
+  },
+  "quality": {
+    "exactRecallAt3": 0.9375,
+    "annRecallAt3": 0.7916666666666666,
+    "exactMeanReciprocalRank": 0.7569444444444445,
+    "annMeanReciprocalRank": 0.6527777777777779,
+    "annRecallAgainstExactTop3": 0.75,
+    "filterViolations": 0,
+    "candidates": {
+      "count": 72,
+      "minimum": 0,
+      "median": 23,
+      "p95": 24,
+      "maximum": 24,
+      "mean": 15.916666666666666
+    },
+    "cosine085ResultCounts": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "timingsMs": {
+    "warmExactVectorReady": {
+      "count": 72,
+      "minimum": 1.10475,
+      "median": 1.207167,
+      "p95": 1.378792,
+      "maximum": 3.211708,
+      "mean": 1.265639486111111
+    },
+    "warmLshVectorReady": {
+      "count": 72,
+      "minimum": 0.078417,
+      "median": 0.997666,
+      "p95": 1.19325,
+      "maximum": 1.594417,
+      "mean": 0.7810289166666671
+    },
+    "fullTextQueryIncludingInference": {
+      "count": 72,
+      "minimum": 1.667459,
+      "median": 2.711708,
+      "p95": 3.293542,
+      "maximum": 3.729167,
+      "mean": 2.589592097222223
+    }
+  },
+  "storage": {
+    "indexBytes": 1319463,
+    "casBytes": 72429,
+    "downloadedModelBytes": 91100283,
+    "retainedHistoricalGenerations": 3,
+    "vectorPayloadBytesPerInput": 1536,
+    "indexFiles": [
+      {
+        "path": "index/generations/122d10e4249e74d566d919e1dae27659818cd24929b0ab9e5e50976c7d5ab04c.json",
+        "bytes": 658925,
+        "sha256": "8c7b3ab7837e00c7a68ed1a9eb19d35c9b37e57b90aa5046044ebed3cc345aff"
+      },
+      {
+        "path": "index/generations/5819ba525ff82bfe55b5df4f496f0f3de34e7b20d97db13b85a403e14a8a4f8e.json",
+        "bytes": 194,
+        "sha256": "333c06b6242a22d49f21233641f7c29eaf9fb60ae6e4c6960eee2f219f3c14b0"
+      },
+      {
+        "path": "index/generations/b6b575be8b2220fd03492b8e455d64985d7ee6df3014d95952815932bd7d90c6.json",
+        "bytes": 658969,
+        "sha256": "cd7d567851fb9bcbd95903c2f8e1ef5fb56fb336df4fdd4b7490e6a6937336b2"
+      },
+      {
+        "path": "index/head.json",
+        "bytes": 269,
+        "sha256": "a465c643db21414dd084be10fda91ba3263b6e500047bed6b3cd1e778856246e"
+      },
+      {
+        "path": "index/index-lock/released-000000000001.json",
+        "bytes": 107,
+        "sha256": "6ebb7e2c3656a05aa76262722c1467382e1a975956ee440c916e9c56b8a68add"
+      },
+      {
+        "path": "index/index-lock/released-000000000002.json",
+        "bytes": 107,
+        "sha256": "9eddd966b47862642c5fa9d0bca0eaed0944e212407f20b588ec2d5926e360e2"
+      },
+      {
+        "path": "index/index-lock/released-000000000003.json",
+        "bytes": 107,
+        "sha256": "bde21831d8442a451f8ea1b347d22446091fe4d892f74d41819d185fcf94b9d0"
+      },
+      {
+        "path": "index/index-lock/released-000000000004.json",
+        "bytes": 107,
+        "sha256": "664a7385d8803972ad2b02d21b12f9cf4b4831cfcf44f04fdd8e85cc94b7c20f"
+      },
+      {
+        "path": "index/index-lock/ticket-000000000001.json",
+        "bytes": 118,
+        "sha256": "294941340eef4e2061f15ab896db95525871a9451f823ec54671540564a53d63"
+      },
+      {
+        "path": "index/index-lock/ticket-000000000002.json",
+        "bytes": 118,
+        "sha256": "c8438a96156e0f41d6386ffe070fc1fdfa9b95cf44207a60be84f4bf0b0faf78"
+      },
+      {
+        "path": "index/index-lock/ticket-000000000003.json",
+        "bytes": 118,
+        "sha256": "89e94129098f92cd1b0ca641971cb49f19a50dde9f53f83a7dc313a8106cf86d"
+      },
+      {
+        "path": "index/index-lock/ticket-000000000004.json",
+        "bytes": 118,
+        "sha256": "636c8ce7751cea189da565cc5eb9f990fe6d422ea05dc91dfa3a1261e8540934"
+      },
+      {
+        "path": "index/profile.json",
+        "bytes": 206,
+        "sha256": "eec53b7992e0e05a5869e3cad16a003eb8d5caa2a31bacd9e64d588310e23d07"
+      }
+    ],
+    "casFileCount": 250
+  },
+  "process": {
+    "rss": 1119617024,
+    "load": [
+      4.00244140625,
+      4.3359375,
+      4.2646484375
+    ]
+  },
+  "sourceChangesDuringRun": []
+}

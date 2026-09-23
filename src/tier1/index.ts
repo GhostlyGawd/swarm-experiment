@@ -9,6 +9,8 @@ export { DurableTreeWorkspace, type TreeWorkspaceOptions, type TreePlacement, ty
 export { allocateFractionalPosition, compareFractionalPositions, parseFractionalPosition } from './fractional-position.ts';
 export { projectOccurrences, occurrenceIdForInsert, type OccurrenceNode, type OccurrenceProjection, type TreeDiagnostic } from './occurrence-tree.ts';
 export { materializeOccurrences, type TreeMaterialization, type MaterializationDiagnostic } from './tree-materialization.ts';
+export { HybridGraphIndex, embeddingModelDigest, canonicalVector, decodeVector, type HybridIndexOptions, type HybridQuery, type HybridQueryResult, type EmbeddingModelProfile, type EmbeddingProvider, type QueryEmbedding, type CanonicalVector, type StructuralFilter } from './semantic-index.ts';
+export { embeddingInputs, type IndexScope, type EmbeddingInput, type StructuralEdge } from './embedding-input.ts';
 export { AetherRepository, type CommitOptions, type CommitRecord, type FsckIssue, type GarbageCollectionResult, type Packfile } from './repository.ts';
 export { ModuleResolver, type ResolvedModule } from './modules.ts';
 export { merge3, type MergeConflict, type MergeResult } from './merge.ts';

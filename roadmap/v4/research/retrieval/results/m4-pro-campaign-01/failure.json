@@ -1,0 +1,6 @@
+{
+  "format": "aether.retrieval-campaign-failure/1",
+  "at": "2026-09-22T23:30:31.318Z",
+  "error": "TypeError: unsafe integer conversion",
+  "stack": "TypeError: unsafe integer conversion\n    at visit (file:///Users/rhenmcleod/Repositories/swarm-experiment/src/fabric/encoding.ts:62:63)\n    at file:///Users/rhenmcleod/Repositories/swarm-experiment/src/fabric/encoding.ts:84:76\n    at Array.forEach (<anonymous>)\n    at visit (file:///Users/rhenmcleod/Repositories/swarm-experiment/src/fabric/encoding.ts:82:12)\n    at encodeCanonical (file:///Users/rhenmcleod/Repositories/swarm-experiment/src/fabric/encoding.ts:90:3)\n    at clone (file:///Users/rhenmcleod/Repositories/swarm-experiment/src/tier1/semantic-index.ts:59:78)\n    at HybridGraphIndex.query (file:///Users/rhenmcleod/Repositories/swarm-experiment/src/tier1/semantic-index.ts:163:15)\n    at file:///Users/rhenmcleod/Repositories/swarm-experiment/roadmap/v4/research/retrieval/run-campaign.mjs:78:34"
+}

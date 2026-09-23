@@ -1,0 +1,47 @@
+{
+  "format": "aether.retrieval-source-capture/1",
+  "capturedAt": "2026-09-22T23:37:53.435Z",
+  "method": "Post-run capture from unchanged workspace; every saved byte sequence verified against pre-run admission SHA-256.",
+  "sources": [
+    {
+      "path": "src/tier1/semantic-index.ts",
+      "sha256": "f1c4bbdf9d5fb7509731232a06322da55eb3b589a3c346adcdf5fa30a122f4ee",
+      "snapshotPath": "sources/src/tier1/semantic-index.ts.source"
+    },
+    {
+      "path": "src/tier1/embedding-input.ts",
+      "sha256": "00991945620db6b78fd85b6904c00bd1216a0b7c51b35d6a68cb9dfda58478e4",
+      "snapshotPath": "sources/src/tier1/embedding-input.ts.source"
+    },
+    {
+      "path": "src/tier1/durable-store.ts",
+      "sha256": "b104d94efed7f5935c0899e17331492e9c221fdad744b8a8c7873421e25f615e",
+      "snapshotPath": "sources/src/tier1/durable-store.ts.source"
+    },
+    {
+      "path": "src/fabric/encoding.ts",
+      "sha256": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+      "snapshotPath": "sources/src/fabric/encoding.ts.source"
+    },
+    {
+      "path": "src/fabric/identity.ts",
+      "sha256": "a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+      "snapshotPath": "sources/src/fabric/identity.ts.source"
+    },
+    {
+      "path": "src/fabric/journal-lock.ts",
+      "sha256": "8a551fa3896b22c9b5f0de21ba9a56fcb4044e286a2a51939494fe4846ca6e74",
+      "snapshotPath": "sources/src/fabric/journal-lock.ts.source"
+    },
+    {
+      "path": "roadmap/v4/research/retrieval/corpus.ts",
+      "sha256": "f9bdcbf8474c3ed494573cb171d08f22a01d2793b48bf160ea13ee1e5508d99a",
+      "snapshotPath": "sources/roadmap/v4/research/retrieval/corpus.ts.source"
+    },
+    {
+      "path": "roadmap/v4/research/retrieval/run-campaign.mjs",
+      "sha256": "71b437ee6361a7393745a3e724ae618d683fd8faf9ae70f7bc4fd572a82753c9",
+      "snapshotPath": "sources/roadmap/v4/research/retrieval/run-campaign.mjs.source"
+    }
+  ]
+}
