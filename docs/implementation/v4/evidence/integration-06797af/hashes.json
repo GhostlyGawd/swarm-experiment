@@ -1,0 +1,12 @@
+{
+  "bench-enforce.log": "5e2716c418e5dd2d0370e9bfa82c60a625b03d9613528bc777722318c43079d7",
+  "benchmark-manifest.json": "ae47cb443050a54b935a7dbb545ee3e9fc3c7f5c8e2c93a7c433e66b4c7428f4",
+  "benchmark-samples.json": "06770a29ff4f3da639127e17e18b07ac1f70ed74ea07a8b6d1b6a32a32be7f2b",
+  "frost-differential.log": "305878f8dba14edc70e7783d4b97a60c15061fbd1200774ec4697b9facc29c6e",
+  "full-test.log": "69960e6e3ca168c97bcd292f99c27957a2fea223dbb8da62b3eac7b555bbb15e",
+  "research-tests.log": "c2088a6b98c86f4ca04b35b482fecc5c3131b58010b7ba1bf8e600d4e5ac6fea",
+  "ristretto-tests.log": "d61320c7afa637d8c62cbbce0884641ab8431abf0b0c5d09f0a31da0dbcd6de8",
+  "roadmap-check.log": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+  "roadmap-v4-check.log": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+  "typecheck.log": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a"
+}

@@ -1,0 +1,27 @@
+✔ independently pinned key admits exact policy and survives equivalent reopen (8.318416ms)
+✔ factory key swap cannot make the same policy body trustworthy on reopen (0.843333ms)
+✔ promotion cannot admit attacker-signed candidate even when approved manifest binds its digest (1.424792ms)
+✔ wrong signer ID, repository, digest, and independent epoch fail closed (0.691334ms)
+✔ missing pin, changed pin, record tampering, and key rotation require explicit migration (1.2555ms)
+✔ input rejects non-public, non-Ed25519, and invalid epoch anchors (43.366458ms)
+✔ explicit legacy ProcessHost history reopens with replacement signer key, documenting compatibility risk (857.088541ms)
+✔ real Aether AST passes base typecheck and fixed-charge linear budget checker (2.264542ms)
+✔ same success handle twice is rejected before host execution (2.703375ms)
+✔ undeclared effect call or spending is rejected (0.733667ms)
+✔ missing or wrong exhaustion fallback is rejected (0.364625ms)
+✔ fallback cannot spend or regain an effect capability (0.268916ms)
+✔ recursive budget call graph without an enforced bound is rejected (0.202ms)
+✔ all four dimensions and fixed charge bound are checked (0.844875ms)
+✔ unsupported branching/forks fail closed in the candidate checker (0.35725ms)
+✔ real durable ledger exhaustion keeps the original handle; committed charge survives reopen (653.182792ms)
+✔ real broker tolerates duplicate delivery, receipt fault, reopen and isolated replay (636.60275ms)
+✔ seeded duplicate-effect bug shrinks to a durable four-action replay witness (2912.369791ms)
+✔ a partition with no healing cannot silently count as a successful effect case (33.980875ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3814.010167
