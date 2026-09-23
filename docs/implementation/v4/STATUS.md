@@ -4,7 +4,7 @@ Goal: implement the complete v4 specification, all 40 functional requirements an
 
 ## Resumed implementation — 2026-09-23
 
-The user resumed the build after the pushed stopping point. **20 of 62 tracked tasks are verified** (baseline 13/13, v2 7/20); full v4 completion and the release performance gates remain open. Agent-IR v2, semantic GC, scoped grants and Byzantine governance remain in progress.
+The user resumed the build after the pushed stopping point. **20 of 62 tracked tasks are verified** (baseline 13/13, v2 7/20); full v4 completion and the release performance gates remain open. Seven tasks have verified prerequisites and are actively in progress. The [active gate dependencies](GATE-DEPENDENCIES.md) show bounded evidence, exact missing work and downstream tasks for each; no partial slice is counted as a verified task.
 
 V4-F02 follow-up: `bench:v4:verify` now independently recounts retained raw token messages, checks canonical artifacts and every target verdict, and can compare the exact measured source/commit. Altered threshold, verdict, message, source list or commit fails. This strengthens evidence integrity; it does not change the still-failed 4× or other release targets.
 

@@ -2,7 +2,7 @@
 
 Specification **0.1.0** · baseline `3c3c8ebe63078f104f1ab7d8182b088124e9b1c6`.
 
-Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) for the normative contracts and [CHANGELOG.md](CHANGELOG.md) for version changes.
+Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) for the normative contracts, [GATE-DEPENDENCIES.md](GATE-DEPENDENCIES.md) for active gate work, and [CHANGELOG.md](CHANGELOG.md) for version changes.
 
 > This is implementation status. Publishing the specification does not complete runtime work. A verified task needs evidence for every gate; functional delivery does not imply that the release NFR/KPI gates passed.
 
@@ -21,9 +21,11 @@ Recommended order (closed under prerequisites). Order among independent items re
 7. [V4-F07](#v4-f07) — Make state handoff durable across actual processes
 8. [V4-F08](#v4-f08) — Integrate exact-root admission and baseline recovery slice
 
-The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.
+The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. The two lists below distinguish active work from unstarted work whose dependencies are verified.
 
-**Ready now:** none.
+**Active with verified prerequisites:** [V4-T1-02](#v4-t1-02), [V4-T1-05](#v4-t1-05), [V4-T2-04](#v4-t2-04), [V4-T2-06](#v4-t2-06), [V4-T3-03](#v4-t3-03), [V4-T3-07](#v4-t3-07), [V4-T3-10](#v4-t3-10).
+
+**Unstarted and ready:** none.
 
 ## Milestones
 

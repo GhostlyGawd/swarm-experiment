@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Active gate visibility — 2026-09-23
+
+- The generated tracker now distinguishes seven active tasks with verified prerequisites from unstarted tasks that are ready. Its former “Ready now: none” label hid active work.
+- Added a gate dependency ledger for the seven active tasks, with bounded evidence, remaining acceptance work and downstream dependencies. T2-04 broker receipt/host-cache integrity and T3-07 full fallback closure are made explicit. The task count remains 20/62; no acceptance or release threshold changed.
+
 ## Opt-in independently clocked Wasm authority — 2026-09-23
 
 - Added `scoped-anchored-wasm-v7` with operator-provisioned trusted clock anchor `/1`, deployment `/7`, prepared `/5`, host configuration `/5` and effect plan `/5`. Signed V4 policy rules must use the anchor's clock domain. V6 remains byte-preserved under its explicit trusted-factory-clock model.

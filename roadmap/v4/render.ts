@@ -20,14 +20,15 @@ export function render(plan: Plan = PLAN): string {
   const lines = [
     '# Aether v4 implementation dependency tracker', '',
     `Specification **${plan.version}** · baseline \`${BASELINE_COMMIT}\`.`, '',
-    'Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) for the normative contracts and [CHANGELOG.md](CHANGELOG.md) for version changes.', '',
+    'Generated from [plan.ts](../../../roadmap/v4/plan.ts). Read [SPEC.md](SPEC.md) for the normative contracts, [GATE-DEPENDENCIES.md](GATE-DEPENDENCIES.md) for active gate work, and [CHANGELOG.md](CHANGELOG.md) for version changes.', '',
     '> This is implementation status. Publishing the specification does not complete runtime work. A verified task needs evidence for every gate; functional delivery does not imply that the release NFR/KPI gates passed.', '',
     `**${plan.tasks.filter(t => t.status === 'verified').length}/${plan.tasks.length} tasks verified; ${plan.requirements.length} source obligations tracked (40 functional, 16 NFR, 3 governance, 12 KPI).**`, '',
     '## First implementation slice', '',
     'Recommended order (closed under prerequisites). Order among independent items reflects the requested priorities, not a technical dependency:', '',
     ...plan.firstSlice.map((id, i) => `${i + 1}. ${link(id)} — ${plan.tasks.find(t => t.id === id)!.title}`), '',
-    'The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. “Ready” means dependencies are verified, not that a task has started.', '',
-    `**Ready now:** ${ready(plan).map(t => link(t.id)).join(', ') || 'none'}.`, '',
+    'The four research tasks can produce decisions early; the baseline release gate also requires their evidence. A dependency is a prerequisite for closing work, not a prohibition on early exploration. The two lists below distinguish active work from unstarted work whose dependencies are verified.', '',
+    `**Active with verified prerequisites:** ${plan.tasks.filter(t => t.status === 'in_progress').map(t => link(t.id)).join(', ') || 'none'}.`, '',
+    `**Unstarted and ready:** ${ready(plan).map(t => link(t.id)).join(', ') || 'none'}.`, '',
     '## Milestones', '',
     '| Milestone | Verified | Total | Release gate |', '|---|---:|---:|---|',
   ];
