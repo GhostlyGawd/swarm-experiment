@@ -97,6 +97,7 @@ export class TopologyHost {
   // dispatch and back into suspended callers. This also coordinates allocation.
   private authoritative: ProductionRuntime | null = null;
   private readonly executionStack: ProductionRuntime[] = [];
+  private readonly strictDispatches: Array<{ symbol: SymbolId; unit: string; tokens: readonly (CapabilityToken | ScopedGrantV2)[] }> = [];
   private moving = false;
   private generationValue = 0;
 
@@ -135,7 +136,19 @@ export class TopologyHost {
   }
 
   call(symbol: SymbolId, args: readonly Value[], from: SymbolId | null = null): ExecutionResult {
+    if (this.scopedGrants) throw new Error('strict topology calls require grant-checked dispatch');
+    return this.callInternal(symbol, args, from);
+  }
+
+  private callInternal(symbol: SymbolId, args: readonly Value[], from: SymbolId | null = null): ExecutionResult {
     if (this.moving) throw new Error('state handoff is in preparation');
+    if (this.scopedGrants) {
+      const authority = this.strictDispatches.at(-1);
+      if (!authority || !this.validStrictDispatch(authority)) throw new Error('authority_denied: strict topology dispatch expired');
+      const required = this.declarations.get(symbol)?.capabilities ?? [];
+      const granted = this.declarations.get(authority.symbol)?.capabilities ?? [];
+      if (required.some(capability => !granted.includes(capability))) throw new Error('authority_denied: nested capability widening');
+    }
     const started = this.clock();
     this.active.set(symbol, (this.active.get(symbol) ?? 0) + 1);
     try {
@@ -173,7 +186,12 @@ export class TopologyHost {
       }
     }
     const started = this.clock();
-    const execution = this.call(request.to, request.args, request.from);
+    const authority = { symbol: request.to, unit, tokens: request.capabilities };
+    if (this.scopedGrants && !this.validStrictDispatch(authority)) return { ok: false, unit, fault: fault('authority', 'strict topology grant changed before execution', false, false) };
+    this.strictDispatches.push(authority);
+    let execution: ExecutionResult;
+    try { execution = this.callInternal(request.to, request.args, request.from); }
+    finally { this.strictDispatches.pop(); }
     if (!execution.ok && execution.fault.kind === 'effect_indeterminate') {
       return { ok: false, unit, fault: {
         kind: 'indeterminate', message: execution.fault.message,
@@ -190,6 +208,10 @@ export class TopologyHost {
   }
 
   private grantPath(unit: string): readonly string[] { return ['topology', String(this.generationValue), domainDigest('aether.topology-unit/1', unit).split(':').at(-1)!]; }
+  private validStrictDispatch(authority: { symbol: SymbolId; unit: string; tokens: readonly (CapabilityToken | ScopedGrantV2)[] }): boolean {
+    return (this.declarations.get(authority.symbol)?.capabilities ?? []).every(capability =>
+      authority.tokens.some(token => this.scopedGrants!.verify(token, { capability, audience: authority.symbol, path: this.grantPath(authority.unit) })));
+  }
   issueTokens(symbol: SymbolId, ttlMs = 60_000): (CapabilityToken | ScopedGrantV2)[] {
     const unit = this.unitFor(symbol);
     if (!unit) throw new ReferenceError(`unplaced function ${symbol}`);
@@ -245,7 +267,7 @@ export class TopologyHost {
     const options: CompileOptions = {
       ...this.compileOptions,
       includeSymbols: unit.members,
-      callHandler: (callee, args, caller) => this.call(callee, args, caller),
+      callHandler: (callee, args, caller) => this.callInternal(callee, args, caller),
       continuationHandler: (runtime, execute) => this.withRuntime(runtime, execute),
     };
     return ProductionRuntime.compile(this.module, options);

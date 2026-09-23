@@ -68,6 +68,8 @@ test('v2 topology dispatch binds grants to target function, generation and curre
   const alice = host.allocateRecord(ACCOUNT, { id: 'alice', balance: 100n });
   const bob = host.allocateRecord(ACCOUNT, { id: 'bob', balance: 0n });
   const request = { id: 'v2-transfer', from: ex.symbols.settle, to: ex.symbols.transfer, args: [alice, bob, 10n] } as const;
+  assert.throws(() => host.call(ex.symbols.transfer, request.args), /strict topology calls require grant-checked dispatch/);
+  assert.equal(host.readRecord(alice).get('balance'), 100n);
   const wrongAudience = host.dispatch({ ...request, capabilities: host.issueTokens(ex.symbols.settle) });
   assert.equal(wrongAudience.ok, false); if (!wrongAudience.ok) assert.equal(wrongAudience.fault.kind, 'authority');
   const malformed = host.dispatch({ ...request, capabilities: null } as unknown as Parameters<typeof host.dispatch>[0]);
@@ -86,6 +88,23 @@ test('v2 topology dispatch binds grants to target function, generation and curre
   revoked = true;
   const denied = host.dispatch({ ...request, id: 'v2-revoked', capabilities: renewed });
   assert.equal(denied.ok, false); if (!denied.ok) assert.equal(denied.fault.kind, 'authority');
+});
+
+test('strict topology dispatch rechecks a grant after the initial boundary check', () => {
+  const ex = buildLedgerExample('topology-grant-race'), plan = slice(ex.module, ledgerTelemetry(ex), { symbols: ex.syms });
+  let epoch = '0', changeBeforeExecution = false;
+  const grants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(19), repositoryId: 'repository',
+    clock: () => 100, policyEpoch: () => '0', revocationEpoch: () => epoch, isRevoked: () => false,
+    authorizeIssue: () => true, authorizeDelegate: () => true });
+  const host = new TopologyHost(ex.module, plan, { registry: ex.capabilities, symbols: ex.syms, scopedGrants: grants,
+    clock: () => { if (changeBeforeExecution) { changeBeforeExecution = false; epoch = '1'; } return 100; } });
+  const alice = host.allocateRecord(ACCOUNT, { id: 'alice', balance: 100n }), bob = host.allocateRecord(ACCOUNT, { id: 'bob', balance: 0n });
+  const capabilities = host.issueTokens(ex.symbols.transfer);
+  changeBeforeExecution = true;
+  const result = host.dispatch({ id: 'changed-at-boundary', from: null, to: ex.symbols.transfer, args: [alice, bob, 10n], capabilities });
+  assert.equal(result.ok, false); if (!result.ok) assert.equal(result.fault.kind, 'authority');
+  assert.equal(host.readRecord(alice).get('balance'), 100n);
+  assert.equal(host.readRecord(bob).get('balance'), 0n);
 });
 
 test('durable grant revocation survives restart at a real topology dispatch boundary', () => {
