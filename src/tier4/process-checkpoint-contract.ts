@@ -36,7 +36,10 @@ export type ProcessCheckpointControlRequest = { readonly operationId: string; re
   { readonly kind: 'record'; readonly reference: LogicalRefV1; readonly field: string; readonly value: TaggedValueV1 } |
   { readonly kind: 'packed-v1'; readonly format: 'aether.process-packed-control/1'; readonly layoutDigest: Digest;
     readonly sourceImageDigest: Digest; readonly candidateImageDigest: Digest; readonly artifactDigest: Digest;
-    readonly executableSha256: string });
+    readonly executableSha256: string } |
+  { readonly kind: 'packed-v2'; readonly format: 'aether.process-packed-control/2'; readonly layoutDigest: Digest;
+    readonly sourceImageDigest: Digest; readonly candidateImageDigest: Digest; readonly artifactDigest: Digest;
+    readonly executableSha256: string; readonly operationsDigest: Digest });
 export interface ProcessCheckpointControl {
   readonly format: 'aether.process-checkpoint-control/1'; readonly id: Digest; readonly binding: Digest;
   readonly request: ProcessCheckpointControlRequest; readonly beforeCheckpoint: Digest; readonly afterCheckpoint: Digest;
@@ -48,15 +51,16 @@ const sameType = (a: Ty | null, b: Ty | null): boolean => Buffer.from(encodeCano
 export function validateCheckpointControlRequest(value: ProcessCheckpointControlRequest): void {
   const keys = ['operationId', 'expectedCheckpoint', 'kind'];
   if (value.kind === 'rewind') keys.push('steps'); else if (value.kind === 'local') keys.push('frameId', 'symbol', 'value'); else if (value.kind === 'record') keys.push('reference', 'field', 'value');
-  else if (value.kind === 'packed-v1') keys.push('format', 'layoutDigest', 'sourceImageDigest', 'candidateImageDigest', 'artifactDigest', 'executableSha256'); else throw new TypeError('unsupported checkpoint control');
+  else if (value.kind === 'packed-v1' || value.kind === 'packed-v2') keys.push('format', 'layoutDigest', 'sourceImageDigest', 'candidateImageDigest', 'artifactDigest', 'executableSha256', ...(value.kind === 'packed-v2' ? ['operationsDigest'] : [])); else throw new TypeError('unsupported checkpoint control');
   exactObject(value, keys); identifier(value.operationId); validateDigest(value.expectedCheckpoint, 'aether.resumable-state/1');
   if (value.kind === 'rewind') { if (!Number.isSafeInteger(value.steps) || value.steps < 1 || value.steps > 4096) throw new RangeError('invalid control rewind distance'); }
-  else if (value.kind === 'packed-v1') {
-    if (value.format !== 'aether.process-packed-control/1' || !/^aether\.packed-layout\/[12]:b3:[0-9a-f]{64}$/.test(value.layoutDigest) ||
+  else if (value.kind === 'packed-v1' || value.kind === 'packed-v2') {
+    if (value.format !== `aether.process-packed-control/${value.kind === 'packed-v2' ? '2' : '1'}` || !/^aether\.packed-layout\/[12]:b3:[0-9a-f]{64}$/.test(value.layoutDigest) ||
       !/^aether\.packed-heap-image\/[12]:b3:[0-9a-f]{64}$/.test(value.sourceImageDigest) ||
       !/^aether\.packed-heap-image\/[12]:b3:[0-9a-f]{64}$/.test(value.candidateImageDigest) ||
       !/^sha256:[0-9a-f]{64}$/.test(value.executableSha256)) throw new TypeError('invalid packed checkpoint control identity');
     validateDigest(value.artifactDigest);
+    if (value.kind === 'packed-v2') validateDigest(value.operationsDigest, 'aether.packed-native-operations/1');
   }
   else {
     validateTaggedValue(value.value); if (!['null', 'bool', 'int', 'string', 'ref'].includes(value.value.tag)) throw new TypeError('checkpoint corrections require scalar/reference values');
@@ -67,10 +71,10 @@ export function validateCheckpointControlTransition(request: ProcessCheckpointCo
   validateCheckpointControlRequest(request); validateCheckpointExtension(before, after, program, request.kind !== 'rewind');
   const event = after.events.at(-1);
   if (request.expectedCheckpoint !== checkpointDigest(before) || after.events.length !== before.events.length + 1 || event?.code !== 'host' ||
-      request.kind !== 'packed-v1' && event.op !== (request.kind === 'rewind' ? `rewind-v1:${request.steps}` : 'correction')) throw new TypeError('checkpoint control does not match the authorized transition');
+      request.kind !== 'packed-v1' && request.kind !== 'packed-v2' && event.op !== (request.kind === 'rewind' ? `rewind-v1:${request.steps}` : 'correction')) throw new TypeError('checkpoint control does not match the authorized transition');
   if (request.kind === 'rewind') return; // Version 2 validator checks every inverse section against the exact target.
   if (before.core.state !== 'running' || !before.core.frames.length || before.core.frames.some(frame => frame.pc >= program.codes.find(code => code.id === frame.code)!.returnPc)) throw new Error('checkpoint correction requires a running body before postcondition evaluation; rewind first');
-  if (request.kind === 'packed-v1') {
+  if (request.kind === 'packed-v1' || request.kind === 'packed-v2') {
     if (!layouts || request.artifactDigest !== program.manifest.target.artifactDigest ||
         event.effect !== null || event.delta.length !== 1 || event.delta[0].section !== 'records') throw new TypeError('packed control artifact or event mismatch');
     const source = packResumableCheckpoint(before, program, layouts).heap;
@@ -90,11 +94,14 @@ export function validateCheckpointControlTransition(request: ProcessCheckpointCo
     if (!changes.length) throw new TypeError('empty packed control');
     const candidate = PackedHeap.pack(candidateRecords, after.core.heapId, layouts).image();
     if (candidate.imageDigest !== request.candidateImageDigest) throw new TypeError('packed control candidate image mismatch');
-    const subject = { format: 'aether.packed-candidate-correction/1', sourceSnapshotDigest: request.expectedCheckpoint,
+    const version = request.kind === 'packed-v2' ? '2' : '1';
+    const subject = { format: `aether.packed-candidate-correction/${version}`, sourceSnapshotDigest: request.expectedCheckpoint,
       sourceImageDigest: request.sourceImageDigest, candidateImageDigest: request.candidateImageDigest,
       layoutDigest: request.layoutDigest, programDigest: program.digest, manifestDigest: program.manifestDigest,
-      changesDigest: domainDigest('aether.packed-candidate-changes/1', changes, MACHINE_LIMITS) };
-    if (event.op !== `packed-correction:${domainDigest('aether.packed-candidate-correction/1', subject, MACHINE_LIMITS)}`)
+      changesDigest: domainDigest('aether.packed-candidate-changes/1', changes, MACHINE_LIMITS),
+      ...(request.kind === 'packed-v2' ? {operationId: request.operationId, artifactDigest: request.artifactDigest,
+        executableSha256: request.executableSha256, operationsDigest: request.operationsDigest} : {}) };
+    if (event.op !== `${request.kind === 'packed-v2' ? 'packed-correction-v2' : 'packed-correction'}:${domainDigest(`aether.packed-candidate-correction/${version}`, subject, MACHINE_LIMITS)}`)
       throw new TypeError('packed control event subject mismatch');
     return;
   }

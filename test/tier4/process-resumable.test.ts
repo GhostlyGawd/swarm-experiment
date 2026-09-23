@@ -20,6 +20,7 @@ import { ResumableRuntime } from '../../src/tier3/resumable-runtime.ts';
 import { packResumableCheckpoint, type PackedLayout } from '../../src/tier3/packed-heap.ts';
 import { ProcessHost, type ProcessHostOptions } from '../../src/tier4/process-host.ts';
 import { ProcessResumableSession, type ProcessResumableOptions } from '../../src/tier4/process-resumable.ts';
+import { PackedNativeProcessRunner } from '../../src/tier4/packed-native-process.ts';
 import { checkpointControlDigest, seedProcessCheckpoint, seededProcessReference } from '../../src/tier4/process-checkpoint-contract.ts';
 import { executePackedCheckpointNative } from '../../roadmap/v4/research/packed-native-bridge/bridge.ts';
 import type { TopologyPlan } from '../../src/tier4/topology.ts';
@@ -67,52 +68,56 @@ test('actual native packed candidate is one durable ProcessHost control across r
     const layout: PackedLayout = { typeName: (f.type as Extract<Ty, {t: 'Record'}>).name,
       fields: [{name: 'value', kind: 'int', min: '0', max: '100', overflow: 'trap'}] };
     const packed = packResumableCheckpoint(input.initial, input.runtime.program, [layout]);
+    const operations = [{kind: 'addInt' as const, id: input.mapped.objectId, field: 'value', increment: '15'}];
     const runNative = (source: typeof packed) => executePackedCheckpointNative({packed: source, program: input.runtime.program,
       expectedSnapshotDigest: source.snapshotDigest, expectedLayoutDigest: source.heap.layoutDigest,
-      executable, expectedExecutableSha256: executableSha256,
-      operations: [{kind: 'addInt', id: input.mapped.objectId, field: 'value', increment: '15'}]});
+      executable, expectedExecutableSha256: executableSha256, operations});
     const predicted = runNative(packed);
-    let executions = 0;
-    const withNative = (current: ProcessHost): ProcessResumableOptions => ({...sessionOptions(f, current), nativePacked: {
-      artifactDigest: f.manifest.target.artifactDigest, executableSha256,
-      execute: source => { executions++; return runNative(source).candidateHeap; }
-    }});
+    const runner = new PackedNativeProcessRunner({program: input.runtime.program,
+      artifactDigest: f.manifest.target.artifactDigest, executable, expectedExecutableSha256: executableSha256, operations});
+    const identity = PackedNativeProcessRunner.identity(runner);
+    const withNative = (current: ProcessHost): ProcessResumableOptions => ({...sessionOptions(f, current), nativePacked: runner});
     let session = await ProcessResumableSession.begin(withNative(host), input.base, input.initial,
       {operationId: 'packed-control-job', symbol: f.main, expectedGeneration: '1', expectedSnapshot: runtimeSnapshotDigest(input.before)});
-    const request = {kind: 'packed-v1' as const, format: 'aether.process-packed-control/1' as const,
+    const request = {kind: 'packed-v2' as const, format: 'aether.process-packed-control/2' as const,
       operationId: 'packed-control-one', expectedCheckpoint: checkpointDigest(input.initial),
       layoutDigest: packed.heap.layoutDigest, sourceImageDigest: packed.heap.imageDigest,
       candidateImageDigest: predicted.candidateHeap.imageDigest,
-      artifactDigest: f.manifest.target.artifactDigest, executableSha256};
+      artifactDigest: f.manifest.target.artifactDigest, executableSha256, operationsDigest: identity.operationsDigest};
     f.allow(false);
     await assert.rejects(session.correctPacked(request, [layout]), /authorization_denied/);
-    assert.equal(executions, 0); f.allow(true);
+    assert.equal(PackedNativeProcessRunner.executionCount(runner), 0); f.allow(true);
+    await assert.rejects(host.withCheckpoint(session.binding.id, 'packed', host.issueTokens(f.main),
+      async access => access.finishControl(access.checkpoint, [], undefined), request), /verified native run proof required/);
+    const {operationsDigest: _oldOperations, ...legacyRequest} = request;
+    await assert.rejects(host.withCheckpoint(session.binding.id, 'packed', host.issueTokens(f.main),
+      async () => null, {...legacyRequest, kind: 'packed-v1', format: 'aether.process-packed-control/1'}), /new packed-v1 controls/);
     await assert.rejects(session.correctPacked({...request, operationId: 'wrong-candidate', candidateImageDigest: packed.heap.imageDigest}, [layout]), /candidate identity mismatch/);
     assert.equal(checkpointDigest(await host.readCheckpoint(session.binding.id)), checkpointDigest(input.initial));
-    const noOp = ProcessResumableSession.reopen({...withNative(host), nativePacked: {
-      artifactDigest: f.manifest.target.artifactDigest, executableSha256,
-      execute: source => source.heap
-    }}, session.binding.id);
-    await assert.rejects(noOp.correctPacked({...request, operationId: 'no-op-candidate', candidateImageDigest: packed.heap.imageDigest}, [layout]), /control does not match|empty packed control/);
+    const noOpRunner = new PackedNativeProcessRunner({program: input.runtime.program,
+      artifactDigest: f.manifest.target.artifactDigest, executable, expectedExecutableSha256: executableSha256, operations: []});
+    const noOp = ProcessResumableSession.reopen({...withNative(host), nativePacked: noOpRunner}, session.binding.id);
+    await assert.rejects(noOp.correctPacked({...request, operationId: 'no-op-candidate', candidateImageDigest: packed.heap.imageDigest,
+      operationsDigest: PackedNativeProcessRunner.identity(noOpRunner).operationsDigest}, [layout]), /control does not match|empty packed control/);
     assert.equal(checkpointDigest(await host.readCheckpoint(session.binding.id)), checkpointDigest(input.initial));
     revokeAtCommit = true;
     await assert.rejects(session.correctPacked(request, [layout]), /authorization_denied/);
     assert.equal(checkpointDigest(await host.readCheckpoint(session.binding.id)), checkpointDigest(input.initial));
     revokeAtCommit = false; f.allow(true);
     const receipt = await session.correctPacked(request, [layout]);
-    assert.equal(executions, 3);
+    assert.equal(PackedNativeProcessRunner.executionCount(runner), 3);
     assert.deepEqual(await session.correctPacked(request, [layout]), receipt);
-    assert.equal(executions, 3, 'a committed same-ID retry must not rerun native code');
+    assert.equal(PackedNativeProcessRunner.executionCount(runner), 3, 'a committed same-ID retry must not rerun native code');
     const corrected = await host.readCheckpoint(session.binding.id);
     assert.equal(corrected.core.records[0].fields[0][1].tag, 'int');
     assert.equal((corrected.core.records[0].fields[0][1] as {value: string}).value, '20');
-    assert.match(corrected.events.at(-1)!.op, /^packed-correction:/);
+    assert.match(corrected.events.at(-1)!.op, /^packed-correction-v2:aether\.packed-candidate-correction\/2:b3:/);
     assert.deepEqual(await host.snapshot(), input.before);
     await assert.rejects(session.correctPacked({...request, operationId: 'stale-packed'}, [layout]), /stale checkpoint control/);
     await host.close(); host = await ProcessHost.open(hostOptions);
     session = ProcessResumableSession.reopen(withNative(host), session.binding.id);
     assert.deepEqual(await session.correctPacked(request, [layout]), receipt);
-    assert.equal(executions, 3);
+    assert.equal(PackedNativeProcessRunner.executionCount(runner), 3);
     assert.equal((await session.run()).state, 'completed');
     await session.commit();
     const mapped = await session.publishedReference(input.mapped);
@@ -131,6 +136,15 @@ test('actual native packed candidate is one durable ProcessHost control across r
     forgedJournal.checkpointControls[0] = {...forgedBody, id: checkpointControlDigest(forgedBody)};
     writeFileSync(journalPath, JSON.stringify(forgedJournal));
     await assert.rejects(ProcessHost.open(hostOptions), /packed control candidate image mismatch/);
+    writeFileSync(journalPath, journalBytes);
+    const forgedOperations = JSON.parse(journalBytes.toString('utf8'));
+    const alteredControl = {...forgedOperations.checkpointControls[0], request: {
+      ...forgedOperations.checkpointControls[0].request,
+      operationsDigest: domainDigest('aether.packed-native-operations/1', [])}};
+    const {id: _previousId, ...alteredBody} = alteredControl;
+    forgedOperations.checkpointControls[0] = {...alteredBody, id: checkpointControlDigest(alteredBody)};
+    writeFileSync(journalPath, JSON.stringify(forgedOperations));
+    await assert.rejects(ProcessHost.open(hostOptions), /packed control event subject mismatch/);
     writeFileSync(journalPath, journalBytes);
     writeFileSync(sidecar, '[]');
     await assert.rejects(ProcessHost.open(hostOptions), /packed layout digest mismatch/);
@@ -151,17 +165,19 @@ test('packed control survives real controller SIGKILL before and after durable d
       const layout: PackedLayout = {typeName: (f.type as Extract<Ty, {t: 'Record'}>).name,
         fields: [{name: 'value', kind: 'int', min: '0', max: '100', overflow: 'trap'}]};
       const packed = packResumableCheckpoint(input.initial, input.runtime.program, [layout]);
+      const operations = [{kind: 'addInt' as const, id: input.mapped.objectId, field: 'value', increment: '15'}];
       const runNative = (source: typeof packed) => executePackedCheckpointNative({packed: source, program: input.runtime.program,
         expectedSnapshotDigest: source.snapshotDigest, expectedLayoutDigest: source.heap.layoutDigest,
-        executable, expectedExecutableSha256: executableSha256, operations: [{kind: 'addInt', id: input.mapped.objectId, field: 'value', increment: '15'}]});
-      const request = {kind: 'packed-v1' as const, format: 'aether.process-packed-control/1' as const,
+        executable, expectedExecutableSha256: executableSha256, operations});
+      const runner = new PackedNativeProcessRunner({program: input.runtime.program, artifactDigest: f.manifest.target.artifactDigest,
+        executable, expectedExecutableSha256: executableSha256, operations});
+      const request = {kind: 'packed-v2' as const, format: 'aether.process-packed-control/2' as const,
         operationId: `packed-kill-${boundary}`, expectedCheckpoint: checkpointDigest(input.initial),
         layoutDigest: packed.heap.layoutDigest, sourceImageDigest: packed.heap.imageDigest,
         candidateImageDigest: runNative(packed).candidateHeap.imageDigest,
-        artifactDigest: f.manifest.target.artifactDigest, executableSha256};
-      const session = await ProcessResumableSession.begin({...sessionOptions(f, host), nativePacked: {
-        artifactDigest: request.artifactDigest, executableSha256, execute: source => runNative(source).candidateHeap
-      }}, input.base, input.initial,
+        artifactDigest: f.manifest.target.artifactDigest, executableSha256,
+        operationsDigest: PackedNativeProcessRunner.identity(runner).operationsDigest};
+      const session = await ProcessResumableSession.begin({...sessionOptions(f, host), nativePacked: runner}, input.base, input.initial,
       {operationId: `packed-lease-${boundary}`, symbol: f.main, expectedGeneration: '1', expectedSnapshot: runtimeSnapshotDigest(input.before)});
       const id = session.binding.id;
       writeFileSync(join(directory, 'packed-child-input.json'), encodeStored({module: f.module, manifest: f.manifest, plan: f.options.plan,
@@ -174,19 +190,18 @@ import { decodeStored } from ${moduleUrl('../../src/tier1/persistence.ts')};
 import { CapabilityRegistry, CapabilitySealer } from ${moduleUrl('../../src/tier2/ocap.ts')};
 import { ProcessHost } from ${moduleUrl('../../src/tier4/process-host.ts')};
 import { ProcessResumableSession } from ${moduleUrl('../../src/tier4/process-resumable.ts')};
+import { PackedNativeProcessRunner } from ${moduleUrl('../../src/tier4/packed-native-process.ts')};
 import { compileResumableProgram } from ${moduleUrl('../../src/tier3/resumable-program.ts')};
-import { executePackedCheckpointNative } from ${moduleUrl('../../roadmap/v4/research/packed-native-bridge/bridge.ts')};
 const directory = ${JSON.stringify(directory)}, boundary = ${JSON.stringify(boundary)};
 const f = decodeStored(readFileSync(join(directory, 'packed-child-input.json'), 'utf8'));
 const registry = new CapabilityRegistry(), program = compileResumableProgram(f.module, {manifest:f.manifest, registry});
 const host = await ProcessHost.open({directory, module:f.module, manifest:f.manifest, registry, plan:f.plan,
   sealer:new CapabilitySealer(new Uint8Array(32).fill(19)), authorizeCheckpoint:()=>true,
   onPhase:phase=>{if(phase===boundary)process.kill(process.pid,'SIGKILL');}});
+const runner = new PackedNativeProcessRunner({program,artifactDigest:f.request.artifactDigest,executable:f.executable,
+  expectedExecutableSha256:f.request.executableSha256,operations:[{kind:'addInt',id:f.mappedId,field:'value',increment:'15'}]});
 const session = ProcessResumableSession.reopen({host,module:f.module,runtime:{manifest:f.manifest,registry},
-  tokens:()=>host.issueTokens(f.main),nativePacked:{artifactDigest:f.request.artifactDigest,
-  executableSha256:f.request.executableSha256,execute:source=>executePackedCheckpointNative({packed:source,program,
-  expectedSnapshotDigest:source.snapshotDigest,expectedLayoutDigest:source.heap.layoutDigest,executable:f.executable,
-  expectedExecutableSha256:f.request.executableSha256,operations:[{kind:'addInt',id:f.mappedId,field:'value',increment:'15'}]}).candidateHeap}},f.id);
+  tokens:()=>host.issueTokens(f.main),nativePacked:runner},f.id);
 await session.correctPacked(f.request,[f.layout]);
 throw Error('expected SIGKILL');
 `);
@@ -195,14 +210,10 @@ throw Error('expected SIGKILL');
         {encoding: 'utf8', timeout: 90000});
       assert.equal(killed.signal, 'SIGKILL', `${boundary}: ${killed.stderr}`);
       host = await ProcessHost.open(f.options);
-      let reruns = 0;
-      const resumed = ProcessResumableSession.reopen({...sessionOptions(f, host), nativePacked: {
-        artifactDigest: request.artifactDigest, executableSha256,
-        execute: source => {reruns++; return runNative(source).candidateHeap;}
-      }}, id);
+      const resumed = ProcessResumableSession.reopen({...sessionOptions(f, host), nativePacked: runner}, id);
       const receipt = await resumed.correctPacked(request, [layout]);
       assert.deepEqual(await resumed.correctPacked(request, [layout]), receipt);
-      assert.equal(reruns, boundary === 'checkpoint-control-before-commit' ? 1 : 0);
+      assert.equal(PackedNativeProcessRunner.executionCount(runner), boundary === 'checkpoint-control-before-commit' ? 1 : 0);
       const corrected = await host.readCheckpoint(id);
       assert.equal((corrected.core.records[0].fields[0][1] as {value: string}).value, '20');
       assert.deepEqual(await host.snapshot(), input.before);

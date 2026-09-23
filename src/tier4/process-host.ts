@@ -29,6 +29,7 @@ import { validateExecutedCheckpoint } from '../tier3/resumable-runtime.ts';
 import { checkpointDigest, eventDigest, type ResumableSnapshot } from '../tier3/resumable-state.ts';
 import { validateProcessCheckpointBinding, processCheckpointBindingDigest, processCheckpointReceiptDigest, validateCheckpointExtension, assertBaseProjection, projectProcessCheckpoint, processReferenceFromCheckpoint, writeProcessCheckpoint, readProcessCheckpoint, retainedProcessCheckpointExists, writeCheckpointEffectAudit, readCheckpointEffectAudit, writeProcessPackedLayout, readProcessPackedLayout, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointAuthorization, type ProcessCheckpointAction, type ProcessCheckpointControlRequest, type ProcessCheckpointControl, checkpointControlDigest, validateCheckpointControlRequest, validateCheckpointControlTransition } from './process-checkpoint-contract.ts';
 import type { PackedLayout } from '../tier3/packed-heap.ts';
+import { PackedNativeProcessRunner, type PackedNativeRun } from './packed-native-process.ts';
 import { validateProcessArguments, validateProcessResult, validateProcessAllocation } from './process-type-validation.ts';
 
 export const PROCESS_INVOKE = capability('cap:process:invoke');
@@ -162,7 +163,7 @@ export interface ProcessCheckpointAccess {
   readonly binding: ProcessCheckpointBinding; readonly program: ResumableProgram; readonly before: RuntimeSnapshotV1; readonly checkpoint: ResumableSnapshot;
   readonly assertAuthority: () => void; readonly save: (snapshot: ResumableSnapshot) => void;
   readonly replayBarrier: ResumableSnapshot | null; readonly controlReceipt: ProcessCheckpointControl | null;
-  readonly finishControl: (snapshot: ResumableSnapshot, effectAudit: readonly EffectEventV1[]) => ProcessCheckpointControl;
+  readonly finishControl: (snapshot: ResumableSnapshot, effectAudit: readonly EffectEventV1[], nativeRun?: PackedNativeRun) => ProcessCheckpointControl;
   readonly commit: (snapshot: ResumableSnapshot, effectAudit: readonly EffectEventV1[]) => ProcessCheckpointReceipt;
   readonly abort: () => void;
 }
@@ -634,7 +635,7 @@ export class ProcessHost {
    * cannot observe another writer between checkpoint and heap publication. */
   async withCheckpoint<T>(bindingId: Digest, action: Exclude<ProcessCheckpointAction, 'begin'>, tokens: readonly ProcessInvocationGrant[], operation: (access: ProcessCheckpointAccess) => Promise<T>, control?: ProcessCheckpointControlRequest): Promise<T> {
     if ((action === 'correct' || action === 'rewind' || action === 'packed') !== (control !== undefined)) throw new TypeError('checkpoint control action requires an exact request');
-    if (control) { validateCheckpointControlRequest(control); control = freeze(copy(control)); if ((action === 'rewind') !== (control.kind === 'rewind') || (action === 'packed') !== (control.kind === 'packed-v1')) throw new TypeError('checkpoint control action mismatch'); }
+    if (control) { validateCheckpointControlRequest(control); control = freeze(copy(control)); if ((action === 'rewind') !== (control.kind === 'rewind') || (action === 'packed') !== (control.kind === 'packed-v1' || control.kind === 'packed-v2')) throw new TypeError('checkpoint control action mismatch'); }
     tokens = freeze(copy([...tokens]));
     return this.lock.runAsync(async () => {
       this.assertOpen(); const journal = this.read(), lease = journal.checkpointLeases?.find(item => item.binding.id === bindingId);
@@ -646,6 +647,7 @@ export class ProcessHost {
       const controls = journal.checkpointControls?.filter(item => item.binding === bindingId) ?? [], latestControl = controls.at(-1);
       const replayBarrier = latestControl ? readProcessCheckpoint(this.options.directory, latestControl.beforeCheckpoint, program) : null;
       const priorControl = control ? controls.find(item => item.request.operationId === control.operationId) : undefined;
+      if (control?.kind === 'packed-v1' && !priorControl) throw new TypeError('new packed-v1 controls require the version 2 native run proof');
       if (priorControl && !equal(priorControl.request, control)) throw new Error('checkpoint control operation identity conflict');
       if (control && !priorControl && control.expectedCheckpoint !== executionOrigin) throw new Error('stale checkpoint control');
       if (control && !priorControl && journal.checkpointControls?.some(item => item.request.operationId === control.operationId)) throw new Error('checkpoint control operation already used');
@@ -661,11 +663,19 @@ export class ProcessHost {
       };
       const access: ProcessCheckpointAccess = {
         replayBarrier, controlReceipt: priorControl ? freeze(copy(priorControl)) : null,
-        finishControl: (snapshot, effectAudit) => {
+        finishControl: (snapshot, effectAudit, nativeRun) => {
           assertAuthority(); if (!control || priorControl) throw new Error('checkpoint control already applied or missing');
           const previous = readProcessCheckpoint(this.options.directory, executionOrigin, program);
+          if (control.kind === 'packed-v2') PackedNativeProcessRunner.assertRun(nativeRun, {
+            operationId: control.operationId,
+            expectedCheckpoint: control.expectedCheckpoint, sourceImageDigest: control.sourceImageDigest,
+            candidateImageDigest: control.candidateImageDigest, layoutDigest: control.layoutDigest,
+            artifactDigest: control.artifactDigest, executableSha256: control.executableSha256,
+            operationsDigest: control.operationsDigest,
+          });
+          else if (nativeRun !== undefined) throw new TypeError('native run proof outside packed-v2 control');
           validateExecutedCheckpoint(snapshot, executionOrigin, program.digest); validateCheckpointControlTransition(control, previous, snapshot, program,
-            control.kind === 'packed-v1' ? readProcessPackedLayout(this.options.directory, control.layoutDigest) : undefined);
+            control.kind === 'packed-v1' || control.kind === 'packed-v2' ? readProcessPackedLayout(this.options.directory, control.layoutDigest) : undefined);
           const initial = readProcessCheckpoint(this.options.directory, lease.binding.initialCheckpoint, program); validateCheckpointExtension(initial, snapshot, program);
           if (control.kind === 'rewind' && previous.events.length - control.steps < initial.events.length) throw new Error('rewind crosses the checkpoint ownership boundary');
           if (previous.core.state === 'blocked') throw new Error('checkpoint control requires resolved effects');
@@ -1228,7 +1238,7 @@ export class ProcessHost {
         if (beforeIndex < 0 || lease.checkpoints[beforeIndex + 1] !== control.afterCheckpoint) throw new Error('checkpoint control lost its durable state ordering');
         const before = readProcessCheckpoint(this.options.directory, control.beforeCheckpoint, program), after = readProcessCheckpoint(this.options.directory, control.afterCheckpoint, program);
         validateCheckpointControlTransition(control.request, before, after, program,
-          control.request.kind === 'packed-v1' ? readProcessPackedLayout(this.options.directory, control.request.layoutDigest) : undefined);
+          control.request.kind === 'packed-v1' || control.request.kind === 'packed-v2' ? readProcessPackedLayout(this.options.directory, control.request.layoutDigest) : undefined);
         if (readCheckpointEffectAudit(this.options.directory, control.effectAudit, before).length !== control.effectCount) throw new Error('checkpoint replay barrier differs from retained effects');
         const previous = (journal.checkpointControls ?? []).find(item => item.id === control.previous);
         if (previous && BigInt(before.core.effectCursor) < BigInt(previous.effectCount)) throw new Error('control bypassed checkpoint replay debt');
@@ -1239,7 +1249,7 @@ export class ProcessHost {
       }
       for (const lease of journal.checkpointLeases) {
         const latest = readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, program), initial = readProcessCheckpoint(this.options.directory, lease.binding.initialCheckpoint, program);
-        for (const event of latest.events.slice(initial.events.length)) if (event.code === 'host' && (event.op === 'correction' || event.op.startsWith('rewind-v1:') || event.op.startsWith('packed-correction:'))) {
+        for (const event of latest.events.slice(initial.events.length)) if (event.code === 'host' && (event.op === 'correction' || event.op.startsWith('rewind-v1:') || event.op.startsWith('packed-correction:') || event.op.startsWith('packed-correction-v2:'))) {
           if (auditedEvents.get(lease.binding.id)?.get(Number(event.sequence)) !== eventDigest(event)) throw new Error('checkpoint history contains an unaudited control');
         }
         const barrier = (journal.checkpointControls ?? []).filter(control => control.binding === lease.binding.id).at(-1);

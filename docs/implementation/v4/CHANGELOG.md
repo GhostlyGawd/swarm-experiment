@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Verified native run control and AST-derived EL1 guest — 2026-09-23
+
+- New `aether.process-packed-control/2` binds the native operation-list digest and requires a private in-process proof of the actual hash-checked binary run before ProcessHost publishes a packed correction. The runtime event subject v2 binds the operation, artifact, executable and plan identities; reopen recomputes it. New V1 control admission is refused while historical V1 audit remains readable. The runner executes a private copy of verified binary bytes; arbitrary callbacks and hash-checked shell scripts cannot publish a V2 candidate. Native code is still unsandboxed and no hardware attestation is claimed.
+- A source-pinned research compiler derives freestanding AArch64 EL1 code from a pure Tier 1 AST subset. An independent verifier rebuilt 57 real guest/reference comparisons and source-edit changes. The bounded fresh-guest maximum was 0.786 ms with 65,536 B observed backing; full runtime boot, memory and native lowering gates remain open.
+
 ## Fused native row reader and durable packed ProcessHost control — 2026-09-23
 
 - The checked C ABI now has a fused bounded-row reader. A preregistered Apple M4 Pro campaign pins unchanged locality fixtures, 504 raw samples, exhaustive reference-code checks and sanitizer results. It is 1.92–3.62× faster than the old checked ABI, yet slower than native pointers in 16 of 18 patterns; G2 and release targets remain open.

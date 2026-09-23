@@ -1,8 +1,8 @@
 import { types as nodeTypes } from 'node:util';
 import type { Term, Ty } from '../tier1/ast.ts';
 import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
-import { domainDigest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
-import { encodeCanonical, exactObject, validateTaggedValue, type TaggedValueV1 } from '../fabric/encoding.ts';
+import { domainDigest, validateDigest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
+import { encodeCanonical, exactObject, identifier, validateTaggedValue, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { DurableEffectBroker, effectPayloadDigest, effectRequestDigest, effectReplayOutcomeDigest, type EffectAdapter, type EffectRequestV1 } from '../fabric/effects.ts';
 import type { CapabilityRegistry } from '../tier2/ocap.ts';
 import { underlying } from '../tier2/typecheck.ts';
@@ -45,8 +45,7 @@ export interface ResumableRuntimeOptions {
   readonly authorizePackedCandidate?: (snapshot: ResumableSnapshot, subject: PackedCandidateSubject) => boolean;
   readonly fault?: (point: 'before-effect' | 'after-effect' | 'before-instruction-commit' | 'after-instruction-commit') => void;
 }
-export interface PackedCandidateSubject {
-  readonly format: 'aether.packed-candidate-correction/1';
+interface PackedCandidateSubjectBase {
   readonly sourceSnapshotDigest: Digest;
   readonly sourceImageDigest: Digest;
   readonly candidateImageDigest: Digest;
@@ -55,6 +54,13 @@ export interface PackedCandidateSubject {
   readonly manifestDigest: Digest;
   readonly changesDigest: Digest;
 }
+export interface PackedCandidateNativeBinding {
+  readonly operationId: string; readonly artifactDigest: Digest;
+  readonly executableSha256: string; readonly operationsDigest: Digest;
+}
+export type PackedCandidateSubject = PackedCandidateSubjectBase & (
+  {readonly format: 'aether.packed-candidate-correction/1'} |
+  {readonly format: 'aether.packed-candidate-correction/2'} & PackedCandidateNativeBinding);
 export type ResumableRunResult = { readonly state: MachineCore['state']; readonly value: MachineValue | null; readonly fault: MachineCore['fault']; readonly steps: number };
 class MachineFault extends Error { readonly kind: string; readonly recoveryId: string | null; constructor(kind: string, message: string, recoveryId: string | null = null) { super(message); this.kind = kind; this.recoveryId = recoveryId; } }
 const nil = (): MachineValue => ({ tag: 'null' });
@@ -467,10 +473,16 @@ export class ResumableRuntime {
    * its exact source and obtaining candidate-specific trusted authorization.
    * Candidate bytes alone never become an event-bound checkpoint. */
   commitPackedCandidate(sourceInput: PackedResumableCheckpoint, candidateInput: PackedHeapImage,
-    expectedSourceDigest: Digest, expectedLayoutDigest: Digest): {
+    expectedSourceDigest: Digest, expectedLayoutDigest: Digest, nativeInput?: PackedCandidateNativeBinding): {
       readonly subjectDigest: Digest; readonly snapshotDigest: Digest; readonly eventCursor: string; readonly changedFields: number
     } {
-    const source = machineClone(sourceInput), candidate = machineClone(candidateInput);
+    const source = machineClone(sourceInput), candidate = machineClone(candidateInput), native = nativeInput === undefined ? undefined : machineClone(nativeInput);
+    if (native) {
+      exactObject(native, ['operationId', 'artifactDigest', 'executableSha256', 'operationsDigest']); identifier(native.operationId);
+      validateDigest(native.artifactDigest); validateDigest(native.operationsDigest, 'aether.packed-native-operations/1');
+      if (!/^sha256:[0-9a-f]{64}$/.test(native.executableSha256) || native.artifactDigest !== this.program.manifest.target.artifactDigest)
+        throw new TypeError('invalid native packed correction binding');
+    }
     const original = unpackResumableCheckpoint(source, this.program, expectedSourceDigest, expectedLayoutDigest);
     const current = this.snapshot();
     if (checkpointDigest(current) !== expectedSourceDigest || !equalBytes(current, original)) throw new TypeError('stale packed candidate source checkpoint');
@@ -488,16 +500,17 @@ export class ResumableRuntime {
         if (!equalBytes(before.fields[field][1], after.fields[field][1])) changes.push({ row, field, value: after.fields[field][1] });
       }
     }
-    const subject: PackedCandidateSubject = Object.freeze({ format: 'aether.packed-candidate-correction/1',
+    const version = native ? '2' : '1';
+    const subject = Object.freeze({format: `aether.packed-candidate-correction/${version}`,
       sourceSnapshotDigest: expectedSourceDigest, sourceImageDigest: source.heap.imageDigest,
       candidateImageDigest: candidate.imageDigest, layoutDigest: expectedLayoutDigest,
       programDigest: this.program.digest, manifestDigest: this.program.manifestDigest,
-      changesDigest: domainDigest('aether.packed-candidate-changes/1', changes, MACHINE_LIMITS) });
-    const subjectDigest = domainDigest('aether.packed-candidate-correction/1', subject, MACHINE_LIMITS);
+      changesDigest: domainDigest('aether.packed-candidate-changes/1', changes, MACHINE_LIMITS), ...native }) as PackedCandidateSubject;
+    const subjectDigest = domainDigest(`aether.packed-candidate-correction/${version}`, subject, MACHINE_LIMITS);
     if (this.options.authorizeCorrection?.(current) !== true || this.options.authorizePackedCandidate?.(current, subject) !== true)
       throw new Error('host did not authorize packed candidate correction');
     if (checkpointDigest(this.snapshot()) !== expectedSourceDigest) throw new TypeError('packed candidate source changed during authorization');
-    if (changes.length) this.hostMutation(`packed-correction:${subjectDigest}`, () => {
+    if (changes.length) this.hostMutation(`${native ? 'packed-correction-v2' : 'packed-correction'}:${subjectDigest}`, () => {
       const touched = new Set<number>();
       for (const change of changes) {
         const row = this.core.records[change.row], expected = original.core.records[change.row];

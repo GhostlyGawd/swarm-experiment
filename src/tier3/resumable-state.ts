@@ -50,6 +50,9 @@ export interface ResumableSnapshot {
 export const MACHINE_LIMITS = Object.freeze({ maxFrameBytes: 64 * 1024 * 1024, maxDecompressedBytes: 64 * 1024 * 1024, maxObjects: 2_000_000, maxDepth: 128, maxIntegerDigits: 4096 });
 export const MAX_MACHINE_ROWS = 20_000;
 export const MAX_MACHINE_EVENTS = 4096;
+const packedCorrectionOp = (op: string): boolean =>
+  /^packed-correction:aether\.packed-candidate-correction\/1:b3:[0-9a-f]{64}$/.test(op) ||
+  /^packed-correction-v2:aether\.packed-candidate-correction\/2:b3:[0-9a-f]{64}$/.test(op);
 export const emptyEventHead = (): Digest => domainDigest('aether.resumable-events/1', { prefix: [] });
 export const machineDigest = (core: MachineCore): Digest => domainDigest('aether.resumable-core/1', core, MACHINE_LIMITS);
 export const eventDigest = (event: MachineEvent): Digest => domainDigest('aether.resumable-event/1', event, MACHINE_LIMITS);
@@ -143,7 +146,7 @@ export function validateResumableSnapshot(value: unknown, program: ResumableProg
     for (const delta of event.delta) { exactObject(delta, ['section', 'before', 'after']); if (!fields.includes(delta.section) || sections.has(delta.section)) throw new TypeError('invalid checkpoint inverse delta'); sections.add(delta.section); }
     const instruction = program.codes.find(code => code.id === event.code)?.instructions[event.pc];
     const rewind = snapshot.format === 'aether.resumable-state/2' && /^rewind-v1:[1-9][0-9]*$/.test(event.op);
-    const packedCorrection = /^packed-correction:aether\.packed-candidate-correction\/1:b3:[0-9a-f]{64}$/.test(event.op);
+    const packedCorrection = packedCorrectionOp(event.op);
     if (!Number.isSafeInteger(event.pc) || event.pc < 0 || (event.code === 'host' ? !rewind && !packedCorrection && !['allocate', 'correction', 'retry-reconciled-effect'].includes(event.op) : event.op !== 'start' && instruction?.op !== event.op)) throw new TypeError('checkpoint event does not name a bound instruction');
     if (event.effect !== null) {
       exactObject(event.effect, ['source', 'request', 'outcome']);
@@ -176,7 +179,7 @@ export function validateResumableSnapshot(value: unknown, program: ResumableProg
       if (!code || code.kind !== 'function' || event.pc !== 0 || before.frames.length || before.state === 'running' || before.state === 'blocked' || afterCore.frames.length !== 1 || afterCore.frames[0].code !== code.id || afterCore.frames[0].pc !== 0 || afterCore.state !== 'running') throw new TypeError('invalid checkpoint start provenance');
     } else if (event.code === 'host') {
       if (event.pc !== 0) throw new TypeError('invalid checkpoint host program counter');
-      const packedCorrection = /^packed-correction:aether\.packed-candidate-correction\/1:b3:[0-9a-f]{64}$/.test(event.op);
+      const packedCorrection = packedCorrectionOp(event.op);
       if (event.op === 'allocate' && (before.frames.length || before.state === 'running' || before.state === 'blocked')) throw new TypeError('host allocation outside idle safe point');
       if (event.op === 'retry-reconciled-effect' && (before.state !== 'blocked' || afterCore.state !== 'running' || afterCore.fault !== null || Buffer.compare(encodeCanonical(before.frames, MACHINE_LIMITS), encodeCanonical(afterCore.frames, MACHINE_LIMITS)))) throw new TypeError('invalid checkpoint retry provenance');
       if (event.op === 'correction' && event.delta.some(delta => !['records', 'environments', 'sequences', 'results', 'nextSequence', 'nextResult'].includes(delta.section))) throw new TypeError('correction changed protected execution control');

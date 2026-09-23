@@ -56,7 +56,7 @@ export { dischargeProof, formatReport, verifyFunction, type Obligation, type Ver
 export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec, type SpecRule } from './tier2/spec.ts';
 
 // --- Tier 3: execution and simulation ---------------------------------------
-export { ResumableRuntime, type ResumableRuntimeOptions, type ResumableRunResult, type ResumableRef, type ResumableEffects, type PackedCandidateSubject } from './tier3/resumable-runtime.ts';
+export { ResumableRuntime, type ResumableRuntimeOptions, type ResumableRunResult, type ResumableRef, type ResumableEffects, type PackedCandidateSubject, type PackedCandidateNativeBinding } from './tier3/resumable-runtime.ts';
 export { ResumableCheckpointStore, type ResumableCheckpointOptions, type CheckpointHead, type CheckpointPersistenceFault } from './tier3/resumable-checkpoint.ts';
 export { compileResumableProgram, type ResumableProgram, type ResumableCode } from './tier3/resumable-program.ts';
 export { checkpointDigest, type ResumableSnapshot, type MachineCore, type MachineEvent, type MachineValue } from './tier3/resumable-state.ts';
@@ -110,6 +110,7 @@ export { BrokerEffectRouter, EffectInvocationError, type RuntimeEffectRouter, ty
 export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessOperationEffectDisposition, type ProcessEffectContext, type ProcessCheckpointAccess, type ProcessInvocationGrant } from './tier4/process-host.ts';
 export { ProcessFallbackSupervisor, type ProcessFallbackOptions, type ProcessFallbackRepairEvent, type ProcessFallbackResult } from './tier4/process-fallback.ts';
 export { ProcessResumableSession, type ProcessResumableOptions, type ProcessResumableEffectsContext } from './tier4/process-resumable.ts';
+export { PackedNativeProcessRunner, PackedNativeRun, executePackedCheckpointNative, type PackedNativeProcessRunnerOptions, type NativeOperation, type NativeBridgeResult } from './tier4/packed-native-process.ts';
 export { seedProcessCheckpoint, seededProcessReference, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointSeed, type ProcessCheckpointAuthorization, type ProcessCheckpointAction, type ProcessCheckpointControlRequest, type ProcessCheckpointControl } from './tier4/process-checkpoint-contract.ts';
 export { ProcessDeployment, processArtifactContext, processArtifactDigest, processMigrationPlan, processEffectPlan, processAnchoredEffectPlan, processImportFreeEffectPlan, processIsolatedWasmEffectPlan, type ProcessArtifactInput, type ProcessDeploymentOptions, type CapabilityDeploymentProfile } from './tier4/process-deployment.ts';
 export { encodeAgentIrBinary, decodeAgentIrBinary, encodeAgentIrModel, decodeAgentIrModel, AGENT_IR_V2_LIMITS } from './tier1/agent-ir-v2.ts';

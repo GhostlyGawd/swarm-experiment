@@ -9,7 +9,7 @@ The retained `Mac16,8` / macOS 26.7 campaign pins source commit `e707c5f99e4f87d
 Run on Apple silicon with the Hypervisor entitlement available:
 
 ```sh
-node --experimental-strip-types roadmap/v4/research/ast-hvf-lowering/verify.ts
+node --experimental-strip-types roadmap/v4/research/ast-hvf-lowering/verify-historical.ts
 ```
 
 This is a narrow research ABI. Its signed 64-bit trap domain differs from Aether's arbitrary-precision `Int`; overflow is refused as an out-of-domain case. The manifest's `compilerDigest` and `target.artifactDigest` in the runner are research placeholders and are not a release artifact admission. The guest only reads one packed record; it does not execute the general resumable machine, validate proofs, broker effects, enforce a full capability policy, replicate, or recover state. Its mapped backing is not a full hypervisor residency measurement. V4-T3-10, V4-T4-05 and all full release gates remain open.

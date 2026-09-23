@@ -9,6 +9,7 @@ import { domainDigest, type Digest, type ExecutionManifestV1 } from '../../src/f
 import { PackedHeap, packResumableCheckpoint, type PackedLayout } from '../../src/tier3/packed-heap.ts';
 import { ResumableRuntime, type PackedCandidateSubject } from '../../src/tier3/resumable-runtime.ts';
 import { checkpointDigest, eventDigest } from '../../src/tier3/resumable-state.ts';
+import { validateCheckpointControlTransition } from '../../src/tier4/process-checkpoint-contract.ts';
 
 function fixture() {
   const symbols = new SymbolSpace('packed-candidate-handoff'), entry = symbols.define('entry');
@@ -48,6 +49,7 @@ function fixture() {
   const foreign = runtime.allocateRecord(foreignTy, {count: 13n, label: 'other'});
   const first = runtime.allocateRecord(ty, {count: 3n, label: 'alpha', next: targetOne});
   const second = runtime.allocateRecord(ty, {count: 7n, label: 'βeta', next: targetOne});
+  runtime.start(entry, []);
   const layouts = [layout, targetLayout, foreignLayout];
   const before = runtime.snapshot(), sourceDigest = checkpointDigest(before), packed = packResumableCheckpoint(before, runtime.program, layouts);
   const candidate = PackedHeap.fromImage(packed.heap, packed.heap.layoutDigest);
@@ -71,6 +73,11 @@ test('native packed candidate becomes one authorized, replayable correction even
   assert.equal(after.events.at(-1)?.op, `packed-correction:${receipt.subjectDigest}`);
   assert.equal(after.events.at(-1)?.delta.length, 1);
   assert.equal(after.events.at(-1)?.delta[0].section, 'records');
+  validateCheckpointControlTransition({kind: 'packed-v1', format: 'aether.process-packed-control/1',
+    operationId: 'historical-packed-control', expectedCheckpoint: f.sourceDigest,
+    layoutDigest: f.packed.heap.layoutDigest, sourceImageDigest: f.packed.heap.imageDigest,
+    candidateImageDigest: f.candidate.imageDigest, artifactDigest: f.runtime.program.manifest.target.artifactDigest,
+    executableSha256: `sha256:${'0'.repeat(64)}`}, f.before, after, f.runtime.program, f.layouts);
   assert.equal(f.runtime.readRecord(f.first).get('count'), 8n);
   assert.equal(f.runtime.readRecord(f.first).get('label'), 'λambda');
   assert.deepEqual(f.runtime.readRecord(f.second).get('next'), f.targetTwo);
