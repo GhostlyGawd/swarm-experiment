@@ -1,0 +1,33 @@
+✔ independently pinned key admits exact policy and survives equivalent reopen (3.745958ms)
+✔ factory key swap cannot make the same policy body trustworthy on reopen (0.803ms)
+✔ promotion cannot admit attacker-signed candidate even when approved manifest binds its digest (2.156542ms)
+✔ wrong signer ID, repository, digest, and independent epoch fail closed (0.795083ms)
+✔ missing pin, changed pin, record tampering, and key rotation require explicit migration (0.624458ms)
+✔ input rejects non-public, non-Ed25519, and invalid epoch anchors (73.659083ms)
+✔ explicit legacy ProcessHost history reopens with replacement signer key, documenting compatibility risk (872.521791ms)
+✔ real Aether AST passes base typecheck and fixed-charge linear budget checker (5.352041ms)
+✔ same success handle twice is rejected before host execution (10.054666ms)
+✔ undeclared effect call or spending is rejected (2.12325ms)
+✔ missing or wrong exhaustion fallback is rejected (0.337666ms)
+✔ fallback cannot spend or regain an effect capability (0.2105ms)
+✔ recursive budget call graph without an enforced bound is rejected (0.19225ms)
+✔ all four dimensions and fixed charge bound are checked (0.317ms)
+✔ unsupported branching/forks fail closed in the candidate checker (0.211292ms)
+✔ real durable ledger exhaustion keeps the original handle; committed charge survives reopen (906.951291ms)
+✔ real broker tolerates duplicate delivery, receipt fault, reopen and isolated replay (839.172875ms)
+✔ seeded duplicate-effect bug shrinks to a durable four-action replay witness (2794.582458ms)
+✔ a partition with no healing cannot silently count as a successful effect case (39.636916ms)
+✔ real Wasm bytes execute a pure, exact-hash i32 guest (1.124958ms)
+✔ altered bytes and a forged host import fail before guest instantiation (0.257833ms)
+✔ live broker dispatch, reopen, and isolated replay invoke the host sink only once (173.833375ms)
+✔ unknown host outcome stays indeterminate without redispatch (246.606875ms)
+✔ broker grant refusal prevents a host sink write (86.098333ms)
+✔ real SIGKILL after durable host write reconciles without another guest or sink dispatch (410.996083ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3877.475041

@@ -1,0 +1,33 @@
+    Finished `release` profile [optimized] target(s) in 0.10s
+     Running unittests src/lib.rs (roadmap/v4/research/frost-ristretto/target/release/deps/aether_frost_ristretto_prototype-3ae36eb25850ec1b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (roadmap/v4/research/frost-ristretto/target/release/deps/aether_frost_ristretto_prototype-7f6b510e351c3b6d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/protocol.rs (roadmap/v4/research/frost-ristretto/target/release/deps/protocol-78aad4066eb69622)
+
+running 8 tests
+test actual_json_wire_decodes_canonical_participant_keys_and_refuses_duplicates ... ok
+test malformed_or_incomplete_round_one_packages_never_complete_key_generation ... ok
+test old_commitment_and_insufficient_selected_set_are_refused ... ok
+test restart_drops_session_authority_instead_of_restoring_spent_nonce_material ... ok
+test participant_authentication_requires_its_own_share_and_every_peers_valid_share ... ok
+test all_four_participants_derive_identical_public_package_without_a_dealer ... ok
+test stale_dkg_private_packages_do_not_validate_against_a_new_session_commitment_set ... ok
+test signer_rejects_changed_message_commitment_and_burns_the_nonce_before_failure ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests aether_frost_ristretto_prototype
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
