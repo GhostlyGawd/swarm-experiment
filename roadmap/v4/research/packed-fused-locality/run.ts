@@ -11,7 +11,7 @@ import { MACHINE_LIMITS, type MachineRecord } from '../../../../src/tier3/resuma
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(here, '../../../..');
-const output = resolve(process.argv[2] ?? join(here, 'results/local-01'));
+const output = resolve(process.argv[2] ?? join(here, 'results/local-02'));
 const sha = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex');
 const distNames = ['local', 'cluster', 'wide'] as const;
 const counts = [4096, 16384] as const;
@@ -106,7 +106,8 @@ try {
   const adversarialRun = spawnSync(adversarialExecutable, [], { encoding: 'utf8', timeout: 120000 });
   if (adversarialRun.status !== 0) throw new Error(`adversarial run failed: ${adversarialRun.stderr || adversarialRun.error?.message}`);
   const adversarial = JSON.parse(adversarialRun.stdout);
-  if (adversarial.validParityRows !== 192192 || adversarial.invalidCases !== 13) throw new Error('adversarial coverage mismatch');
+  if (adversarial.validParityRows !== 192192 || adversarial.exhaustiveCodeRows !== 1052672 || adversarial.invalidCases !== 13)
+    throw new Error('adversarial coverage mismatch');
   const cases = [];
   for (const count of counts) for (let distribution = 0; distribution < distNames.length; distribution++) {
     const generated = makeFixture(count, distribution);

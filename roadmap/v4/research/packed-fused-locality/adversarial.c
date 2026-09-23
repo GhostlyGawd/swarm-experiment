@@ -22,7 +22,7 @@ static void expect_error(uint8_t *bytes, size_t byte_length, size_t valid_bits,
 
 int main(void) {
   const uint64_t codes[] = { 0, 1, 2, 3, 126, 127 };
-  uint64_t cases = 0;
+  uint64_t cases = 0, exhaustive_codes = 0;
   for (unsigned ref_width = 7; ref_width <= 15; ref_width += 8)
     for (size_t offset = 0; offset < 8; offset++)
       for (uint16_t value = 0; value <= 1000; value++)
@@ -49,6 +49,41 @@ int main(void) {
             cases++;
           }
 
+  /* Cover every representable relative code for both measured layouts,
+   * including codes that must fail at the source or row-count boundary. */
+  for (unsigned ref_width = 7; ref_width <= 15; ref_width += 8) {
+    const size_t source = ref_width == 7 ? 80 : 8192;
+    const size_t count = ref_width == 7 ? 160 : 16384;
+    const size_t max_relative = ref_width == 7 ? 63 : 16383;
+    for (uint64_t code = 0; code < (UINT64_C(1) << ref_width); code++)
+      for (size_t offset = 0; offset < 8; offset++)
+        for (uint16_t value = 0; value <= 1000; value += 1000)
+          for (uint8_t alive = 0; alive < 2; alive++) {
+            uint8_t bytes[8] = { 0 };
+            put(bytes, offset, 10, value);
+            put(bytes, offset + 10, 1, alive);
+            put(bytes, offset + 11, ref_width, code);
+            size_t old_target = 0;
+            int old_null = 0;
+            const ae_packed_status expected = ae_packed_ref_target(code, source,
+                count, max_relative, &old_target, &old_null);
+            ae_packed_bounded_row fused;
+            memset(&fused, 0xa5, sizeof fused);
+            ae_packed_bounded_row before = fused;
+            const ae_packed_status actual = ae_packed_read_bounded_row(bytes, 8,
+                offset + 11 + ref_width, offset, ref_width, source, count,
+                max_relative, &fused);
+            if (actual != expected) fail("exhaustive reference status mismatch");
+            if (actual == AE_PACKED_OK) {
+              if (fused.value != value || fused.alive != alive ||
+                  fused.target_ordinal != old_target || fused.is_null != old_null)
+                fail("exhaustive reference value mismatch");
+            } else if (memcmp(&fused, &before, sizeof fused))
+              fail("exhaustive reference error mutated output");
+            exhaustive_codes++;
+          }
+  }
+
   uint8_t bad[8] = { 0 };
   put(bad, 0, 10, 1001);
   expect_error(bad, 8, 18, 0, 7, 80, 160, 63, AE_PACKED_BOUNDS);
@@ -68,7 +103,7 @@ int main(void) {
   expect_error(bad, 8, 18, 0, 17, 80, 160, 63, AE_PACKED_WIDTH);
   if (ae_packed_read_bounded_row(bad, 8, 18, 0, 7, 80, 160, 63, NULL) != AE_PACKED_BOUNDS)
     fail("null output accepted");
-  printf("{\"validParityRows\":%llu,\"invalidCases\":13}\n",
-      (unsigned long long)cases);
+  printf("{\"validParityRows\":%llu,\"exhaustiveCodeRows\":%llu,\"invalidCases\":13}\n",
+      (unsigned long long)cases, (unsigned long long)exhaustive_codes);
   return 0;
 }

@@ -11,7 +11,7 @@ import { MACHINE_LIMITS, type MachineRecord } from '../../../../src/tier3/resuma
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(here, '../../../..');
-const reportPath = resolve(process.argv[2] ?? join(here, 'results/local-01/report.json'));
+const reportPath = resolve(process.argv[2] ?? join(here, 'results/local-02/report.json'));
 const report = JSON.parse(readFileSync(reportPath, 'utf8'));
 const sha = (value: Uint8Array) => createHash('sha256').update(value).digest('hex');
 function assert(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message); }
@@ -85,7 +85,8 @@ try {
   assert(sha(readFileSync(adversarialExecutable)) === report.source.adversarialBinarySha256, 'adversarial binary digest mismatch');
   const adversarialRun = spawnSync(adversarialExecutable, [], { encoding: 'utf8' });
   assert(adversarialRun.status === 0 && JSON.stringify(JSON.parse(adversarialRun.stdout)) === JSON.stringify(report.adversarial) &&
-    report.adversarial.validParityRows === 192192 && report.adversarial.invalidCases === 13, 'adversarial replay mismatch');
+    report.adversarial.validParityRows === 192192 && report.adversarial.exhaustiveCodeRows === 1052672 &&
+    report.adversarial.invalidCases === 13, 'adversarial replay mismatch');
 } finally { rmSync(temporary, { recursive: true, force: true }); }
 for (const count of [4096, 16384]) for (let distribution = 0; distribution < 3; distribution++) {
   const label = distributions[distribution], item = report.cases.find((value: any) => value.count === count && value.distribution === label);
@@ -167,4 +168,4 @@ for (const count of [4096, 16384]) for (let distribution = 0; distribution < 3; 
     }
   }
 }
-process.stdout.write(`verified 6 fixtures, 61,440 rows, 18 patterns, 504 raw timed samples, 192,192 parity rows: ${reportPath}\n`);
+process.stdout.write(`verified 6 fixtures, 61,440 rows, 18 patterns, 504 raw timed samples, 192,192 value parity rows, 1,052,672 exhaustive code rows: ${reportPath}\n`);
