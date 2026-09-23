@@ -1,0 +1,200 @@
+{
+  "format": "aether.native-fallback-switch-report/1",
+  "preregistrationSha256": "a7c84e2f4ac6169a0e54aa297e95a935e73ca8f4eb6a31ec408a2179893ac389",
+  "sourceHashes": {
+    "roadmap/v4/research/native-fallback-switch/switch.c": "ca071281a42b53843efb5715980c03be4374601bc9af6e8035758cd9210522fe",
+    "roadmap/v4/research/native-fallback-switch/verify.ts": "dc0ddd143ecac007a781216fcb7fd0680b646801c054705d5385260dcf7299f8",
+    "roadmap/v4/research/native-fallback-switch/campaign.ts": "b8065c3e89e20db65718955c0db8b9c8af17cd06dfd358e0f84568403bf0f68a",
+    "test/tier3/fallback-tree-fixture.ts": "dbecb6ec3e2ce20d00d97b2e9fc4393e9b04fca23bb3386ed06d0fd95338dbc8",
+    "src/tier3/fallback-tree.ts": "2bd81ea6e266f4387104188628e9b380c9998d521a4e89a71f9ee838b5146f64",
+    "src/tier3/compile.ts": "e9dbe025271c94fd26b184f45ebd13ba3ec427b7354d39465e0dcb40925c3fee"
+  },
+  "compiledAt": "2026-09-23T16:06:28.889Z",
+  "startedAt": "2026-09-23T16:06:30.948Z",
+  "finishedAt": "2026-09-23T16:06:30.965Z",
+  "binarySha256": "116b5f6174e8e62bc35b8c285c1817e01aca1577e364e140240b27f6091d0c01",
+  "assemblySha256": "0b52c02f4fd4023171c76c505785264d29c089f718d5b9a8b80697b74b19c57b",
+  "differentialSha256": "aaa1388d55ba7c6a61713b0ac4e2bcb942a4b3f6de21a42a164f4322505ac261",
+  "rawSha256": "b1c0a413437869bfe7cfa34848a2df142faa4a70629d04d95c7bb377636b1f83",
+  "differentialCases": 12,
+  "clock": "mach_absolute_time",
+  "tickNs": 41.666666666667,
+  "summary": {
+    "switch": {
+      "count": 10000,
+      "min": 0,
+      "p50": 0,
+      "p95": 41.666666666667,
+      "p99": 41.666666666667,
+      "max": 83.333333333334,
+      "above50ns": 1
+    },
+    "full": {
+      "count": 10000,
+      "min": 0,
+      "p50": 0,
+      "p95": 41.666666666667,
+      "p99": 41.666666666667,
+      "max": 83.333333333334,
+      "above50ns": 2
+    },
+    "timerPair": {
+      "count": 10000,
+      "min": 0,
+      "p50": 0,
+      "p95": 41.666666666667,
+      "p99": 41.666666666667,
+      "max": 41.666666666667,
+      "above50ns": 0
+    }
+  },
+  "byTrial": [
+    {
+      "switch": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "full": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "timerPair": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      }
+    },
+    {
+      "switch": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 83.333333333334,
+        "above50ns": 1
+      },
+      "full": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 83.333333333334,
+        "above50ns": 1
+      },
+      "timerPair": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      }
+    },
+    {
+      "switch": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "full": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "timerPair": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      }
+    },
+    {
+      "switch": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "full": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "timerPair": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      }
+    },
+    {
+      "switch": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "full": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 83.333333333334,
+        "above50ns": 1
+      },
+      "timerPair": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      }
+    }
+  ],
+  "verdict": "miss",
+  "qualification": "Research only: bounded manually lowered state, no Aether native compiler/guest runtime, durable journal, proof, effects, broader state, or statistically defensible hard maximum; clock quantization and observer overhead are retained."
+}

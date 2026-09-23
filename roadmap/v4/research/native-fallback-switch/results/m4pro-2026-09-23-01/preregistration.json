@@ -1,0 +1,130 @@
+{
+  "format": "aether.native-fallback-switch-preregistration/1",
+  "registeredAt": "2026-09-23T16:06:24.354Z",
+  "sourceHashes": {
+    "roadmap/v4/research/native-fallback-switch/switch.c": "ca071281a42b53843efb5715980c03be4374601bc9af6e8035758cd9210522fe",
+    "roadmap/v4/research/native-fallback-switch/verify.ts": "dc0ddd143ecac007a781216fcb7fd0680b646801c054705d5385260dcf7299f8",
+    "roadmap/v4/research/native-fallback-switch/campaign.ts": "b8065c3e89e20db65718955c0db8b9c8af17cd06dfd358e0f84568403bf0f68a",
+    "test/tier3/fallback-tree-fixture.ts": "dbecb6ec3e2ce20d00d97b2e9fc4393e9b04fca23bb3386ed06d0fd95338dbc8",
+    "src/tier3/fallback-tree.ts": "2bd81ea6e266f4387104188628e9b380c9998d521a4e89a71f9ee838b5146f64",
+    "src/tier3/compile.ts": "e9dbe025271c94fd26b184f45ebd13ba3ec427b7354d39465e0dcb40925c3fee"
+  },
+  "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+  "compilerFlags": [
+    "-O3",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fno-lto"
+  ],
+  "hardware": {
+    "architecture": "arm64",
+    "processor": "Apple M4 Pro",
+    "os": "Darwin 25.6.0 arm64"
+  },
+  "experiment": {
+    "profile": "bounded pure record-reference fallback; actual Tier 1 fault, whole-frame state and allocator rollback, alias-preserving Tier 2 execution",
+    "comparison": "12 native cases against FallbackTreeRuntime with the existing Aether AST fixture",
+    "bound": "50 ns maximum within the active frame; raw individual brackets, no timer-overhead subtraction",
+    "switchStart": "immediately before volatile Tier 1 fault-marker check, after speculative Tier 1 mutation",
+    "switchEnd": "first instruction of noinline Tier 2 body, after frame restoration, grant check and call transfer",
+    "excludedFromSwitch": [
+      "Tier 1 speculative body before detection",
+      "Tier 2 body after entry",
+      "durable journal",
+      "proof verification",
+      "external effects"
+    ],
+    "warmup": 10000,
+    "trials": 5,
+    "samplesPerTrial": 2000,
+    "workload": "aliased record argument; Tier 1 allocates ID 2, writes 99 and faults; rollback; Tier 2 allocates ID 2, increments record and validates contract",
+    "differentialCases": [
+      {
+        "mode": "primary",
+        "alias": true,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "abort",
+        "alias": true,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "primary",
+        "alias": false,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": false,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "abort",
+        "alias": false,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": true,
+        "initial": -7,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 99,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "primary",
+        "alias": true,
+        "initial": 0,
+        "grant2": false,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 0,
+        "grant2": false,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 0,
+        "grant2": true,
+        "revokeAtFault": true
+      },
+      {
+        "mode": "abort",
+        "alias": true,
+        "initial": 0,
+        "grant2": true,
+        "revokeAtFault": true
+      }
+    ]
+  }
+}
