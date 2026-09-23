@@ -4,6 +4,7 @@ import { CapabilitySealer, type CapabilityToken } from '../tier2/ocap.ts';
 import { ScopedGrantAuthority, type ScopedGrantV2 } from '../tier2/scoped-grants.ts';
 import { domainDigest } from '../fabric/identity.ts';
 import { ProductionRuntime, type CompileOptions } from '../tier3/compile.ts';
+import type { RuntimeEffectRouter } from '../tier3/effects.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
 import { type Ref, type Value } from '../tier3/values.ts';
 import { DEFAULT_COST_MODEL, type EdgeTelemetry, type FunctionTelemetry, type Telemetry, type TopologyPlan, type Unit } from './topology.ts';
@@ -191,6 +192,10 @@ export class TopologyHost {
     this.strictDispatches.push(authority);
     let execution: ExecutionResult;
     try { execution = this.callInternal(request.to, request.args, request.from); }
+    catch (error) {
+      if (error instanceof Error && error.message.startsWith('authority_denied:')) return { ok: false, unit, fault: { kind: 'authority', message: error.message, retryable: false, committed: null } };
+      throw error;
+    }
     finally { this.strictDispatches.pop(); }
     if (!execution.ok && execution.fault.kind === 'effect_indeterminate') {
       return { ok: false, unit, fault: {
@@ -211,6 +216,16 @@ export class TopologyHost {
   private validStrictDispatch(authority: { symbol: SymbolId; unit: string; tokens: readonly (CapabilityToken | ScopedGrantV2)[] }): boolean {
     return (this.declarations.get(authority.symbol)?.capabilities ?? []).every(capability =>
       authority.tokens.some(token => this.scopedGrants!.verify(token, { capability, audience: authority.symbol, path: this.grantPath(authority.unit) })));
+  }
+  private currentStrictAuthority(): boolean {
+    const authority = this.strictDispatches.at(-1);
+    return !!authority && this.unitFor(authority.symbol) === authority.unit && this.validStrictDispatch(authority);
+  }
+  private assertStrictEffect(capability: CapabilityName, unit: string): void {
+    if (!this.currentStrictAuthority() || !this.planValue.units.find(row => row.id === unit)?.capabilities.includes(capability)
+      || !this.declarations.get(this.strictDispatches.at(-1)!.symbol)?.capabilities.includes(capability)) {
+      throw new Error(`authority_denied: current topology effect ${capability}`);
+    }
   }
   issueTokens(symbol: SymbolId, ttlMs = 60_000): (CapabilityToken | ScopedGrantV2)[] {
     const unit = this.unitFor(symbol);
@@ -264,11 +279,28 @@ export class TopologyHost {
   }
 
   private compileUnit(unit: Unit): ProductionRuntime {
+    const wrapRouter = (router: RuntimeEffectRouter): RuntimeEffectRouter => ({
+      get mode() { return router.mode; },
+      bind: root => router.bind(root),
+      invoke: (capability, args) => { if (router.mode === 'live') this.assertStrictEffect(capability, unit.id); return router.invoke(capability, args); },
+      fork: () => wrapRouter(router.fork()),
+      ...(router.adapterIdentity ? { adapterIdentity: (capability: CapabilityName) => router.adapterIdentity!(capability) } : {}),
+    });
+    const effects = this.scopedGrants && this.compileOptions.effects
+      ? new Map([...this.compileOptions.effects].map(([capability, handler]) => [capability,
+        (args: readonly Value[], from?: SymbolId) => { this.assertStrictEffect(capability, unit.id); return handler(args, from); }] as const))
+      : this.compileOptions.effects;
     const options: CompileOptions = {
       ...this.compileOptions,
       includeSymbols: unit.members,
+      effects,
+      ...(this.scopedGrants ? { effectRouter: this.compileOptions.effectRouter ? wrapRouter(this.compileOptions.effectRouter) : undefined,
+        executionGuard: () => this.currentStrictAuthority() && (this.compileOptions.executionGuard?.() ?? true) === true } : {}),
       callHandler: (callee, args, caller) => this.callInternal(callee, args, caller),
-      continuationHandler: (runtime, execute) => this.withRuntime(runtime, execute),
+      continuationHandler: (runtime, execute) => {
+        if (this.scopedGrants && !this.currentStrictAuthority()) throw new Error('authority_denied: strict topology continuation');
+        return this.withRuntime(runtime, execute);
+      },
     };
     return ProductionRuntime.compile(this.module, options);
   }

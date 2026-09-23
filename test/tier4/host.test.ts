@@ -12,6 +12,7 @@ import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
+import type { RuntimeEffectRouter } from '../../src/tier3/effects.ts';
 
 const grantDirectories: string[] = [];
 after(() => grantDirectories.forEach(path => rmSync(path, { recursive: true, force: true })));
@@ -105,6 +106,70 @@ test('strict topology dispatch rechecks a grant after the initial boundary check
   assert.equal(result.ok, false); if (!result.ok) assert.equal(result.fault.kind, 'authority');
   assert.equal(host.readRecord(alice).get('balance'), 100n);
   assert.equal(host.readRecord(bob).get('balance'), 0n);
+});
+
+test('strict topology effect callbacks recheck revocation before each sink', () => {
+  const symbols = new SymbolSpace('topology-effect-recheck'), main = symbols.define('main');
+  const registry = new CapabilityRegistry();
+  const first = registry.declare('cap:test:first', { arity: 0, description: 'First effect.' }).name;
+  const second = registry.declare('cap:test:second', { arity: 0, description: 'Second effect.' }).name;
+  const entry = b.fn({ symbol: main, returns: b.Unit, capabilities: [first, second], body: b.block(
+    b.exprStmt(b.invoke(first)), b.exprStmt(b.invoke(second)), b.ret(b.unit())) });
+  const module = b.module_({ symbol: symbols.define('module'), members: [entry], symbolTable: symbols.table() });
+  const plan = { shape: 'containers' as const, units: [{ id: 'worker', members: [main], capabilities: [first, second], placement: 'container' as const, memoryMb: 16 }],
+    crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+  let epoch = '0', firstCalls = 0, secondCalls = 0;
+  const grants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(41), repositoryId: 'repository', clock: () => 100,
+    policyEpoch: () => '0', revocationEpoch: () => epoch, isRevoked: () => false,
+    authorizeIssue: () => true, authorizeDelegate: () => true });
+  const host = new TopologyHost(module, plan, { registry, symbols, scopedGrants: grants,
+    effects: new Map([[first, () => { firstCalls++; epoch = '1'; return null; }], [second, () => { secondCalls++; return null; }]]) });
+  const result = host.dispatch({ id: 'two-effects', from: null, to: main, args: [], capabilities: host.issueTokens(main) });
+  assert.equal(result.ok, false); assert.equal(firstCalls, 1); assert.equal(secondCalls, 0);
+});
+
+test('strict topology closure entry rechecks authority after revocation', () => {
+  const symbols = new SymbolSpace('topology-closure-recheck'), main = symbols.define('main'), callback = symbols.define('callback');
+  const registry = new CapabilityRegistry();
+  const first = registry.declare('cap:test:first', { arity: 0, description: 'Revoke on first effect.' }).name;
+  const second = registry.declare('cap:test:second', { arity: 0, description: 'Closure effect.' }).name;
+  const closureType = { t: 'Fn' as const, params: [], returns: b.Unit, capabilities: [second] };
+  const entry = b.fn({ symbol: main, returns: b.Unit, capabilities: [first, second], body: b.block(
+    b.let_(callback, closureType, b.lambda({ returns: b.Unit, capabilities: [second], body: b.invoke(second) })),
+    b.exprStmt(b.invoke(first)), b.exprStmt(b.apply(b.v(callback))), b.ret(b.unit())) });
+  const module = b.module_({ symbol: symbols.define('module'), members: [entry], symbolTable: symbols.table() });
+  const plan = { shape: 'containers' as const, units: [{ id: 'worker', members: [main], capabilities: [first, second], placement: 'container' as const, memoryMb: 16 }],
+    crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+  let epoch = '0', secondCalls = 0;
+  const grants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(43), repositoryId: 'repository', clock: () => 100,
+    policyEpoch: () => '0', revocationEpoch: () => epoch, isRevoked: () => false,
+    authorizeIssue: () => true, authorizeDelegate: () => true });
+  const host = new TopologyHost(module, plan, { registry, symbols, scopedGrants: grants,
+    effects: new Map([[first, () => { epoch = '1'; return null; }], [second, () => { secondCalls++; return null; }]]) });
+  const result = host.dispatch({ id: 'closure-after-revocation', from: null, to: main, args: [], capabilities: host.issueTokens(main) });
+  assert.equal(result.ok, false); assert.equal(secondCalls, 0);
+  if (!result.ok) assert.match(result.fault.message, /authority_denied: strict topology continuation/);
+});
+
+test('strict topology router boundary rechecks revocation before the next live adapter', () => {
+  const symbols = new SymbolSpace('topology-router-recheck'), main = symbols.define('main');
+  const registry = new CapabilityRegistry();
+  const first = registry.declare('cap:test:first', { arity: 0, description: 'First router effect.' }).name;
+  const second = registry.declare('cap:test:second', { arity: 0, description: 'Second router effect.' }).name;
+  const entry = b.fn({ symbol: main, returns: b.Unit, capabilities: [first, second], body: b.block(
+    b.exprStmt(b.invoke(first)), b.exprStmt(b.invoke(second)), b.ret(b.unit())) });
+  const module = b.module_({ symbol: symbols.define('module'), members: [entry], symbolTable: symbols.table() });
+  const plan = { shape: 'containers' as const, units: [{ id: 'worker', members: [main], capabilities: [first, second], placement: 'container' as const, memoryMb: 16 }],
+    crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+  let epoch = '0', firstCalls = 0, secondCalls = 0;
+  const grants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(47), repositoryId: 'repository', clock: () => 100,
+    policyEpoch: () => '0', revocationEpoch: () => epoch, isRevoked: () => false,
+    authorizeIssue: () => true, authorizeDelegate: () => true });
+  const router: RuntimeEffectRouter = { mode: 'live', bind() {}, fork() { throw new Error('no speculative router in this fixture'); },
+    invoke(capability) { if (capability === first) { firstCalls++; epoch = '1'; return null; } secondCalls++; return null; } };
+  const host = new TopologyHost(module, plan, { registry, symbols, scopedGrants: grants, effectRouter: router });
+  const result = host.dispatch({ id: 'router-effects', from: null, to: main, args: [], capabilities: host.issueTokens(main) });
+  assert.equal(result.ok, false); assert.equal(firstCalls, 1); assert.equal(secondCalls, 0);
 });
 
 test('durable grant revocation survives restart at a real topology dispatch boundary', () => {
