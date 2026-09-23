@@ -11,7 +11,7 @@ import { GraphStore } from '../../../../src/tier1/store.ts';
 import { SymbolSpace } from '../../../../src/tier1/symbols.ts';
 import { typeName } from '../../../../src/tier1/ids.ts';
 import { CapabilityRegistry } from '../../../../src/tier2/ocap.ts';
-import { domainDigest, type ExecutionManifestV1 } from '../../../../src/fabric/identity.ts';
+import { domainDigest, type Digest, type ExecutionManifestV1 } from '../../../../src/fabric/identity.ts';
 import { checkpointDigest } from '../../../../src/tier3/resumable-state.ts';
 import { ResumableRuntime } from '../../../../src/tier3/resumable-runtime.ts';
 import { PackedHeap, packResumableCheckpoint, unpackResumableCheckpoint, type PackedLayout } from '../../../../src/tier3/packed-heap.ts';
@@ -28,7 +28,7 @@ const layout: PackedLayout = { typeName: nodeName, fields: [
   { name: 'link', kind: 'ref', maxRelative: 3 },
 ] };
 
-function runtimeFixture() {
+function runtimeFixture(authorization?: { value: Digest | null }) {
   const symbols = new SymbolSpace('packed-native'), entry = symbols.define('entry');
   const declaration = b.fn({ symbol: entry, returns: b.Int, body: b.ret(b.int(1)) });
   const module = b.module_({ symbol: symbols.define('module'), members: [declaration], symbolTable: symbols.table() });
@@ -38,10 +38,11 @@ function runtimeFixture() {
     target: { abiVersion: 'resumable/1', profileDigest: digest('target'), artifactDigest: digest('artifact') },
     capabilityPolicyDigest: digest('caps'), evidencePolicyDigest: digest('evidence') };
   return new ResumableRuntime(module, { manifest, registry: new CapabilityRegistry(),
-    executionId: 'packed-native-execution', authorizeCorrection: () => true });
+    executionId: 'packed-native-execution', authorizeCorrection: () => true,
+    authorizePackedCandidate: authorization ? (_snapshot, subject) => subject.candidateImageDigest === authorization.value : undefined });
 }
-function fixture() {
-  const runtime = runtimeFixture();
+function fixture(authorization?: { value: Digest | null }) {
+  const runtime = runtimeFixture(authorization);
   const a = runtime.allocateRecord(nodeType, { number: 1000n, alive: true, link: null });
   const bRef = runtime.allocateRecord(nodeType, { number: 5n, alive: false, link: null });
   const c = runtime.allocateRecord(nodeType, { number: 7n, alive: true, link: null });
@@ -50,6 +51,43 @@ function fixture() {
   runtime.correctRecord(a, 'link', c);
   return { runtime, a, bRef, c };
 }
+
+test('actual /1 C mutation enters one authorized, replayable packed correction event', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'aether-packed-native-commit-'));
+  try {
+    const executable = join(folder, 'native');
+    execFileSync('cc', ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
+      new URL('native.c', directory).pathname, new URL('../packed-heap/abi.c', directory).pathname, '-o', executable]);
+    const authorization = { value: null as Digest | null };
+    const { runtime, a, bRef } = fixture(authorization);
+    const original = runtime.snapshot(), sourceDigest = checkpointDigest(original);
+    const packed = packResumableCheckpoint(original, runtime.program, [layout]);
+    const result = executePackedCheckpointNative({ packed, program: runtime.program,
+      expectedSnapshotDigest: sourceDigest, expectedLayoutDigest: packed.heap.layoutDigest,
+      executable, expectedExecutableSha256: sha256(readFileSync(executable)), operations: [
+        { kind: 'addInt', id: String(bRef.addr), field: 'number', increment: '10' },
+        { kind: 'setRef', id: String(a.addr), field: 'link', targetId: String(bRef.addr) },
+      ] });
+    assert.deepEqual(result.observations, ['I 0 15', 'S 0']);
+    assert.equal(checkpointDigest(runtime.snapshot()), sourceDigest);
+    assert.throws(() => runtime.commitPackedCandidate(packed, result.candidateHeap, sourceDigest, packed.heap.layoutDigest), /did not authorize/);
+    assert.equal(checkpointDigest(runtime.snapshot()), sourceDigest);
+    authorization.value = result.candidateHeap.imageDigest;
+    const receipt = runtime.commitPackedCandidate(packed, result.candidateHeap, sourceDigest, packed.heap.layoutDigest);
+    assert.equal(receipt.changedFields, 2);
+    const after = runtime.snapshot();
+    assert.equal(checkpointDigest(after), receipt.snapshotDigest);
+    assert.equal(after.events.length, original.events.length + 1);
+    assert.equal(after.events.at(-1)?.op, `packed-correction:${receipt.subjectDigest}`);
+    assert.equal(runtime.readRecord(bRef).get('number'), 15n);
+    assert.deepEqual(runtime.readRecord(a).get('link'), bRef);
+    const reopened = runtimeFixture();
+    reopened.restore(after, receipt.snapshotDigest);
+    assert.equal(reopened.readRecord(bRef).get('number'), 15n);
+    reopened.rewind(1);
+    assert.equal(checkpointDigest(reopened.snapshot()), sourceDigest);
+  } finally { rmSync(folder, { recursive: true, force: true }); }
+});
 
 test('real packed checkpoint enters native executable, preserves aliases, and matches host correction', () => {
   const folder = mkdtempSync(join(tmpdir(), 'aether-packed-native-'));

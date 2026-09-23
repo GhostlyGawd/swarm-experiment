@@ -8,11 +8,13 @@ import { MACHINE_LIMITS } from '../../../../src/tier3/resumable-state.ts';
 
 export type NativeOperation =
   | { readonly kind: 'readInt' | 'readBool' | 'readRef'; readonly id: string; readonly field: string }
+  | { readonly kind: 'readString'; readonly id: string; readonly field: string }
+  | { readonly kind: 'equalString'; readonly id: string; readonly field: string; readonly otherId: string; readonly otherField: string }
   | { readonly kind: 'addInt'; readonly id: string; readonly field: string; readonly increment: string }
   | { readonly kind: 'setRef'; readonly id: string; readonly field: string; readonly targetId: string | null };
 
 export interface NativeBridgeResult {
-  readonly format: 'aether.packed-native-bridge-result/1';
+  readonly format: 'aether.packed-native-bridge-result/1' | 'aether.packed-native-bridge-result/2';
   readonly inputSnapshotDigest: Digest;
   readonly layoutDigest: Digest;
   readonly executableSha256: string;
@@ -32,7 +34,8 @@ const fieldWidth = (field: PackedField): number => {
   if (field.kind === 'bool') return 1;
   if (field.kind === 'ref') return width(BigInt(2 * field.maxRelative + 1));
   if (field.kind === 'int') return width(BigInt(field.max) - BigInt(field.min));
-  throw new TypeError('native bridge does not support packed string fields');
+  if (field.kind === 'string') return 12;
+  throw new TypeError('unsupported packed field');
 };
 const sha256 = (bytes: Uint8Array): string => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const policyCode = { trap: 0, wrap: 1, saturate: 2 } as const;
@@ -51,7 +54,7 @@ export function executePackedCheckpointNative(args: {
   unpackResumableCheckpoint(args.packed, args.program, args.expectedSnapshotDigest, args.expectedLayoutDigest);
   const image = args.packed.heap;
   const model = PackedHeap.fromImage(image, args.expectedLayoutDigest);
-  if (model.format !== 'aether.packed-heap/1') throw new TypeError('native bridge does not support packed string images');
+  const strings = model.format === 'aether.packed-heap/2';
   if (model.rows.length < 1 || model.rows.length > 1024 || model.byteLength > 65536 ||
       !Array.isArray(args.operations) || args.operations.length > 4096) throw new RangeError('native bridge profile limit');
   const executableSha256 = sha256(readFileSync(args.executable));
@@ -60,10 +63,20 @@ export function executePackedCheckpointNative(args: {
   const layouts = new Map(model.layouts.map(layout => [layout.typeName, layout]));
   const raw = Buffer.from(image.bytes, 'base64');
   const validBits = model.rows.reduce((sum, row) => sum + row.bitLength, 0);
-  const lines = [`AEPBR001 ${model.rows.length} ${raw.length} ${validBits} ${args.operations.length}`, raw.length ? raw.toString('hex') : '-'];
+  const arena = strings ? Buffer.from(image.stringBytes!, 'base64') : Buffer.alloc(0);
+  const entries = strings ? image.stringEntries! : [];
+  if (entries.length > 4096 || arena.length > 65536) throw new RangeError('native bridge string profile limit');
+  const lines = [strings
+    ? `AEPBR002 ${model.rows.length} ${raw.length} ${validBits} ${args.operations.length} ${entries.length} ${arena.length}`
+    : `AEPBR001 ${model.rows.length} ${raw.length} ${validBits} ${args.operations.length}`,
+    raw.length ? raw.toString('hex') : '-'];
   for (const row of model.rows) {
     nativeDecimal(row.id); nativeDecimal(row.epoch);
     lines.push(`${row.id} ${row.epoch} ${row.bitOffset} ${row.bitLength}`);
+  }
+  if (strings) {
+    for (const entry of entries) lines.push(`${entry.offset} ${entry.length}`);
+    lines.push(arena.length ? arena.toString('hex') : '-');
   }
   const expected: string[] = [];
   for (const op of args.operations) {
@@ -99,6 +112,25 @@ export function executePackedCheckpointNative(args: {
       const value = model.get(op.id, op.field);
       if (value.tag !== 'bool') throw new TypeError('invalid packed boolean model');
       lines.push(`B ${ordinal} ${offset} ${bits}`); expected.push(`B 0 ${value.value ? 1 : 0}`);
+    } else if (op.kind === 'readString' && field.kind === 'string') {
+      const value = model.get(op.id, op.field);
+      if (value.tag !== 'string') throw new TypeError('invalid packed string model');
+      const utf8 = Buffer.from(value.value, 'utf8');
+      lines.push(`T ${ordinal} ${offset} ${bits} ${field.maxUtf8Bytes}`);
+      expected.push(`T 0 ${utf8.length ? utf8.toString('hex') : '-'}`);
+    } else if (op.kind === 'equalString' && field.kind === 'string') {
+      const otherOrdinal = rowIndex.get(op.otherId);
+      if (otherOrdinal === undefined) throw new ReferenceError('unknown native comparison row');
+      const otherRow = model.rows[otherOrdinal], otherLayout = layouts.get(otherRow.typeName)!;
+      const otherIndex = otherLayout.fields.findIndex(part => part.name === op.otherField);
+      if (otherIndex < 0) throw new ReferenceError('unknown native comparison field');
+      const otherField = otherLayout.fields[otherIndex];
+      if (otherField.kind !== 'string') throw new TypeError('native comparison requires string fields');
+      const otherOffset = otherRow.bitOffset + otherLayout.fields.slice(0, otherIndex).reduce((sum, part) => sum + fieldWidth(part), 0);
+      const left = model.get(op.id, op.field), right = model.get(op.otherId, op.otherField);
+      if (left.tag !== 'string' || right.tag !== 'string') throw new TypeError('invalid packed string model');
+      lines.push(`E ${ordinal} ${offset} ${bits} ${field.maxUtf8Bytes} ${otherOrdinal} ${otherOffset} 12 ${otherField.maxUtf8Bytes}`);
+      expected.push(`E 0 ${left.value === right.value ? 1 : 0}`);
     } else if (op.kind === 'readRef' && field.kind === 'ref') {
       const value = model.get(op.id, op.field);
       lines.push(`R ${ordinal} ${offset} ${bits} ${field.maxRelative}`);
@@ -124,10 +156,10 @@ export function executePackedCheckpointNative(args: {
   const nativeBytes = output.at(-1)!.slice(2) === '-' ? Buffer.alloc(0) : Buffer.from(output.at(-1)!.slice(2), 'hex');
   const { imageDigest: _old, ...body } = image;
   const candidateBody = { ...body, bytes: nativeBytes.toString('base64') };
-  const candidateHeap = { ...candidateBody, imageDigest: domainDigest('aether.packed-heap-image/1', candidateBody, MACHINE_LIMITS) };
+  const candidateHeap = { ...candidateBody, imageDigest: domainDigest(strings ? 'aether.packed-heap-image/2' : 'aether.packed-heap-image/1', candidateBody, MACHINE_LIMITS) };
   PackedHeap.fromImage(candidateHeap, args.expectedLayoutDigest);
   return {
-    format: 'aether.packed-native-bridge-result/1', inputSnapshotDigest: args.expectedSnapshotDigest,
+    format: strings ? 'aether.packed-native-bridge-result/2' : 'aether.packed-native-bridge-result/1', inputSnapshotDigest: args.expectedSnapshotDigest,
     layoutDigest: image.layoutDigest, executableSha256, observations: output.slice(0, -1),
     candidateHeap,
   };
