@@ -107,7 +107,7 @@ test('post-rewind externally held future references cannot alias divergent new a
 test('checkpoint validation rejects stale code/schema, corrupt frame PCs and altered inverse events', () => {
   const f = pendingFixture(), runtime = f.runtime(); runtime.start(f.entry, [1n]); runtime.run(4); const snapshot = runtime.snapshot();
   const cases = [
-    { ...snapshot, format: 'aether.resumable-state/2' },
+    { ...snapshot, format: 'aether.resumable-state/999' },
     { ...snapshot, core: { ...snapshot.core, programDigest: digest('other-code') } },
     { ...snapshot, eventCursor: '999' },
   ];
@@ -155,6 +155,24 @@ test('asynchronous correction policy cannot authorize local or heap mutations', 
   const started = runtime.snapshot();
   assert.throws(() => runtime.correctLocal(frame.id, declaration.params[0].symbol, 9n), /did not authorize/);
   assert.deepEqual(runtime.snapshot(), started);
+  assert.throws(() => runtime.rewindRetainingHistory(1), /did not authorize/); assert.deepEqual(runtime.snapshot(), started);
+});
+
+test('retained rewind appends checked inverse history and cannot masquerade as version 1', () => {
+  const f = pendingFixture(), runtime = new ResumableRuntime(f.module, { ...f.options, authorizeCorrection: () => true });
+  runtime.start(f.entry, [4n]); runtime.run(4); const target = runtime.snapshot(); runtime.run(3); const before = runtime.snapshot();
+  runtime.rewindRetainingHistory(3); const rewound = runtime.snapshot();
+  assert.equal(rewound.format, 'aether.resumable-state/2'); assert.deepEqual(rewound.core, target.core); assert.deepEqual(rewound.events.slice(0, -1), before.events);
+  validateResumableSnapshot(rewound, runtime.program);
+  assert.throws(() => validateResumableSnapshot({ ...rewound, format: 'aether.resumable-state/1' }, runtime.program), /bound instruction/);
+  const corrupt = machineClone(rewound); corrupt.events.at(-1)!.op = 'rewind-v1:2'; corrupt.eventHead = eventDigest(corrupt.events.at(-1)!);
+  assert.throws(() => validateResumableSnapshot(corrupt, runtime.program), /exact historical core/);
+  const reopened = f.runtime(); reopened.restore(rewound, checkpointDigest(rewound)); assert.equal(reopened.run().state, 'completed');
+  const type: Ty = { t: 'Record', name: typeName('type:test:retained_future'), fields: [['value', b.Int]] };
+  const heap = new ResumableRuntime(f.module, { ...f.options, authorizeCorrection: () => true });
+  const future = heap.allocateRecord(type, { value: 7n }); heap.rewindRetainingHistory(1);
+  const replayed = heap.allocateRecord(type, { value: 7n }); assert.deepEqual(replayed, future);
+  heap.rewindRetainingHistory(1); const divergent = heap.allocateRecord(type, { value: 8n }); assert.notEqual(divergent.ownerEpoch, future.ownerEpoch); assert.throws(() => heap.readRecord(future), /stale/);
 });
 
 test('fresh-process replay preserves allocation identity while divergence rejects a held future handle', () => {

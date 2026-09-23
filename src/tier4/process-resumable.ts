@@ -9,11 +9,13 @@ import { encodeCanonical, type LogicalRefV1, type TaggedValueV1 } from '../fabri
 import { domainDigest, type Digest } from '../fabric/identity.ts';
 import { runtimeSnapshotDigest, type RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
 import { effectPayloadDigest, effectReplayOutcomeDigest, type EffectAdapter, type EffectEventV1, type EffectRequestV1 } from '../fabric/effects.ts';
-import type { CapabilityToken } from '../tier2/ocap.ts';
+import { underlying } from '../tier2/typecheck.ts';
+import { validateMachineResult, instantiateMachineType } from '../tier3/resumable-types.ts';
+import type { Value } from '../tier3/values.ts';
 import { ResumableRuntime, type ResumableRuntimeOptions, type ResumableEffects, type ResumableRunResult } from '../tier3/resumable-runtime.ts';
-import { checkpointDigest, machineClone, type ResumableSnapshot } from '../tier3/resumable-state.ts';
-import type { ProcessHost, ProcessCheckpointAccess } from './process-host.ts';
-import { projectProcessCheckpoint, processReferenceFromCheckpoint, type ProcessCheckpointBinding, type ProcessCheckpointReceipt } from './process-checkpoint-contract.ts';
+import { checkpointDigest, machineClone, type ResumableSnapshot, type MachineValue, type MachineCore } from '../tier3/resumable-state.ts';
+import type { ProcessHost, ProcessCheckpointAccess, ProcessInvocationGrant } from './process-host.ts';
+import { projectProcessCheckpoint, processReferenceFromCheckpoint, validateCheckpointControlRequest, type ProcessCheckpointBinding, type ProcessCheckpointReceipt, type ProcessCheckpointControlRequest, type ProcessCheckpointControl } from './process-checkpoint-contract.ts';
 
 export interface ProcessResumableEffectsContext {
   readonly binding: ProcessCheckpointBinding;
@@ -24,12 +26,32 @@ export interface ProcessResumableEffectsContext {
 export interface ProcessResumableOptions {
   readonly host: ProcessHost; readonly module: Term;
   readonly runtime: Omit<ResumableRuntimeOptions, 'executionId' | 'heapId' | 'ownerEpoch' | 'mode' | 'branchId' | 'capabilities' | 'effects' | 'onSafePoint' | 'fault' | 'authorizeCorrection'>;
-  readonly tokens: () => readonly CapabilityToken[];
+  readonly tokens: () => readonly ProcessInvocationGrant[];
   /** Trusted host adapter factory; use a broker namespace specific to binding.id. */
   readonly effects?: (context: ProcessResumableEffectsContext) => ResumableEffects;
   readonly onCheckpoint?: (checkpoint: ResumableSnapshot) => void;
 }
 function same(a: unknown, b: unknown): boolean { return Buffer.from(encodeCanonical(a)).equals(Buffer.from(encodeCanonical(b))); }
+function replayState(core: MachineCore): unknown { const { steps: _steps, ...logical } = core; return logical; }
+function checkReplayBarrier(current: ResumableSnapshot, barrier: ResumableSnapshot | null, events: readonly EffectEventV1[]): void {
+  if (!barrier || BigInt(current.core.effectCursor) >= BigInt(barrier.core.effectCursor)) return;
+  const index = Number(current.core.effectCursor), expected = barrier.core.effectPrefix[index], actual = events[index];
+  if (!actual || !actual.outcome || actual.outcome.state === 'indeterminate' || actual.requestDigest !== expected.requestDigest || effectReplayOutcomeDigest(actual.outcome) !== expected.outcomeDigest) throw new Error('checkpoint replay debt lost its durable recorded outcome');
+  const target = machineClone(barrier.core) as unknown as Record<string, unknown>;
+  for (let position = barrier.events.length - 1; position >= 0; position--) {
+    const event = barrier.events[position]; for (const delta of event.delta) target[delta.section] = machineClone(delta.before);
+    if (event.effect?.request.effectId === `effect-${index}` && event.effect.outcome.state !== 'indeterminate') {
+      if (!same(replayState(current.core), replayState(target as unknown as MachineCore))) throw new Error('checkpoint replay diverged before consuming recorded effects');
+      return;
+    }
+  }
+  throw new Error('checkpoint replay barrier lacks its historical instruction');
+}
+function correctionValue(value: TaggedValueV1): Value {
+  if (value.tag === 'null') return null; if (value.tag === 'int') return BigInt(value.value); if (value.tag === 'string' || value.tag === 'bool') return value.value;
+  if (value.tag === 'ref') return { addr: Number(value.value.objectId), heapId: value.value.heapId, ownerEpoch: value.value.ownerEpoch } as Value;
+  throw new TypeError('unsupported process correction value');
+}
 function heapType(type: Ty): void {
   if (type.t === 'Nominal') return heapType(type.repr);
   if (type.t === 'Owned') return heapType(type.inner);
@@ -72,11 +94,12 @@ export class ProcessResumableSession {
     for (const [capability, adapter] of original.adapters) {
       const id = domainDigest('aether.process-checkpoint-adapter/1', { binding: access.binding.id, capability, adapter: adapter.id, semantics: adapter.semantics });
       const request = (value: EffectRequestV1) => translateRequest(value, access.binding, snapshot());
+      const dispatchAuthority = (): void => { access.assertAuthority(); if (access.replayBarrier && BigInt(snapshot().core.effectCursor) < BigInt(access.replayBarrier.core.effectCursor)) throw new Error('checkpoint replay debt cannot dispatch a live adapter'); };
       adapters.set(capability, {
         id, semantics: adapter.semantics,
-        ...(adapter.execute ? { execute: (value: EffectRequestV1) => { access.assertAuthority(); return adapter.execute!(request(value)); } } : {}),
-        ...(adapter.prepare ? { prepare: (value: EffectRequestV1) => { access.assertAuthority(); return adapter.prepare!(request(value)); } } : {}),
-        ...(adapter.commit ? { commit: (value: EffectRequestV1, prepared: TaggedValueV1) => { access.assertAuthority(); return adapter.commit!(request(value), prepared); } } : {}),
+        ...(adapter.execute ? { execute: (value: EffectRequestV1) => { dispatchAuthority(); return adapter.execute!(request(value)); } } : {}),
+        ...(adapter.prepare ? { prepare: (value: EffectRequestV1) => { dispatchAuthority(); return adapter.prepare!(request(value)); } } : {}),
+        ...(adapter.commit ? { commit: (value: EffectRequestV1, prepared: TaggedValueV1) => { dispatchAuthority(); return adapter.commit!(request(value), prepared); } } : {}),
         ...(adapter.abort ? { abort: (value: EffectRequestV1, prepared: TaggedValueV1 | null) => { access.assertAuthority(); return adapter.abort!(request(value), prepared); } } : {}),
         ...(adapter.reconcile ? { reconcile: (value: EffectRequestV1, prepared: TaggedValueV1 | null) => { access.assertAuthority(); return adapter.reconcile!(request(value), prepared); } } : {}),
       });
@@ -93,11 +116,18 @@ export class ProcessResumableSession {
     return this.options.host.withCheckpoint(this.binding.id, 'run', this.options.tokens(), async access => {
       let latest = access.checkpoint;
       const resources = this.resources(access, () => latest);
+      if (access.replayBarrier) {
+        const events = this.events(resources);
+        for (const [index, expected] of access.replayBarrier.core.effectPrefix.entries()) {
+          const actual = events[index];
+          if (!actual?.outcome || actual.outcome.state === 'indeterminate' || actual.requestDigest !== expected.requestDigest || effectReplayOutcomeDigest(actual.outcome) !== expected.outcomeDigest) throw new Error('checkpoint replay debt lost its durable recorded outcome');
+        }
+      }
       const entry = access.program.codes.find(code => code.id === `function:${this.binding.symbol}`)!;
       const runtime = new ResumableRuntime(this.options.module, { ...this.options.runtime, executionId: latest.core.executionId, heapId: latest.core.heapId, ownerEpoch: latest.core.ownerEpoch, mode: 'live', branchId: null,
         effects: resources.effects, capabilities: () => { access.assertAuthority(); return entry.capabilities; },
         onSafePoint: (_event, machine) => { const checkpoint = machine.snapshot(); access.save(checkpoint); latest = checkpoint; this.options.onCheckpoint?.(machineClone(checkpoint)); access.assertAuthority(); },
-        fault: point => { if (point === 'before-effect') { access.assertAuthority(); this.events(resources); } },
+        fault: point => { if (point === 'before-effect') { access.assertAuthority(); checkReplayBarrier(latest, access.replayBarrier, this.events(resources)); } },
       });
       if (runtime.program.digest !== access.program.digest) throw new TypeError('resumable bridge compiler/registry mismatch');
       runtime.restore(latest, checkpointDigest(latest));
@@ -120,6 +150,49 @@ export class ProcessResumableSession {
         runtime.restore(latest, checkpointDigest(latest)); runtime.retryBlocked(); latest = runtime.snapshot(); access.save(latest);
       }
     });
+  }
+  /** Corrections are typed, explicitly authorized control operations. The
+   * expected checkpoint and operation ID make retries safe across restart. */
+  async correct(request: Exclude<ProcessCheckpointControlRequest, { kind: 'rewind' }>): Promise<ProcessCheckpointControl> { return this.control(request); }
+  async rewind(request: Extract<ProcessCheckpointControlRequest, { kind: 'rewind' }>): Promise<ProcessCheckpointControl> { return this.control(request); }
+  private async control(request: ProcessCheckpointControlRequest): Promise<ProcessCheckpointControl> {
+    validateCheckpointControlRequest(request); request = machineClone(request);
+    return this.options.host.withCheckpoint(this.binding.id, request.kind === 'rewind' ? 'rewind' : 'correct', this.options.tokens(), async access => {
+      if (access.controlReceipt) return access.controlReceipt;
+      const snapshot = access.checkpoint, resources = this.resources(access, () => snapshot), events = this.events(resources);
+      if (events.some(event => event.outcome === null || event.outcome.state === 'indeterminate')) throw new Error('checkpoint control requires reconciled effects');
+      if (request.kind !== 'rewind') {
+        if (snapshot.core.state !== 'running' || !snapshot.core.frames.length || snapshot.core.frames.some(frame => frame.pc >= access.program.codes.find(code => code.id === frame.code)!.returnPc)) throw new Error('checkpoint correction requires a running body before postcondition evaluation; rewind first');
+        let type: Ty | undefined;
+        if (request.kind === 'record') {
+          const record = snapshot.core.records.find(row => row.id === request.reference.objectId && row.epoch === request.reference.ownerEpoch);
+          const recordType = record?.ty ? underlying(record.ty) : undefined; type = recordType?.t === 'Record' ? recordType.fields.find(([field]) => field === request.field)?.[1] : undefined;
+        } else {
+          const frame = snapshot.core.frames.find(frame => frame.id === request.frameId); if (!frame) throw new TypeError('unknown correction frame');
+          const symbol = request.symbol, code = access.program.codes.find(code => code.id === frame.code)!;
+          type = code.params.find(param => param.symbol === symbol)?.ty;
+          if (!type) {
+            const witnesses: Ty[] = [];
+            const visit = (term: Term): void => { if (term.kind === 'FunctionDecl' || term.kind === 'Lambda') { const param = term.params.find(param => param.symbol === symbol); if (param) witnesses.push(param.ty); } if (term.kind === 'Let' && term.symbol === symbol) witnesses.push(term.ty); children(term).forEach(visit); };
+            const owner = this.options.module.kind === 'Module' ? this.options.module.members.find(term => term.kind === 'FunctionDecl' && term.symbol === code.symbol) : this.options.module;
+            if (owner) visit(owner);
+            if (witnesses.length && witnesses.every(witness => same(witness, witnesses[0]))) type = witnesses[0];
+          }
+          if (type) type = instantiateMachineType(type, frame.typeBindings);
+        }
+        if (!type) throw new TypeError('checkpoint correction requires an explicit declared type witness');
+        validateMachineResult(type, request.value as MachineValue, snapshot.core, access.program);
+      }
+      const entry = access.program.codes.find(code => code.id === `function:${this.binding.symbol}`)!;
+      const runtime = new ResumableRuntime(this.options.module, { ...this.options.runtime, executionId: snapshot.core.executionId, heapId: snapshot.core.heapId, ownerEpoch: snapshot.core.ownerEpoch, mode: 'live', branchId: null,
+        capabilities: () => { access.assertAuthority(); return entry.capabilities; }, authorizeCorrection: () => { access.assertAuthority(); return true; } });
+      if (runtime.program.digest !== access.program.digest) throw new TypeError('checkpoint control compiler mismatch');
+      runtime.restore(snapshot, checkpointDigest(snapshot));
+      if (request.kind === 'rewind') runtime.rewindRetainingHistory(request.steps);
+      else if (request.kind === 'local') runtime.correctLocal(request.frameId, request.symbol, correctionValue(request.value));
+      else runtime.correctRecord({ addr: Number(request.reference.objectId), heapId: request.reference.heapId, ownerEpoch: request.reference.ownerEpoch } as Value & { addr: number }, request.field, correctionValue(request.value));
+      access.assertAuthority(); return access.finishControl(runtime.snapshot(), events);
+    }, request);
   }
   async commit(): Promise<ProcessCheckpointReceipt> {
     const existing = this.options.host.checkpointReceipt(this.binding.id, this.options.tokens()); if (existing) return existing;

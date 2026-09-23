@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { decode as decodeIR, encode as encodeIR } from '../tier1/agent-ir.ts';
 import { walk, type Term, type Ty } from '../tier1/ast.ts';
 import { atomicWrite } from '../tier1/persistence.ts';
-import type { SymbolId } from '../tier1/ids.ts';
+import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
 import { CapabilityRegistry, type CapabilityDescriptor, type CapabilityToken } from '../tier2/ocap.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { decodeCanonical, encodeCanonical, exactObject, identifier, decimal, validateTaggedValue, type TaggedValueV1, type LogicalRefV1 } from '../fabric/encoding.ts';
@@ -13,7 +13,8 @@ import { DEFAULT_EVIDENCE_POLICY, validateEvidence, validateVettedEvidence, type
 import { JournalLock } from '../fabric/journal-lock.ts';
 import { runtimeSnapshotDigest, validateRuntimeSnapshot, type RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
 import { createPromotionHandle, evidenceBundleDigest, type PromotionAdmissionProfile, type PromotionBindingV1, type PromotionCoordinator, type PromotionDriver, type PromotionInput, type PreparedPromotionHandleV1, type ProductionAdmissionState } from '../fabric/promotion.ts';
-import { ProcessHost, type ProcessHostCallResult, type ProcessHostOptions } from './process-host.ts';
+import { ProcessHost, type ProcessHostCallResult, type ProcessHostOptions, type ProcessInvocationGrant } from './process-host.ts';
+import type { ScopedGrantV2 } from '../tier2/scoped-grants.ts';
 import { validateProcessAllocation, validateProcessArguments } from './process-type-validation.ts';
 import type { TopologyPlan } from './topology.ts';
 
@@ -37,7 +38,7 @@ export interface ProcessArtifactV1 {
   readonly evidence: LocalEvidenceV1;
   readonly schemaDigest: Digest;
 }
-export type ProcessHostServices = Pick<ProcessHostOptions, 'sealer' | 'revocations' | 'effectRouterFactory' | 'authorizeRecovery' | 'timeoutMs' | 'lockWaitMs' | 'maxWorkers' | 'onPhase'>;
+export type ProcessHostServices = Pick<ProcessHostOptions, 'sealer' | 'scopedGrants' | 'effectResourcePath' | 'effectResourcePolicyDigest' | 'revocations' | 'effectRouterFactory' | 'authorizeRecovery' | 'timeoutMs' | 'lockWaitMs' | 'maxWorkers' | 'onPhase'>;
 export interface ProcessDeploymentOptions {
   readonly directory: string;
   readonly coordinator: PromotionCoordinator;
@@ -371,6 +372,11 @@ export class ProcessDeployment implements PromotionDriver {
     const host = this.hosts.get(state.active.id); if (!host) throw new Error('deployment workers require recovery/open');
     return host.issueTokens(symbol, ttlMs);
   }
+  issueScopedTokens(symbol: SymbolId, ttlMs?: number, resourceScopes?: ReadonlyMap<CapabilityName, readonly string[]>): ScopedGrantV2[] {
+    const state = this.readState(); this.assertServing(state);
+    const host = this.hosts.get(state.active.id); if (!host) throw new Error('deployment workers require recovery/open');
+    return host.issueScopedTokens(symbol, ttlMs, resourceScopes);
+  }
   async snapshot(): Promise<RuntimeSnapshotV1> { return this.gate.runAsync(async () => { const state = this.readState(); this.assertServing(state); return (await this.hostFor(state.active)).snapshot(); }, this.options.lockWaitMs ?? 5000); }
   /** Administrative evidence capture, never code execution. Allows a newly
    * signed repair to replace a quiescent artifact invalidated by a specification. */
@@ -409,7 +415,7 @@ export class ProcessDeployment implements PromotionDriver {
       return result;
     }, this.options.lockWaitMs ?? 5000);
   }
-  async call(symbol: SymbolId, args: readonly TaggedValueV1[], options: { operationId: string; tokens: readonly CapabilityToken[] }): Promise<ProcessHostCallResult> {
+  async call(symbol: SymbolId, args: readonly TaggedValueV1[], options: { operationId: string; tokens: readonly ProcessInvocationGrant[] }): Promise<ProcessHostCallResult> {
     this.assertServing();
     identifier(options.operationId); args.forEach(value => validateTaggedValue(value));
     args = freeze(copy(args)); options = Object.freeze({ operationId: options.operationId, tokens: freeze(copy(options.tokens)) });
@@ -476,7 +482,7 @@ export class ProcessDeployment implements PromotionDriver {
       const authorize = (): void => {
         this.assertCommittedSource();
         const services = this.options.factories.get(artifact.factoryId)?.(artifact);
-        if (!services?.authorizeRecovery?.(operationId, strategy)) throw new Error('deployment recovery authorization denied');
+        if (services?.authorizeRecovery?.(operationId, strategy) !== true) throw new Error('deployment recovery authorization denied');
       };
       authorize();
       if (invocation.phase === 'settled' && invocation.result) { authorize(); return copy(invocation.result); }

@@ -14,7 +14,7 @@ export {
   type TopologyHostOptions, type WireRequest,
 } from './host.ts';
 export { ProcessChannel, ProcessChannelError, type ProcessChannelInit, type ProcessChannelOptions, type ProcessCallRequest, type ProcessCallResult, type ProcessEffectRequest } from './process-channel.ts';
-export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessEffectContext, type ProcessHostPhase, type ProcessCheckpointAccess } from './process-host.ts';
+export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessEffectContext, type ProcessHostPhase, type ProcessCheckpointAccess, type ProcessInvocationGrant } from './process-host.ts';
 export { ProcessResumableSession, type ProcessResumableOptions, type ProcessResumableEffectsContext } from './process-resumable.ts';
-export { seedProcessCheckpoint, seededProcessReference, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointSeed, type ProcessCheckpointAuthorization, type ProcessCheckpointAction } from './process-checkpoint-contract.ts';
+export { seedProcessCheckpoint, seededProcessReference, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointSeed, type ProcessCheckpointAuthorization, type ProcessCheckpointAction, type ProcessCheckpointControlRequest, type ProcessCheckpointControl } from './process-checkpoint-contract.ts';
 export { ProcessDeployment, processArtifactDigest, processArtifactContext, processMigrationPlan, processEffectPlan, type ProcessArtifactInput, type ProcessArtifactV1, type ProcessDeploymentOptions, type ProcessHostServices } from './process-deployment.ts';

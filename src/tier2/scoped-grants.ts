@@ -67,12 +67,14 @@ function prefix(parent: readonly string[], child: readonly string[]): boolean {
 }
 
 export class ScopedGrantAuthority {
+  readonly repositoryId: string;
   private readonly key: Buffer;
   private readonly options: GrantAuthorityOptions;
   private readonly maxTtlMs: number;
   constructor(options: GrantAuthorityOptions) {
     identifier(options.repositoryId);
     if (!(options.key instanceof Uint8Array) || options.key.byteLength < 32) throw new TypeError('capability grant key must contain 32 bytes');
+    this.repositoryId = options.repositoryId;
     this.key = Buffer.from(options.key); this.options = options; this.maxTtlMs = options.maxTtlMs ?? 60_000;
     if (!Number.isSafeInteger(this.maxTtlMs) || this.maxTtlMs < 1) throw new TypeError('invalid capability grant TTL profile');
   }

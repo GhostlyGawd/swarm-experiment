@@ -45,7 +45,7 @@ export interface MachineEvent {
   code: string; pc: number; op: string; effect: { source: 'live' | 'recorded' | 'isolated'; request: EffectRequestV1; outcome: EffectOutcome } | null; delta: MachineDelta[];
 }
 export interface ResumableSnapshot {
-  format: 'aether.resumable-state/1'; core: MachineCore; eventCursor: string; eventHead: Digest; events: MachineEvent[];
+  format: 'aether.resumable-state/1' | 'aether.resumable-state/2'; core: MachineCore; eventCursor: string; eventHead: Digest; events: MachineEvent[];
 }
 export const MACHINE_LIMITS = Object.freeze({ maxFrameBytes: 64 * 1024 * 1024, maxDecompressedBytes: 64 * 1024 * 1024, maxObjects: 2_000_000, maxDepth: 128, maxIntegerDigits: 4096 });
 export const MAX_MACHINE_ROWS = 20_000;
@@ -131,7 +131,7 @@ export function validateMachineCore(value: unknown, program: ResumableProgram): 
 export function validateResumableSnapshot(value: unknown, program: ResumableProgram): asserts value is ResumableSnapshot {
   encodeCanonical(value, MACHINE_LIMITS);
   const snapshot = exactObject(value, ['format', 'core', 'eventCursor', 'eventHead', 'events']) as unknown as ResumableSnapshot;
-  if (snapshot.format !== 'aether.resumable-state/1' || !Array.isArray(snapshot.events) || snapshot.events.length > MAX_MACHINE_EVENTS) throw new TypeError('unsupported checkpoint/event version or size');
+  if (!['aether.resumable-state/1', 'aether.resumable-state/2'].includes(snapshot.format) || !Array.isArray(snapshot.events) || snapshot.events.length > MAX_MACHINE_EVENTS) throw new TypeError('unsupported checkpoint/event version or size');
   validateMachineCore(snapshot.core, program); decimal(snapshot.eventCursor);
   if (snapshot.eventCursor !== String(snapshot.events.length)) throw new TypeError('checkpoint event cursor mismatch');
   let previous = emptyEventHead(), after: Digest | undefined;
@@ -142,7 +142,8 @@ export function validateResumableSnapshot(value: unknown, program: ResumableProg
     const sections = new Set<string>();
     for (const delta of event.delta) { exactObject(delta, ['section', 'before', 'after']); if (!fields.includes(delta.section) || sections.has(delta.section)) throw new TypeError('invalid checkpoint inverse delta'); sections.add(delta.section); }
     const instruction = program.codes.find(code => code.id === event.code)?.instructions[event.pc];
-    if (!Number.isSafeInteger(event.pc) || event.pc < 0 || (event.code === 'host' ? !['allocate', 'correction', 'retry-reconciled-effect'].includes(event.op) : event.op !== 'start' && instruction?.op !== event.op)) throw new TypeError('checkpoint event does not name a bound instruction');
+    const rewind = snapshot.format === 'aether.resumable-state/2' && /^rewind-v1:[1-9][0-9]*$/.test(event.op);
+    if (!Number.isSafeInteger(event.pc) || event.pc < 0 || (event.code === 'host' ? !rewind && !['allocate', 'correction', 'retry-reconciled-effect'].includes(event.op) : event.op !== 'start' && instruction?.op !== event.op)) throw new TypeError('checkpoint event does not name a bound instruction');
     if (event.effect !== null) {
       exactObject(event.effect, ['source', 'request', 'outcome']);
       if (!['live', 'recorded', 'isolated'].includes(event.effect.source) || (snapshot.core.mode === 'live') !== (event.effect.source === 'live')) throw new TypeError('checkpoint effect source/mode mismatch'); validateEffectRequest(event.effect.request); effectReplayOutcomeDigest(event.effect.outcome);
@@ -160,6 +161,14 @@ export function validateResumableSnapshot(value: unknown, program: ResumableProg
     if (machineDigest(core as unknown as MachineCore) !== event.before) throw new TypeError('invalid checkpoint inverse state');
     validateMachineCore(core, program);
     const before = core as unknown as MachineCore;
+    if (event.code === 'host' && event.op.startsWith('rewind-v1:')) {
+      const distance = Number(event.op.slice('rewind-v1:'.length));
+      if (!Number.isSafeInteger(distance) || distance < 1 || distance > index || event.pc !== 0 || event.effect !== null) throw new TypeError('invalid retained rewind distance');
+      const target = machineClone(before) as unknown as Record<string, unknown>;
+      for (let back = index - 1; back >= index - distance; back--) for (const delta of snapshot.events[back].delta) target[delta.section] = machineClone(delta.before);
+      if (machineDigest(target as unknown as MachineCore) !== machineDigest(afterCore)) throw new TypeError('retained rewind does not restore its exact historical core');
+      continue;
+    }
     if (before.executionId !== snapshot.core.executionId || before.heapId !== snapshot.core.heapId || before.ownerEpoch !== snapshot.core.ownerEpoch || before.mode !== snapshot.core.mode || before.branchId !== snapshot.core.branchId) throw new TypeError('checkpoint history changes execution identity');
     const code = program.codes.find(code => code.id === event.code);
     if (event.op === 'start') {

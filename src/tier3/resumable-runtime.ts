@@ -62,6 +62,7 @@ export class ResumableRuntime {
   private eventEffect: MachineEvent['effect'] = null;
   private readonly checkpointBytes: number;
   private restoredOrigin: Digest;
+  private snapshotFormat: ResumableSnapshot['format'] = 'aether.resumable-state/1';
   constructor(module: Term, options: ResumableRuntimeOptions) {
     this.program = compileResumableProgram(module, options); this.options = options;
     this.checkpointBytes = options.maxCheckpointBytes ?? MACHINE_LIMITS.maxFrameBytes;
@@ -142,7 +143,7 @@ export class ResumableRuntime {
     if (this.events.length >= MAX_MACHINE_EVENTS) throw new RangeError('resumable event history limit');
     const delta = (Object.keys(before) as MachineSection[]).filter(section => !equalBytes(before[section], this.core[section])).map(section => ({ section, before: machineClone(before[section]), after: machineClone(this.core[section]) }));
     const event: MachineEvent = { format: 'aether.resumable-event/1', sequence: String(this.events.length + 1), previous: this.events.length ? eventDigest(this.events.at(-1)!) : emptyEventHead(), before: machineDigest(before), after: machineDigest(this.core), code, pc, op, effect: this.eventEffect === null ? null : machineClone(this.eventEffect), delta };
-    const proposed: ResumableSnapshot = { format: 'aether.resumable-state/1', core: this.core, eventCursor: event.sequence, eventHead: eventDigest(event), events: [...this.events, event] };
+    const proposed: ResumableSnapshot = { format: this.snapshotFormat, core: this.core, eventCursor: event.sequence, eventHead: eventDigest(event), events: [...this.events, event] };
     encodeCanonical(proposed, { ...MACHINE_LIMITS, maxFrameBytes: this.checkpointBytes, maxDecompressedBytes: this.checkpointBytes });
     this.events.push(event); this.eventEffect = null; return event;
   }
@@ -389,7 +390,7 @@ export class ResumableRuntime {
   result(): ResumableRunResult { return machineClone({ state: this.core.state, value: this.core.result, fault: this.core.fault, steps: this.core.steps }); }
   snapshot(): ResumableSnapshot {
     if (this.executing) throw new Error('checkpoint requires an instruction safe point');
-    const snapshot: ResumableSnapshot = { format: 'aether.resumable-state/1', core: machineClone(this.core), eventCursor: String(this.events.length), eventHead: this.events.length ? eventDigest(this.events.at(-1)!) : emptyEventHead(), events: machineClone(this.events) };
+    const snapshot: ResumableSnapshot = { format: this.snapshotFormat, core: machineClone(this.core), eventCursor: String(this.events.length), eventHead: this.events.length ? eventDigest(this.events.at(-1)!) : emptyEventHead(), events: machineClone(this.events) };
     encodeCanonical(snapshot, { ...MACHINE_LIMITS, maxFrameBytes: this.checkpointBytes, maxDecompressedBytes: this.checkpointBytes });
     validateResumableSnapshot(snapshot, this.program);
     executionSnapshots.set(snapshot, { digest: checkpointDigest(snapshot), origin: this.restoredOrigin, program: this.program.digest }); return snapshot;
@@ -406,7 +407,7 @@ export class ResumableRuntime {
       if (snapshot.core.isolatedEffects.length && this.options.effects.broker.recordedEventCount !== snapshot.core.effectPrefix.length) throw new TypeError('isolated checkpoint recorded trace changed');
       this.options.effects.broker.restoreIsolatedState({ prefix: snapshot.core.effectPrefix, bufferedIntents: snapshot.core.isolatedEffects.filter(item => item.outcome.state === 'rejected' && item.outcome.code === 'isolated_intent_buffered').map(item => item.request) });
     }
-    this.core = machineClone(snapshot.core); this.events = machineClone(snapshot.events); this.restoredOrigin = expectedDigest;
+    this.core = machineClone(snapshot.core); this.events = machineClone(snapshot.events); this.restoredOrigin = expectedDigest; this.snapshotFormat = snapshot.format;
   }
   rewind(steps: number): void {
     if (this.executing || !Number.isSafeInteger(steps) || steps < 0 || steps > this.events.length) throw new RangeError('invalid rewind distance');
@@ -414,6 +415,21 @@ export class ResumableRuntime {
     for (let index = 0; index < steps; index++) { const event = snapshot.events.pop()!; for (const delta of event.delta) (snapshot.core as unknown as Record<string, unknown>)[delta.section] = machineClone(delta.before); }
     snapshot.eventCursor = String(snapshot.events.length); snapshot.eventHead = snapshot.events.length ? eventDigest(snapshot.events.at(-1)!) : emptyEventHead();
     this.restore(snapshot, checkpointDigest(snapshot));
+  }
+  /** Version 2 preserves the discarded future and records the exact inverse
+   * transition. Live sinks remain owned by the durable broker, never rewound. */
+  rewindRetainingHistory(steps: number): void {
+    if (this.executing || !Number.isSafeInteger(steps) || steps < 1 || steps > this.events.length) throw new RangeError('invalid retained rewind distance');
+    const snapshot = this.snapshot();
+    if (this.options.authorizeCorrection?.(snapshot) !== true) throw new Error('host did not authorize state correction');
+    const target = machineClone(this.core) as unknown as Record<string, unknown>;
+    for (let index = this.events.length - 1; index >= this.events.length - steps; index--) for (const delta of this.events[index].delta) target[delta.section] = machineClone(delta.before);
+    validateMachineCore(target, this.program);
+    for (const frame of (target as unknown as MachineCore).frames) this.currentCapabilities(frame.capabilities);
+    if (this.options.effects && this.options.effects.broker.executionMode !== 'live') throw new Error('retained rewind requires a live broker or an effect-free runtime');
+    const priorFormat = this.snapshotFormat; this.snapshotFormat = 'aether.resumable-state/2';
+    try { this.hostMutation(`rewind-v1:${steps}`, () => { this.core = target as unknown as MachineCore; }); }
+    catch (error) { this.snapshotFormat = priorFormat; throw error; }
   }
   retryBlocked(): void {
     if (this.core.state !== 'blocked' || this.executing) throw new Error('no blocked effect at a safe point');

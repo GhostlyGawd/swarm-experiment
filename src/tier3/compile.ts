@@ -304,6 +304,10 @@ export class ProductionRuntime {
 
   assertMigrationSafe(): void {
     if (this.activeCalls) throw new Error('cannot snapshot active execution');
+    this.assertNoLiveContinuations();
+  }
+
+  private assertNoLiveContinuations(): void {
     this.continuations = this.continuations.filter(ref => ref.deref() !== undefined);
     if (this.continuations.length) throw new Error('live closures and tasks cannot be migrated');
   }
@@ -325,6 +329,10 @@ export class ProductionRuntime {
   /** Heap-only transfer at a suspended host callback; this never migrates frames. */
   exportBoundarySnapshot(): ProductionSnapshot {
     if (!this.boundaryDepth) throw new Error('state transfer requires a suspended host boundary');
+    // A live closure/task can be held in the suspended frame even when the
+    // heap itself is serializable. Reject before the parent can dispatch an
+    // external effect and then discover the continuation cannot be restored.
+    this.assertNoLiveContinuations();
     return snapshotHeap(this.heap, this.moduleRef);
   }
   importBoundarySnapshot(snapshot: ProductionSnapshot): void {

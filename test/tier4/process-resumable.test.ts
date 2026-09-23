@@ -130,6 +130,8 @@ test('leased effects use the durable private C1 view, reconcile unknown outcomes
     const session = await ProcessResumableSession.begin(options, input.base, input.initial, { operationId: 'effects', symbol: f.main, expectedGeneration: '1', expectedSnapshot: runtimeSnapshotDigest(input.before) });
     assert.equal((await session.run()).state, 'blocked');
     await assert.rejects(session.commit(), /unresolved effects/); await assert.rejects(session.abort(), /possible external work/);
+    const blocked = await host.readCheckpoint(session.binding.id);
+    await assert.rejects(session.rewind({ kind: 'rewind', operationId: 'unknown-outcome-rewind', expectedCheckpoint: checkpointDigest(blocked), steps: 1 }), /reconciled effects/);
     assert.deepEqual(await host.snapshot(), input.before);
     await session.reconcile(); assert.equal((await session.run()).state, 'completed'); const receipt = await session.commit();
     const rows = JSON.parse(readFileSync(join(f.options.directory, 'sink.json'), 'utf8')); assert.deepEqual(rows.map((row: { value: string }) => row.value), ['7', '9']);
@@ -154,14 +156,74 @@ test('checkpoint policy requires literal true and publication rechecks policy af
   } finally { await host?.close(); }
 });
 
+test('typed local and heap controls survive restart, retain audit, and resume without rebuilding workers', async () => {
+  const f = fixture(); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open(f.options); const input = await source(f, host), pids = host.workerPids;
+    let session = await ProcessResumableSession.begin(sessionOptions(f, host), input.base, input.initial, { operationId: 'control-job', symbol: f.main, expectedGeneration: '1', expectedSnapshot: runtimeSnapshotDigest(input.before) });
+    const initial = await host.readCheckpoint(session.binding.id), frame = initial.core.frames.at(-1)!;
+    const target = f.module.kind === 'Module' ? f.module.members.find(member => member.kind === 'FunctionDecl' && member.symbol === f.child) : null; if (target?.kind !== 'FunctionDecl') throw new Error('fixture');
+    const correction = { kind: 'local' as const, operationId: 'change-amount', expectedCheckpoint: checkpointDigest(initial), frameId: frame.id, symbol: target.params[1].symbol, value: integer(3) };
+    f.allow(false); await assert.rejects(session.correct(correction), /authorization_denied/); f.allow(true);
+    await assert.rejects(session.correct({ ...correction, value: { tag: 'string', value: 'invalid' } }), /type/);
+    const first = await session.correct(correction); assert.deepEqual(await session.correct(correction), first);
+    await assert.rejects(session.correct({ ...correction, value: integer(4) }), /identity conflict/);
+    const changed = await host.readCheckpoint(session.binding.id);
+    await session.correct({ kind: 'record', operationId: 'change-record', expectedCheckpoint: checkpointDigest(changed), reference: input.mapped, field: 'value', value: integer(20) });
+    const beforeRun = await host.readCheckpoint(session.binding.id); await session.run(3); const advanced = await host.readCheckpoint(session.binding.id);
+    await session.rewind({ kind: 'rewind', operationId: 'rewind-three', expectedCheckpoint: checkpointDigest(advanced), steps: 3 });
+    const rewound = await host.readCheckpoint(session.binding.id); assert.deepEqual(rewound.core, beforeRun.core); assert.equal(rewound.events.length, advanced.events.length + 1); assert.deepEqual(host.workerPids, pids);
+    await assert.rejects(session.rewind({ kind: 'rewind', operationId: 'outside-lease', expectedCheckpoint: checkpointDigest(rewound), steps: rewound.events.length }), /ownership/);
+    await host.close(); host = await ProcessHost.open(f.options); session = ProcessResumableSession.reopen(sessionOptions(f, host), session.binding.id);
+    assert.equal((await session.run()).state, 'completed'); await session.commit();
+    const result = await host.call(f.read, [{ tag: 'ref', value: await session.publishedReference(input.mapped) }], { operationId: 'read-corrected', tokens: host.issueTokens(f.read) });
+    assert.equal(result.state, 'completed'); if (result.state === 'completed' && result.execution.ok) assert.equal((result.execution.value as { value: string }).value, '25'); else assert.fail('worker read failed');
+    const journal = JSON.parse(readFileSync(join(f.options.directory, 'host.json'), 'utf8')); assert.equal(journal.format, 'aether.process-host/3'); assert.equal(journal.checkpointControls.length, 3);
+    const file = join(f.options.directory, 'host.json'), bytes = readFileSync(file); await host.close(); host = undefined;
+    writeFileSync(file, JSON.stringify({ ...journal, checkpointControls: [] }));
+    await assert.rejects(ProcessHost.open(f.options), /unaudited control/); writeFileSync(file, bytes);
+  } finally { await host?.close(); }
+});
+
+test('correction policies reject Promise grants and revocation at the durable publication boundary', async () => {
+  const f = fixture(); let host: ProcessHost | undefined, policy: unknown = true, revoke = false;
+  try {
+    host = await ProcessHost.open({ ...f.options, authorizeCheckpoint: (() => policy) as ProcessHostOptions['authorizeCheckpoint'], onPhase: phase => { if (phase === 'checkpoint-control-before-commit' && revoke) policy = false; } });
+    const input = await source(f, host), session = await ProcessResumableSession.begin(sessionOptions(f, host), input.base, input.initial, { operationId: 'control-policy', symbol: f.main, expectedGeneration: '1', expectedSnapshot: runtimeSnapshotDigest(input.before) });
+    const request = { kind: 'record' as const, operationId: 'revoked-control', expectedCheckpoint: checkpointDigest(input.initial), reference: input.mapped, field: 'value', value: integer(20) };
+    policy = Promise.resolve(true); await assert.rejects(session.correct(request), /authorization_denied/); policy = true;
+    revoke = true; await assert.rejects(session.correct(request), /authorization_denied/); assert.equal(checkpointDigest(await host.readCheckpoint(session.binding.id)), checkpointDigest(input.initial));
+    policy = true; revoke = false; await session.correct(request); await session.abort(); assert.deepEqual(await host.snapshot(), input.before);
+  } finally { await host?.close(); }
+});
+
+test('durable rewind debt replays committed effects without redispatch and blocks divergent corrections', async () => {
+  const f = fixture(false, true); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open(f.options); const input = await source(f, host);
+    let session = await ProcessResumableSession.begin({ ...sessionOptions(f, host), effects: effectFactory(f, f.options.directory) }, input.base, input.initial, { operationId: 'debt', symbol: f.main, expectedGeneration: '1', expectedSnapshot: runtimeSnapshotDigest(input.before) });
+    await session.run(); const completed = await host.readCheckpoint(session.binding.id);
+    await assert.rejects(session.correct({ kind: 'record', operationId: 'late-correction', expectedCheckpoint: checkpointDigest(completed), reference: input.mapped, field: 'value', value: integer(100) }), /before postcondition/);
+    const control = { kind: 'rewind' as const, operationId: 'replay-effects', expectedCheckpoint: checkpointDigest(completed), steps: completed.events.length - input.initial.events.length };
+    await session.rewind(control); const rewound = await host.readCheckpoint(session.binding.id); assert.equal(rewound.core.effectCursor, '0');
+    await host.close(); host = await ProcessHost.open(f.options); session = ProcessResumableSession.reopen({ ...sessionOptions(f, host), effects: effectFactory(f, f.options.directory) }, session.binding.id);
+    const withoutBroker = ProcessResumableSession.reopen(sessionOptions(f, host), session.binding.id);
+    await assert.rejects(withoutBroker.run(), /lost its durable recorded outcome/); assert.equal(checkpointDigest(await host.readCheckpoint(session.binding.id)), checkpointDigest(rewound));
+    await assert.rejects(session.correct({ kind: 'record', operationId: 'unsafe-change', expectedCheckpoint: checkpointDigest(rewound), reference: input.mapped, field: 'value', value: integer(100) }), /replay debt/);
+    await assert.rejects(session.abort(), /possible external work/);
+    assert.equal((await session.run()).state, 'completed'); await session.commit();
+    assert.deepEqual(JSON.parse(readFileSync(join(f.options.directory, 'sink.json'), 'utf8')).map((row: { value: string }) => row.value), ['7', '9']);
+  } finally { await host?.close(); }
+});
+
 test('fresh controllers recover SIGKILL at checkpoint, effect receipt and publication boundaries', async () => {
-  for (const boundary of ['checkpoint-saved', 'effect-receipt', 'checkpoint-committed']) {
+  for (const boundary of ['checkpoint-saved', 'effect-receipt', 'checkpoint-committed', 'checkpoint-control-before-commit', 'checkpoint-control-committed']) {
     const f = fixture(false, true); let host: ProcessHost | undefined;
     try {
       host = await ProcessHost.open(f.options); const input = await source(f, host);
       const session = await ProcessResumableSession.begin({ ...sessionOptions(f, host), effects: effectFactory(f, f.options.directory) }, input.base, input.initial, { operationId: boundary, symbol: f.main, expectedGeneration: '1', expectedSnapshot: runtimeSnapshotDigest(input.before) });
       const id = session.binding.id, directory = f.options.directory;
-      writeFileSync(join(directory, 'child-input.json'), encodeStored({ module: f.module, manifest: f.manifest, plan: f.options.plan, main: f.main, cap: f.cap, id }));
+      writeFileSync(join(directory, 'child-input.json'), encodeStored({ module: f.module, manifest: f.manifest, plan: f.options.plan, main: f.main, cap: f.cap, id, initialEvents: input.initial.events.length }));
       const moduleUrl = (path: string) => JSON.stringify(new URL(path, import.meta.url).href);
       const factory = effectFactory.toString().replace("throw new Error('injected receipt interruption')", "process.kill(process.pid, 'SIGKILL')");
       writeFileSync(join(directory, 'controller.ts'), `
@@ -173,6 +235,7 @@ import { DurableEffectBroker } from ${moduleUrl('../../src/fabric/effects.ts')};
 import { CapabilityRegistry, CapabilitySealer } from ${moduleUrl('../../src/tier2/ocap.ts')};
 import { ProcessHost } from ${moduleUrl('../../src/tier4/process-host.ts')};
 import { ProcessResumableSession } from ${moduleUrl('../../src/tier4/process-resumable.ts')};
+import { checkpointDigest } from ${moduleUrl('../../src/tier3/resumable-state.ts')};
 const directory = ${JSON.stringify(directory)}, boundary = ${JSON.stringify(boundary)};
 const f = decodeStored(readFileSync(join(directory, 'child-input.json'), 'utf8'));
 const registry = new CapabilityRegistry(); registry.declare(f.cap, { arity: 1, description: 'Observe the leased production record.' });
@@ -180,7 +243,11 @@ const host = await ProcessHost.open({ directory, module: f.module, manifest: f.m
   onPhase: phase => { if (phase === boundary) process.kill(process.pid, 'SIGKILL'); } });
 const effectFactory = ${factory};
 const session = ProcessResumableSession.reopen({ host, module: f.module, runtime: { manifest: f.manifest, registry }, tokens: () => host.issueTokens(f.main), effects: effectFactory(f, directory, boundary === 'effect-receipt') }, f.id);
-await session.run(); await session.commit();
+await session.run();
+if (boundary.startsWith('checkpoint-control-')) {
+  const snapshot = await host.readCheckpoint(f.id), control = { kind: 'rewind', operationId: 'child-rewind', expectedCheckpoint: checkpointDigest(snapshot), steps: snapshot.events.length - f.initialEvents };
+  atomicWrite(join(directory, 'control-request.json'), JSON.stringify(control)); await session.rewind(control);
+} else await session.commit();
 throw new Error('expected controller death');
 `);
       await host.close(); host = undefined;
@@ -192,7 +259,12 @@ throw new Error('expected controller death');
         assert.equal(host.checkpointStatus(id).state, 'active');
         assert.deepEqual(await host.snapshot(), input.before);
         await assert.rejects(host.call(f.read, [{ tag: 'ref', value: input.ref }], { operationId: 'blocked-after-kill', tokens: host.issueTokens(f.read) }), /checkpoint lease/);
-        if (boundary === 'checkpoint-saved') {
+        if (boundary.startsWith('checkpoint-control-')) {
+          const request = JSON.parse(readFileSync(join(directory, 'control-request.json'), 'utf8'));
+          const receipt = await resumed.rewind(request); assert.deepEqual(await resumed.rewind(request), receipt);
+          const rewound = await host.readCheckpoint(id); assert.equal(rewound.core.effectCursor, '0'); assert.ok(rewound.core.frames.length > 1); assert.equal(rewound.core.tasks[0].state, 'pending');
+          await assert.rejects(resumed.correct({ kind: 'record', operationId: 'after-death-correction', expectedCheckpoint: checkpointDigest(rewound), reference: input.mapped, field: 'value', value: integer(100) }), /replay debt/);
+        } else if (boundary === 'checkpoint-saved') {
           const saved = await host.readCheckpoint(id); assert.ok(saved.core.frames.length > 1); assert.equal(saved.core.tasks[0].state, 'pending');
         } else await resumed.reconcile();
         assert.equal((await resumed.run()).state, 'completed');

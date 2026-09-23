@@ -7,3 +7,4 @@ export * from './evidence.ts';
 export * from './promotion.ts';
 export * from './quorum-crypto.ts';
 export * from './quorum-votes.ts';
+export * from './quorum-node.ts';

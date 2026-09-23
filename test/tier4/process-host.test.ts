@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { buildLedgerExample, ACCOUNT, CAP_LEDGER_APPEND } from '../../src/examples/ledger.ts';
 import { CapabilitySealer, CapabilityRegistry, RevocationList } from '../../src/tier2/ocap.ts';
+import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
+import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
 import { createEvidenceManifest } from '../../src/fabric/evidence.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
 import { DurableEffectBroker, type EffectAdapter } from '../../src/fabric/effects.ts';
@@ -54,6 +56,152 @@ function balances(snapshot: Awaited<ReturnType<ProcessHost['snapshot']>>): strin
     return value?.tag === 'int' ? value.value : '?';
   });
 }
+
+function scopedAuthority(directory: string) {
+  const epochs = new DurableGrantEpochs({ directory: join(directory, 'grant-epochs'), repositoryId: 'repository' });
+  let now = 100;
+  const grants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(29), repositoryId: 'repository', clock: () => now,
+    policyEpoch: () => epochs.policyEpoch, revocationEpoch: () => epochs.epoch,
+    isRevoked: (cap, path) => epochs.isRevoked(cap, path), authorizeIssue: () => true,
+    authorizeDelegate: () => true });
+  return { epochs, grants, setTime: (value: number) => { now = value; } };
+}
+
+test('strict ProcessHost grants bind real worker calls to audience, generation and durable revocation', async () => {
+  const f = fixture(), { epochs, grants, setTime } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open({ ...f.options, scopedGrants: grants });
+    assert.throws(() => host!.issueTokens(f.ex.symbols.transfer), /strict ProcessHost/);
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const args = [reference(alice), reference(bob), integer(10)];
+    await assert.rejects(host.call(f.ex.symbols.transfer, args, { operationId: 'wrong-audience', tokens: host.issueScopedTokens(f.ex.symbols.settle) }), /authority_denied/);
+    assert.equal(f.calls(), 0);
+    const original = host.issueScopedTokens(f.ex.symbols.transfer);
+    await assert.rejects(host.call(f.ex.symbols.transfer, args, { operationId: 'forged-signature', tokens: [{ ...original[0], signature: '0'.repeat(64) }, ...original.slice(1)] }), /authority_denied/);
+    const wrongScope = grants.issue({ capability: CAP_LEDGER_APPEND, audience: f.ex.symbols.transfer, path: ['wrong'] }, 60000);
+    await assert.rejects(host.call(f.ex.symbols.transfer, args, { operationId: 'wrong-resource', tokens: [original[0], wrongScope] }), /authority_denied/);
+    assert.equal(f.calls(), 0);
+    assert.equal((await host.call(f.ex.symbols.transfer, args, { operationId: 'strict-valid', tokens: original })).state, 'completed');
+    assert.equal(f.calls(), 1);
+    epochs.revoke(CAP_LEDGER_APPEND, []);
+    await assert.rejects(host.call(f.ex.symbols.transfer, args, { operationId: 'strict-revoked', tokens: original }), /authority_denied/);
+    assert.equal(f.calls(), 1);
+    epochs.restore(CAP_LEDGER_APPEND, []);
+    await assert.rejects(host.call(f.ex.symbols.transfer, args, { operationId: 'strict-stale', tokens: original }), /authority_denied/);
+    assert.equal((await host.call(f.ex.symbols.transfer, args, { operationId: 'strict-renewed', tokens: host.issueScopedTokens(f.ex.symbols.transfer) })).state, 'completed');
+    assert.equal(f.calls(), 2);
+    await host.close(); host = undefined;
+    await assert.rejects(ProcessHost.open(f.options), /configuration|profile/i);
+    host = await ProcessHost.open({ ...f.options, scopedGrants: grants });
+    assert.deepEqual(balances(await host.snapshot()), ['80', '20']);
+    const expires = host.issueScopedTokens(f.ex.symbols.transfer);
+    setTime(60_100);
+    await assert.rejects(host.call(f.ex.symbols.transfer, args, { operationId: 'strict-expired', tokens: expires }), /authority_denied/);
+    assert.equal(f.calls(), 2);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('strict ProcessHost rechecks a grant after effect intent and before the external sink', async () => {
+  const f = fixture(), { epochs, grants } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open({ ...f.options, scopedGrants: grants,
+      onPhase: phase => { if (phase === 'effect-requested') epochs.revoke(CAP_LEDGER_APPEND, []); } });
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const result = await host.call(f.ex.symbols.transfer, [reference(alice), reference(bob), integer(10)], { operationId: 'revoked-before-sink', tokens: host.issueScopedTokens(f.ex.symbols.transfer) });
+    assert.notEqual(result.state, 'completed');
+    assert.equal(f.calls(), 0);
+    assert.deepEqual(balances(await host.snapshot()), ['100', '0']);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('strict ProcessHost rejects pre-migration grants after a durable ownership generation change', async () => {
+  const f = fixture(), { grants } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open({ ...f.options, scopedGrants: grants });
+    const old = host.issueScopedTokens(f.ex.symbols.feeFor);
+    await host.move(f.ex.symbols.transfer, 'b', { migrationId: 'strict-move', expectedGeneration: '1' });
+    assert.equal(host.generation, '2');
+    await assert.rejects(host.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'old-grant', tokens: old }), /authority_denied/);
+    assert.equal((await host.call(f.ex.symbols.feeFor, [integer(100)], { operationId: 'fresh-grant', tokens: host.issueScopedTokens(f.ex.symbols.feeFor) })).state, 'completed');
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('trusted effect resource policy denies a valid grant for the wrong ledger target', async () => {
+  const f = fixture(), { grants } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  try {
+    await assert.rejects(ProcessHost.open({ ...f.options, scopedGrants: grants, effectResourcePath: () => [] }), /exact policy digest/);
+    host = await ProcessHost.open({ ...f.options, scopedGrants: grants,
+      effectResourcePolicyDigest: domainDigest('aether.effect-resource-policy/1', 'ledger-sender-id-v1'),
+      effectResourcePath: request => {
+        const first = request.args[0];
+        if (request.capability !== CAP_LEDGER_APPEND || first?.tag !== 'string') throw new TypeError('unsupported effect resource');
+        return ['ledger', first.value];
+      },
+    });
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const args = [reference(alice), reference(bob), integer(10)];
+    const aliceScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
+    assert.equal((await host.call(f.ex.symbols.transfer, args, { operationId: 'alice-scope', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, aliceScope) })).state, 'completed');
+    assert.equal(f.calls(), 1);
+    const bobScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'bob']]]);
+    const denied = await host.call(f.ex.symbols.transfer, args, { operationId: 'bob-scope', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, bobScope) });
+    assert.equal(f.calls(), 1, JSON.stringify(denied));
+    if (denied.state === 'completed') assert.equal(denied.execution.ok, false, JSON.stringify(denied));
+    assert.match(JSON.stringify(denied), /authority_denied|effect_indeterminate/);
+    assert.deepEqual(balances(await host.snapshot()), ['90', '10']);
+    await host.close(); host = undefined;
+    await assert.rejects(ProcessHost.open({ ...f.options, scopedGrants: grants,
+      effectResourcePolicyDigest: domainDigest('aether.effect-resource-policy/1', 'different-policy'), effectResourcePath: () => [] }), /configuration|profile/i);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('strict scoped grants remain bound through an actual cross-process nested call', async () => {
+  const f = fixture(), { grants } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open({ ...f.options, scopedGrants: grants });
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const args = [reference(alice), reference(bob), integer(10)];
+    await assert.rejects(host.call(f.ex.symbols.settle, args, { operationId: 'nested-wrong-audience', tokens: host.issueScopedTokens(f.ex.symbols.transfer) }), /authority_denied/);
+    const result = await host.call(f.ex.symbols.settle, args, { operationId: 'nested-authorized', tokens: host.issueScopedTokens(f.ex.symbols.settle) });
+    assert.equal(result.state, 'completed');
+    assert.equal(f.calls(), 1);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('legacy and strict process profiles reject live closure transfer before external effects', async () => {
+  for (const strict of [false, true]) {
+    const directory = mkdtempSync(join(tmpdir(), 'aether-process-closure-grants-')); let host: ProcessHost | undefined;
+    try {
+    const symbols = new SymbolSpace('closure-grants'), main = symbols.define('main'), value = symbols.define('value'), callback = symbols.define('callback');
+    const registry = new CapabilityRegistry(), cap = registry.declare('cap:test:emit', { arity: 1, description: 'Closure effect.' }).name;
+    const fnType: Ty = { t: 'Fn', params: [], returns: b.Unit, capabilities: [cap] };
+    const entry = b.fn({ symbol: main, params: [b.param(value, b.Int)], returns: b.Int, capabilities: [cap],
+      body: b.block(b.let_(callback, fnType, b.lambda({ returns: b.Unit, capabilities: [cap], body: b.invoke(cap, b.v(value)) })),
+        b.exprStmt(b.apply(b.v(callback))), b.ret(b.v(value))) });
+    const module = b.module_({ symbol: symbols.define('module'), members: [entry], symbolTable: symbols.table() });
+    const manifestValue = manifest(module, registry), plan: TopologyPlan = { shape: 'containers', units: [{ id: 'worker', members: [main], capabilities: [cap], placement: 'container', memoryMb: 16 }], crossEdges: [], transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+    const epochs = new DurableGrantEpochs({ directory: join(directory, 'grant-epochs'), repositoryId: 'repository' });
+    const grants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(37), repositoryId: 'repository', clock: () => 100,
+      policyEpoch: () => epochs.policyEpoch, revocationEpoch: () => epochs.epoch,
+      isRevoked: (name, path) => epochs.isRevoked(name, path), authorizeIssue: () => true, authorizeDelegate: () => true });
+    let calls = 0;
+    const sink: EffectAdapter = { id: 'closure-sink/1', semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true }, execute: () => { calls++; return { tag: 'null' }; }, reconcile: () => ({ state: 'unknown' }) };
+    host = await ProcessHost.open({ directory, module, manifest: manifestValue, plan, registry, sealer: new CapabilitySealer(), ...(strict ? { scopedGrants: grants } : {}),
+      effectRouterFactory: factory(directory, manifestValue, cap, sink) });
+    const tokens = () => strict ? host!.issueScopedTokens(main) : host!.issueTokens(main);
+    const first = await host.call(main, [integer(7)], { operationId: 'closure-valid', tokens: tokens() });
+    assert.equal(first.state, 'indeterminate');
+    if (first.state === 'indeterminate') assert.match(first.reason, /live closures and tasks cannot be migrated/);
+    assert.equal(calls, 0, 'unsupported continuation must be rejected before external dispatch');
+    assert.equal((await host.call(main, [integer(7)], { operationId: 'closure-valid', tokens: tokens() })).state, 'indeterminate');
+    assert.equal(calls, 0, 'same-operation retry cannot dispatch the effect');
+    } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
+  }
+});
 
 test('F07 coordinator: actual ledger workers preserve state, exact receipts, allocator and migration epochs', async () => {
   const f = fixture(); let host: ProcessHost | undefined;

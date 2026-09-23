@@ -1,16 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import * as b from '../../src/tier1/build.ts';
-import type { Term } from '../../src/tier1/ast.ts';
+import { linkGroups, type Term } from '../../src/tier1/ast.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
-import { capability, type NodeRef } from '../../src/tier1/ids.ts';
+import { capability, type NodeRef, type SymbolId, type CapabilityName } from '../../src/tier1/ids.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import { DurableGraphStore } from '../../src/tier1/durable-store.ts';
-import { SemanticGarbageCollector, type SemanticGcProposal, type SemanticRetentionKind } from '../../src/tier1/semantic-gc.ts';
+import { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, type SemanticGcOptions, type SemanticGcProposal, type SemanticRetentionKind } from '../../src/tier1/semantic-gc.ts';
 import { CausalLineageLedger, signIntent, signSpecRevision, fenceRequirement } from '../../src/tier1/causal-lineage.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
@@ -19,7 +20,9 @@ import { approvePromotion, createPromotionHandle, evidenceBundleDigest, effectPl
 import { ProductionRuntime } from '../../src/tier3/compile.ts';
 import { encodeCanonical } from '../../src/fabric/encoding.ts';
 
-function fixture(options: { nonlinear?: boolean; opaque?: boolean; fenceWrapper?: boolean; booleanWrapper?: boolean } = {}) {
+type Module = Extract<Term, { kind: 'Module' }>;
+type FixtureNames = { target: SymbolId; wrapper: SymbolId; entry: SymbolId; sink: SymbolId; dead: SymbolId; fenced: SymbolId; x: SymbolId; w: SymbolId; n: SymbolId; message: SymbolId; log: CapabilityName };
+function fixture(options: { branchProfile?: boolean; transform?: (module: Module, names: FixtureNames, symbols: SymbolSpace) => Module; nonlinear?: boolean; opaque?: boolean; fenceWrapper?: boolean; booleanWrapper?: boolean } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'aether-semantic-gc-')), store = new DurableGraphStore({ directory: join(directory, 'ast') });
   const symbols = new SymbolSpace('semantic-gc-fixture'), target = symbols.define('increment'), wrapper = symbols.define('forward'), entry = symbols.define('compute'), sink = symbols.define('append'), dead = symbols.define('unused'), fenced = symbols.define('protected');
   const x = symbols.define('x'), w = symbols.define('w'), n = symbols.define('n'), message = symbols.define('message'), log = capability('cap:test:append');
@@ -27,16 +30,18 @@ function fixture(options: { nonlinear?: boolean; opaque?: boolean; fenceWrapper?
   const scalarType = options.booleanWrapper ? b.Bool : b.Int;
   const targetDecl = b.fn({ symbol: target, contract: b.contract({}), params: [b.param(x, scalarType)], returns: scalarType, body: b.ret(options.booleanWrapper ? b.not(b.v(x)) : options.nonlinear ? b.mul(b.v(x), b.v(x)) : b.add(b.v(x), b.int(1))) });
   const protectedDecl = b.fn({ symbol: fenced, returns: b.Int, contract: b.contract({ ensures: [b.clause(b.eq(b.result(), b.int(7)), 'fixed-protected-value')] }), body: b.ret(b.int(7)) });
-  const module = b.module_({ symbol: symbols.define('module'), symbolTable: symbols.table(), members: [targetDecl,
+  let module = b.module_({ symbol: symbols.define('module'), symbolTable: symbols.table(), members: [targetDecl,
     b.fn({ symbol: wrapper, contract: options.fenceWrapper ? b.contract({ ensures: [b.clause(b.bool(true), 'required-wrapper-presence')] }) : b.contract({}), params: [b.param(w, scalarType)], returns: scalarType, body: b.block(b.ret(b.call(target, b.v(w)))) }),
     b.fn({ symbol: entry, contract: b.contract({}), params: [b.param(n, scalarType)], returns: scalarType, body: b.ret(options.booleanWrapper ? b.call(wrapper, b.v(n)) : b.add(b.call(wrapper, b.v(n)), b.int(10))) }),
     b.fn({ symbol: sink, contract: b.contract({}), params: [b.param(message, b.Str)], returns: b.Unit, capabilities: [log], purity: 'effectful', body: b.block(b.exprStmt(b.invoke(log, b.v(message))), b.ret(b.unit())) }),
     b.fn({ symbol: dead, contract: b.contract({}), returns: options.opaque ? { t: 'Task', result: b.Int } : b.Unit, capabilities: options.opaque ? [] : [log], purity: options.opaque ? 'pure' : 'effectful', body: options.opaque ? b.ret(b.spawn(b.int(1))) : b.block(b.exprStmt(b.invoke(log, b.str('unreachable effect'))), b.ret(b.unit())) }), protectedDecl,
   ] }) as Extract<Term, { kind: 'Module' }>;
+  if (options.transform) module = options.transform(module, { target, wrapper, entry, sink, dead, fenced, x, w, n, message, log }, symbols);
+  module = { ...module, symbolTable: symbols.table() };
   store.intern(module, { leaseId: 'source-draft' });
   const author = generateKeyPairSync('ed25519'), governor = generateKeyPairSync('ed25519'), authority = { policyEpoch: '1', eligibleAuthors: ['author'] };
   const lineage = new CausalLineageLedger({ directory: join(directory, 'lineage'), repositoryId: 'semantic-gc', store, authority: () => authority, authorKey: () => author.publicKey });
-  const spec = { id: 'application', revision: lineage.publishSpec(signSpecRevision({ repositoryId: 'semantic-gc', id: 'application', revision: 1, previous: null, parents: [], text: 'Preserve compute and append exports, exact append effects, and the protected function.', requirements: [fenceRequirement(protectedDecl), ...(options.fenceWrapper ? [fenceRequirement(module.members.find(node => node.kind === 'FunctionDecl' && node.symbol === wrapper)!)] : [])], author: 'author', policyEpoch: '1', nonce: randomUUID() }, author.privateKey)) };
+  const spec = { id: 'application', revision: lineage.publishSpec(signSpecRevision({ repositoryId: 'semantic-gc', id: 'application', revision: 1, previous: null, parents: [], text: 'Preserve compute and append exports, exact append effects, and the protected function.', requirements: [fenceRequirement(module.members.find(node => node.kind === 'FunctionDecl' && node.symbol === fenced)!), ...(options.fenceWrapper ? [fenceRequirement(module.members.find(node => node.kind === 'FunctionDecl' && node.symbol === wrapper)!)] : [])], author: 'author', policyEpoch: '1', nonce: randomUUID() }, author.privateKey)) };
   let sequence = 0;
   const artifact = (term: Term, parents: string[], sign = true) => {
     const root = store.intern(term, { leaseId: `draft-${sequence++}` }), d = (value: string) => domainDigest('aether.semantic-gc-test/1', value);
@@ -47,7 +52,7 @@ function fixture(options: { nonlinear?: boolean; opaque?: boolean; fenceWrapper?
     return { root, context, evidence, manifest, intent };
   };
   const genesis = artifact(module, []); store.commit('production', genesis.root, null);
-  const gcOptions = { directory: join(directory, 'gc'), repositoryId: 'semantic-gc', store, lineage, registry, policy: { epoch: 'closed-exports/1', exports: [entry, sink], protectedSymbols: [] } };
+  const gcOptions: SemanticGcOptions = { profile: options.branchProfile ? SEMANTIC_GC_BRANCH_PROFILE : SEMANTIC_GC_PROFILE, directory: join(directory, 'gc'), repositoryId: 'semantic-gc', store, lineage, registry, policy: { epoch: 'closed-exports/1', exports: [entry, sink], protectedSymbols: [] } };
   const gc = new SemanticGarbageCollector(gcOptions);
   const coordinatorOptions: PromotionCoordinatorOptions = { directory: join(directory, 'governor'), repositoryId: 'semantic-gc', genesisManifest: genesis.manifest, lineage: lineage.admissionAdapter(), authority: () => ({ repositoryId: 'semantic-gc', membershipEpoch: '1', policyEpoch: '1', eligibleGovernors: ['governor'] }), governorKey: () => governor.publicKey, clock: () => 100n };
   const coordinator = new PromotionCoordinator(coordinatorOptions);
@@ -203,4 +208,195 @@ test('semantic GC explicit background scheduling emits a durable candidate and s
     });
     assert.equal(f.gc.readProposal(proposal.id).id, proposal.id); assert.equal(f.store.head('production')!.root, f.genesis.root);
   } finally { f.cleanup(); }
+});
+
+function changeFunction(module: Module, symbol: SymbolId, update: (decl: Extract<Term, { kind: 'FunctionDecl' }>) => Term): Module {
+  return { ...module, members: module.members.map(member => member.kind === 'FunctionDecl' && member.symbol === symbol ? update(member) : member) };
+}
+function terms(root: Term): Term[] {
+  const output: Term[] = [], pending = [root];
+  while (pending.length) { const term = pending.pop()!; output.push(term); for (const group of linkGroups(term)) pending.push(...group.links); }
+  return output;
+}
+const branchFixture = (enabled = true) => fixture({ branchProfile: enabled, transform(module, names) {
+  let result = changeFunction(module, names.entry, decl => ({ ...decl, body: b.if_(b.eq(b.sub(b.v(names.n), b.v(names.n)), b.int(0)), b.block(b.ret(b.add(b.call(names.wrapper, b.v(names.n)), b.int(10)))), b.block(b.ret(b.int(-999)))) }));
+  result = changeFunction(result, names.sink, decl => ({ ...decl, body: b.block(b.if_(b.bool(false), b.block(b.exprStmt(b.call(names.dead))), b.block(b.exprStmt(b.invoke(names.log, b.v(names.message))))), b.ret(b.unit())) }));
+  return result;
+} });
+
+test('branch profile prunes symbolic/literal unreachable arms, preserves selected scopes/effects and removes newly unreachable declarations from the candidate', () => {
+  const f = branchFixture();
+  try {
+    const before = f.store.head('production'), proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.profile, SEMANTIC_GC_BRANCH_PROFILE); assert.equal(proposal.branches!.length, 2);
+    assert.deepEqual(proposal.branches!.map(witness => witness.selection.value), [true, false]);
+    assert.ok(proposal.removed.includes(f.dead)); assert.ok(proposal.removed.includes(f.wrapper));
+    const candidate = f.store.hydrate(proposal.targetRoot); assert.ok(!terms(candidate).some(term => term.kind === 'If'));
+    assert.deepEqual(f.execute(candidate.kind === 'Module' ? proposal.targetRoot : proposal.sourceRoot), f.execute(proposal.sourceRoot));
+    assert.deepEqual(f.store.head('production'), before); assert.equal(proposal.productionAuthorized, false);
+    for (const witness of proposal.branches!) assert.equal(witness.certificate.format, 'aether.portable-ast-proof/1');
+    assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(proposal.id).id, proposal.id);
+    assert.equal(f.gc.propose(f.genesis.evidence.manifest)!.id, proposal.id);
+  } finally { f.cleanup(); }
+});
+
+test('legacy forwarder profile keeps branch syntax and cannot reopen a new branch-profile journal', () => {
+  const f = branchFixture(false);
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.profile, SEMANTIC_GC_PROFILE); assert.equal(proposal.branches, undefined);
+    assert.ok(terms(f.store.hydrate(proposal.targetRoot)).some(term => term.kind === 'If'));
+    assert.ok(!proposal.removed.includes(f.dead), 'syntactic call in the unpruned branch keeps the declaration live');
+    assert.throws(() => new SemanticGarbageCollector({ ...f.gcOptions, profile: SEMANTIC_GC_BRANCH_PROFILE }), /configuration changed/);
+  } finally { f.cleanup(); }
+});
+
+test('branch profile handles Cond expressions and definitely initialized local bindings without flattening blocks', () => {
+  const f = fixture({ branchProfile: true, transform(module, names, symbols) {
+    const local = symbols.define('definite');
+    return changeFunction(module, names.entry, decl => ({ ...decl, body: b.block(
+      b.if_(b.ge(b.v(names.n), b.int(0)), b.let_(local, b.Int, b.int(1)), b.let_(local, b.Int, b.int(2))),
+      b.ret(b.cond(b.eq(b.sub(b.v(local), b.v(local)), b.int(0)), b.add(b.v(names.n), b.int(11)), b.int(-999))),
+    ) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.branches!.length, 1); assert.equal(proposal.branches![0].selection.kind, 'Cond');
+    const candidate = f.store.hydrate(proposal.targetRoot);
+    assert.ok(terms(candidate).some(term => term.kind === 'If')); assert.ok(!terms(candidate).some(term => term.kind === 'Cond'));
+    assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+  } finally { f.cleanup(); }
+});
+
+test('branch pruning does not erase a condition call or its effects even when the callee always returns true', () => {
+  const f = fixture({ branchProfile: true, transform(module, names, symbols) {
+    const condition = symbols.define('effectfulCondition');
+    const source = { ...module, members: [...module.members, b.fn({ symbol: condition, returns: b.Bool, purity: 'effectful', capabilities: [names.log], contract: b.contract({}), body: b.block(b.exprStmt(b.invoke(names.log, b.str('condition'))), b.ret(b.bool(true))) })] };
+    return changeFunction(source, names.entry, decl => ({ ...decl, purity: 'effectful', capabilities: [names.log], body: b.if_(b.call(condition), b.ret(b.add(b.call(names.wrapper, b.v(names.n)), b.int(10))), b.ret(b.int(-1))) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.branches!.length, 0); assert.ok(terms(f.store.hydrate(proposal.targetRoot)).some(term => term.kind === 'If'));
+    const before = f.execute(proposal.sourceRoot), after = f.execute(proposal.targetRoot); assert.deepEqual(after, before);
+    assert.equal(after.effects.filter(args => args[0] === 'condition').length, 5);
+  } finally { f.cleanup(); }
+});
+
+test('branch pruning does not treat an entry precondition or an earlier assigned value as a permanent branch fact', () => {
+  const f = fixture({ branchProfile: true, transform(module, names, symbols) {
+    const local = symbols.define('mutableLocal');
+    return changeFunction(module, names.entry, decl => ({ ...decl, contract: b.contract({ requires: [b.clause(b.ge(b.v(names.n), b.int(0)), 'nonnegative-entry')] }), body: b.block(b.let_(local, b.Int, b.v(names.n)), b.assign(b.place(local), b.int(-1)), b.if_(b.ge(b.v(local), b.int(0)), b.ret(b.int(111)), b.ret(b.int(222)))) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.branches!.length, 0); assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+    assert.ok(terms(f.store.hydrate(proposal.targetRoot)).some(term => term.kind === 'If'));
+  } finally { f.cleanup(); }
+});
+
+test('dead-branch cleanup and inverse rollback require fresh signed F08 authority and retain condition certificates through GC', async () => {
+  const f = branchFixture();
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!, candidate = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!]);
+    await f.gc.promote(proposal.id, f.input(candidate), f.coordinator, f.driver(proposal));
+    const rollback = f.gc.proposeRollback(proposal.id, candidate.evidence.manifest);
+    assert.equal(rollback.branches!.length, proposal.branches!.length);
+    assert.notEqual(rollback.branches![0].manifest.specRoot, proposal.branches![0].manifest.specRoot);
+    const restored = f.artifact(f.module, [candidate.intent!]);
+    await f.gc.promote(rollback.id, f.input(restored), f.coordinator, f.driver(rollback));
+    assert.equal(f.store.head('production')!.root, proposal.sourceRoot); assert.deepEqual(f.execute(proposal.sourceRoot), f.execute(proposal.targetRoot));
+    f.gc.collect(); for (const witness of [...proposal.branches!, ...rollback.branches!]) assert.ok(f.store.get(witness.root));
+    assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(rollback.id).id, rollback.id);
+  } finally { f.cleanup(); }
+});
+
+test('branch proofs preserve contract and loop annotation identities while pruning a stable condition inside a loop', () => {
+  const f = fixture({ branchProfile: true, transform(module, names, symbols) {
+    const counter = symbols.define('loopCounter');
+    let source = changeFunction(module, names.entry, decl => ({ ...decl, purity: 'effectful', capabilities: [names.log], body: b.block(
+      b.let_(counter, b.Int, b.int(0)),
+      b.while_(b.lt(b.v(counter), b.int(2)), b.block(
+        b.if_(b.eq(b.v(names.n), b.v(names.n)), b.exprStmt(b.invoke(names.log, b.str('loop-live'))), b.exprStmt(b.invoke(names.log, b.str('loop-dead')))),
+        b.if_(b.lt(b.v(counter), b.int(0)), b.exprStmt(b.invoke(names.log, b.str('negative-counter')))),
+        b.assign(b.place(counter), b.add(b.v(counter), b.int(1))),
+      ), { invariants: [b.cond(b.bool(true), b.and(b.ge(b.v(counter), b.int(0)), b.le(b.v(counter), b.int(2))), b.bool(false))], variant: b.sub(b.int(2), b.v(counter)) }),
+      b.ret(b.add(b.v(names.n), b.int(11))),
+    ) }));
+    source = changeFunction(source, names.fenced, decl => ({ ...decl, contract: b.contract({ ensures: [b.clause(b.cond(b.bool(true), b.eq(b.result(), b.int(7)), b.bool(false)), 'conditional-contract')] }) }));
+    return source;
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!; assert.equal(proposal.branches!.length, 1);
+    const before = terms(f.module).find(term => term.kind === 'While')!, after = terms(f.store.hydrate(proposal.targetRoot)).find(term => term.kind === 'While')!;
+    if (before.kind !== 'While' || after.kind !== 'While') throw new Error('loop missing');
+    assert.deepEqual(after.invariants, before.invariants); assert.deepEqual(after.variant, before.variant);
+    assert.equal(terms(after.body).filter(term => term.kind === 'If').length, 1, 'loop-written bindings are not assumed stable');
+    const oldContract = f.module.members.find(node => node.kind === 'FunctionDecl' && node.symbol === f.fenced)!;
+    const candidate = f.store.hydrate(proposal.targetRoot); if (candidate.kind !== 'Module') throw new Error('module missing');
+    assert.equal(new GraphStore().intern(candidate.members.find(node => node.kind === 'FunctionDecl' && node.symbol === f.fenced)!), new GraphStore().intern(oldContract));
+    const result = f.execute(proposal.targetRoot); assert.deepEqual(result, f.execute(proposal.sourceRoot));
+    assert.equal(result.effects.filter(args => args[0] === 'loop-live').length, 10);
+    assert.ok(result.effects.every(args => args[0] !== 'loop-dead' && args[0] !== 'negative-counter'));
+  } finally { f.cleanup(); }
+});
+
+test('portable branch proof does not claim a partial division condition is universally total from an entry precondition', () => {
+  const f = fixture({ branchProfile: true, transform(module, names) {
+    return changeFunction(module, names.entry, decl => ({ ...decl, contract: b.contract({ requires: [b.clause(b.ne(b.v(names.n), b.int(0)), 'nonzero-entry')] }), body: b.if_(b.eq(b.div(b.v(names.n), b.v(names.n)), b.int(1)), b.ret(b.add(b.v(names.n), b.int(11))), b.ret(b.int(0))) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.branches!.length, 0); assert.ok(terms(f.store.hydrate(proposal.targetRoot)).some(term => term.kind === 'If'));
+    assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+  } finally { f.cleanup(); }
+});
+
+test('branch admission rejects missing/swapped certificates, invalid source sites, wrong-arm code and relabeled condition claims', () => {
+  const f = branchFixture();
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    const forge = (changes: Partial<SemanticGcProposal>) => { const { id: _id, ...body } = { ...proposal, ...changes }; const changed = { ...body, id: domainDigest('aether.semantic-gc-proposal/1', body) }; writeFileSync(join(f.directory, 'gc/proposals', `${changed.id.split(':').at(-1)}.json`), encodeCanonical(changed)); return changed.id; };
+    assert.throws(() => f.gc.readProposal(forge({ branches: [] })), /unsafe candidate|incomplete/);
+    assert.throws(() => f.gc.readProposal(forge({ branches: [...proposal.branches!].reverse() })), /reordered/);
+    const incomplete = proposal.branches!.map(witness => ({ ...witness, certificate: { ...witness.certificate, certificates: [] } }));
+    assert.throws(() => f.gc.readProposal(forge({ branches: incomplete })), /coverage/);
+    const swapped = proposal.branches!.map((witness, index) => ({ ...witness, certificate: proposal.branches![1 - index].certificate }));
+    assert.throws(() => f.gc.readProposal(forge({ branches: swapped })), /execution context/);
+    const wrongSite = proposal.branches!.map((witness, index) => index ? witness : { ...witness, selection: { ...witness.selection, path: [{ field: 'stmts', index: 999 }] } });
+    assert.throws(() => f.gc.readProposal(forge({ branches: wrongSite })), /missing|unreachable/);
+    const wrongChoice = proposal.branches!.map((witness, index) => index ? witness : { ...witness, selection: { ...witness.selection, value: false } });
+    assert.throws(() => f.gc.readProposal(forge({ branches: wrongChoice })), /unsafe candidate|incomplete/);
+    const candidate = f.store.hydrate(proposal.targetRoot); if (candidate.kind !== 'Module') throw new Error('module missing');
+    const wrongRoot = f.store.intern(changeFunction(candidate, f.entry, decl => ({ ...decl, body: b.ret(b.int(-999)) })), { leaseId: 'wrong-arm-draft' });
+    assert.throws(() => f.gc.readProposal(forge({ targetRoot: wrongRoot })), /unsafe candidate/);
+    assert.equal(f.store.head('production')!.root, proposal.sourceRoot);
+  } finally { f.cleanup(); }
+});
+
+test('branch analysis does not assume a local declared in only one syntactic arm is definitely bound', () => {
+  const f = fixture({ branchProfile: true, transform(module, names, symbols) {
+    const local = symbols.define('oneArmLocal');
+    return changeFunction(module, names.entry, decl => ({ ...decl, body: b.block(
+      b.if_(b.ge(b.v(names.n), b.int(0)), b.let_(local, b.Int, b.int(1)), b.ret(b.int(-1))),
+      b.if_(b.eq(b.v(local), b.v(local)), b.ret(b.add(b.v(names.n), b.int(11))), b.ret(b.int(-999))),
+    ) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.branches!.length, 0, 'the bounded join deliberately does not use return-path reasoning');
+    assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+  } finally { f.cleanup(); }
+});
+
+test('persisted branch witnesses are checked with the portable proof producer replaced by a throwing stub', async () => {
+  const f = branchFixture(), consumer = mkdtempSync(join(tmpdir(), 'aether-gc-branch-consumer-'));
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    cpSync(resolve('src'), join(consumer, 'src'), { recursive: true });
+    writeFileSync(join(consumer, 'package.json'), '{"type":"module"}\n');
+    writeFileSync(join(consumer, 'src/tier2/portable-proof-producer.ts'), "export function generatePortableCertificate() { throw new Error('proof search forbidden in consumer'); }\n");
+    const { SemanticGarbageCollector: IndependentConsumer } = await import(pathToFileURL(join(consumer, 'src/tier1/semantic-gc.ts')).href);
+    const reader = new IndependentConsumer(f.gcOptions);
+    assert.equal(reader.readProposal(proposal.id).id, proposal.id);
+  } finally { f.cleanup(); rmSync(consumer, { recursive: true, force: true }); }
 });

@@ -13,6 +13,8 @@ import { encode as encodeIR } from '../../src/tier1/agent-ir.ts';
 import { atomicWrite } from '../../src/tier1/persistence.ts';
 import { ACCOUNT, CAP_LEDGER_APPEND, buildLedgerExample } from '../../src/examples/ledger.ts';
 import { CapabilitySealer, RevocationList } from '../../src/tier2/ocap.ts';
+import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
+import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
 import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
 import { DurableEffectBroker, type EffectAdapter } from '../../src/fabric/effects.ts';
 import { JournalLock } from '../../src/fabric/journal-lock.ts';
@@ -95,6 +97,42 @@ async function accounts(deployment: ProcessDeployment) {
   return { alice, bob };
 }
 async function balances(deployment: ProcessDeployment) { return (await deployment.snapshot()).records.filter(record => record.fields.some(([key]) => key === 'balance')).map(record => (record.fields.find(([key]) => key === 'balance')![1] as { value: string }).value); }
+
+test('strict process deployment carries scoped grants through the production host and sink', async () => {
+  const f = fixture(); let deployment: ProcessDeployment | undefined;
+  const epochs = new DurableGrantEpochs({ directory: join(f.directory, 'grant-epochs'), repositoryId: 'deployment-test' });
+  const scopedGrants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(31), repositoryId: 'deployment-test', clock: () => 100,
+    policyEpoch: () => epochs.policyEpoch, revocationEpoch: () => epochs.epoch,
+    isRevoked: (cap, path) => epochs.isRevoked(cap, path), authorizeIssue: () => true, authorizeDelegate: () => true });
+  const strictFactory = new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => ({ ...hostFactory(f.directory, artifact), scopedGrants,
+    effectResourcePolicyDigest: domainDigest('aether.effect-resource-policy/1', 'ledger-sender-id-v1'),
+    effectResourcePath: (request: { capability: string; args: readonly TaggedValueV1[] }) => {
+      const first = request.args[0]; if (first?.tag !== 'string') throw new TypeError('unsupported ledger resource');
+      return ['ledger', first.value];
+    },
+  })]]);
+  try {
+    deployment = await ProcessDeployment.open({ ...f.options, factories: strictFactory });
+    assert.throws(() => deployment!.issueTokens(f.ex.symbols.transfer), /strict ProcessHost/);
+    const { alice, bob } = await accounts(deployment), args = [reference(alice), reference(bob), integer(10)];
+    await assert.rejects(deployment.call(f.ex.symbols.transfer, args, { operationId: 'wrong-audience', tokens: deployment.issueScopedTokens(f.ex.symbols.settle) }), /authority_denied/);
+    assert.equal(f.rows().length, 0);
+    const original = deployment.issueScopedTokens(f.ex.symbols.transfer);
+    assert.equal((await deployment.call(f.ex.symbols.transfer, args, { operationId: 'strict-transfer', tokens: original })).state, 'completed');
+    assert.equal(f.rows().length, 1);
+    const wrongScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'bob']]]);
+    const denied = await deployment.call(f.ex.symbols.transfer, args, { operationId: 'wrong-ledger-target', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, wrongScope) });
+    if (denied.state === 'completed') assert.equal(denied.execution.ok, false);
+    assert.equal(f.rows().length, 1);
+    epochs.revoke(CAP_LEDGER_APPEND, []);
+    await assert.rejects(deployment.call(f.ex.symbols.transfer, args, { operationId: 'revoked', tokens: original }), /authority_denied/);
+    assert.equal(f.rows().length, 1);
+    await deployment.close(); deployment = undefined;
+    await assert.rejects(ProcessDeployment.open(f.options), /configuration|profile/i);
+    deployment = await ProcessDeployment.open({ ...f.options, factories: strictFactory });
+    assert.deepEqual(await balances(deployment), ['90', '10']);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
 
 test('F08 process deployment: rejected composition, approved migration/body change and rollback preserve real ledger state', async () => {
   const f = fixture(); let deployment: ProcessDeployment | undefined;
@@ -386,6 +424,22 @@ test('F08 review: recovery freezes strategy and rechecks permission after awaits
     assert.equal((await deployment.recoverOperation('inner-completed')).state, 'completed');
     assert.equal(f.rows().length, 0);
   } finally { ProcessHost.prototype.recoverOperation = original; await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('asynchronous deployment recovery policy is denied before host recovery or receipt publication', async () => {
+  const f = fixture(); let deployment: ProcessDeployment | undefined;
+  try {
+    deployment = await ProcessDeployment.open({ ...f.options,
+      factories: new Map([['ledger-services/1', artifact => ({ ...hostFactory(f.directory, artifact),
+        authorizeRecovery: (() => Promise.resolve(true)) as unknown as () => boolean })]]),
+      invocationPhase: phase => { if (phase === 'after-intent') throw new Error('held for recovery'); },
+    });
+    const symbol = f.ex.symbols.feeFor;
+    await assert.rejects(deployment.call(symbol, [integer(100)], { operationId: 'async-held', tokens: deployment.issueTokens(symbol) }), /held/);
+    const path = join(f.options.directory, 'deployment.json'), before = readFileSync(path, 'utf8');
+    await assert.rejects(deployment.recoverOperation('async-held'), /recovery authorization denied/);
+    assert.equal(readFileSync(path, 'utf8'), before);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });
 
 test('F08 review: repeated manifest activation rejects historical ABA handles without changing workers or serving generation', async () => {

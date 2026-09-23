@@ -4,11 +4,11 @@
 import { closeSync, existsSync, fsyncSync, linkSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { decodeCanonical, encodeCanonical, exactObject, identifier, decimal, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
+import { decodeCanonical, encodeCanonical, exactObject, identifier, decimal, validateLogicalRef, validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { domainDigest, validateDigest, type Digest } from '../fabric/identity.ts';
 import { validateEffectRequest, effectRequestDigest, effectReplayOutcomeDigest, type EffectEventV1 } from '../fabric/effects.ts';
 import { runtimeSnapshotDigest, validateRuntimeSnapshot, type RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
-import { checkpointDigest, eventDigest, MACHINE_LIMITS, machineClone, validateResumableSnapshot, type ResumableSnapshot, type MachineValue } from '../tier3/resumable-state.ts';
+import { checkpointDigest, eventDigest, machineDigest, MACHINE_LIMITS, machineClone, validateResumableSnapshot, type ResumableSnapshot, type MachineValue } from '../tier3/resumable-state.ts';
 import type { ResumableProgram } from '../tier3/resumable-program.ts';
 import type { Ty } from '../tier1/ast.ts';
 import { validateMachineResult } from '../tier3/resumable-types.ts';
@@ -28,8 +28,47 @@ export interface ProcessCheckpointReceipt {
   readonly checkpoint: Digest; readonly beforeSnapshot: Digest; readonly afterSnapshot: Digest;
   readonly effectAudit: Digest; readonly eventHead: Digest; readonly eventCursor: string;
 }
-export type ProcessCheckpointAction = 'begin' | 'run' | 'commit' | 'reconcile' | 'abort';
-export interface ProcessCheckpointAuthorization { readonly action: ProcessCheckpointAction; readonly binding: ProcessCheckpointBinding }
+export type ProcessCheckpointAction = 'begin' | 'run' | 'commit' | 'reconcile' | 'abort' | 'correct' | 'rewind';
+export type ProcessCheckpointControlRequest = { readonly operationId: string; readonly expectedCheckpoint: Digest } & (
+  { readonly kind: 'rewind'; readonly steps: number } |
+  { readonly kind: 'local'; readonly frameId: string; readonly symbol: SymbolId; readonly value: TaggedValueV1 } |
+  { readonly kind: 'record'; readonly reference: LogicalRefV1; readonly field: string; readonly value: TaggedValueV1 });
+export interface ProcessCheckpointControl {
+  readonly format: 'aether.process-checkpoint-control/1'; readonly id: Digest; readonly binding: Digest;
+  readonly request: ProcessCheckpointControlRequest; readonly beforeCheckpoint: Digest; readonly afterCheckpoint: Digest;
+  readonly previous: Digest | null; readonly effectAudit: Digest; readonly effectCount: number;
+}
+export interface ProcessCheckpointAuthorization { readonly action: ProcessCheckpointAction; readonly binding: ProcessCheckpointBinding; readonly control?: ProcessCheckpointControlRequest }
+export const checkpointControlDigest = (value: Omit<ProcessCheckpointControl, 'id'>): Digest => domainDigest('aether.process-checkpoint-control/1', value);
+export function validateCheckpointControlRequest(value: ProcessCheckpointControlRequest): void {
+  const keys = ['operationId', 'expectedCheckpoint', 'kind'];
+  if (value.kind === 'rewind') keys.push('steps'); else if (value.kind === 'local') keys.push('frameId', 'symbol', 'value'); else if (value.kind === 'record') keys.push('reference', 'field', 'value'); else throw new TypeError('unsupported checkpoint control');
+  exactObject(value, keys); identifier(value.operationId); validateDigest(value.expectedCheckpoint, 'aether.resumable-state/1');
+  if (value.kind === 'rewind') { if (!Number.isSafeInteger(value.steps) || value.steps < 1 || value.steps > 4096) throw new RangeError('invalid control rewind distance'); }
+  else {
+    validateTaggedValue(value.value); if (!['null', 'bool', 'int', 'string', 'ref'].includes(value.value.tag)) throw new TypeError('checkpoint corrections require scalar/reference values');
+    if (value.kind === 'local') { decimal(value.frameId); identifier(value.symbol); } else { validateLogicalRef(value.reference); identifier(value.field); }
+  }
+}
+export function validateCheckpointControlTransition(request: ProcessCheckpointControlRequest, before: ResumableSnapshot, after: ResumableSnapshot, program: ResumableProgram): void {
+  validateCheckpointControlRequest(request); validateCheckpointExtension(before, after, program, request.kind !== 'rewind');
+  const event = after.events.at(-1);
+  if (request.expectedCheckpoint !== checkpointDigest(before) || after.events.length !== before.events.length + 1 || event?.code !== 'host' || event.op !== (request.kind === 'rewind' ? `rewind-v1:${request.steps}` : 'correction')) throw new TypeError('checkpoint control does not match the authorized transition');
+  if (request.kind === 'rewind') return; // Version 2 validator checks every inverse section against the exact target.
+  if (before.core.state !== 'running' || !before.core.frames.length || before.core.frames.some(frame => frame.pc >= program.codes.find(code => code.id === frame.code)!.returnPc)) throw new Error('checkpoint correction requires a running body before postcondition evaluation; rewind first');
+  const expected = machineClone(before.core), value = machineClone(request.value) as MachineValue;
+  if (request.kind === 'record') {
+    const record = expected.records.find(record => record.id === request.reference.objectId && record.epoch === request.reference.ownerEpoch);
+    const field = record?.fields.find(([name]) => name === request.field);
+    if (!record || !field || request.reference.heapId !== expected.heapId) throw new TypeError('stale correction target');
+    field[1] = value; record.version = String(BigInt(record.version) + 1n);
+  } else {
+    const frame = expected.frames.find(frame => frame.id === request.frameId); if (!frame) throw new TypeError('unknown correction frame');
+    const field = [...frame.scopes].reverse().map(id => expected.environments.find(environment => environment.id === id)?.bindings.find(([symbol]) => symbol === request.symbol)).find(Boolean);
+    if (!field) throw new TypeError('unknown correction local'); field[1] = value;
+  }
+  if (machineDigest(expected) !== machineDigest(after.core)) throw new TypeError('checkpoint correction differs from its authorized value/target');
+}
 export function processCheckpointBindingDigest(value: Omit<ProcessCheckpointBinding, 'id'>): Digest { return domainDigest('aether.process-checkpoint-binding/1', value); }
 export function validateProcessCheckpointBinding(value: ProcessCheckpointBinding): void {
   exactObject(value, ['format', 'id', 'operationId', 'symbol', 'configuration', 'generation', 'unit', 'processHead', 'beforeSnapshot', 'baseCheckpoint', 'initialCheckpoint', 'program', 'executionId']);
@@ -63,12 +102,14 @@ export function projectProcessCheckpoint(snapshot: ResumableSnapshot, baseline: 
   };
   validateRuntimeSnapshot(projected); return projected;
 }
-export function validateCheckpointExtension(base: ResumableSnapshot, next: ResumableSnapshot, program: ResumableProgram): void {
+export function validateCheckpointExtension(base: ResumableSnapshot, next: ResumableSnapshot, program: ResumableProgram, preserveAllocations = true): void {
   validateResumableSnapshot(base, program); validateResumableSnapshot(next, program);
   if (base.core.executionId !== next.core.executionId || base.core.heapId !== next.core.heapId || base.core.ownerEpoch !== next.core.ownerEpoch || base.core.mode !== next.core.mode || base.core.branchId !== next.core.branchId || next.events.length < base.events.length || base.events.some((event, index) => eventDigest(event) !== eventDigest(next.events[index]))) throw new TypeError('checkpoint is not an append-only continuation of its ownership base');
   const current = new Map(next.core.records.map(record => [record.id, record]));
-  for (const record of base.core.records) if (current.get(record.id)?.epoch !== record.epoch) throw new TypeError('checkpoint replaced a pre-existing allocation identity');
-  if (BigInt(next.core.nextRecord) < BigInt(base.core.nextRecord)) throw new TypeError('checkpoint allocator moved before ownership base');
+  if (preserveAllocations) {
+    for (const record of base.core.records) if (current.get(record.id)?.epoch !== record.epoch) throw new TypeError('checkpoint replaced a pre-existing allocation identity');
+    if (BigInt(next.core.nextRecord) < BigInt(base.core.nextRecord)) throw new TypeError('checkpoint allocator moved before ownership base');
+  }
 }
 export function processReferenceFromCheckpoint(value: LogicalRefV1, snapshot: ResumableSnapshot, generation: string): LogicalRefV1 {
   if (value.heapId !== snapshot.core.heapId || snapshot.core.records.find(record => record.id === value.objectId)?.epoch !== value.ownerEpoch) throw new TypeError('stale resumable handle cannot be rebound');

@@ -1,0 +1,6 @@
+{
+  "format": "aether.projection-token-failure/1",
+  "error": "ledger unexpectedly inside scalar profile",
+  "reason": "The standard ledger became supported by the new composite profile; the old required-refusal assertion was obsolete. No completed measurement report was published.",
+  "sourceSnapshotsRetained": 11
+}

@@ -2,11 +2,15 @@
  * existing strict-lineage governor coordinator commits their deployment.
  *
  * This profile handles unreachable private FunctionDecls and monomorphic pure
- * Int/Bool tail-forwarders with empty frame contracts. The trusted export
- * allowlist must match the application's actual externally callable surface.
+ * Int/Bool tail-forwarders with empty frame contracts. An opt-in branch profile
+ * also prunes If/Cond arms whose original conditions have portable proofs of
+ * total, uniform truth over definitely bound scalar values. It preserves chosen
+ * statement scopes, function contracts and loop annotations; it does not infer
+ * facts from entry preconditions, local values, heap state or loop invariants.
+ * The trusted export allowlist must match the externally callable surface.
  *
- * Remaining FR-1.5 coverage: dead-branch simplification, general obsolete-shim
- * recognition and external third-party adapter/import retirement. Removing an
+ * Remaining FR-1.5 coverage: broader path-dependent/opaque branch reasoning,
+ * general obsolete-shim recognition and third-party adapter/import retirement. Removing an
  * unreachable effectful FunctionDecl is not evidence of adapter-registration
  * cleanup. No general inlining or active-frame rewrite is claimed. Retention is
  * conservative and nonexpiring, so this does not reclaim protected history.
@@ -32,6 +36,8 @@ import { atomicWrite } from './persistence.ts';
 import * as b from './build.ts';
 
 export const SEMANTIC_GC_PROFILE = 'aether.semantic-gc-closed-forwarders/1';
+export const SEMANTIC_GC_BRANCH_PROFILE = 'aether.semantic-gc-closed-branches/1';
+export type SemanticGcProfile = typeof SEMANTIC_GC_PROFILE | typeof SEMANTIC_GC_BRANCH_PROFILE;
 type FunctionDecl = Extract<Term, { kind: 'FunctionDecl' }>;
 type Module = Extract<Term, { kind: 'Module' }>;
 export type SemanticRetentionKind = 'audit' | 'replay' | 'active-task' | 'unstable-replication';
@@ -40,17 +46,25 @@ export interface SemanticGcPolicy { readonly epoch: string; readonly exports: re
 export interface SemanticGcOptions {
   readonly directory: string; readonly repositoryId: string; readonly store: DurableGraphStore; readonly lineage: CausalLineageLedger;
   readonly registry: CapabilityRegistry; readonly policy: SemanticGcPolicy;
+  /** Opt in to portable total-condition pruning; old journals remain unchanged. */
+  readonly profile?: SemanticGcProfile;
+  readonly maxBranchProofs?: number;
   readonly maxDeclarations?: number; readonly maxAstNodes?: number; readonly maxRecords?: number;
 }
 interface Wrapper { readonly symbol: SymbolId; readonly target: SymbolId }
+interface BranchStep { readonly field: string; readonly index: number }
+interface BranchSelection { readonly symbol: SymbolId; readonly path: readonly BranchStep[]; readonly kind: 'If' | 'Cond'; readonly site: NodeRef; readonly condition: NodeRef; readonly value: boolean }
+interface BranchLocation { readonly declaration: FunctionDecl; readonly term: Extract<Term, { kind: 'If' | 'Cond' }>; readonly path: readonly BranchStep[]; readonly environment: ReadonlyMap<SymbolId, Ty> }
+interface BranchWitness { readonly selection: BranchSelection; readonly root: NodeRef; readonly specification: string; readonly manifest: ExecutionManifestV1; readonly certificate: PortableCertificateV1 }
 interface RewritePlan { readonly removed: readonly SymbolId[]; readonly collapsed: readonly Wrapper[]; readonly target: Module }
 interface EquivalenceWitness { readonly wrapper: SymbolId; readonly root: NodeRef; readonly specification: string; readonly manifest: ExecutionManifestV1; readonly certificate: PortableCertificateV1 }
 export interface SemanticGcProposal {
-  readonly format: 'aether.semantic-gc-proposal/1'; readonly configuration: Digest; readonly profile: typeof SEMANTIC_GC_PROFILE;
+  readonly format: 'aether.semantic-gc-proposal/1'; readonly configuration: Digest; readonly profile: SemanticGcProfile;
   readonly direction: 'cleanup' | 'rollback'; readonly rollbackOf: Digest | null; readonly sourceManifest: ExecutionManifestV1;
   readonly specification: string; readonly productionAuthorized: false;
   readonly sourceRoot: NodeRef; readonly targetRoot: NodeRef; readonly exports: readonly SymbolId[];
   readonly removed: readonly SymbolId[]; readonly collapsed: readonly Wrapper[]; readonly witnesses: readonly EquivalenceWitness[];
+  readonly branches?: readonly BranchWitness[];
   readonly obligationDigest: Digest; readonly id: Digest;
 }
 const WIRE_LIMITS = { maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024, maxObjects: 500000, maxDepth: 64 };
@@ -71,8 +85,8 @@ function returnExpression(decl: FunctionDecl): Term {
 function emptyContract(term: Term | null): boolean { return term === null || term.kind === 'Contract' && term.requires.length === 0 && term.modifies.length === 0 && term.ensures.length === 0; }
 function scalar(ty: Ty): boolean { return ty.t === 'Int' || ty.t === 'Bool'; }
 function shape(decl: FunctionDecl) { return { typeParams: decl.typeParams, params: decl.params.map(param => param.ty), returns: decl.returns, capabilities: decl.capabilities, purity: decl.purity }; }
-function witnessManifest(root: NodeRef, specification: string, obligation: Digest): ExecutionManifestV1 {
-  const d = (part: string) => domainDigest('aether.semantic-gc-proof-context/1', { profile: SEMANTIC_GC_PROFILE, obligation, part });
+function witnessManifest(root: NodeRef, specification: string, obligation: Digest, profile: SemanticGcProfile = SEMANTIC_GC_PROFILE): ExecutionManifestV1 {
+  const d = (part: string) => domainDigest('aether.semantic-gc-proof-context/1', { profile, obligation, part });
   return { format: 'aether.execution/1', astRoot: root, specRoot: domainDigest('aether.specification/1', specification), dependencies: [], semanticsVersion: 'aether-reference/1', compilerDigest: d('witness-derivation'), target: { abiVersion: 'semantic-gc-equivalence/1', profileDigest: d('portable-scalar-profile'), artifactDigest: d('witness') }, capabilityPolicyDigest: d('no-effects'), evidencePolicyDigest: d('portable-ast-kernel') };
 }
 
@@ -88,15 +102,21 @@ export class SemanticGarbageCollector {
   private readonly maxAstNodes: number;
   private readonly maxRecords: number;
   private readonly builderLease: string;
+  readonly profile: SemanticGcProfile;
+  private readonly maxBranchProofs: number;
   constructor(options: SemanticGcOptions) {
     this.options = { ...options }; identifier(options.repositoryId);
+    this.profile = options.profile ?? SEMANTIC_GC_PROFILE;
+    if (![SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE].includes(this.profile)) throw new Error('unsupported semantic GC profile');
+    this.maxBranchProofs = options.maxBranchProofs ?? 64;
+    if (!Number.isSafeInteger(this.maxBranchProofs) || this.maxBranchProofs < 1 || this.maxBranchProofs > 256 || this.profile === SEMANTIC_GC_PROFILE && options.maxBranchProofs !== undefined) throw new Error('invalid branch proof profile');
     this.policy = freeze(clone(options.policy)); exactObject(this.policy, ['epoch', 'exports', 'protectedSymbols']); identifier(this.policy.epoch);
     for (const values of [this.policy.exports, this.policy.protectedSymbols]) { if (!Array.isArray(values) || new Set(values).size !== values.length) throw new Error('invalid semantic GC symbol policy'); values.forEach(identifier); }
     if (!this.policy.exports.length) throw new Error('semantic GC requires a nonempty trusted export allowlist');
     this.registry = new CapabilityRegistry(); for (const name of options.registry.names) this.registry.define(clone(options.registry.get(name)!));
     this.maxDeclarations = options.maxDeclarations ?? 128; this.maxAstNodes = options.maxAstNodes ?? 4096; this.maxRecords = options.maxRecords ?? 1000;
     for (const [limit, maximum] of [[this.maxDeclarations, 128], [this.maxAstNodes, 10000], [this.maxRecords, 10000]]) if (!Number.isSafeInteger(limit) || limit < 1 || limit > maximum) throw new RangeError('semantic GC resource profile');
-    const profile = { format: SEMANTIC_GC_PROFILE, repositoryId: options.repositoryId, policy: this.policy, registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), maxDeclarations: this.maxDeclarations, maxAstNodes: this.maxAstNodes, maxRecords: this.maxRecords };
+    const profile = { format: this.profile, repositoryId: options.repositoryId, policy: this.policy, registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), maxDeclarations: this.maxDeclarations, maxAstNodes: this.maxAstNodes, maxRecords: this.maxRecords, ...(this.profile === SEMANTIC_GC_BRANCH_PROFILE ? { maxBranchProofs: this.maxBranchProofs } : {}) };
     this.configuration = domainDigest('aether.semantic-gc-config/1', profile); this.builderLease = `semantic-gc-builder:${this.configuration}`;
     durableDirectory(options.directory); durableDirectory(join(options.directory, 'proposals')); durableDirectory(join(options.directory, 'retention'));
     this.lock = new JournalLock({ directory: join(options.directory, 'lock'), domain: 'aether.semantic-gc', maxTickets: 100000 });
@@ -163,7 +183,114 @@ export class SemanticGarbageCollector {
     const pending = [...this.policy.exports, ...this.policy.protectedSymbols, ...fences, ...[...functions.values()].filter(decl => !emptyContract(decl.contract) || decl.surfaces.length).map(decl => decl.symbol)], result = new Set<SymbolId>();
     while (pending.length) { const symbol = pending.pop()!; if (result.has(symbol)) continue; const decl = functions.get(symbol); if (!decl) throw new Error('missing static dependency'); result.add(symbol); pending.push(...this.calls(decl)); } return result;
   }
-  private rewrite(source: Module, fences: ReadonlySet<SymbolId>): RewritePlan {
+  private branchKey(selection: Pick<BranchSelection, 'symbol' | 'path'>): string { return JSON.stringify([selection.symbol, selection.path]); }
+  private selection(location: BranchLocation, value: boolean): BranchSelection {
+    const memory = new GraphStore();
+    return { symbol: location.declaration.symbol, path: location.path, kind: location.term.kind, site: memory.intern(location.term), condition: memory.intern(location.term.cond), value };
+  }
+  /** Track only definitely bound types. No inferred values, entry preconditions,
+   * loop invariants or heap facts can discharge a branch condition. */
+  private walkBranches(source: Module, choose: (location: BranchLocation) => boolean | null): Module {
+    const changed = (term: Term): Set<SymbolId> => { const result = new Set<SymbolId>(), todo = [term]; while (todo.length) { const node = todo.pop()!; if (node.kind === 'Let' || node.kind === 'ForAll') result.add(node.symbol); if (node.kind === 'Assign' && node.target.kind === 'Place' && !node.target.path.length) result.add(node.target.symbol); todo.push(...children(node)); } return result; };
+    const visit = (node: Term, environment: Map<SymbolId, Ty>, path: readonly BranchStep[], declaration: FunctionDecl): Term => {
+      const child = (term: Term, field: string, index: number, env = environment) => visit(term, env, [...path, { field, index }], declaration);
+      if (node.kind === 'Contract' || node.kind === 'Clause' || node.kind === 'FunctionDecl') return node;
+      if (node.kind === 'ForAll') { environment.delete(node.symbol); return node; }
+      if (node.kind === 'Block') { const inner = new Map(environment); return { ...node, stmts: node.stmts.map((stmt, index) => child(stmt, 'stmts', index, inner)) }; }
+      if (node.kind === 'Let') { const init = child(node.init, 'init', 0); environment.set(node.symbol, node.ty); return { ...node, init }; }
+      if (node.kind === 'While') {
+        const writes = changed(node.body), stable = new Map(environment); for (const symbol of writes) stable.delete(symbol);
+        const cond = child(node.cond, 'cond', 0, new Map(stable)), body = child(node.body, 'body', 0, new Map(stable));
+        for (const symbol of writes) environment.delete(symbol);
+        return { ...node, cond, body }; // Invariant/variant AST identities stay intact.
+      }
+      if (node.kind === 'If' || node.kind === 'Cond') {
+        const location: BranchLocation = { declaration, term: node, path, environment: new Map(environment) }, selected = choose(location);
+        if (selected !== null) {
+          const chosen = selected ? node.then : node.otherwise;
+          return chosen === null ? b.block() : child(chosen, selected ? 'then' : 'otherwise', 0);
+        }
+        const cond = child(node.cond, 'cond', 0), yes = new Map(environment), no = new Map(environment);
+        const then = child(node.then, 'then', 0, yes), otherwise = node.otherwise ? child(node.otherwise, 'otherwise', 0, no) : null;
+        if (node.kind === 'If') { environment.clear(); for (const [symbol, ty] of yes) if (no.has(symbol) && same(ty, no.get(symbol))) environment.set(symbol, ty); return { ...node, cond, then, otherwise }; }
+        return { ...node, cond, then, otherwise: otherwise! };
+      }
+      if (node.kind === 'MatchResult') {
+        const yes = new Map(environment), no = new Map(environment); yes.delete(node.okSymbol); no.delete(node.errSymbol);
+        const value = child(node.value, 'value', 0), ok = child(node.ok, 'ok', 0, yes), err = child(node.err, 'err', 0, no);
+        environment.delete(node.okSymbol); environment.delete(node.errSymbol); return { ...node, value, ok, err };
+      }
+      return withLinkGroups(node, new Map(linkGroups(node).map(group => [group.field, group.links.map((term, index) => child(term, group.field, index))])));
+    };
+    return { ...source, members: source.members.map(member => member.kind === 'FunctionDecl' && member.body ? { ...member, body: visit(member.body, new Map(member.params.map(param => [param.symbol, param.ty])), [], member) } : member) };
+  }
+  private applyBranches(source: Module, selections: readonly BranchSelection[]): { module: Module; locations: Map<string, BranchLocation> } {
+    const locations = new Map<string, BranchLocation>();
+    if (!selections.length) return { module: source, locations };
+    if (this.profile !== SEMANTIC_GC_BRANCH_PROFILE || selections.length > this.maxBranchProofs) throw new Error('unsupported branch selection profile/count');
+    const wanted = new Map<string, BranchSelection>();
+    for (const selection of selections) {
+      exactObject(selection, ['symbol', 'path', 'kind', 'site', 'condition', 'value']); identifier(selection.symbol); validateDigest(selection.site, 'ast'); validateDigest(selection.condition, 'ast');
+      if (!Array.isArray(selection.path) || selection.path.length > 64 || !['If', 'Cond'].includes(selection.kind) || typeof selection.value !== 'boolean') throw new Error('invalid branch selection');
+      for (const step of selection.path) { exactObject(step, ['field', 'index']); identifier(step.field); if (!Number.isSafeInteger(step.index) || step.index < 0 || step.index > this.maxAstNodes) throw new Error('invalid branch path'); }
+      const key = this.branchKey(selection); if (wanted.has(key)) throw new Error('duplicate branch selection'); wanted.set(key, selection);
+    }
+    const observed: BranchSelection[] = [];
+    const module = this.walkBranches(source, location => {
+      const key = this.branchKey({ symbol: location.declaration.symbol, path: location.path }), selection = wanted.get(key); if (!selection) return null;
+      if (!same(this.selection(location, selection.value), selection)) throw new Error('branch selection does not match exact source site');
+      locations.set(key, location); observed.push(selection); return selection.value;
+    });
+    if (!same(observed, selections)) throw new Error('missing, unreachable or reordered branch selection');
+    return { module, locations };
+  }
+  private branchHarness(source: Module, location: BranchLocation, selection: BranchSelection, targetRoot: NodeRef, obligation: Digest): { module: Module; specification: string; manifest: ExecutionManifestV1 } {
+    if (!location || !same(this.selection(location, selection.value), selection)) throw new Error('missing branch condition source');
+    // Ambiguous rebinding types are excluded even across nested lexical scopes.
+    // This also prevents depending on accidental host-frame slot reuse.
+    const bindings = new Map<SymbolId, Ty>(), ambiguous = new Set<SymbolId>();
+    const bind = (symbol: SymbolId, ty: Ty) => { if (bindings.has(symbol) && !same(bindings.get(symbol), ty)) ambiguous.add(symbol); bindings.set(symbol, ty); };
+    location.declaration.params.forEach(param => bind(param.symbol, param.ty));
+    const todo = [location.declaration.body!]; while (todo.length) { const node = todo.pop()!; if (node.kind === 'Let') bind(node.symbol, node.ty); if (node.kind === 'ForAll') bind(node.symbol, b.Int); if (node.kind === 'MatchResult') { ambiguous.add(node.okSymbol); ambiguous.add(node.errSymbol); } todo.push(...children(node)); }
+    const variables = new Set<SymbolId>(); let remaining = 256;
+    const inspect = (term: Term): void => {
+      if (--remaining < 0) throw new Error('branch condition expression bound');
+      if (term.kind === 'Var' || term.kind === 'Place' && !term.path.length) { const ty = location.environment.get(term.symbol); if (!ty || !scalar(ty) || ambiguous.has(term.symbol)) throw new Error('branch variable is not definitely bound with a scalar type'); variables.add(term.symbol); return; }
+      if (term.kind === 'Lit') { if (!scalar(term.ty)) throw new Error('unsupported branch literal'); return; }
+      if (term.kind === 'Un' && ['neg', 'not'].includes(term.op)) { inspect(term.operand); return; }
+      if (term.kind === 'Bin' && term.op !== 'concat') { inspect(term.left); inspect(term.right); return; }
+      if (term.kind === 'Cond') { inspect(term.cond); inspect(term.then); inspect(term.otherwise); return; }
+      throw new Error(`unsupported or effectful branch condition: ${term.kind}`);
+    };
+    inspect(location.term.cond);
+    const selectionDigest = domainDigest('aether.semantic-gc-branch/1', selection), symbols = new SymbolSpace(`semantic-gc-branch:${obligation}:${selectionDigest}`);
+    const ordered = [...variables].sort(), params = ordered.map((symbol, index) => b.param(symbols.define(`current${index}`), location.environment.get(symbol)!));
+    const names = new Map(ordered.map((symbol, index) => [symbol, params[index].symbol]));
+    const substitute = (term: Term): Term => term.kind === 'Var' || term.kind === 'Place' ? b.v(names.get(term.symbol)!) : withLinkGroups(term, new Map(linkGroups(term).map(group => [group.field, group.links.map(substitute)])));
+    const condition = substitute(location.term.cond), fn = b.fn({ symbol: symbols.define('constantCondition'), params, returns: b.Bool, contract: b.contract({ ensures: [b.clause(b.eq(b.result(), b.bool(selection.value)), 'total-constant-condition')] }), body: b.ret(condition) });
+    const module = b.module_({ symbol: symbols.define('branchWitness'), members: [fn], symbolTable: symbols.table() }) as Module;
+    const specification = Buffer.from(encodeCanonical({ profile: this.profile, obligation, sourceRoot: new GraphStore().intern(source), targetRoot, selection, variables: ordered.map((symbol, index) => ({ symbol, parameter: params[index] })), claim: 'For every current value of the definitely initialized scalar bindings, this original condition terminates normally and equals the selected Boolean. Structural checking preserves the selected arm and all contracts; no effectful or opaque condition computation is removed.' }, WIRE_LIMITS)).toString('utf8');
+    const root = new GraphStore().intern(module); return { module, specification, manifest: witnessManifest(root, specification, obligation, this.profile) };
+  }
+  private discoverBranches(source: Module, manifest: ExecutionManifestV1): BranchSelection[] {
+    if (this.profile !== SEMANTIC_GC_BRANCH_PROFILE) return [];
+    const selections: BranchSelection[] = []; let attempted = 0;
+    this.walkBranches(source, location => {
+      if (attempted++ >= this.maxBranchProofs) return null;
+      for (const value of [true, false]) {
+        const selection = this.selection(location, value);
+        try {
+          const probe = domainDigest('aether.semantic-gc-branch-discovery/1', { profile: this.profile, source: executionManifestDigest(manifest), selection });
+          const harness = this.branchHarness(source, location, selection, manifest.astRoot as NodeRef, probe);
+          if (generatePortableCertificate(harness.module, { ...harness, expectedManifest: harness.manifest })) { selections.push(selection); return value; }
+        } catch { /* Unsupported/partial/unknown conditions remain executable. */ }
+      }
+      return null;
+    });
+    return selections;
+  }
+  private rewrite(source: Module, fences: ReadonlySet<SymbolId>, branches: readonly BranchSelection[] = []): RewritePlan {
+    source = this.applyBranches(source, branches).module;
     const functions = this.declarations(source), wrappers = new Map<SymbolId, SymbolId>();
     for (const decl of functions.values()) {
       if (this.policy.exports.includes(decl.symbol) || this.policy.protectedSymbols.includes(decl.symbol) || fences.has(decl.symbol) || !emptyContract(decl.contract) || decl.surfaces.length || decl.purity !== 'pure' || decl.capabilities.length || decl.typeParams.length || !scalar(decl.returns) || decl.params.some(param => !scalar(param.ty))) continue;
@@ -175,6 +302,10 @@ export class SemanticGarbageCollector {
     const resolve = (symbol: SymbolId): SymbolId => { const visited = new Set<SymbolId>(); while (wrappers.has(symbol)) { if (visited.has(symbol)) throw new Error('recursive forwarding wrapper is unsupported'); visited.add(symbol); symbol = wrappers.get(symbol)!; } return symbol; };
     for (const symbol of wrappers.keys()) resolve(symbol);
     const replaceCalls = (term: Term): Term => {
+      if (this.profile === SEMANTIC_GC_BRANCH_PROFILE) {
+        if (term.kind === 'Contract' || term.kind === 'Clause') return term;
+        if (term.kind === 'While') return { ...term, cond: replaceCalls(term.cond), body: replaceCalls(term.body) };
+      }
       const groups = new Map(linkGroups(term).map(group => [group.field, group.links.map(replaceCalls)]));
       const copied = withLinkGroups(term, groups); return copied.kind === 'Call' ? { ...copied, callee: resolve(copied.callee) } : copied;
     };
@@ -200,7 +331,7 @@ export class SemanticGarbageCollector {
       default: throw new Error(`unsupported equivalence expression: ${term.kind}`);
     }
   }
-  private obligation(source: ExecutionManifestV1, target: NodeRef, removed: readonly SymbolId[], collapsed: readonly Wrapper[]): Digest { return domainDigest('aether.semantic-gc-obligation/1', { configuration: this.configuration, profile: SEMANTIC_GC_PROFILE, source: source.astRoot, sourceExecution: executionManifestDigest(source), target, exports: this.policy.exports, removed, collapsed }); }
+  private obligation(source: ExecutionManifestV1, target: NodeRef, removed: readonly SymbolId[], collapsed: readonly Wrapper[], branches: readonly BranchSelection[] = []): Digest { return domainDigest('aether.semantic-gc-obligation/1', { configuration: this.configuration, profile: this.profile, source: source.astRoot, sourceExecution: executionManifestDigest(source), target, exports: this.policy.exports, removed, collapsed, ...(this.profile === SEMANTIC_GC_BRANCH_PROFILE ? { branches } : {}) }); }
   private harness(source: Module, targetRoot: NodeRef, wrapper: Wrapper, obligation: Digest): { module: Module; specification: string; manifest: ExecutionManifestV1 } {
     const functions = this.declarations(source), decl = functions.get(wrapper.symbol); if (!decl) throw new Error('missing equivalence wrapper');
     const symbols = new SymbolSpace(`semantic-gc:${obligation}:${wrapper.symbol}`), params = decl.params.map((param, index) => b.param(symbols.define(`argument${index}`), param.ty));
@@ -209,8 +340,8 @@ export class SemanticGarbageCollector {
     const after = this.expand(b.call(wrapper.target, ...args), new Map(params.map(param => [param.symbol, b.v(param.symbol)])), functions);
     const proof = b.fn({ symbol: symbols.define('equivalent'), params, returns: b.Bool, contract: b.contract({ ensures: [b.clause(b.result(), 'forwarder-return-equivalence')] }), body: b.ret(b.eq(before, after)) });
     const module = b.module_({ symbol: symbols.define('equivalenceWitness'), members: [proof], symbolTable: symbols.table() }) as Module;
-    const specification = JSON.stringify({ profile: SEMANTIC_GC_PROFILE, obligation, targetRoot, wrapper, claim: 'For all scalar arguments, the transparent forwarder and its unchanged ultimate target return equal values; structural rewrite validation separately preserves call argument order, declarations, contracts and effect sites.' });
-    const root = new GraphStore().intern(module); return { module, specification, manifest: witnessManifest(root, specification, obligation) };
+    const specification = JSON.stringify({ profile: this.profile, obligation, targetRoot, wrapper, claim: 'For all scalar arguments, the transparent forwarder and its unchanged ultimate target return equal values; structural rewrite validation separately preserves call argument order, declarations, contracts and effect sites.' });
+    const root = new GraphStore().intern(module); return { module, specification, manifest: witnessManifest(root, specification, obligation, this.profile) };
   }
   private sourceSpecification(manifest: ExecutionManifestV1): string {
     const digest = executionManifestDigest(manifest);
@@ -237,44 +368,63 @@ export class SemanticGarbageCollector {
     return this.lock.run(() => {
       this.options.lineage.assertCurrent(executionManifestDigest(sourceManifest)); this.options.lineage.assertNodeCurrent(executionManifestDigest(sourceManifest), sourceManifest.astRoot as NodeRef);
       const source = this.options.store.hydrate(sourceManifest.astRoot as NodeRef); const functions = this.declarations(source); void functions;
-      if (source.kind !== 'Module') throw new Error('expected module'); const specification = this.sourceSpecification(sourceManifest); const plan = this.rewrite(source, this.fenceSymbols(sourceManifest, specification));
+      if (source.kind !== 'Module') throw new Error('expected module'); const specification = this.sourceSpecification(sourceManifest); const branches = this.discoverBranches(source, sourceManifest); const plan = this.rewrite(source, this.fenceSymbols(sourceManifest, specification), branches);
       const targetRoot = this.options.store.intern(plan.target, { leaseId: this.builderLease }); if (targetRoot === sourceManifest.astRoot) return null;
-      return this.recordProposal(sourceManifest, targetRoot, plan.removed, plan.collapsed, 'cleanup', null, source, specification);
+      return this.recordProposal(sourceManifest, targetRoot, plan.removed, plan.collapsed, 'cleanup', null, source, specification, branches);
     }, 5000);
   }
-  private recordProposal(sourceManifest: ExecutionManifestV1, targetRoot: NodeRef, removed: readonly SymbolId[], collapsed: readonly Wrapper[], direction: 'cleanup' | 'rollback', rollbackOf: Digest | null, witnessSource: Module, specification: string): SemanticGcProposal {
-    const sourceRoot = sourceManifest.astRoot as NodeRef, obligationDigest = this.obligation(sourceManifest, targetRoot, removed, collapsed), witnesses: EquivalenceWitness[] = [];
+  private recordProposal(sourceManifest: ExecutionManifestV1, targetRoot: NodeRef, removed: readonly SymbolId[], collapsed: readonly Wrapper[], direction: 'cleanup' | 'rollback', rollbackOf: Digest | null, witnessSource: Module, specification: string, branchSelections: readonly BranchSelection[] = []): SemanticGcProposal {
+    const sourceRoot = sourceManifest.astRoot as NodeRef, obligationDigest = this.obligation(sourceManifest, targetRoot, removed, collapsed, branchSelections), witnesses: EquivalenceWitness[] = [];
+    const transformed = this.applyBranches(witnessSource, branchSelections), branches: BranchWitness[] = [];
+    for (const selection of branchSelections) {
+      const location = transformed.locations.get(this.branchKey(selection))!;
+      const harness = this.branchHarness(witnessSource, location, selection, targetRoot, obligationDigest);
+      const certificate = generatePortableCertificate(harness.module, { ...harness, expectedManifest: harness.manifest });
+      if (!certificate) throw new Error('unproved total branch condition');
+      const root = this.options.store.intern(harness.module, { leaseId: this.builderLease });
+      branches.push({ selection, root, specification: harness.specification, manifest: harness.manifest, certificate });
+    }
     for (const wrapper of collapsed) {
-      const harness = this.harness(witnessSource, targetRoot, wrapper, obligationDigest);
+      const harness = this.harness(transformed.module, targetRoot, wrapper, obligationDigest);
       const certificate = generatePortableCertificate(harness.module, { ...harness, expectedManifest: harness.manifest });
       if (!certificate) throw new Error('unsupported or unproved portable equivalence obligation');
       const root = this.options.store.intern(harness.module, { leaseId: this.builderLease }); witnesses.push({ wrapper: wrapper.symbol, root, specification: harness.specification, manifest: harness.manifest, certificate });
     }
-    const body: Omit<SemanticGcProposal, 'id'> = { format: 'aether.semantic-gc-proposal/1' as const, configuration: this.configuration, profile: SEMANTIC_GC_PROFILE, direction, rollbackOf, sourceManifest, specification, productionAuthorized: false, sourceRoot, targetRoot, exports: this.policy.exports, removed, collapsed, witnesses, obligationDigest };
+    const body: Omit<SemanticGcProposal, 'id'> = { format: 'aether.semantic-gc-proposal/1' as const, configuration: this.configuration, profile: this.profile, direction, rollbackOf, sourceManifest, specification, productionAuthorized: false, sourceRoot, targetRoot, exports: this.policy.exports, removed, collapsed, witnesses, obligationDigest, ...(this.profile === SEMANTIC_GC_BRANCH_PROFILE ? { branches } : {}) };
     const proposal: SemanticGcProposal = { ...body, id: domainDigest('aether.semantic-gc-proposal/1', body, WIRE_LIMITS) };
     this.verify(proposal, false);
-    this.options.store.retain(`semantic-gc-proposal:${proposal.id}`, [sourceRoot, targetRoot, ...witnesses.map(witness => witness.root)]);
+    this.options.store.retain(`semantic-gc-proposal:${proposal.id}`, [sourceRoot, targetRoot, ...witnesses.map(witness => witness.root), ...branches.map(witness => witness.root)]);
     this.immutable('proposals', proposal.id, proposal); return freeze(clone(proposal));
   }
   readProposal(id: Digest): SemanticGcProposal { validateDigest(id, 'aether.semantic-gc-proposal/1'); const value = this.read(this.path('proposals', id)) as SemanticGcProposal; if (value.id !== id) throw new Error('proposal address mismatch'); this.verify(value, false); return freeze(clone(value)); }
   private verify(proposal: SemanticGcProposal, current: boolean): void {
-    encodeCanonical(proposal, WIRE_LIMITS); exactObject(proposal, ['format', 'configuration', 'profile', 'direction', 'rollbackOf', 'sourceManifest', 'specification', 'productionAuthorized', 'sourceRoot', 'targetRoot', 'exports', 'removed', 'collapsed', 'witnesses', 'obligationDigest', 'id']);
+    encodeCanonical(proposal, WIRE_LIMITS); exactObject(proposal, ['format', 'configuration', 'profile', 'direction', 'rollbackOf', 'sourceManifest', 'specification', 'productionAuthorized', 'sourceRoot', 'targetRoot', 'exports', 'removed', 'collapsed', 'witnesses', 'obligationDigest', 'id', ...(this.profile === SEMANTIC_GC_BRANCH_PROFILE ? ['branches'] : [])]);
     const { id, ...body } = proposal;
-    if (proposal.productionAuthorized !== false || proposal.format !== 'aether.semantic-gc-proposal/1' || proposal.profile !== SEMANTIC_GC_PROFILE || proposal.configuration !== this.configuration || id !== domainDigest('aether.semantic-gc-proposal/1', body, WIRE_LIMITS) || !same(proposal.exports, this.policy.exports)) throw new Error('semantic GC proposal identity/profile mismatch');
+    if (proposal.productionAuthorized !== false || proposal.format !== 'aether.semantic-gc-proposal/1' || proposal.profile !== this.profile || proposal.configuration !== this.configuration || id !== domainDigest('aether.semantic-gc-proposal/1', body, WIRE_LIMITS) || !same(proposal.exports, this.policy.exports)) throw new Error('semantic GC proposal identity/profile mismatch');
     validateExecutionManifest(proposal.sourceManifest); if (proposal.sourceManifest.semanticsVersion !== 'aether-reference/1') throw new Error('unsupported source semantics for GC equivalence'); if (proposal.sourceManifest.astRoot !== proposal.sourceRoot) throw new Error('rewrite source manifest mismatch');
     const fences = this.fenceSymbols(proposal.sourceManifest, proposal.specification);
+    if (this.profile === SEMANTIC_GC_BRANCH_PROFILE && (!Array.isArray(proposal.branches) || proposal.branches.length > this.maxBranchProofs)) throw new Error('invalid branch witness coverage');
+    const branches = proposal.branches ?? [];
+    for (const witness of branches) exactObject(witness, ['selection', 'root', 'specification', 'manifest', 'certificate']);
+    const selections = branches.map(witness => witness.selection);
     const source = this.options.store.hydrate(proposal.sourceRoot), target = this.options.store.hydrate(proposal.targetRoot); this.declarations(source); this.declarations(target);
     if (source.kind !== 'Module' || target.kind !== 'Module') throw new Error('rewrite modules required');
     let plan: RewritePlan, witnessSource: Module;
-    if (proposal.direction === 'cleanup') { if (proposal.rollbackOf !== null) throw new Error('cleanup has rollback predecessor'); plan = this.rewrite(source, fences); witnessSource = source; if (new GraphStore().intern(plan.target) !== proposal.targetRoot) throw new Error('unsupported or unsafe candidate rewrite'); }
+    if (proposal.direction === 'cleanup') { if (proposal.rollbackOf !== null) throw new Error('cleanup has rollback predecessor'); plan = this.rewrite(source, fences, selections); witnessSource = source; if (new GraphStore().intern(plan.target) !== proposal.targetRoot) throw new Error('unsupported or unsafe candidate rewrite'); }
     else if (proposal.direction === 'rollback' && proposal.rollbackOf !== null) {
       const prior = this.read(this.path('proposals', proposal.rollbackOf)) as SemanticGcProposal; if (prior.direction !== 'cleanup') throw new Error('rollback cannot chain another rollback');
       const previous = this.readProposal(proposal.rollbackOf); if (previous.direction !== 'cleanup' || previous.targetRoot !== proposal.sourceRoot || previous.sourceRoot !== proposal.targetRoot) throw new Error('rollback is not the exact inverse cleanup');
-      plan = this.rewrite(target, fences); witnessSource = target; if (new GraphStore().intern(plan.target) !== proposal.sourceRoot) throw new Error('rollback proof relation changed');
+      plan = this.rewrite(target, fences, selections); witnessSource = target; if (new GraphStore().intern(plan.target) !== proposal.sourceRoot) throw new Error('rollback proof relation changed');
     } else throw new Error('unsupported rewrite direction');
-    if (!same(proposal.removed, plan.removed) || !same(proposal.collapsed, plan.collapsed) || proposal.obligationDigest !== this.obligation(proposal.sourceManifest, proposal.targetRoot, plan.removed, plan.collapsed) || proposal.witnesses.length !== plan.collapsed.length) throw new Error('incomplete rewrite equivalence relation');
+    if (!same(proposal.removed, plan.removed) || !same(proposal.collapsed, plan.collapsed) || proposal.obligationDigest !== this.obligation(proposal.sourceManifest, proposal.targetRoot, plan.removed, plan.collapsed, selections) || proposal.witnesses.length !== plan.collapsed.length) throw new Error('incomplete rewrite equivalence relation');
+    const transformed = this.applyBranches(witnessSource, selections);
+    for (const witness of branches) {
+      const expected = this.branchHarness(witnessSource, transformed.locations.get(this.branchKey(witness.selection))!, witness.selection, proposal.targetRoot, proposal.obligationDigest);
+      if (witness.root !== expected.manifest.astRoot || witness.specification !== expected.specification || !same(witness.manifest, expected.manifest) || new GraphStore().intern(this.options.store.hydrate(witness.root)) !== expected.manifest.astRoot) throw new Error('stale or substituted branch witness');
+      checkPortableCertificate(expected.module, witness.certificate, { expectedManifest: expected.manifest, specification: expected.specification });
+    }
     proposal.witnesses.forEach((witness, index) => {
-      exactObject(witness, ['wrapper', 'root', 'specification', 'manifest', 'certificate']); const expected = this.harness(witnessSource, proposal.targetRoot, plan.collapsed[index], proposal.obligationDigest);
+      exactObject(witness, ['wrapper', 'root', 'specification', 'manifest', 'certificate']); const expected = this.harness(transformed.module, proposal.targetRoot, plan.collapsed[index], proposal.obligationDigest);
       if (witness.wrapper !== plan.collapsed[index].symbol || witness.root !== expected.manifest.astRoot || witness.specification !== expected.specification || !same(witness.manifest, expected.manifest) || new GraphStore().intern(this.options.store.hydrate(witness.root)) !== expected.manifest.astRoot) throw new Error('stale or substituted equivalence witness');
       checkPortableCertificate(expected.module, witness.certificate, { expectedManifest: expected.manifest, specification: expected.specification });
     });
@@ -285,7 +435,7 @@ export class SemanticGarbageCollector {
     return this.lock.run(() => {
       const previous = this.readProposal(cleanupId); if (previous.direction !== 'cleanup' || currentManifest.astRoot !== previous.targetRoot) throw new Error('rollback parent is not the cleaned artifact');
       this.options.lineage.assertCurrent(executionManifestDigest(currentManifest)); const original = this.options.store.hydrate(previous.sourceRoot); if (original.kind !== 'Module') throw new Error('rollback source module missing');
-      return this.recordProposal(currentManifest, previous.sourceRoot, previous.removed, previous.collapsed, 'rollback', cleanupId, original, this.sourceSpecification(currentManifest));
+      return this.recordProposal(currentManifest, previous.sourceRoot, previous.removed, previous.collapsed, 'rollback', cleanupId, original, this.sourceSpecification(currentManifest), (previous.branches ?? []).map(witness => witness.selection));
     }, 5000);
   }
   /** Strict F08 is the only production path. Signed current candidate evidence
