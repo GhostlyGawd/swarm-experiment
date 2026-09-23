@@ -39,7 +39,7 @@ export interface ProcessArtifactV1 {
   readonly schemaDigest: Digest;
 }
 export type ProcessHostServices = Pick<ProcessHostOptions, 'sealer' | 'scopedGrants' | 'effectResourcePath' | 'effectResourcePolicyDigest' | 'signedEffectResourcePolicy' | 'effectResourceSignerKey' | 'currentEffectPolicyEpoch' | 'revocations' | 'effectRouterFactory' | 'authorizeRecovery' | 'timeoutMs' | 'lockWaitMs' | 'maxWorkers' | 'onPhase'>;
-export type CapabilityDeploymentProfile = 'scoped-v2' | 'legacy-sealed-v1';
+export type CapabilityDeploymentProfile = 'scoped-signed-v3' | 'scoped-v2' | 'legacy-sealed-v1';
 export interface ProcessDeploymentOptions {
   readonly directory: string;
   readonly coordinator: PromotionCoordinator;
@@ -50,7 +50,7 @@ export interface ProcessDeploymentOptions {
   readonly phase?: (phase: 'prepared' | 'before-activation' | 'activated' | 'aborted', detail: Readonly<{ proposalDigest: Digest; workerPids: Readonly<Record<string, number>> }>) => void;
   readonly invocationPhase?: (phase: 'after-intent' | 'after-host-result' | 'after-receipt', detail: Readonly<{ operationId: string; workerPids: Readonly<Record<string, number>> }>) => void;
   readonly legacyProfileMigration?: 'adopt-baseline-v1';
-  /** Fresh production deployments default to scoped grants. Legacy authority is explicit. */
+  /** Fresh production deployments default to signed resource policies and scoped grants. */
   readonly capabilityProfile?: CapabilityDeploymentProfile;
   /** Existing v2 histories have no capability-profile field and require explicit adoption. */
   readonly legacyCapabilityMigration?: 'adopt-legacy-sealed-v1' | 'adopt-scoped-v2';
@@ -220,8 +220,8 @@ export class ProcessDeployment implements PromotionDriver {
   private historicalRecovery: string | null = null;
   private closed = false;
   private constructor(options: ProcessDeploymentOptions) {
-    this.options = options; this.capabilityProfile = options.capabilityProfile ?? 'scoped-v2';
-    if (!['scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
+    this.options = options; this.capabilityProfile = options.capabilityProfile ?? 'scoped-signed-v3';
+    if (!['scoped-signed-v3', 'scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
       || options.legacyCapabilityMigration !== undefined && !['adopt-legacy-sealed-v1', 'adopt-scoped-v2'].includes(options.legacyCapabilityMigration)) throw new TypeError('invalid capability deployment profile/migration');
     ensureDirectory(options.directory);
     ensureDirectory(join(options.directory, 'artifacts')); ensureDirectory(join(options.directory, 'deployments'));
@@ -241,6 +241,7 @@ export class ProcessDeployment implements PromotionDriver {
           await deployment.hostFor(migrated.active); save(deployment.stateFile,migrated);
         }
         if(existsSync(deployment.stateFile)&&(load(deployment.stateFile) as {format?:unknown}).format==='aether.process-deployment/2'){
+          if(deployment.capabilityProfile==='scoped-signed-v3')throw new Error('v2 authority cannot be silently upgraded to signed policy; use a new admitted deployment');
           const required = deployment.capabilityProfile === 'scoped-v2' ? 'adopt-scoped-v2' : 'adopt-legacy-sealed-v1';
           if(options.legacyCapabilityMigration!==required)throw new Error('unprofiled capability history requires explicit legacy capability migration');
           const migrated = deployment.readState('v2'); deployment.assertHistoricalServices(migrated);
@@ -250,7 +251,7 @@ export class ProcessDeployment implements PromotionDriver {
           if (!options.genesis) throw new Error('trusted genesis artifact is required');
           const candidate = makeArtifact(options.genesis), factory = options.factories.get(candidate.factoryId);
           if (!factory) throw new Error('trusted artifact factory is unavailable');
-          deployment.assertServices(factory(candidate));
+          deployment.assertServices(factory(candidate), decodeIR(candidate.ir));
           const artifact = deployment.persistArtifact(candidate);
           const manifest = executionManifestDigest(artifact.manifest), admission = options.coordinator.state();
           if (admission.committedManifest !== manifest || admission.generation !== '0' || admission.pendingProposal !== null) throw new Error('genesis does not match production admission');
@@ -380,7 +381,7 @@ export class ProcessDeployment implements PromotionDriver {
     if (processArtifactDigest(artifact) !== reference.artifactDigest) throw new TypeError('prepared artifact registry changed');
     const context = processArtifactContext(artifact), factory = this.options.factories.get(artifact.factoryId)!;
     const services = factory(artifact);
-    this.assertServices(services);
+    this.assertServices(services, context.module);
     ensureDirectory(join(this.directory(reference.id), 'host'));
     const host = await ProcessHost.open({ ...services, onPhase:(phase,detail)=>{
       if(this.historicalRecovery!==reference.id)this.options.coordinator.assertLineageCurrent(reference.manifest);
@@ -391,14 +392,21 @@ export class ProcessDeployment implements PromotionDriver {
     if (this.closed) { await host.close(); throw new Error('deployment closed during worker preparation'); }
     this.hosts.set(reference.id, host); return host;
   }
-  private assertServices(services: ProcessHostServices): void {
-    if (this.capabilityProfile === 'scoped-v2' ? !services.scopedGrants : !!services.scopedGrants || !!services.signedEffectResourcePolicy || !!services.effectResourcePath) {
+  private assertServices(services: ProcessHostServices, module: Term): void {
+    const invoked = new Set([...walk(module)].filter(node => node.kind === 'Invoke').map(node => (node as Extract<Term, { kind: 'Invoke' }>).capability));
+    if (this.capabilityProfile === 'legacy-sealed-v1' ? !!services.scopedGrants || !!services.signedEffectResourcePolicy || !!services.effectResourcePath : !services.scopedGrants) {
       throw new Error('trusted deployment factory does not match durable capability profile');
+    }
+    if (this.capabilityProfile === 'scoped-signed-v3'
+      && (services.effectResourcePath || services.effectResourcePolicyDigest
+        || invoked.size > 0 && (!services.signedEffectResourcePolicy || !services.effectResourceSignerKey || !services.currentEffectPolicyEpoch
+          || [...invoked].some(cap => !services.signedEffectResourcePolicy!.body.rules.some(rule => rule.capability === cap))))) {
+      throw new Error('signed deployment profile requires complete manifest-bound effect policy');
     }
   }
   private assertHistoricalServices(state: DeploymentState): void {
     const artifact = this.readArtifact(state.active.manifest), factory = this.options.factories.get(artifact.factoryId)!;
-    this.assertServices(factory(artifact));
+    this.assertServices(factory(artifact), decodeIR(artifact.ir));
   }
   issueTokens(symbol: SymbolId, ttlMs?: number): CapabilityToken[] {
     const state = this.readState(); this.assertServing(state);

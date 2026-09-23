@@ -2,7 +2,7 @@
 
 ## Capability deployment profile implementation — 2026-09-22
 
-- ProcessDeployment now persists capability authority as `aether.process-deployment/3`. Fresh deployments default to scoped grants; legacy sealed authority requires an explicit profile.
+- ProcessDeployment now persists capability authority as `aether.process-deployment/3`. Fresh effectful deployments default to signed resource/adapter-descriptor policies with scoped grants; unsigned scoped-v2 and legacy sealed authority require explicit profiles.
 - Existing v1/v2 records require an explicit adoption choice. The active factory and existing host configuration are checked before the record is rewritten, retaining old bytes on mismatch or crash.
 - This implements the existing V4-T2-04 containment contract; acceptance gates and specification version 0.1.0 are unchanged. Signed adapter code admission and complete path coverage remain open.
 

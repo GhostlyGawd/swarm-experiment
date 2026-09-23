@@ -165,7 +165,8 @@ test('process deployment factory serves a signed effect resource policy bound to
       effectResourceSignerKey: keys.publicKey, currentEffectPolicyEpoch: () => epochs.policyEpoch };
   }]]);
   try {
-    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-v2', factories });
+    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, factories });
+    assert.equal(deployment.status().capabilityProfile, 'scoped-signed-v3');
     const { alice, bob } = await accounts(deployment), args = [reference(alice), reference(bob), integer(10)];
     const aliceScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
     const valid = await deployment.call(f.ex.symbols.transfer, args, { operationId: 'signed-deployment-valid', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, aliceScope) });
@@ -542,7 +543,7 @@ test('deployment legacy profile adoption is explicit and preserves durable recei
   } finally {await deployment?.close();rmSync(f.directory,{recursive:true,force:true});}
 });
 
-test('fresh production deployment defaults to scoped authority and refuses a legacy factory', async () => {
+test('fresh production deployment defaults to signed scoped authority and refuses a legacy factory', async () => {
   const f = fixture(); let deployment: ProcessDeployment | undefined;
   try {
     await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined }), /trusted deployment factory does not match durable capability profile/);
@@ -554,6 +555,17 @@ test('fresh production deployment defaults to scoped authority and refuses a leg
     await deployment.close(); deployment = undefined;
     await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined }), /readiness\/profile/);
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('fresh signed deployment refuses unsigned effect services before durable genesis', async () => {
+  const f = fixture(true);
+  const scopedGrants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(53), repositoryId: 'deployment-test', clock: () => 100,
+    policyEpoch: () => '0', revocationEpoch: () => '0', isRevoked: () => false, authorizeIssue: () => true, authorizeDelegate: () => true });
+  try {
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined,
+      factories: new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => ({ ...hostFactory(f.directory, artifact), scopedGrants })]]) }), /signed deployment profile requires complete manifest-bound effect policy/);
+    assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
 });
 
 test('v2 capability history needs explicit legacy adoption and retains settled calls', async () => {
