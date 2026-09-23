@@ -1,0 +1,38 @@
+{
+  "format": "aether.packed-string-size-experiment/1",
+  "sourceSha256": "sha256:bf0ae1bf0f30c3e22de4c5e0d324d9e63655238be17291d315f750643b7d9d1e",
+  "runnerSha256": "sha256:a821c63f40bcd08a565b0bf5911af159b81b20e709bfd831260cfb40d54c6706",
+  "node": "v26.7.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cpu": "Apple M4 Pro",
+  "scenarios": [
+    {
+      "distinct": 4,
+      "logicalRecordBytes": 382814,
+      "completeImageBytes": 260236,
+      "ratio": 0.6797974995689813,
+      "payloadBytes": 4480,
+      "dictionaryArenaBytes": 40,
+      "dictionaryEntries": 4
+    },
+    {
+      "distinct": 64,
+      "logicalRecordBytes": 382814,
+      "completeImageBytes": 262650,
+      "ratio": 0.686103434043687,
+      "payloadBytes": 4480,
+      "dictionaryArenaBytes": 640,
+      "dictionaryEntries": 64
+    },
+    {
+      "distinct": 1024,
+      "logicalRecordBytes": 382814,
+      "completeImageBytes": 302318,
+      "ratio": 0.7897255586263825,
+      "payloadBytes": 4480,
+      "dictionaryArenaBytes": 10240,
+      "dictionaryEntries": 1024
+    }
+  ]
+}

@@ -28,8 +28,12 @@ const signed64 = (value: string): void => {
   if (typeof value !== 'string' || !/^(0|-?[1-9][0-9]*)$/.test(value) || BigInt(value) < -(1n << 63n) || BigInt(value) > (1n << 63n) - 1n) throw new RangeError('native bridge requires signed 64-bit integer');
 };
 const width = (span: bigint): number => span === 0n ? 0 : span.toString(2).length;
-const fieldWidth = (field: PackedField): number => field.kind === 'bool' ? 1 : field.kind === 'ref'
-  ? width(BigInt(2 * field.maxRelative + 1)) : width(BigInt(field.max) - BigInt(field.min));
+const fieldWidth = (field: PackedField): number => {
+  if (field.kind === 'bool') return 1;
+  if (field.kind === 'ref') return width(BigInt(2 * field.maxRelative + 1));
+  if (field.kind === 'int') return width(BigInt(field.max) - BigInt(field.min));
+  throw new TypeError('native bridge does not support packed string fields');
+};
 const sha256 = (bytes: Uint8Array): string => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const policyCode = { trap: 0, wrap: 1, saturate: 2 } as const;
 
@@ -47,6 +51,7 @@ export function executePackedCheckpointNative(args: {
   unpackResumableCheckpoint(args.packed, args.program, args.expectedSnapshotDigest, args.expectedLayoutDigest);
   const image = args.packed.heap;
   const model = PackedHeap.fromImage(image, args.expectedLayoutDigest);
+  if (model.format !== 'aether.packed-heap/1') throw new TypeError('native bridge does not support packed string images');
   if (model.rows.length < 1 || model.rows.length > 1024 || model.byteLength > 65536 ||
       !Array.isArray(args.operations) || args.operations.length > 4096) throw new RangeError('native bridge profile limit');
   const executableSha256 = sha256(readFileSync(args.executable));
