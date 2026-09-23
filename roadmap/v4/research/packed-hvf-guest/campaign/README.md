@@ -27,3 +27,23 @@ fresh guest allocation, zeroing, image and frame copy, HVF VM/vCPU creation and
 configuration, guest execution and response checks. `mincore` reports backing
 page residency, not total hypervisor memory. The full runtime boot and 2 MB
 release gates remain open.
+
+## Retained M4 Pro result
+
+`results/local-01.json` pins source commit
+`a705390eefb4fe24f592ab50e9a7e16a9389ad1d` and retains every raw sample.
+The verifier rebuilt the signed controller and guest, checked the Git source
+bytes, and repeated the 128-operation semantic campaign.
+
+| Measure | Result |
+| --- | ---: |
+| Guest samples | 1,000 |
+| Fresh guest to validated response median | 38,500 ns |
+| Fresh guest to validated response p95 | 94,417 ns |
+| Fresh guest to validated response maximum | 181,125 ns |
+| Guest mapped bytes | 65,536 B |
+| Observed resident backing per sample | 65,536 B |
+| Separate controller launch through exit | 379.7 ms |
+
+The bounded fresh guest path passes the unchanged 1 ms maximum in this
+preregistered campaign. It does not close the release boot or memory gates.
