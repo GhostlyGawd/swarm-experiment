@@ -1,0 +1,18 @@
+{
+  "format": "aether.string-data/1",
+  "node": "v26.7.0",
+  "unicode": "17.0",
+  "icu": "78.3",
+  "v8": "14.6.202.34-node.28",
+  "sha256": "ddc546ef614eecffa148f186d4459c3c699ee6418cbc3ce39f11187d459a3a59",
+  "counts": {
+    "lower": 1488,
+    "upper": 1580,
+    "cased": 4632,
+    "ignorable": 2794
+  },
+  "references": [
+    "https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-string.prototype.tolowercase",
+    "https://www.unicode.org/Public/17.0.0/ucd/SpecialCasing.txt"
+  ]
+}

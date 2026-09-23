@@ -88,3 +88,44 @@ Actual TypeScript/Python/Rust fixtures cover nested success/failure, alias resto
 Campaign 07 adds an Atomic workload to the prior seven workloads. It retains **24 complete messages**, all native source edits, **17 source snapshots**, and the exact runtime text/cost for each of the four profiles. Cold totals are **2,149 legacy TypeScript review / 3,222 AE2 cl100k tokens (0.667×)** and **2,169 / 3,208 o200k tokens (0.676×)**. The raw audit recomputes these counts, binary/model identities, native parse identities and all stored runtime text hashes/costs. These authored workloads do not meet 4× and do not qualify as a representative production corpus.
 
 **Remaining FR-1.2 scope:** Import, StringOp, generic declarations/types, nested modules, unsynthesized bodies, and the documented restricted control/contract contexts. T1-02 and Q03 remain open. The versioned binary/model codec preserves all existing AST forms, but that does not establish executable target-language coverage of the remaining forms.
+
+## Unicode and linked-import profile (header version 6)
+
+V6 adds all six `StringOp` operations and module-level `Import`. `projectExecutable` and `executableBundle` select it when either kind is present. Named V2–V5 producers retain their kind sets; their source and runtime protocols remain supported. Direct-module named V6 producers and `LINKED_PROJECTION_PROFILE` are exported from `src/projection/executable.ts`; shared package barrels are unchanged in this slice.
+
+### Exact-address native import files
+
+Supply the hydrated dependency modules explicitly:
+
+```ts
+const bundle = executableBundle(rootModule, symbols, 'typescript', {
+  modules: new Map([[dependencyRoot, dependencyModule]])
+});
+const checked = parseExecutableBundle(bundle);
+```
+
+The bundle contains `source`, its matching `runtime`, and a `dependencies` map of content-address-derived filenames to **executable source**. Write TypeScript/Python dependency files beside the entry and runtime; put Rust files together in `src`. No network, package registry, ambient filename search or implicit dependency fetch is used by the projector/parser. Native execution requires the exact files validated by `parseExecutableBundle`; changing a file after validation is outside that check.
+
+Each original module and Import declaration round-trips separately. Generated imports bind the actual dependency functions: TypeScript imports/re-exports, Python imports, and Rust module declarations/public imports. All modules share the same runtime types, record identity domain and capability context. Import metadata records the content address and symbol selection; regenerating the complete native scaffold checks that metadata against the executable path and aliases. Dependency bodies are not embedded in comments or hidden IR.
+
+The bundle parser first parses every visible file, verifies each original AST against its content address, then validates the complete source closure and native import scaffolding with the reference `ModuleResolver`. It rejects missing or mismatched dependencies, extra files, mismatched runtimes, requested symbols that do not exist, duplicate imported definitions, malformed/accessor-bearing AST dependencies, and Import outside module membership. Closures are bounded to 64 modules including the entry, 16 MiB of native source across the bundle, and the existing per-module node/source bounds. The resolver retains its selection semantics: an empty symbol list selects all linked declarations; explicit selection does not automatically add a selected function's callees. Such incomplete selections fail typechecking. Generic, nested or unsynthesized dependency declarations remain unsupported even when not selected by the entry.
+
+V6 native aliases are derived from the module's symbol table and full SymbolId. Arbitrarily renaming only native import aliases is refused. A dependency-body edit must change its content address and rebind ancestor Import addresses. The actual target fixtures perform this flow: parse a changed string literal in a dependency, calculate its new root, rebind the middle and entry modules, and execute the changed program. A separate entry-body edit is also executed; the effect sink sees the edited result once.
+
+### Unicode semantics
+
+The reference uses code-point length and slicing (`[...text]`), JavaScript substring matching, default locale-independent casing, and JavaScript trim whitespace. This follows the ECMAScript [case-conversion rules](https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-string.prototype.tolowercase), including Unicode default full mappings and [contextual Final_Sigma](https://www.unicode.org/Public/17.0.0/ucd/SpecialCasing.txt).
+
+V6 pins Unicode **17.0**, matching the measured Node 26.7.0 / ICU 78.3 reference. `generate-string-data.mjs` reproducibly extracts the mappings and Cased/Case_Ignorable properties; `string-data-provenance.json` binds the resulting source hash and engine versions. All three native runtimes use these tables, including TypeScript, so a different Python/Rust Unicode version cannot change results. Updating Unicode requires an explicit new table/profile decision.
+
+The tests compare upper/lower mappings, both contextual properties, and trim membership against the actual TypeScript reference for **all 1,112,064 valid Unicode scalar values**. Actual target-language calls also cover every mapped casing character, contextual range boundaries around Greek sigma, combining marks, astral characters, multi-character expansions, Unicode additions, JavaScript-specific trim differences, substring matching, negative slices, and 1,001-digit slice bounds. Native TypeScript is strictly typechecked before execution. Rust V6 escapes bidirectional controls in emitted literals so valid Aether strings compile under Rust's default source lint.
+
+The supported string domain is well-formed Unicode scalar strings, consistent with canonical AST strings. Helpers explicitly reject isolated surrogate code units at host boundaries. Length is code-point length, not UTF-16 length or grapheme count. Huge integer slice bounds clamp without lossy conversion inside Python/Rust. No locale-sensitive casing, Unicode normalization, grapheme segmentation, native string-allocation quota or throughput claim is added.
+
+### Retained token evidence
+
+Campaign 08 preserves the first complete V6 measurement. Campaign 09 records the final dependency-validation ordering fix; campaign outputs and audits are retained separately. The final nine-workload campaign stores **27 root messages plus six dependency messages**, **23 source snapshots**, every native dependency source, and exact runtime text/costs. Imported workloads count JSON `{entry, dependencies}` framing and repeat the full dependency closure in every message. Neither binary/model encoding nor native imports hide dependency costs; reported binary bytes are summed binary payload sizes.
+
+Cold totals are **2,584 legacy TypeScript review / 4,807 AE2 cl100k tokens (0.538×)** and **2,604 / 4,782 o200k tokens (0.545×)**. The V6 runtime, including Unicode tables, separately costs 32,657 / 32,071 / 35,505 cl100k tokens for TypeScript / Python / Rust. The audit re-decodes every AST and shared dictionary, checks dependency addresses and actual native parse identities, recomputes message counts, and rehashes/recounts each stored runtime. Both campaigns miss 4×; these authored workloads remain diagnostic rather than representative production qualification.
+
+All AST *kind names* now have a bounded executable context in V6. This is not complete FR-1.2 coverage: generic declarations/types, nested modules, unsynthesized bodies, and earlier restricted control/contract/binder contexts still require work. T1-02 and Q03 remain open. Trusted native source/adapters, local runtime state, ordinary effect callbacks and import parsing do not establish proof admission, process sandboxing or durable external transactions.

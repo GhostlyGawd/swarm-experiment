@@ -1,0 +1,117 @@
+{
+  "format": "aether.projection-token-campaign/1",
+  "createdAt": "2026-09-23T04:53:16.952Z",
+  "tokenizers": [
+    "cl100k_base",
+    "o200k_base"
+  ],
+  "workloads": [
+    "scalar-math",
+    "loop-contract",
+    "external-effect",
+    "fixed-lazy",
+    "composite-alias-collections",
+    "full-ledger",
+    "continuation-capture-task",
+    "atomic-nested-return-fault",
+    "strings-linked-imports"
+  ],
+  "dependencyFraming": "Imported workloads count JSON {entry,dependencies} messages containing the complete content-addressed closure; static dependencies repeat in each message; binaryBytes reports summed binary payload bytes",
+  "session": "one original complete module and two complete-module replacements; every message includes framing/dictionary overhead",
+  "densityGoal": 4,
+  "scope": "Small authored scalar corpus, no representative-production or release density qualification. Legacy TS review syntax is a diagnostic baseline; native v2 metadata/runtime overhead is reported separately.",
+  "sources": [
+    {
+      "path": "src/projection/executable-strings.ts",
+      "sha256": "0b1b6d5f924702c63b2dc34f88a5d52f7a88714489a24be9b688006e240dc767"
+    },
+    {
+      "path": "src/projection/executable-string-data.ts",
+      "sha256": "ddc546ef614eecffa148f186d4459c3c699ee6418cbc3ce39f11187d459a3a59"
+    },
+    {
+      "path": "src/projection/executable-link.ts",
+      "sha256": "cd435aeeb67d997fe3e1757a4fde80297975596aa85cec4e6cbce758edec72f5"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus-strings-imports.ts",
+      "sha256": "42f09b9f16ab06173f1ae4ffa9e36f804c69444fb5e1637daa8f7e05ef9b314f"
+    },
+    {
+      "path": "roadmap/v4/research/projections/generate-string-data.mjs",
+      "sha256": "b4fd8218e49680843e4171a515b0fe64c1809af52250360b0dd9ae3f3347e5dc"
+    },
+    {
+      "path": "roadmap/v4/research/projections/string-data-provenance.json",
+      "sha256": "93f0ddedb8febd4d41ac002a2e6582207009b3b563cbdb4d4398f6bfc54dea42"
+    },
+    {
+      "path": "src/projection/executable-atomic.ts",
+      "sha256": "3f10194e7bacffe07dd9855b5c14b46763ef6856a359992574683fc2230d2dab"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus-atomic.ts",
+      "sha256": "ac32d9df7577b7de31b4e73aa56b87358d0e4ddfedd4f6b29e7cf84d9b9cc89e"
+    },
+    {
+      "path": "roadmap/v4/research/projections/verify.mjs",
+      "sha256": "3417c219d32ac30bc2db850cace9163c638be02550eedd0dc12fa5b9373277ab"
+    },
+    {
+      "path": "src/projection/executable-continuations.ts",
+      "sha256": "f45ae8a31d4c35331d63724a6424b0f303560826fe1381aff37e4e872dde9521"
+    },
+    {
+      "path": "src/projection/executable-continuation-plan.ts",
+      "sha256": "dd7a3730b7d344eb261a9604088d4fef696d22be0e9e34f25d8d7f114a1d2588"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus-continuations.ts",
+      "sha256": "538f65731f91af3947069966386ca1d77a24823afa1a2cc31d01acd5cf5a88ed"
+    },
+    {
+      "path": "src/projection/executable-composites.ts",
+      "sha256": "e4a272e67dc1341f510fff032668e40582efc62dc8aa138c7fc1d57d9174cb97"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus-composites.ts",
+      "sha256": "7d9c23377fc94d1c58e8142e4b085d282cb35a82aa996d6fa19e10828d9d2ddb"
+    },
+    {
+      "path": "src/tier1/agent-ir-v2.ts",
+      "sha256": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671"
+    },
+    {
+      "path": "src/tier1/agent-ir.ts",
+      "sha256": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b"
+    },
+    {
+      "path": "src/projection/executable.ts",
+      "sha256": "d442193b02526d3d77d04fde13e76ad6c6d21d58154b02cd3111ce86c30f8fa9"
+    },
+    {
+      "path": "src/projection/executable-runtime.ts",
+      "sha256": "4dc5091680f499786a35196a25ed87ad7ae335beff2fd383cbeec261db827ee5"
+    },
+    {
+      "path": "src/projection/typescript.ts",
+      "sha256": "952e790f7da01ab12dd2fa0a247c7ac1699e106462c70fe388fe9923e592594a"
+    },
+    {
+      "path": "src/util/tokens.ts",
+      "sha256": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus.ts",
+      "sha256": "1ba712e5dabe13991272f0075f6ac485c1c1a543804628e94aecd852a8d87304"
+    },
+    {
+      "path": "roadmap/v4/research/projections/measure.mjs",
+      "sha256": "4c981c33ec15a153629cbe167946677fb9996ed2e85a16717a7d632e8f321638"
+    },
+    {
+      "path": "roadmap/v4/research/projections/Cargo.lock",
+      "sha256": "d04dcb5467cd0c7a1252561be05befdc2cadd456fd285506c04225ea7ec1d58e"
+    }
+  ]
+}

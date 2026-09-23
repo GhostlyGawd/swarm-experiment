@@ -1,0 +1,742 @@
+{
+  "format": "aether.projection-token-campaign/1",
+  "createdAt": "2026-09-23T04:51:32.605Z",
+  "tokenizers": [
+    "cl100k_base",
+    "o200k_base"
+  ],
+  "workloads": [
+    "scalar-math",
+    "loop-contract",
+    "external-effect",
+    "fixed-lazy",
+    "composite-alias-collections",
+    "full-ledger",
+    "continuation-capture-task",
+    "atomic-nested-return-fault",
+    "strings-linked-imports"
+  ],
+  "dependencyFraming": "Imported workloads count JSON {entry,dependencies} messages containing the complete content-addressed closure; static dependencies repeat in each message; binaryBytes reports summed binary payload bytes",
+  "session": "one original complete module and two complete-module replacements; every message includes framing/dictionary overhead",
+  "densityGoal": 4,
+  "scope": "Small authored scalar corpus, no representative-production or release density qualification. Legacy TS review syntax is a diagnostic baseline; native v2 metadata/runtime overhead is reported separately.",
+  "sources": [
+    {
+      "path": "src/projection/executable-strings.ts",
+      "sha256": "0b1b6d5f924702c63b2dc34f88a5d52f7a88714489a24be9b688006e240dc767"
+    },
+    {
+      "path": "src/projection/executable-string-data.ts",
+      "sha256": "ddc546ef614eecffa148f186d4459c3c699ee6418cbc3ce39f11187d459a3a59"
+    },
+    {
+      "path": "src/projection/executable-link.ts",
+      "sha256": "e4ffdc785dda637c606b5ca4083020e4d9ab441aa8cf68bce2541a0886293939"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus-strings-imports.ts",
+      "sha256": "42f09b9f16ab06173f1ae4ffa9e36f804c69444fb5e1637daa8f7e05ef9b314f"
+    },
+    {
+      "path": "roadmap/v4/research/projections/generate-string-data.mjs",
+      "sha256": "b4fd8218e49680843e4171a515b0fe64c1809af52250360b0dd9ae3f3347e5dc"
+    },
+    {
+      "path": "roadmap/v4/research/projections/string-data-provenance.json",
+      "sha256": "93f0ddedb8febd4d41ac002a2e6582207009b3b563cbdb4d4398f6bfc54dea42"
+    },
+    {
+      "path": "src/projection/executable-atomic.ts",
+      "sha256": "3f10194e7bacffe07dd9855b5c14b46763ef6856a359992574683fc2230d2dab"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus-atomic.ts",
+      "sha256": "ac32d9df7577b7de31b4e73aa56b87358d0e4ddfedd4f6b29e7cf84d9b9cc89e"
+    },
+    {
+      "path": "roadmap/v4/research/projections/verify.mjs",
+      "sha256": "3417c219d32ac30bc2db850cace9163c638be02550eedd0dc12fa5b9373277ab"
+    },
+    {
+      "path": "src/projection/executable-continuations.ts",
+      "sha256": "f45ae8a31d4c35331d63724a6424b0f303560826fe1381aff37e4e872dde9521"
+    },
+    {
+      "path": "src/projection/executable-continuation-plan.ts",
+      "sha256": "dd7a3730b7d344eb261a9604088d4fef696d22be0e9e34f25d8d7f114a1d2588"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus-continuations.ts",
+      "sha256": "538f65731f91af3947069966386ca1d77a24823afa1a2cc31d01acd5cf5a88ed"
+    },
+    {
+      "path": "src/projection/executable-composites.ts",
+      "sha256": "e4a272e67dc1341f510fff032668e40582efc62dc8aa138c7fc1d57d9174cb97"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus-composites.ts",
+      "sha256": "7d9c23377fc94d1c58e8142e4b085d282cb35a82aa996d6fa19e10828d9d2ddb"
+    },
+    {
+      "path": "src/tier1/agent-ir-v2.ts",
+      "sha256": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671"
+    },
+    {
+      "path": "src/tier1/agent-ir.ts",
+      "sha256": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b"
+    },
+    {
+      "path": "src/projection/executable.ts",
+      "sha256": "d442193b02526d3d77d04fde13e76ad6c6d21d58154b02cd3111ce86c30f8fa9"
+    },
+    {
+      "path": "src/projection/executable-runtime.ts",
+      "sha256": "4dc5091680f499786a35196a25ed87ad7ae335beff2fd383cbeec261db827ee5"
+    },
+    {
+      "path": "src/projection/typescript.ts",
+      "sha256": "952e790f7da01ab12dd2fa0a247c7ac1699e106462c70fe388fe9923e592594a"
+    },
+    {
+      "path": "src/util/tokens.ts",
+      "sha256": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9"
+    },
+    {
+      "path": "roadmap/v4/research/projections/corpus.ts",
+      "sha256": "1ba712e5dabe13991272f0075f6ac485c1c1a543804628e94aecd852a8d87304"
+    },
+    {
+      "path": "roadmap/v4/research/projections/measure.mjs",
+      "sha256": "4c981c33ec15a153629cbe167946677fb9996ed2e85a16717a7d632e8f321638"
+    },
+    {
+      "path": "roadmap/v4/research/projections/Cargo.lock",
+      "sha256": "d04dcb5467cd0c7a1252561be05befdc2cadd456fd285506c04225ea7ec1d58e"
+    }
+  ],
+  "completedAt": "2026-09-23T04:51:34.334Z",
+  "gitCommit": "632821c6a7c58be5a5b2ce533440312391313f47",
+  "gitStatus": " M docs/implementation/v4/CHANGELOG.md\n M docs/implementation/v4/STATUS.md\n M roadmap/v4/research/adapter-artifacts/README.md\n M roadmap/v4/research/projections/measure.mjs\n M roadmap/v4/research/projections/verify.mjs\n M src/index.ts\n M src/projection/executable-continuation-plan.ts\n M src/projection/executable-runtime.ts\n M src/projection/executable.ts\n M src/tier2/effect-resource-policy.ts\n M src/tier2/index.ts\n M src/tier3/effects.ts\n M src/tier4/process-deployment.ts\n M src/tier4/process-host.ts\n M test/projection/executable.test.ts\n M test/tier2/effect-resource-policy.test.ts\n M test/tier4/process-deployment.test.ts\n M test/tier4/process-host.test.ts\n?? roadmap/v4/research/frost-custody/\n?? roadmap/v4/research/projections/corpus-strings-imports.ts\n?? roadmap/v4/research/projections/generate-string-data.mjs\n?? roadmap/v4/research/projections/results/campaign-08-linked/\n?? roadmap/v4/research/projections/string-data-provenance.json\n?? roadmap/v4/research/resource-budget/BRIDGE.md\n?? src/projection/executable-link.ts\n?? src/projection/executable-string-data.ts\n?? src/projection/executable-strings.ts\n?? src/tier2/resource-budget-bridge.ts\n?? test/projection/strings-imports.test.ts\n?? test/tier2/resource-budget-bridge-fixture.ts\n?? test/tier2/resource-budget-bridge.test.ts\n",
+  "node": "v26.7.0",
+  "tokenizerPackage": {
+    "name": "js-tiktoken",
+    "version": "1.0.21"
+  },
+  "rows": [
+    {
+      "workload": "scalar-math",
+      "tokenizer": "cl100k_base",
+      "cold": {
+        "legacyTsReviewTokens": 85,
+        "ae1Tokens": 183,
+        "ae2Tokens": 222,
+        "binaryBytes": 728,
+        "nativeTokens": {
+          "typescript": 986,
+          "python": 856,
+          "rust": 889
+        },
+        "legacyReviewToAe2Ratio": 0.38288288288288286,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 255,
+        "ae1SharedDictionaryTokens": 333,
+        "ae2CompleteMessages": 686,
+        "legacyReviewToAe2Ratio": 0.3717201166180758,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "scalar-math",
+      "tokenizer": "o200k_base",
+      "cold": {
+        "legacyTsReviewTokens": 85,
+        "ae1Tokens": 184,
+        "ae2Tokens": 223,
+        "binaryBytes": 728,
+        "nativeTokens": {
+          "typescript": 1001,
+          "python": 870,
+          "rust": 902
+        },
+        "legacyReviewToAe2Ratio": 0.3811659192825112,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 255,
+        "ae1SharedDictionaryTokens": 334,
+        "ae2CompleteMessages": 689,
+        "legacyReviewToAe2Ratio": 0.37010159651669083,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "loop-contract",
+      "tokenizer": "cl100k_base",
+      "cold": {
+        "legacyTsReviewTokens": 118,
+        "ae1Tokens": 193,
+        "ae2Tokens": 235,
+        "binaryBytes": 736,
+        "nativeTokens": {
+          "typescript": 838,
+          "python": 713,
+          "rust": 744
+        },
+        "legacyReviewToAe2Ratio": 0.502127659574468,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 354,
+        "ae1SharedDictionaryTokens": 361,
+        "ae2CompleteMessages": 710,
+        "legacyReviewToAe2Ratio": 0.49859154929577465,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "loop-contract",
+      "tokenizer": "o200k_base",
+      "cold": {
+        "legacyTsReviewTokens": 118,
+        "ae1Tokens": 193,
+        "ae2Tokens": 235,
+        "binaryBytes": 736,
+        "nativeTokens": {
+          "typescript": 851,
+          "python": 725,
+          "rust": 756
+        },
+        "legacyReviewToAe2Ratio": 0.502127659574468,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 354,
+        "ae1SharedDictionaryTokens": 361,
+        "ae2CompleteMessages": 711,
+        "legacyReviewToAe2Ratio": 0.4978902953586498,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "external-effect",
+      "tokenizer": "cl100k_base",
+      "cold": {
+        "legacyTsReviewTokens": 53,
+        "ae1Tokens": 97,
+        "ae2Tokens": 140,
+        "binaryBytes": 451,
+        "nativeTokens": {
+          "typescript": 525,
+          "python": 395,
+          "rust": 415
+        },
+        "legacyReviewToAe2Ratio": 0.37857142857142856,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 159,
+        "ae1SharedDictionaryTokens": 161,
+        "ae2CompleteMessages": 426,
+        "legacyReviewToAe2Ratio": 0.3732394366197183,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "external-effect",
+      "tokenizer": "o200k_base",
+      "cold": {
+        "legacyTsReviewTokens": 54,
+        "ae1Tokens": 97,
+        "ae2Tokens": 140,
+        "binaryBytes": 451,
+        "nativeTokens": {
+          "typescript": 532,
+          "python": 401,
+          "rust": 420
+        },
+        "legacyReviewToAe2Ratio": 0.38571428571428573,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 162,
+        "ae1SharedDictionaryTokens": 161,
+        "ae2CompleteMessages": 428,
+        "legacyReviewToAe2Ratio": 0.37850467289719625,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "fixed-lazy",
+      "tokenizer": "cl100k_base",
+      "cold": {
+        "legacyTsReviewTokens": 86,
+        "ae1Tokens": 118,
+        "ae2Tokens": 166,
+        "binaryBytes": 613,
+        "nativeTokens": {
+          "typescript": 843,
+          "python": 702,
+          "rust": 738
+        },
+        "legacyReviewToAe2Ratio": 0.5180722891566265,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 258,
+        "ae1SharedDictionaryTokens": 212,
+        "ae2CompleteMessages": 487,
+        "legacyReviewToAe2Ratio": 0.5297741273100616,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "fixed-lazy",
+      "tokenizer": "o200k_base",
+      "cold": {
+        "legacyTsReviewTokens": 86,
+        "ae1Tokens": 115,
+        "ae2Tokens": 163,
+        "binaryBytes": 613,
+        "nativeTokens": {
+          "typescript": 843,
+          "python": 701,
+          "rust": 736
+        },
+        "legacyReviewToAe2Ratio": 0.5276073619631901,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 258,
+        "ae1SharedDictionaryTokens": 209,
+        "ae2CompleteMessages": 478,
+        "legacyReviewToAe2Ratio": 0.5397489539748954,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "composite-alias-collections",
+      "tokenizer": "cl100k_base",
+      "cold": {
+        "legacyTsReviewTokens": 162,
+        "ae1Tokens": 320,
+        "ae2Tokens": 366,
+        "binaryBytes": 1216,
+        "nativeTokens": {
+          "typescript": 1845,
+          "python": 1651,
+          "rust": 1718
+        },
+        "legacyReviewToAe2Ratio": 0.4426229508196721,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 486,
+        "ae1SharedDictionaryTokens": 518,
+        "ae2CompleteMessages": 1089,
+        "legacyReviewToAe2Ratio": 0.4462809917355372,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "composite-alias-collections",
+      "tokenizer": "o200k_base",
+      "cold": {
+        "legacyTsReviewTokens": 165,
+        "ae1Tokens": 317,
+        "ae2Tokens": 364,
+        "binaryBytes": 1216,
+        "nativeTokens": {
+          "typescript": 1873,
+          "python": 1677,
+          "rust": 1741
+        },
+        "legacyReviewToAe2Ratio": 0.4532967032967033,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 495,
+        "ae1SharedDictionaryTokens": 515,
+        "ae2CompleteMessages": 1081,
+        "legacyReviewToAe2Ratio": 0.45790934320074006,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "full-ledger",
+      "tokenizer": "cl100k_base",
+      "cold": {
+        "legacyTsReviewTokens": 878,
+        "ae1Tokens": 933,
+        "ae2Tokens": 977,
+        "binaryBytes": 3268,
+        "nativeTokens": {
+          "typescript": 5003,
+          "python": 4836,
+          "rust": 4966
+        },
+        "legacyReviewToAe2Ratio": 0.8986693961105425,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 2634,
+        "ae1SharedDictionaryTokens": 1701,
+        "ae2CompleteMessages": 2938,
+        "legacyReviewToAe2Ratio": 0.8965282505105514,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "full-ledger",
+      "tokenizer": "o200k_base",
+      "cold": {
+        "legacyTsReviewTokens": 886,
+        "ae1Tokens": 931,
+        "ae2Tokens": 974,
+        "binaryBytes": 3268,
+        "nativeTokens": {
+          "typescript": 5066,
+          "python": 4899,
+          "rust": 5030
+        },
+        "legacyReviewToAe2Ratio": 0.9096509240246407,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 2658,
+        "ae1SharedDictionaryTokens": 1695,
+        "ae2CompleteMessages": 2930,
+        "legacyReviewToAe2Ratio": 0.9071672354948805,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "continuation-capture-task",
+      "tokenizer": "cl100k_base",
+      "cold": {
+        "legacyTsReviewTokens": 96,
+        "ae1Tokens": 213,
+        "ae2Tokens": 261,
+        "binaryBytes": 786,
+        "nativeTokens": {
+          "typescript": 1095,
+          "python": 897,
+          "rust": 932
+        },
+        "legacyReviewToAe2Ratio": 0.367816091954023,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 288,
+        "ae1SharedDictionaryTokens": 339,
+        "ae2CompleteMessages": 781,
+        "legacyReviewToAe2Ratio": 0.3687580025608195,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "continuation-capture-task",
+      "tokenizer": "o200k_base",
+      "cold": {
+        "legacyTsReviewTokens": 98,
+        "ae1Tokens": 210,
+        "ae2Tokens": 258,
+        "binaryBytes": 786,
+        "nativeTokens": {
+          "typescript": 1112,
+          "python": 914,
+          "rust": 947
+        },
+        "legacyReviewToAe2Ratio": 0.3798449612403101,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 294,
+        "ae1SharedDictionaryTokens": 336,
+        "ae2CompleteMessages": 772,
+        "legacyReviewToAe2Ratio": 0.38082901554404147,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "atomic-nested-return-fault",
+      "tokenizer": "cl100k_base",
+      "cold": {
+        "legacyTsReviewTokens": 671,
+        "ae1Tokens": 814,
+        "ae2Tokens": 855,
+        "binaryBytes": 3099,
+        "nativeTokens": {
+          "typescript": 7820,
+          "python": 7006,
+          "rust": 7375
+        },
+        "legacyReviewToAe2Ratio": 0.7847953216374269,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 2013,
+        "ae1SharedDictionaryTokens": 1582,
+        "ae2CompleteMessages": 2565,
+        "legacyReviewToAe2Ratio": 0.7847953216374269,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "atomic-nested-return-fault",
+      "tokenizer": "o200k_base",
+      "cold": {
+        "legacyTsReviewTokens": 677,
+        "ae1Tokens": 810,
+        "ae2Tokens": 851,
+        "binaryBytes": 3099,
+        "nativeTokens": {
+          "typescript": 7926,
+          "python": 7111,
+          "rust": 7476
+        },
+        "legacyReviewToAe2Ratio": 0.7955346650998825,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 2031,
+        "ae1SharedDictionaryTokens": 1574,
+        "ae2CompleteMessages": 2553,
+        "legacyReviewToAe2Ratio": 0.7955346650998825,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "strings-linked-imports",
+      "tokenizer": "cl100k_base",
+      "cold": {
+        "legacyTsReviewTokens": 435,
+        "ae1Tokens": 1454,
+        "ae2Tokens": 1585,
+        "binaryBytes": 3990,
+        "nativeTokens": {
+          "typescript": 10426,
+          "python": 9510,
+          "rust": 9777
+        },
+        "legacyReviewToAe2Ratio": 0.2744479495268139,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 1305,
+        "ae1SharedDictionaryTokens": 1315,
+        "ae2CompleteMessages": 4767,
+        "legacyReviewToAe2Ratio": 0.2737570799244808,
+        "meetsFourfoldDiagnostic": false
+      }
+    },
+    {
+      "workload": "strings-linked-imports",
+      "tokenizer": "o200k_base",
+      "cold": {
+        "legacyTsReviewTokens": 435,
+        "ae1Tokens": 1445,
+        "ae2Tokens": 1574,
+        "binaryBytes": 3990,
+        "nativeTokens": {
+          "typescript": 10283,
+          "python": 9375,
+          "rust": 9631
+        },
+        "legacyReviewToAe2Ratio": 0.27636594663278274,
+        "meetsFourfoldDiagnostic": false
+      },
+      "session": {
+        "messages": 3,
+        "legacyTsReviewTokens": 1305,
+        "ae1SharedDictionaryTokens": 1320,
+        "ae2CompleteMessages": 4737,
+        "legacyReviewToAe2Ratio": 0.27549081697276756,
+        "meetsFourfoldDiagnostic": false
+      }
+    }
+  ],
+  "aggregate": [
+    {
+      "tokenizer": "cl100k_base",
+      "legacyTsReviewTokens": 2584,
+      "ae2Tokens": 4807,
+      "ratioOfSums": 0.5375494071146245,
+      "meetsFourfoldDiagnostic": false
+    },
+    {
+      "tokenizer": "o200k_base",
+      "legacyTsReviewTokens": 2604,
+      "ae2Tokens": 4782,
+      "ratioOfSums": 0.5445420326223338,
+      "meetsFourfoldDiagnostic": false
+    }
+  ],
+  "runtime": {
+    "typescript": {
+      "bytes": 4720,
+      "sha256": "924dc81b10149da3ac067ea31ce15eb69d426026564398538bea0c249218252c",
+      "tokens": {
+        "cl100k_base": 1544,
+        "o200k_base": 1565
+      }
+    },
+    "python": {
+      "bytes": 4558,
+      "sha256": "7fa20d7ab3f921a55ae9e8db128816eeab1588a97d85277dcc50a6564dee2b00",
+      "tokens": {
+        "cl100k_base": 1315,
+        "o200k_base": 1337
+      }
+    },
+    "rust": {
+      "bytes": 5774,
+      "sha256": "42c0abe1a397adf5ae60c307868f29579fd854008991995dc8d2bd02ccda4212",
+      "tokens": {
+        "cl100k_base": 1919,
+        "o200k_base": 1951
+      }
+    }
+  },
+  "compositeRuntime": {
+    "typescript": {
+      "bytes": 11829,
+      "sha256": "1704a8703e1221fe8253433eff89ed1c7acaf7aca5fff746235890dc7b94fb0d",
+      "tokens": {
+        "cl100k_base": 3558,
+        "o200k_base": 3590
+      }
+    },
+    "python": {
+      "bytes": 11361,
+      "sha256": "6ceff256c170c00c81046405df8e005105a5fcdfe9f3352059131bbfa0664c8e",
+      "tokens": {
+        "cl100k_base": 3218,
+        "o200k_base": 3258
+      }
+    },
+    "rust": {
+      "bytes": 16026,
+      "sha256": "881fdd4f91f160c0eeaada75065f97527107fa537aac40e5c42aac3f4b357d28",
+      "tokens": {
+        "cl100k_base": 5129,
+        "o200k_base": 5199
+      }
+    }
+  },
+  "continuationRuntime": {
+    "typescript": {
+      "bytes": 16479,
+      "sha256": "29a2a28710432a88db2433f3df6e4e51a1f1be078c624198f83481d9c6f7bcd1",
+      "tokens": {
+        "cl100k_base": 4813,
+        "o200k_base": 4853
+      }
+    },
+    "python": {
+      "bytes": 15647,
+      "sha256": "3c08ce88d0c576d4a3431411a691d1c719f19d780d562204fa534a7f2569a3e9",
+      "tokens": {
+        "cl100k_base": 4346,
+        "o200k_base": 4411
+      }
+    },
+    "rust": {
+      "bytes": 22274,
+      "sha256": "213f03defb46540adef7c223bc5d40d9602dfb4f0ecacfa20982e4772b5d603a",
+      "tokens": {
+        "cl100k_base": 7038,
+        "o200k_base": 7150
+      }
+    }
+  },
+  "atomicRuntime": {
+    "typescript": {
+      "bytes": 17946,
+      "sha256": "6a6507f46806fa97e4353d08c1d0b08da46920966a65e19c6caa4341d1f40797",
+      "tokens": {
+        "cl100k_base": 5186,
+        "o200k_base": 5228
+      }
+    },
+    "python": {
+      "bytes": 17040,
+      "sha256": "787d5f5fb34e9c63368c0525d384ed61a1c957d8dac9e6f9e170751ba738ffad",
+      "tokens": {
+        "cl100k_base": 4677,
+        "o200k_base": 4746
+      }
+    },
+    "rust": {
+      "bytes": 24555,
+      "sha256": "2d150fdcb5022dc8b10d90432e0cf431aa1273974a3b41a45e62dfa83edda224",
+      "tokens": {
+        "cl100k_base": 7713,
+        "o200k_base": 7818
+      }
+    }
+  },
+  "linkedRuntime": {
+    "typescript": {
+      "bytes": 74573,
+      "sha256": "1c079e2d0dc8b83c840c832f2a249db3564296e3e1861b926abdf7815ae3ab1d",
+      "tokens": {
+        "cl100k_base": 32657,
+        "o200k_base": 31826
+      }
+    },
+    "python": {
+      "bytes": 73506,
+      "sha256": "988cc6041835bb7f311007104acd5e43b8c3dc8ee89b330206f2a4f04c96f914",
+      "tokens": {
+        "cl100k_base": 32071,
+        "o200k_base": 31265
+      }
+    },
+    "rust": {
+      "bytes": 75891,
+      "sha256": "3642b5a47d7b213aab8b2fafcd258a2e98cbf8990224b206794edbe69ce96919",
+      "tokens": {
+        "cl100k_base": 35505,
+        "o200k_base": 34738
+      }
+    }
+  },
+  "unsupportedWorkloads": [],
+  "coverage": [
+    {
+      "workload": "full-ledger",
+      "target": "typescript",
+      "status": "supported"
+    },
+    {
+      "workload": "full-ledger",
+      "target": "python",
+      "status": "supported"
+    },
+    {
+      "workload": "full-ledger",
+      "target": "rust",
+      "status": "supported"
+    }
+  ],
+  "qualifiedReleaseDensity": false
+}
