@@ -1,0 +1,9 @@
+/* Aether AST root ast:b3:2dc78bb6bf5939d963a45073a13287da05e108e3501e1bfe68e4d120a56ea8d0; manifest aether.execution/1:b3:f117a0a5bb9f4590ebf07322bd990559f8a7d2df65181d2056a1a18de163b4eb; bounded research ABI. */
+static int tier1(Frame*frame,const Frame*before,uint32_t left,uint32_t right,int64_t*out){uint32_t fault=0;(void)before;(void)right;int64_t valuelocal0=((int64_t)UINT64_C(888)); if(fault)return 1; uint32_t local0=ae_alloc(frame,valuelocal0,&fault); if(fault)return 1; (void)local0;
+int64_t assigned1=ae_add(frame->records[left].value,((int64_t)UINT64_C(1)),&fault); if(fault)return 1; frame->records[left].value=assigned1;
+*out=frame->records[right].value; if(fault)return 1; return 0;return 1;}
+__attribute__((noinline)) static int tier2(Frame*frame,const Frame*before,uint32_t left,uint32_t right,int64_t*out,uint64_t started,uint64_t*switch_ticks){if(switch_ticks)*switch_ticks=tick()-started;uint32_t fault=0;(void)before;(void)right;int64_t valuelocal2=((int64_t)UINT64_C(888)); if(fault)return 1; uint32_t local2=ae_alloc(frame,valuelocal2,&fault); if(fault)return 1; (void)local2;
+int64_t assigned3=ae_add(frame->records[left].value,((int64_t)UINT64_C(1)),&fault); if(fault)return 1; frame->records[left].value=assigned3;
+*out=frame->records[right].value; if(fault)return 1; return 0;return 1;}
+static int precondition(const Frame*before,uint32_t left,uint32_t right){uint32_t fault=0;(void)before;(void)left;(void)right;return !fault;}
+static int postcondition(const Frame*before,const Frame*after,uint32_t left,uint32_t right,int64_t result){uint32_t fault=0;(void)left;(void)right;(void)result;for(uint32_t id=1;id<before->next_id;id++)if(id!=left&&before->records[id].value!=after->records[id].value)return 0;if(!(((result)==(ae_add(before->records[left].value,((int64_t)UINT64_C(1)),&fault))))||fault)return 0;return !fault;}

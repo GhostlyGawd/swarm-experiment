@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## AST-derived native fallback campaign — 2026-09-23
+
+- Added a bounded native compiler that derives both tier bodies and contract checks from the exact Aether fallback AST. One C call frame restores aliased record state and allocator before entering Tier 2. A source edit changes the root, generated source, binary and result; 14 native/reference cases match.
+- A preregistered Apple M4 Pro campaign at clean source `9f7d5cf` retained 10,000 individual samples and an independent rebuild/recount. The switch bracket's observed maximum was 41.667 ns with zero samples over 50 ns, but timer resolution is 41.667 ns, so the result is **inconclusive**. The full-call maximum was 83.333 ns. No release threshold or T3-07 status changed.
+- General values/effects, proof admission, durable host handoff and a qualified hard-maximum timing method remain open.
+
 ## Proved process fallback V2 — 2026-09-23
 
 - Added opt-in process fallback profile `/2` and journal `/2`. An effectful Tier 1 may fall back to an independently proved pure scalar Tier 2 with the same exact contract and a proof digest in the durable profile. V1 histories remain explicit.

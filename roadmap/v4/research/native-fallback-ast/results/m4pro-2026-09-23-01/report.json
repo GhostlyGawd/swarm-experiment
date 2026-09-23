@@ -1,0 +1,242 @@
+{
+  "format": "aether.ast-native-fallback-report/1",
+  "preregistrationSha256": "a005fa56bbb5e909bbbd07763f4a2717b7e7c318353255714487d1247db69ee7",
+  "commit": "9f7d5cf9959c6cc96ec0896d4063105a22a1a1ce",
+  "sourceHashes": {
+    "roadmap/v4/research/native-fallback-ast/compiler.ts": "c63beca0a1e1dad46d598c399c46c274f8353d745465db9ddf0383f467f90a6b",
+    "roadmap/v4/research/native-fallback-ast/driver.c": "ff4a28f303799bd86a70f68adf2ce7cea615fc20eb093cab429f92c65e59b4e6",
+    "roadmap/v4/research/native-fallback-ast/verify.ts": "e71b27a9b221193efb4c00e80727471497a4172d96860bcfbb20db7e0ce85767",
+    "roadmap/v4/research/native-fallback-ast/campaign.ts": "8d7914c52afa71f99ac65e543b03a7a4b0af5666269c69624f6be6305936bb67",
+    "roadmap/v4/research/native-fallback-ast/audit.ts": "bfb546b4e1bbda248673a254609a78022de69f78ac280b2c014b6134efe63963",
+    "test/tier3/native-fallback-ast.test.ts": "f41684d4d31ea1ae3d8734347254c2d764a0fab223c162f0c6a33eaa42ed8929",
+    "test/tier3/fallback-tree-fixture.ts": "dbecb6ec3e2ce20d00d97b2e9fc4393e9b04fca23bb3386ed06d0fd95338dbc8",
+    "src/tier3/fallback-tree.ts": "ac21196ea810f1638b545397fd2c7301a2ae65053489abe6aa22259f6a555826",
+    "src/tier2/typecheck.ts": "19113ce88ac99a02a1e7b1f4acad694a1d1c83f9520b2fe7f2545669a5da1b18",
+    "src/tier1/ast.ts": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb",
+    "package-lock.json": "5c681465706b3f7b5316290d26e3e2612d733b43260994cb3339e7b422a174dc"
+  },
+  "compiledAt": "2026-09-23T23:26:07.910Z",
+  "startedAt": "2026-09-23T23:26:13.504Z",
+  "finishedAt": "2026-09-23T23:26:13.554Z",
+  "programs": [
+    {
+      "mode": "primary",
+      "root": "ast:b3:2dc78bb6bf5939d963a45073a13287da05e108e3501e1bfe68e4d120a56ea8d0",
+      "manifestDigest": "aether.execution/1:b3:f117a0a5bb9f4590ebf07322bd990559f8a7d2df65181d2056a1a18de163b4eb",
+      "sourceSha256": "099ade124954cdda2a90a5d1068c1ad19caa9f09cd6e1b7aaacf64f622d79f7d",
+      "binarySha256": "c75673c2f06d40dc8bef5f5a7ee60ba4470a8607a7d3ee50be65a78077c4d1c5",
+      "assemblySha256": "73e38c4aec22281f0df10379091420a1a72a86b969d18ab79e699cfd4235f765"
+    },
+    {
+      "mode": "fallback",
+      "root": "ast:b3:cbc1157ee4c86fbc04fd666ee3ef28896cfd211a5a0f6e4f97d6b600f5cfc338",
+      "manifestDigest": "aether.execution/1:b3:ac75d3c9461e4355c38db7c1b345af4fa79030daaf4d99ad226bf7d793c2566f",
+      "sourceSha256": "3779727d96b2d727c6aa325cb6a52f8433fb492b9d5af6c1d33421e04303f313",
+      "binarySha256": "5e01aab6829421eae82e90ec5859e23043684c382cf67af214f738adf8ec4a03",
+      "assemblySha256": "5c037f051eeebf96b1c52fe342b4375ef269907a852d3209d1504f729aecac04"
+    },
+    {
+      "mode": "abort",
+      "root": "ast:b3:29f42a044c0869d1894add326539a9fcc80efecce34e760b4871f840c6fdfb3b",
+      "manifestDigest": "aether.execution/1:b3:d95ca974f55a26620d0b90929f4eae81b5d1c212ed68f00c38f9b3398b24a149",
+      "sourceSha256": "fa31d073fd983dc845159d0be134811077e3251c81c4d52623773c290fc9d8b2",
+      "binarySha256": "029825ac88e78acdf832dffe42e8dd6bfc475452c732fbe9d09584c1e9072c6b",
+      "assemblySha256": "570d3987022d9b29227a6926fdc34193f2b8c1262d3991a75145c66b15a490bf"
+    },
+    {
+      "mode": "edited",
+      "root": "ast:b3:1796d1e156a0ed911d5c426afba3ac10397ffbc89807c089d5b7fe5147f0d2cb",
+      "manifestDigest": "aether.execution/1:b3:506acc573e1fd1cf1d82e7f5b346ad37f76bb3fbc55705b30f302058a3145278",
+      "sourceSha256": "5a9e7b9a914409c266379b9e26dfc15043068f02d689bced5bf604e98137c454",
+      "binarySha256": "eae8a53b8c9d57bee24125998fac2b251d21813d5aae3b9ed0488b1a53cdf189",
+      "assemblySha256": "f473e14dcd17405462841e859cc8cc0a43714d3b35d51f0f1f66ed8c47e08b24"
+    }
+  ],
+  "differentialSha256": "4cf0ca4b79d0d6a3a13b41c8fa2e71bdc1b77a8f12a74736fe56413abf495f87",
+  "rawSha256": "688beff93499c2064bacf78ba0e6a1b2973a3546788e33a3a16644e5ea0ed48b",
+  "differentialCases": 14,
+  "editWitness": {
+    "editedRoot": "ast:b3:1796d1e156a0ed911d5c426afba3ac10397ffbc89807c089d5b7fe5147f0d2cb",
+    "changedBinary": true
+  },
+  "clock": "mach_absolute_time",
+  "tickNs": 41.666666666667,
+  "summary": {
+    "switch": {
+      "count": 10000,
+      "min": 0,
+      "p50": 0,
+      "p95": 41.666666666667,
+      "p99": 41.666666666667,
+      "max": 41.666666666667,
+      "above50ns": 0
+    },
+    "full": {
+      "count": 10000,
+      "min": 0,
+      "p50": 41.666666666667,
+      "p95": 41.666666666667,
+      "p99": 41.666666666667,
+      "max": 83.333333333334,
+      "above50ns": 1
+    },
+    "timerPair": {
+      "count": 10000,
+      "min": 0,
+      "p50": 0,
+      "p95": 41.666666666667,
+      "p99": 41.666666666667,
+      "max": 41.666666666667,
+      "above50ns": 0
+    }
+  },
+  "byTrial": [
+    {
+      "switch": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "full": {
+        "count": 2000,
+        "min": 0,
+        "p50": 41.666666666667,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 83.333333333334,
+        "above50ns": 1
+      },
+      "timerPair": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      }
+    },
+    {
+      "switch": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "full": {
+        "count": 2000,
+        "min": 0,
+        "p50": 41.666666666667,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "timerPair": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      }
+    },
+    {
+      "switch": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "full": {
+        "count": 2000,
+        "min": 0,
+        "p50": 41.666666666667,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "timerPair": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      }
+    },
+    {
+      "switch": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "full": {
+        "count": 2000,
+        "min": 0,
+        "p50": 41.666666666667,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "timerPair": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      }
+    },
+    {
+      "switch": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "full": {
+        "count": 2000,
+        "min": 0,
+        "p50": 41.666666666667,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      },
+      "timerPair": {
+        "count": 2000,
+        "min": 0,
+        "p50": 0,
+        "p95": 41.666666666667,
+        "p99": 41.666666666667,
+        "max": 41.666666666667,
+        "above50ns": 0
+      }
+    }
+  ],
+  "verdict": "inconclusive",
+  "qualification": "Research only: AST-derived bounded native frame, no full runtime/effects/proof admission; clock quantization and raw maximum retained."
+}

@@ -1,0 +1,148 @@
+{
+  "format": "aether.ast-native-fallback-preregistration/1",
+  "registeredAt": "2026-09-23T23:25:59.436Z",
+  "commit": "9f7d5cf9959c6cc96ec0896d4063105a22a1a1ce",
+  "sourceHashes": {
+    "roadmap/v4/research/native-fallback-ast/compiler.ts": "c63beca0a1e1dad46d598c399c46c274f8353d745465db9ddf0383f467f90a6b",
+    "roadmap/v4/research/native-fallback-ast/driver.c": "ff4a28f303799bd86a70f68adf2ce7cea615fc20eb093cab429f92c65e59b4e6",
+    "roadmap/v4/research/native-fallback-ast/verify.ts": "e71b27a9b221193efb4c00e80727471497a4172d96860bcfbb20db7e0ce85767",
+    "roadmap/v4/research/native-fallback-ast/campaign.ts": "8d7914c52afa71f99ac65e543b03a7a4b0af5666269c69624f6be6305936bb67",
+    "roadmap/v4/research/native-fallback-ast/audit.ts": "bfb546b4e1bbda248673a254609a78022de69f78ac280b2c014b6134efe63963",
+    "test/tier3/native-fallback-ast.test.ts": "f41684d4d31ea1ae3d8734347254c2d764a0fab223c162f0c6a33eaa42ed8929",
+    "test/tier3/fallback-tree-fixture.ts": "dbecb6ec3e2ce20d00d97b2e9fc4393e9b04fca23bb3386ed06d0fd95338dbc8",
+    "src/tier3/fallback-tree.ts": "ac21196ea810f1638b545397fd2c7301a2ae65053489abe6aa22259f6a555826",
+    "src/tier2/typecheck.ts": "19113ce88ac99a02a1e7b1f4acad694a1d1c83f9520b2fe7f2545669a5da1b18",
+    "src/tier1/ast.ts": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb",
+    "package-lock.json": "5c681465706b3f7b5316290d26e3e2612d733b43260994cb3339e7b422a174dc"
+  },
+  "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+  "compilerFlags": [
+    "-O3",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fno-lto"
+  ],
+  "hardware": {
+    "architecture": "arm64",
+    "processor": "Apple M4 Pro",
+    "os": "Darwin 25.6.0 arm64"
+  },
+  "experiment": {
+    "scope": "AST-derived pure record-reference fallback, one signed i64 field, native same-frame rollback",
+    "differentialCases": [
+      {
+        "mode": "primary",
+        "alias": true,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "primary",
+        "alias": false,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": false,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "abort",
+        "alias": true,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "abort",
+        "alias": false,
+        "initial": 10,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": true,
+        "initial": -7,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 99,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "primary",
+        "alias": true,
+        "initial": 0,
+        "grant2": false,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 0,
+        "grant2": false,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "fallback",
+        "alias": true,
+        "initial": 0,
+        "grant2": true,
+        "revokeAtFault": true
+      },
+      {
+        "mode": "abort",
+        "alias": true,
+        "initial": 0,
+        "grant2": true,
+        "revokeAtFault": true
+      },
+      {
+        "mode": "fallback",
+        "alias": false,
+        "initial": -101,
+        "grant2": true,
+        "revokeAtFault": false
+      },
+      {
+        "mode": "primary",
+        "alias": false,
+        "initial": 1000000,
+        "grant2": true,
+        "revokeAtFault": false
+      }
+    ],
+    "warmup": 10000,
+    "trials": 5,
+    "samplesPerTrial": 2000,
+    "switchStart": "before volatile fault read after Tier 1 speculative mutation",
+    "switchEnd": "first Tier 2 prologue timer read after frame restoration, permission and native call transfer",
+    "excluded": [
+      "full Aether Int/heap/effects/proof admission",
+      "remote sink status",
+      "durable host journal",
+      "guest runtime"
+    ],
+    "hardLimitNs": 50,
+    "timerOverheadSubtracted": false
+  }
+}
