@@ -6,12 +6,14 @@ import type { ResumableProgram } from '../../../../src/tier3/resumable-program.t
 import { PackedHeap, unpackResumableCheckpoint, type PackedField, type PackedHeapImage, type PackedResumableCheckpoint } from '../../../../src/tier3/packed-heap.ts';
 import { sha256 } from './build.ts';
 
-const HEADER = 48, ROW = 8, OP = 40, RESULT = 16;
+const HEADER = 48, HEADER_V2 = 64, ROW = 8, OP = 40, RESULT = 16, STRING_ENTRY = 8;
 const MAGIC = 0x47504541, DONE = 0x454e4f44;
-const kinds = { readInt: 1, addInt: 2, readBool: 3, readRef: 4 } as const;
+const kinds = { readInt: 1, addInt: 2, readBool: 3, readRef: 4, readString: 5, equalsString: 6 } as const;
 export type GuestOperation =
   | { readonly kind: 'readInt' | 'readBool' | 'readRef'; readonly id: string; readonly field: string }
-  | { readonly kind: 'addInt'; readonly id: string; readonly field: string; readonly increment: string };
+  | { readonly kind: 'readString'; readonly id: string; readonly field: string }
+  | { readonly kind: 'addInt'; readonly id: string; readonly field: string; readonly increment: string }
+  | { readonly kind: 'equalsString'; readonly id: string; readonly field: string; readonly otherId: string; readonly otherField: string };
 export interface GuestResult {
   readonly format: 'aether.packed-hvf-guest-result/1';
   readonly inputSnapshotDigest: Digest;
@@ -41,11 +43,17 @@ const signed64 = (value: string): bigint => {
   return integer;
 };
 const width = (span: bigint): number => span === 0n ? 0 : span.toString(2).length;
+const stringHash = (value: string): bigint => {
+  let hash = 14695981039346656037n;
+  for (const byte of Buffer.from(value, 'utf8')) hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 1099511628211n);
+  return hash;
+};
 const fieldWidth = (field: PackedField): number => {
   if (field.kind === 'bool') return 1;
   if (field.kind === 'ref') return width(BigInt(2 * field.maxRelative + 1));
   if (field.kind === 'int') return width(BigInt(field.max) - BigInt(field.min));
-  throw new TypeError('packed guest does not support string fields');
+  if (field.kind === 'string') return 12;
+  throw new TypeError('unsupported packed field');
 };
 /** Runs an authenticated resumable checkpoint through an actual EL1 guest.
  * The bounded field plan is host derived; the guest independently checks its
@@ -65,30 +73,41 @@ export function executePackedCheckpointGuest(args: {
 }): GuestResult {
   unpackResumableCheckpoint(args.packed, args.program, args.expectedSnapshotDigest, args.expectedLayoutDigest);
   const image = args.packed.heap, model = PackedHeap.fromImage(image, args.expectedLayoutDigest);
-  if (model.layouts.some(layout => layout.fields.some(field => field.kind === 'string')))
-    throw new TypeError('packed guest does not support string fields');
+  const v2 = image.format === 'aether.packed-heap/2';
   if (sha256(readFileSync(args.driver)) !== args.expectedDriverSha256 ||
       sha256(readFileSync(args.guestImage)) !== args.expectedGuestSha256)
     throw new TypeError('packed guest executable digest mismatch');
   if (!Array.isArray(args.operations) || model.rows.length < 1 || model.rows.length > 1024 ||
       args.operations.length > 256 || model.byteLength > 16384) throw new RangeError('packed guest profile limit');
   const raw = Buffer.from(image.bytes, 'base64');
+  const stringEntries = v2 ? image.stringEntries! : [];
+  const stringBytes = v2 ? Buffer.from(image.stringBytes!, 'base64') : Buffer.alloc(0);
   const bits = model.rows.reduce((sum, row) => sum + row.bitLength, 0);
-  const rowsAt = HEADER, opsAt = rowsAt + model.rows.length * ROW;
+  const rowsAt = v2 ? HEADER_V2 : HEADER, opsAt = rowsAt + model.rows.length * ROW;
   const resultsAt = opsAt + args.operations.length * OP, bytesAt = resultsAt + args.operations.length * RESULT;
-  const frameLength = bytesAt + raw.length;
+  const entriesAt = bytesAt + raw.length, stringsAt = entriesAt + stringEntries.length * STRING_ENTRY;
+  const frameLength = stringsAt + stringBytes.length;
   if (frameLength > 32768) throw new RangeError('packed guest frame exceeds two pages');
   const frame = Buffer.alloc(frameLength);
-  frame.writeUInt32LE(MAGIC, 0); frame.writeUInt32LE(1, 4); frame.writeUInt32LE(frameLength, 8);
+  frame.writeUInt32LE(MAGIC, 0); frame.writeUInt32LE(v2 ? 2 : 1, 4); frame.writeUInt32LE(frameLength, 8);
   frame.writeUInt32LE(model.rows.length, 12); frame.writeUInt32LE(args.operations.length, 16);
   frame.writeUInt32LE(bits, 20); frame.writeUInt32LE(raw.length, 24);
   frame.writeUInt32LE(rowsAt, 28); frame.writeUInt32LE(opsAt, 32);
   frame.writeUInt32LE(bytesAt, 36); frame.writeUInt32LE(resultsAt, 40);
+  if (v2) {
+    frame.writeUInt32LE(stringEntries.length, 48); frame.writeUInt32LE(entriesAt, 52);
+    frame.writeUInt32LE(stringsAt, 56); frame.writeUInt32LE(stringBytes.length, 60);
+  }
   model.rows.forEach((row, index) => {
     frame.writeUInt32LE(row.bitOffset, rowsAt + index * ROW);
     frame.writeUInt32LE(row.bitLength, rowsAt + index * ROW + 4);
   });
   raw.copy(frame, bytesAt);
+  stringEntries.forEach((entry, index) => {
+    frame.writeUInt32LE(entry.offset, entriesAt + index * STRING_ENTRY);
+    frame.writeUInt32LE(entry.length, entriesAt + index * STRING_ENTRY + 4);
+  });
+  stringBytes.copy(frame, stringsAt);
   const byId = new Map(model.rows.map((row, index) => [row.id, index]));
   const byType = new Map(model.layouts.map(layout => [layout.typeName, layout]));
   const expected: GuestResult['observations'][number][] = [];
@@ -126,6 +145,28 @@ export function executePackedCheckpointGuest(args: {
       const current = model.get(operation.id, operation.field);
       if (current.tag !== 'bool') throw new TypeError('invalid packed boolean model');
       value = current.value ? '1' : '0'; native = BigInt(value);
+    } else if ((operation.kind === 'readString' || operation.kind === 'equalsString') && field.kind === 'string') {
+      if (!v2) throw new TypeError('string operation requires packed /2 image');
+      frame.writeUInt32LE(field.maxUtf8Bytes, at + 16);
+      const current = model.get(operation.id, operation.field);
+      if (current.tag !== 'string') throw new TypeError('invalid packed string model');
+      if (operation.kind === 'readString') {
+        value = current.value; native = stringHash(value);
+      } else {
+        if (typeof operation.otherId !== 'string' || typeof operation.otherField !== 'string') throw new TypeError('invalid packed guest string equality operand');
+        const otherOrdinal = byId.get(operation.otherId);
+        if (otherOrdinal === undefined) throw new ReferenceError('unknown packed guest string equality record');
+        const otherRow = model.rows[otherOrdinal], otherLayout = byType.get(otherRow.typeName)!;
+        const otherIndex = otherLayout.fields.findIndex(item => item.name === operation.otherField);
+        if (otherIndex < 0 || otherLayout.fields[otherIndex].kind !== 'string') throw new TypeError('invalid packed guest string equality field');
+        const otherField = otherLayout.fields[otherIndex] as Extract<PackedField, { kind: 'string' }>;
+        const otherOffset = otherRow.bitOffset + otherLayout.fields.slice(0, otherIndex).reduce((sum, item) => sum + fieldWidth(item), 0);
+        frame.writeUInt32LE(otherOrdinal, at + 20); frame.writeUInt32LE(otherOffset, at + 24);
+        frame.writeUInt32LE(12, at + 28); frame.writeUInt32LE(otherField.maxUtf8Bytes, at + 32);
+        const other = model.get(operation.otherId, operation.otherField);
+        if (other.tag !== 'string') throw new TypeError('invalid packed guest string equality model');
+        value = current.value === other.value ? '1' : '0'; native = BigInt(value);
+      }
     } else if (operation.kind === 'readRef' && field.kind === 'ref') {
       const current = model.get(operation.id, operation.field);
       if (current.tag === 'null') value = 'null';
@@ -196,8 +237,8 @@ export function executePackedCheckpointGuest(args: {
     guestStartTick: String(diagnostic.guestStartTick), runStartTick: String(diagnostic.runStartTick),
     validatedResponseTick: String(diagnostic.validatedResponseTick), processLaunchToExitNs } as GuestResult['diagnostics'];
   const { imageDigest: _old, ...body } = image;
-  const candidateBody = { ...body, bytes: output.subarray(bytesAt).toString('base64') };
-  const candidateHeap = { ...candidateBody, imageDigest: domainDigest('aether.packed-heap-image/1', candidateBody, MACHINE_LIMITS) };
+  const candidateBody = { ...body, bytes: output.subarray(bytesAt, bytesAt + raw.length).toString('base64') };
+  const candidateHeap = { ...candidateBody, imageDigest: domainDigest(`aether.packed-heap-image/${v2 ? '2' : '1'}`, candidateBody, MACHINE_LIMITS) };
   PackedHeap.fromImage(candidateHeap, args.expectedLayoutDigest);
   return { format: 'aether.packed-hvf-guest-result/1', inputSnapshotDigest: args.expectedSnapshotDigest,
     layoutDigest: image.layoutDigest, driverSha256: args.expectedDriverSha256,

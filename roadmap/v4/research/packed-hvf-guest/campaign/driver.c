@@ -96,7 +96,9 @@ int main(int argc,char **argv) {
   fclose(file);
   if(fread(input,1,48,stdin)!=48)return failure("short frame header",0,0);
   frame_bytes=u32(input+8);
-  if(u32(input)!=FRAME_MAGIC || u32(input+4)!=1 || frame_bytes<48 || frame_bytes>page*2)
+  const uint32_t version=u32(input+4);
+  if(u32(input)!=FRAME_MAGIC || (version!=1 && version!=2) ||
+     frame_bytes<(version==2?64u:48u) || frame_bytes>page*2)
     return failure("invalid frame header",(long)frame_bytes,0);
   if(fread(input+48,1,frame_bytes-48,stdin)!=frame_bytes-48 || fgetc(stdin)!=EOF)
     return failure("frame length",0,0);

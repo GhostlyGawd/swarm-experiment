@@ -134,20 +134,91 @@ test('actual EL1 guest reads and mutates authenticated packed checkpoint with di
       cases.push({ kind: 'signed-i64-edges', operations: edgeOperations,
         observations: edgeResult.observations, inputImageDigest: edgePacked.heap.imageDigest,
         candidateImageDigest: edgeResult.candidateHeap.imageDigest, diagnostics: edgeResult.diagnostics });
-      const strings = fixture('packed-hvf-string-rejection');
+      const strings = fixture('packed-hvf-string-roundtrip');
       const stringName = typeName('type:test:packed_hvf_string');
       const stringType = { t: 'Record' as const, name: stringName,
         fields: [['text', b.Str]] as const };
-      strings.allocateRecord(stringType, { text: 'é' });
+      const stringRefs = ['é', 'hello', 'é', '', '🧪', 'a\u0000b'].map(text =>
+        strings.allocateRecord(stringType, { text }));
       const stringPacked = packResumableCheckpoint(strings.snapshot(), strings.program,
         [{ typeName: stringName, fields: [{ name: 'text', kind: 'string', maxUtf8Bytes: 16 }] }]);
       assert.equal(stringPacked.format, 'aether.packed-resumable-checkpoint/2');
-      assert.throws(() => executePackedCheckpointGuest({ packed: stringPacked, program: strings.program,
+      const stringRun = (actions: readonly GuestOperation[]) => executePackedCheckpointGuest({ packed: stringPacked, program: strings.program,
         expectedSnapshotDigest: stringPacked.snapshotDigest,
         expectedLayoutDigest: stringPacked.heap.layoutDigest, driver: binary.driver,
         guestImage: binary.image, expectedDriverSha256: binary.driverSha256,
-        expectedGuestSha256: binary.guestSha256, operations: [] }),
-      /does not support string fields/);
+        expectedGuestSha256: binary.guestSha256, operations: actions });
+      const stringActions: GuestOperation[] = [
+        { kind: 'readString', id: String(stringRefs[0].addr), field: 'text' },
+        { kind: 'readString', id: String(stringRefs[3].addr), field: 'text' },
+        { kind: 'readString', id: String(stringRefs[4].addr), field: 'text' },
+        { kind: 'equalsString', id: String(stringRefs[0].addr), field: 'text', otherId: String(stringRefs[2].addr), otherField: 'text' },
+        { kind: 'equalsString', id: String(stringRefs[0].addr), field: 'text', otherId: String(stringRefs[1].addr), otherField: 'text' },
+      ];
+      const stringResult = stringRun(stringActions);
+      assert.deepEqual(stringResult.observations.map(item => item.value), ['é', '', '🧪', '1', '0']);
+      assert.equal(stringResult.candidateHeap.imageDigest, stringPacked.heap.imageDigest);
+      assert.equal(unpackResumableCheckpoint({ ...stringPacked, heap: stringResult.candidateHeap },
+        strings.program, stringPacked.snapshotDigest).core.records.length, stringRefs.length);
+      cases.push({ kind: 'string-roundtrip', operations: stringActions, observations: stringResult.observations,
+        inputImageDigest: stringPacked.heap.imageDigest, candidateImageDigest: stringResult.candidateHeap.imageDigest,
+        diagnostics: stringResult.diagnostics });
+      let stringSeed = 0x93f813af;
+      const nextString = () => { stringSeed ^= stringSeed << 13; stringSeed ^= stringSeed >>> 17;
+        stringSeed ^= stringSeed << 5; return stringSeed >>> 0; };
+      for (let campaign = 0; campaign < 3; campaign++) {
+        const actions: GuestOperation[] = Array.from({ length: 128 }, () => {
+          const left = stringRefs[nextString() % stringRefs.length];
+          return nextString() & 1 ? { kind: 'readString', id: String(left.addr), field: 'text' }
+            : { kind: 'equalsString', id: String(left.addr), field: 'text',
+                otherId: String(stringRefs[nextString() % stringRefs.length].addr), otherField: 'text' };
+        });
+        const observed = stringRun(actions);
+        assert.equal(observed.observations.length, 128);
+        assert.equal(observed.candidateHeap.imageDigest, stringPacked.heap.imageDigest);
+        cases.push({ kind: 'seeded-string-differential', campaign, seed: 'xorshift32 0x93f813af',
+          operations: actions, observations: observed.observations,
+          inputImageDigest: stringPacked.heap.imageDigest, candidateImageDigest: observed.candidateHeap.imageDigest,
+          diagnostics: observed.diagnostics });
+      }
+      const stringFrame = () => {
+        const frame = Buffer.alloc(140);
+        frame.writeUInt32LE(0x47504541, 0); frame.writeUInt32LE(2, 4); frame.writeUInt32LE(frame.length, 8);
+        frame.writeUInt32LE(1, 12); frame.writeUInt32LE(1, 16); frame.writeUInt32LE(12, 20);
+        frame.writeUInt32LE(2, 24); frame.writeUInt32LE(64, 28); frame.writeUInt32LE(72, 32);
+        frame.writeUInt32LE(128, 36); frame.writeUInt32LE(112, 40);
+        frame.writeUInt32LE(1, 48); frame.writeUInt32LE(130, 52);
+        frame.writeUInt32LE(138, 56); frame.writeUInt32LE(2, 60);
+        frame.writeUInt32LE(12, 68); frame.writeUInt32LE(5, 72);
+        frame.writeUInt32LE(12, 84); frame.writeUInt32LE(16, 88);
+        frame.writeUInt32LE(2, 134); frame[138] = 0xc3; frame[139] = 0xa9;
+        return frame;
+      };
+      const rawGuest = (frame: Buffer) => execFileSync(binary.driver, [binary.image],
+        { input: frame, timeout: 5000, maxBuffer: 65536, stdio: ['pipe', 'pipe', 'pipe'] });
+      assert.equal(rawGuest(stringFrame()).readUInt32LE(44), 0x454e4f44);
+      const invalidUtf8 = stringFrame(); invalidUtf8[138] = 0xc0; invalidUtf8[139] = 0x80;
+      assert.throws(() => rawGuest(invalidUtf8), /guest exit\/status/);
+      const surrogateUtf8 = stringFrame(); surrogateUtf8[138] = 0xed; surrogateUtf8[139] = 0xa0;
+      assert.throws(() => rawGuest(surrogateUtf8), /guest exit\/status/);
+      const truncatedUtf8 = stringFrame(); truncatedUtf8[138] = 0xe2; truncatedUtf8[139] = 0x82;
+      assert.throws(() => rawGuest(truncatedUtf8), /guest exit\/status/);
+      const invalidOffset = stringFrame(); invalidOffset.writeUInt32LE(1, 130);
+      assert.throws(() => rawGuest(invalidOffset), /guest exit\/status/);
+      const invalidIndex = stringFrame(); invalidIndex[128] = 1;
+      assert.throws(() => rawGuest(invalidIndex), /guest exit\/status/);
+      const invalidOtherIndex = Buffer.concat([stringFrame().subarray(0, 130), Buffer.from([0]), stringFrame().subarray(130)]);
+      invalidOtherIndex.writeUInt32LE(141, 8); invalidOtherIndex.writeUInt32LE(24, 20);
+      invalidOtherIndex.writeUInt32LE(3, 24); invalidOtherIndex.writeUInt32LE(24, 68);
+      invalidOtherIndex.writeUInt32LE(131, 52); invalidOtherIndex.writeUInt32LE(139, 56);
+      invalidOtherIndex.writeUInt32LE(6, 72); invalidOtherIndex.writeUInt32LE(12, 96);
+      invalidOtherIndex.writeUInt32LE(12, 100); invalidOtherIndex.writeUInt32LE(16, 104);
+      invalidOtherIndex[129] = 0x10;
+      assert.throws(() => rawGuest(invalidOtherIndex), /guest exit\/status/);
+      cases.push({ kind: 'malformed-string-frames', rejected: [
+        'overlong-utf8', 'surrogate-utf8', 'truncated-utf8', 'noncontiguous-offset',
+        'out-of-range-primary-index', 'out-of-range-secondary-index',
+      ] });
       let state = 0x52d8a441;
       const next = () => { state ^= state << 13; state ^= state >>> 17; state ^= state << 5; return state >>> 0; };
       for (const maxRelative of [1, 15]) for (let campaign = 0; campaign < 3; campaign++) {

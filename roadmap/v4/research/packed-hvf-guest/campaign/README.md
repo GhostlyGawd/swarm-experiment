@@ -47,3 +47,21 @@ bytes, and repeated the 128-operation semantic campaign.
 
 The bounded fresh guest path passes the unchanged 1 ms maximum in this
 preregistered campaign. It does not close the release boot or memory gates.
+
+## Packed `/2` string extension
+
+The [string registration](string-registration.md) fixes a separate 16-record,
+128-operation UTF-8 read/equality workload and the same 20 warmup plus 1,000
+fresh guest boundary. The controller accepts both frame versions; version 1
+retains its exact input bytes. The `/2` guest validates dictionary spans and
+UTF-8 before returning results. The host authenticates the `/2` resumable
+checkpoint and compares exact guest bytes to the logical model. The new raw
+campaign and its source-pinned verifier are:
+
+```sh
+node --experimental-strip-types roadmap/v4/research/packed-hvf-guest/campaign/string-run.ts /tmp/hvf-string.json
+node --experimental-strip-types roadmap/v4/research/packed-hvf-guest/campaign/string-verify.ts /tmp/hvf-string.json
+```
+
+The string result is a bounded research result; historical fields, closures,
+tasks, effect routing and full runtime admission remain outside this guest.

@@ -34,10 +34,14 @@ int main(int argc,char **argv) {
   if(fseek(image,0,SEEK_END))return failure("image seek",0);
   long image_bytes=ftell(image);rewind(image);
   if(image_bytes<1||(size_t)image_bytes>page)return failure("image outside code page",image_bytes);
-  unsigned char header[48];
-  if(fread(header,1,sizeof(header),stdin)!=sizeof(header))return failure("short frame header",0);
+  unsigned char header[64];
+  if(fread(header,1,48,stdin)!=48)return failure("short frame header",0);
+  const uint32_t version=u32(header+4);
+  const size_t header_bytes=version==1?48:version==2?64:0;
+  if(!header_bytes)return failure("invalid frame version",version);
+  if(header_bytes==64 && fread(header+48,1,16,stdin)!=16)return failure("short v2 frame header",0);
   size_t frame_bytes=u32(header+8);
-  if(u32(header)!=FRAME_MAGIC||u32(header+4)!=1||frame_bytes<48||frame_bytes>page*2)
+  if(u32(header)!=FRAME_MAGIC||frame_bytes<header_bytes||frame_bytes>page*2)
     return failure("invalid frame header",(long)frame_bytes);
   const uint64_t guest_start=mach_absolute_time();
   void *memory=mmap(NULL,guest_bytes,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
@@ -46,8 +50,8 @@ int main(int argc,char **argv) {
   if(fread(memory,1,(size_t)image_bytes,image)!=(size_t)image_bytes)return failure("image read",0);
   fclose(image);
   unsigned char *frame=(unsigned char*)memory+page;
-  memcpy(frame,header,sizeof(header));
-  if(fread(frame+sizeof(header),1,frame_bytes-sizeof(header),stdin)!=frame_bytes-sizeof(header) || fgetc(stdin)!=EOF)
+  memcpy(frame,header,header_bytes);
+  if(fread(frame+header_bytes,1,frame_bytes-header_bytes,stdin)!=frame_bytes-header_bytes || fgetc(stdin)!=EOF)
     return failure("frame length",0);
   const uint64_t base=0x40000000;
   hv_return_t code=hv_vm_create(NULL);if(code!=HV_SUCCESS)return failure("hv_vm_create",code);
