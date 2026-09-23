@@ -1,0 +1,1290 @@
+{
+  "format": "aether.living-research-registration/1",
+  "at": "2026-09-23T03:56:15.135Z",
+  "profile": {
+    "format": "aether.living-campaign-research-profile/1",
+    "registration": "Before the first timed run; no sample removal or adaptive trial count",
+    "seed": "20260922",
+    "campaign": {
+      "profile": "aether.living-cooperative-campaign/1",
+      "goodCandidateCases": 15,
+      "brokenCandidateCases": 15,
+      "scheduler": "All six interleavings of two actors with two call steps each; actual shared Aether heap",
+      "resources": "Three cases: fill/checksum 4096 materialized bytes, refuse the next byte at declared quota, release and reuse; candidate observes quota result",
+      "network": "Three cases: serialize/parse actual JSON frames with duplication, malformed bytes, checksum corruption, drop and delivery; candidate checks integrity and sequence",
+      "eventOrder": "Three cases: later event before earlier event, candidate rejects stale sequence",
+      "admission": "100% of declared cases, no precondition exclusions, all explicit coverage obligations, immutable exact executor report",
+      "shrinking": "At most 64 attempts per failure; preserve all actor operations, reduce input magnitude/schedule inversions, retain the exact failure property and original witness",
+      "scope": "Bounded deterministic cooperative call-boundary scheduling and isolated host resource/network models; not native-thread or distributed hardware campaign qualification"
+    },
+    "r04BoundaryRate": {
+      "minimumPerSecond": 2000000,
+      "trials": 5,
+      "warmups": 1,
+      "inputsPerTrial": 20000,
+      "inputKind": "Four-field integer JSON event: order=i%24, sequence=i, allocation=(i*31)%4097, checksum=(i*17)%256",
+      "evaluation": "(order!=0) + 2*(sequence%7==0) + 4*(allocation>4095) + 8*(checksum==255)",
+      "checksumPerTrial": 25534,
+      "included": [
+        "object generation",
+        "JSON.stringify",
+        "JSON.parse into fresh objects",
+        "all four guards",
+        "uint32 coverage accumulation"
+      ],
+      "excluded": [
+        "source hashing and fixture construction",
+        "diagnostics and durable raw observation writes between trials",
+        "Aether campaign execution",
+        "vector math without event materialization"
+      ],
+      "passRule": "Every one of the five measured trials must reach the unchanged threshold; first trial retained",
+      "qualification": "Local fixed R04 JSON boundary kernel only; passing does not qualify full distributed or Aether runtime micro-world throughput"
+    }
+  },
+  "profileSha256": "a210c6d1a5c399e572e0c8b9f7ac3f7b631efd6813136fe773dfcb3d250d1c69",
+  "gitHead": "02ff9007bfe6e20acb9033e4ca798deb0cc0380d",
+  "gitStatus": " M docs/implementation/v4/STATUS.md\n M roadmap/v4/research/projections/README.md\n M roadmap/v4/research/projections/measure.mjs\n M src/index.ts\n M src/projection/executable-runtime.ts\n M src/projection/executable.ts\n M src/projection/index.ts\n M src/tier1/semantic-gc.ts\n M test/projection/executable.test.ts\n M test/tier1/semantic-gc.test.ts\n?? roadmap/v4/research/microworld/\n?? roadmap/v4/research/projections/corpus-continuations.ts\n?? roadmap/v4/research/projections/results/campaign-06-continuations/\n?? src/projection/executable-continuation-plan.ts\n?? src/projection/executable-continuations.ts\n?? src/tier3/living-campaign.ts\n?? test/projection/continuations.test.ts\n?? test/tier3/living-campaign.test.ts\n",
+  "sources": {
+    "package-lock.json": "472041ed211ffa638f64690103b93f19f0135b42ebd541c59004fb530daa74d4",
+    "roadmap/v4/research/microworld/campaign.ts": "2175a9adf8d1ad523d444d28f49c29fb0556d73eee3c2761b04e4b3b56413411",
+    "roadmap/v4/research/microworld/fixture.ts": "a1167d0bc86a91bc37ee06011794ede232014da051c7273b86bf56a11cb5bfee",
+    "roadmap/v4/research/microworld/profile.json": "a210c6d1a5c399e572e0c8b9f7ac3f7b631efd6813136fe773dfcb3d250d1c69",
+    "src/fabric/effects.ts": "f32a59d9fcf48ee0e96646eb045e45a3ae1bab7c8aa37f499aaa27d75ac3020d",
+    "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+    "src/fabric/identity.ts": "a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+    "src/fabric/journal-lock.ts": "8a551fa3896b22c9b5f0de21ba9a56fcb4044e286a2a51939494fe4846ca6e74",
+    "src/tier1/ast.ts": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb",
+    "src/tier1/blake3.ts": "1fe06b0b58c78837acdb5a2a2431b313474c64427fde573196bcd58f86f709d4",
+    "src/tier1/build.ts": "e1617b0eed8c27cf4d3162e68494126f817f28ec1bf24d32828ebcaa55e6d934",
+    "src/tier1/canonical.ts": "16022baba00d8d0e87a4fe7f5eabfe1d79492945ad48c4bd6783ad22f5f83021",
+    "src/tier1/ids.ts": "73a6cf5a0b6537d879b2b3980ba9b4a1937701d52f97b4bf1deb09acf1e023a5",
+    "src/tier1/persistence.ts": "59a3d46d55aeeffadd80ecf834cbe3db5dd117142cf6ca8beb9c18abfa46ea06",
+    "src/tier1/store.ts": "b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3",
+    "src/tier1/symbols.ts": "1520a4adfd1f837f16357205d88c330056ffe73f3c74d4f26e1d1663dc0362a9",
+    "src/tier2/ocap.ts": "b4ae5aec25c07e0e50beca96a67fac555a397c1c06be564c2f334bb821d55ef6",
+    "src/tier2/typecheck.ts": "19113ce88ac99a02a1e7b1f4acad694a1d1c83f9520b2fe7f2545669a5da1b18",
+    "src/tier3/effects.ts": "e0d42925cba296744d89bf16a7254da006abf985b9146734900d7e3154d0fd9e",
+    "src/tier3/living-campaign.ts": "efc50ba29431a6c5e35f5c4d74a258f1852f5c44b7ec9d752851a37d816cfc63",
+    "src/tier3/runtime.ts": "1546e867fa73ec8d2a0d7f15c6ea2ffc2a11f79cf5d9cec3fdfe7d8ea7782e00",
+    "src/tier3/values.ts": "0b48ec39f48128c65c11a3fcd3edfec06720fd1c0c9871fd33ad3ea92759a99e",
+    "src/util/rng.ts": "722540744b859c0995931e6c0270f3b9a80012b6e31b2371c027cf19f4518295"
+  },
+  "goodManifest": {
+    "format": "aether.living-cooperative-campaign/1",
+    "candidateRoot": "ast:b3:13ae95a6be64858b7234f8b73d1e7fad0585137f35c7557bad429705b2affcc4",
+    "seed": "20260922",
+    "maxStepsPerCall": 1000,
+    "shrinkAttempts": 64,
+    "scenarios": [
+      {
+        "id": "two-writers",
+        "kind": "scheduler",
+        "scheduling": {
+          "mode": "enumerate",
+          "cases": 6
+        },
+        "variables": [],
+        "records": [
+          {
+            "name": "state",
+            "ty": {
+              "t": "Record",
+              "name": "type:campaign:state",
+              "fields": [
+                [
+                  "value",
+                  {
+                    "t": "Int"
+                  }
+                ]
+              ]
+            },
+            "fields": {
+              "value": {
+                "tag": "int",
+                "value": "0"
+              }
+            }
+          }
+        ],
+        "actors": [
+          {
+            "id": "a",
+            "steps": [
+              {
+                "kind": "call",
+                "id": "read",
+                "symbol": "sym:s2x7msjincmqvboepzhtgn",
+                "args": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": null
+              },
+              {
+                "kind": "call",
+                "id": "write",
+                "symbol": "sym:2mv4cit2dprbqq72psbwyv",
+                "args": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  },
+                  {
+                    "tag": "slot",
+                    "actor": "a",
+                    "step": "read"
+                  }
+                ],
+                "expect": {
+                  "tag": "null"
+                }
+              }
+            ]
+          },
+          {
+            "id": "b",
+            "steps": [
+              {
+                "kind": "call",
+                "id": "read",
+                "symbol": "sym:s2x7msjincmqvboepzhtgn",
+                "args": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": null
+              },
+              {
+                "kind": "call",
+                "id": "write",
+                "symbol": "sym:2mv4cit2dprbqq72psbwyv",
+                "args": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  },
+                  {
+                    "tag": "slot",
+                    "actor": "b",
+                    "step": "read"
+                  }
+                ],
+                "expect": {
+                  "tag": "null"
+                }
+              }
+            ]
+          }
+        ],
+        "checks": [
+          {
+            "kind": "call",
+            "id": "final-value",
+            "symbol": "sym:s2x7msjincmqvboepzhtgn",
+            "args": [
+              {
+                "tag": "record",
+                "name": "state"
+              }
+            ],
+            "expect": {
+              "tag": "int",
+              "value": "2"
+            }
+          }
+        ],
+        "requiredCoverage": [
+          "scheduler:switched",
+          "candidate-call"
+        ],
+        "allocationLimitBytes": 0
+      },
+      {
+        "id": "bounded-allocation",
+        "kind": "resource",
+        "scheduling": {
+          "mode": "seeded",
+          "cases": 3
+        },
+        "variables": [],
+        "records": [
+          {
+            "name": "state",
+            "ty": {
+              "t": "Record",
+              "name": "type:campaign:state",
+              "fields": [
+                [
+                  "value",
+                  {
+                    "t": "Int"
+                  }
+                ]
+              ]
+            },
+            "fields": {
+              "value": {
+                "tag": "int",
+                "value": "0"
+              }
+            }
+          }
+        ],
+        "actors": [
+          {
+            "id": "allocator",
+            "steps": [
+              {
+                "kind": "reserve",
+                "id": "first",
+                "bytes": 4096,
+                "expect": "allocated"
+              },
+              {
+                "kind": "reserve",
+                "id": "excess",
+                "bytes": 1,
+                "expect": "exhausted"
+              },
+              {
+                "kind": "call",
+                "id": "observe",
+                "symbol": "sym:bnepyvvb5gpl4ildgg24qm",
+                "args": [
+                  {
+                    "tag": "slot",
+                    "actor": "allocator",
+                    "step": "excess"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                }
+              },
+              {
+                "kind": "release",
+                "id": "release",
+                "reservation": "first"
+              },
+              {
+                "kind": "reserve",
+                "id": "reuse",
+                "bytes": 1,
+                "expect": "allocated"
+              }
+            ]
+          }
+        ],
+        "checks": [
+          {
+            "kind": "call",
+            "id": "final-value",
+            "symbol": "sym:s2x7msjincmqvboepzhtgn",
+            "args": [
+              {
+                "tag": "record",
+                "name": "state"
+              }
+            ],
+            "expect": {
+              "tag": "int",
+              "value": "0"
+            }
+          }
+        ],
+        "requiredCoverage": [
+          "resource:allocated",
+          "resource:exhausted",
+          "resource:released",
+          "candidate-call"
+        ],
+        "allocationLimitBytes": 4096
+      },
+      {
+        "id": "faulted-json-network",
+        "kind": "network",
+        "scheduling": {
+          "mode": "seeded",
+          "cases": 3
+        },
+        "variables": [],
+        "records": [
+          {
+            "name": "state",
+            "ty": {
+              "t": "Record",
+              "name": "type:campaign:state",
+              "fields": [
+                [
+                  "value",
+                  {
+                    "t": "Int"
+                  }
+                ]
+              ]
+            },
+            "fields": {
+              "value": {
+                "tag": "int",
+                "value": "0"
+              }
+            }
+          }
+        ],
+        "actors": [
+          {
+            "id": "transport",
+            "steps": [
+              {
+                "kind": "send",
+                "id": "dup",
+                "event": {
+                  "order": 0,
+                  "sequence": 1,
+                  "allocation": 1,
+                  "checksum": 17
+                },
+                "mutation": "duplicate"
+              },
+              {
+                "kind": "deliver",
+                "id": "first",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": true
+                },
+                "ingress": "delivered"
+              },
+              {
+                "kind": "deliver",
+                "id": "duplicate",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                },
+                "ingress": "delivered"
+              },
+              {
+                "kind": "send",
+                "id": "bad-json",
+                "event": {
+                  "order": 0,
+                  "sequence": 2,
+                  "allocation": 1,
+                  "checksum": 34
+                },
+                "mutation": "malformed"
+              },
+              {
+                "kind": "deliver",
+                "id": "reject-json",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                },
+                "ingress": "malformed"
+              },
+              {
+                "kind": "send",
+                "id": "bad-integrity",
+                "event": {
+                  "order": 0,
+                  "sequence": 2,
+                  "allocation": 1,
+                  "checksum": 34
+                },
+                "mutation": "checksum"
+              },
+              {
+                "kind": "deliver",
+                "id": "reject-integrity",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                },
+                "ingress": "delivered"
+              },
+              {
+                "kind": "send",
+                "id": "loss",
+                "event": {
+                  "order": 0,
+                  "sequence": 2,
+                  "allocation": 1,
+                  "checksum": 34
+                },
+                "mutation": "drop"
+              },
+              {
+                "kind": "deliver",
+                "id": "empty",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                },
+                "ingress": "empty"
+              },
+              {
+                "kind": "send",
+                "id": "good",
+                "event": {
+                  "order": 0,
+                  "sequence": 2,
+                  "allocation": 1,
+                  "checksum": 34
+                },
+                "mutation": "none"
+              },
+              {
+                "kind": "deliver",
+                "id": "last",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": true
+                },
+                "ingress": "delivered"
+              }
+            ]
+          }
+        ],
+        "checks": [
+          {
+            "kind": "call",
+            "id": "final-value",
+            "symbol": "sym:s2x7msjincmqvboepzhtgn",
+            "args": [
+              {
+                "tag": "record",
+                "name": "state"
+              }
+            ],
+            "expect": {
+              "tag": "int",
+              "value": "2"
+            }
+          }
+        ],
+        "requiredCoverage": [
+          "network:duplicate",
+          "network:malformed",
+          "network:checksum",
+          "network:drop",
+          "ingress:malformed",
+          "ingress:empty",
+          "ingress:delivered"
+        ],
+        "allocationLimitBytes": 0
+      },
+      {
+        "id": "out-of-order-events",
+        "kind": "event-order",
+        "scheduling": {
+          "mode": "seeded",
+          "cases": 3
+        },
+        "variables": [],
+        "records": [
+          {
+            "name": "state",
+            "ty": {
+              "t": "Record",
+              "name": "type:campaign:state",
+              "fields": [
+                [
+                  "value",
+                  {
+                    "t": "Int"
+                  }
+                ]
+              ]
+            },
+            "fields": {
+              "value": {
+                "tag": "int",
+                "value": "0"
+              }
+            }
+          }
+        ],
+        "actors": [
+          {
+            "id": "events",
+            "steps": [
+              {
+                "kind": "send",
+                "id": "second-before-first",
+                "event": {
+                  "order": 1,
+                  "sequence": 2,
+                  "allocation": 1,
+                  "checksum": 34
+                },
+                "mutation": "none"
+              },
+              {
+                "kind": "deliver",
+                "id": "second",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": true
+                },
+                "ingress": "delivered"
+              },
+              {
+                "kind": "send",
+                "id": "late-first",
+                "event": {
+                  "order": 0,
+                  "sequence": 1,
+                  "allocation": 1,
+                  "checksum": 17
+                },
+                "mutation": "none"
+              },
+              {
+                "kind": "deliver",
+                "id": "first",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                },
+                "ingress": "delivered"
+              }
+            ]
+          }
+        ],
+        "checks": [
+          {
+            "kind": "call",
+            "id": "final-value",
+            "symbol": "sym:s2x7msjincmqvboepzhtgn",
+            "args": [
+              {
+                "tag": "record",
+                "name": "state"
+              }
+            ],
+            "expect": {
+              "tag": "int",
+              "value": "2"
+            }
+          }
+        ],
+        "requiredCoverage": [
+          "event:reordered",
+          "event:ordered",
+          "candidate-call"
+        ],
+        "allocationLimitBytes": 0
+      }
+    ]
+  },
+  "brokenManifest": {
+    "format": "aether.living-cooperative-campaign/1",
+    "candidateRoot": "ast:b3:561d08842cdeeda145c0b98f2960d2426d01d4bd709beaf7363ebca52d9d91f3",
+    "seed": "20260922",
+    "maxStepsPerCall": 1000,
+    "shrinkAttempts": 64,
+    "scenarios": [
+      {
+        "id": "two-writers",
+        "kind": "scheduler",
+        "scheduling": {
+          "mode": "enumerate",
+          "cases": 6
+        },
+        "variables": [],
+        "records": [
+          {
+            "name": "state",
+            "ty": {
+              "t": "Record",
+              "name": "type:campaign:state",
+              "fields": [
+                [
+                  "value",
+                  {
+                    "t": "Int"
+                  }
+                ]
+              ]
+            },
+            "fields": {
+              "value": {
+                "tag": "int",
+                "value": "0"
+              }
+            }
+          }
+        ],
+        "actors": [
+          {
+            "id": "a",
+            "steps": [
+              {
+                "kind": "call",
+                "id": "read",
+                "symbol": "sym:s2x7msjincmqvboepzhtgn",
+                "args": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": null
+              },
+              {
+                "kind": "call",
+                "id": "write",
+                "symbol": "sym:2mv4cit2dprbqq72psbwyv",
+                "args": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  },
+                  {
+                    "tag": "slot",
+                    "actor": "a",
+                    "step": "read"
+                  }
+                ],
+                "expect": {
+                  "tag": "null"
+                }
+              }
+            ]
+          },
+          {
+            "id": "b",
+            "steps": [
+              {
+                "kind": "call",
+                "id": "read",
+                "symbol": "sym:s2x7msjincmqvboepzhtgn",
+                "args": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": null
+              },
+              {
+                "kind": "call",
+                "id": "write",
+                "symbol": "sym:2mv4cit2dprbqq72psbwyv",
+                "args": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  },
+                  {
+                    "tag": "slot",
+                    "actor": "b",
+                    "step": "read"
+                  }
+                ],
+                "expect": {
+                  "tag": "null"
+                }
+              }
+            ]
+          }
+        ],
+        "checks": [
+          {
+            "kind": "call",
+            "id": "final-value",
+            "symbol": "sym:s2x7msjincmqvboepzhtgn",
+            "args": [
+              {
+                "tag": "record",
+                "name": "state"
+              }
+            ],
+            "expect": {
+              "tag": "int",
+              "value": "2"
+            }
+          }
+        ],
+        "requiredCoverage": [
+          "scheduler:switched",
+          "candidate-call"
+        ],
+        "allocationLimitBytes": 0
+      },
+      {
+        "id": "bounded-allocation",
+        "kind": "resource",
+        "scheduling": {
+          "mode": "seeded",
+          "cases": 3
+        },
+        "variables": [],
+        "records": [
+          {
+            "name": "state",
+            "ty": {
+              "t": "Record",
+              "name": "type:campaign:state",
+              "fields": [
+                [
+                  "value",
+                  {
+                    "t": "Int"
+                  }
+                ]
+              ]
+            },
+            "fields": {
+              "value": {
+                "tag": "int",
+                "value": "0"
+              }
+            }
+          }
+        ],
+        "actors": [
+          {
+            "id": "allocator",
+            "steps": [
+              {
+                "kind": "reserve",
+                "id": "first",
+                "bytes": 4096,
+                "expect": "allocated"
+              },
+              {
+                "kind": "reserve",
+                "id": "excess",
+                "bytes": 1,
+                "expect": "exhausted"
+              },
+              {
+                "kind": "call",
+                "id": "observe",
+                "symbol": "sym:bnepyvvb5gpl4ildgg24qm",
+                "args": [
+                  {
+                    "tag": "slot",
+                    "actor": "allocator",
+                    "step": "excess"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                }
+              },
+              {
+                "kind": "release",
+                "id": "release",
+                "reservation": "first"
+              },
+              {
+                "kind": "reserve",
+                "id": "reuse",
+                "bytes": 1,
+                "expect": "allocated"
+              }
+            ]
+          }
+        ],
+        "checks": [
+          {
+            "kind": "call",
+            "id": "final-value",
+            "symbol": "sym:s2x7msjincmqvboepzhtgn",
+            "args": [
+              {
+                "tag": "record",
+                "name": "state"
+              }
+            ],
+            "expect": {
+              "tag": "int",
+              "value": "0"
+            }
+          }
+        ],
+        "requiredCoverage": [
+          "resource:allocated",
+          "resource:exhausted",
+          "resource:released",
+          "candidate-call"
+        ],
+        "allocationLimitBytes": 4096
+      },
+      {
+        "id": "faulted-json-network",
+        "kind": "network",
+        "scheduling": {
+          "mode": "seeded",
+          "cases": 3
+        },
+        "variables": [],
+        "records": [
+          {
+            "name": "state",
+            "ty": {
+              "t": "Record",
+              "name": "type:campaign:state",
+              "fields": [
+                [
+                  "value",
+                  {
+                    "t": "Int"
+                  }
+                ]
+              ]
+            },
+            "fields": {
+              "value": {
+                "tag": "int",
+                "value": "0"
+              }
+            }
+          }
+        ],
+        "actors": [
+          {
+            "id": "transport",
+            "steps": [
+              {
+                "kind": "send",
+                "id": "dup",
+                "event": {
+                  "order": 0,
+                  "sequence": 1,
+                  "allocation": 1,
+                  "checksum": 17
+                },
+                "mutation": "duplicate"
+              },
+              {
+                "kind": "deliver",
+                "id": "first",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": true
+                },
+                "ingress": "delivered"
+              },
+              {
+                "kind": "deliver",
+                "id": "duplicate",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                },
+                "ingress": "delivered"
+              },
+              {
+                "kind": "send",
+                "id": "bad-json",
+                "event": {
+                  "order": 0,
+                  "sequence": 2,
+                  "allocation": 1,
+                  "checksum": 34
+                },
+                "mutation": "malformed"
+              },
+              {
+                "kind": "deliver",
+                "id": "reject-json",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                },
+                "ingress": "malformed"
+              },
+              {
+                "kind": "send",
+                "id": "bad-integrity",
+                "event": {
+                  "order": 0,
+                  "sequence": 2,
+                  "allocation": 1,
+                  "checksum": 34
+                },
+                "mutation": "checksum"
+              },
+              {
+                "kind": "deliver",
+                "id": "reject-integrity",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                },
+                "ingress": "delivered"
+              },
+              {
+                "kind": "send",
+                "id": "loss",
+                "event": {
+                  "order": 0,
+                  "sequence": 2,
+                  "allocation": 1,
+                  "checksum": 34
+                },
+                "mutation": "drop"
+              },
+              {
+                "kind": "deliver",
+                "id": "empty",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                },
+                "ingress": "empty"
+              },
+              {
+                "kind": "send",
+                "id": "good",
+                "event": {
+                  "order": 0,
+                  "sequence": 2,
+                  "allocation": 1,
+                  "checksum": 34
+                },
+                "mutation": "none"
+              },
+              {
+                "kind": "deliver",
+                "id": "last",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": true
+                },
+                "ingress": "delivered"
+              }
+            ]
+          }
+        ],
+        "checks": [
+          {
+            "kind": "call",
+            "id": "final-value",
+            "symbol": "sym:s2x7msjincmqvboepzhtgn",
+            "args": [
+              {
+                "tag": "record",
+                "name": "state"
+              }
+            ],
+            "expect": {
+              "tag": "int",
+              "value": "2"
+            }
+          }
+        ],
+        "requiredCoverage": [
+          "network:duplicate",
+          "network:malformed",
+          "network:checksum",
+          "network:drop",
+          "ingress:malformed",
+          "ingress:empty",
+          "ingress:delivered"
+        ],
+        "allocationLimitBytes": 0
+      },
+      {
+        "id": "out-of-order-events",
+        "kind": "event-order",
+        "scheduling": {
+          "mode": "seeded",
+          "cases": 3
+        },
+        "variables": [],
+        "records": [
+          {
+            "name": "state",
+            "ty": {
+              "t": "Record",
+              "name": "type:campaign:state",
+              "fields": [
+                [
+                  "value",
+                  {
+                    "t": "Int"
+                  }
+                ]
+              ]
+            },
+            "fields": {
+              "value": {
+                "tag": "int",
+                "value": "0"
+              }
+            }
+          }
+        ],
+        "actors": [
+          {
+            "id": "events",
+            "steps": [
+              {
+                "kind": "send",
+                "id": "second-before-first",
+                "event": {
+                  "order": 1,
+                  "sequence": 2,
+                  "allocation": 1,
+                  "checksum": 34
+                },
+                "mutation": "none"
+              },
+              {
+                "kind": "deliver",
+                "id": "second",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": true
+                },
+                "ingress": "delivered"
+              },
+              {
+                "kind": "send",
+                "id": "late-first",
+                "event": {
+                  "order": 0,
+                  "sequence": 1,
+                  "allocation": 1,
+                  "checksum": 17
+                },
+                "mutation": "none"
+              },
+              {
+                "kind": "deliver",
+                "id": "first",
+                "symbol": "sym:vhiw5lznjqb3sxtwkhu4ce",
+                "prefix": [
+                  {
+                    "tag": "record",
+                    "name": "state"
+                  }
+                ],
+                "expect": {
+                  "tag": "bool",
+                  "value": false
+                },
+                "ingress": "delivered"
+              }
+            ]
+          }
+        ],
+        "checks": [
+          {
+            "kind": "call",
+            "id": "final-value",
+            "symbol": "sym:s2x7msjincmqvboepzhtgn",
+            "args": [
+              {
+                "tag": "record",
+                "name": "state"
+              }
+            ],
+            "expect": {
+              "tag": "int",
+              "value": "2"
+            }
+          }
+        ],
+        "requiredCoverage": [
+          "event:reordered",
+          "event:ordered",
+          "candidate-call"
+        ],
+        "allocationLimitBytes": 0
+      }
+    ]
+  },
+  "diagnostic": {
+    "at": "2026-09-23T03:56:15.199Z",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "architecture": "arm64",
+    "node": "v26.7.0",
+    "cpus": [
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      }
+    ],
+    "memory": {
+      "total": 25769803776,
+      "free": 1120960512,
+      "process": {
+        "rss": 104611840,
+        "heapTotal": 16252928,
+        "heapUsed": 11129464,
+        "external": 6716542,
+        "arrayBuffers": 454663
+      }
+    },
+    "load": [
+      3.60595703125,
+      3.271484375,
+      3.1220703125
+    ]
+  }
+}

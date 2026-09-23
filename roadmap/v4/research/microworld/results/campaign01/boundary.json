@@ -1,0 +1,137 @@
+{
+  "format": "aether.r04-json-event-measurement/1",
+  "minimumPerSecond": 2000000,
+  "warmups": 1,
+  "inputsPerTrial": 20000,
+  "warmup": {
+    "elapsedNs": "5617041",
+    "inputsPerSecond": 3560593.558067317,
+    "checksum": 25534
+  },
+  "samples": [
+    {
+      "trial": 0,
+      "generated": 20000,
+      "executed": 20000,
+      "filtered": 0,
+      "elapsedNs": "5486542",
+      "inputsPerSecond": 3645283.313241747,
+      "checksum": 25534,
+      "pass": true
+    },
+    {
+      "trial": 1,
+      "generated": 20000,
+      "executed": 20000,
+      "filtered": 0,
+      "elapsedNs": "5434209",
+      "inputsPerSecond": 3680388.4429178196,
+      "checksum": 25534,
+      "pass": true
+    },
+    {
+      "trial": 2,
+      "generated": 20000,
+      "executed": 20000,
+      "filtered": 0,
+      "elapsedNs": "5433875",
+      "inputsPerSecond": 3680614.662648662,
+      "checksum": 25534,
+      "pass": true
+    },
+    {
+      "trial": 3,
+      "generated": 20000,
+      "executed": 20000,
+      "filtered": 0,
+      "elapsedNs": "5013333",
+      "inputsPerSecond": 3989361.9673777902,
+      "checksum": 25534,
+      "pass": true
+    },
+    {
+      "trial": 4,
+      "generated": 20000,
+      "executed": 20000,
+      "filtered": 0,
+      "elapsedNs": "4988375",
+      "inputsPerSecond": 4009321.6728894683,
+      "checksum": 25534,
+      "pass": true
+    }
+  ],
+  "pass": true,
+  "after": {
+    "at": "2026-09-23T03:56:19.089Z",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "architecture": "arm64",
+    "node": "v26.7.0",
+    "cpus": [
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      }
+    ],
+    "memory": {
+      "total": 25769803776,
+      "free": 888389632,
+      "process": {
+        "rss": 103710720,
+        "heapTotal": 15728640,
+        "heapUsed": 11742680,
+        "external": 6511957,
+        "arrayBuffers": 250038
+      }
+    },
+    "load": [
+      3.60595703125,
+      3.271484375,
+      3.1220703125
+    ]
+  }
+}

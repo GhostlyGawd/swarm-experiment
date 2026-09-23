@@ -1,0 +1,30 @@
+{
+  "format": "aether.living-campaign-research-profile/1",
+  "registration": "Before the first timed run; no sample removal or adaptive trial count",
+  "seed": "20260922",
+  "campaign": {
+    "profile": "aether.living-cooperative-campaign/1",
+    "goodCandidateCases": 15,
+    "brokenCandidateCases": 15,
+    "scheduler": "All six interleavings of two actors with two call steps each; actual shared Aether heap",
+    "resources": "Three cases: fill/checksum 4096 materialized bytes, refuse the next byte at declared quota, release and reuse; candidate observes quota result",
+    "network": "Three cases: serialize/parse actual JSON frames with duplication, malformed bytes, checksum corruption, drop and delivery; candidate checks integrity and sequence",
+    "eventOrder": "Three cases: later event before earlier event, candidate rejects stale sequence",
+    "admission": "100% of declared cases, no precondition exclusions, all explicit coverage obligations, immutable exact executor report",
+    "shrinking": "At most 64 attempts per failure; preserve all actor operations, reduce input magnitude/schedule inversions, retain the exact failure property and original witness",
+    "scope": "Bounded deterministic cooperative call-boundary scheduling and isolated host resource/network models; not native-thread or distributed hardware campaign qualification"
+  },
+  "r04BoundaryRate": {
+    "minimumPerSecond": 2000000,
+    "trials": 5,
+    "warmups": 1,
+    "inputsPerTrial": 20000,
+    "inputKind": "Four-field integer JSON event: order=i%24, sequence=i, allocation=(i*31)%4097, checksum=(i*17)%256",
+    "evaluation": "(order!=0) + 2*(sequence%7==0) + 4*(allocation>4095) + 8*(checksum==255)",
+    "checksumPerTrial": 25534,
+    "included": ["object generation", "JSON.stringify", "JSON.parse into fresh objects", "all four guards", "uint32 coverage accumulation"],
+    "excluded": ["source hashing and fixture construction", "diagnostics and durable raw observation writes between trials", "Aether campaign execution", "vector math without event materialization"],
+    "passRule": "Every one of the five measured trials must reach the unchanged threshold; first trial retained",
+    "qualification": "Local fixed R04 JSON boundary kernel only; passing does not qualify full distributed or Aether runtime micro-world throughput"
+  }
+}

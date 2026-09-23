@@ -1,0 +1,77 @@
+{
+  "format": "aether.living-research-attempt/1",
+  "registrationSha256": "7f5574db3f2279c14cef6a2d4fa36f767b7c91159693d914b2218e09fb3f6a15",
+  "before": {
+    "at": "2026-09-23T03:56:19.021Z",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "architecture": "arm64",
+    "node": "v26.7.0",
+    "cpus": [
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      },
+      {
+        "model": "Apple M4 Pro",
+        "speed": 2400
+      }
+    ],
+    "memory": {
+      "total": 25769803776,
+      "free": 894337024,
+      "process": {
+        "rss": 101072896,
+        "heapTotal": 15466496,
+        "heapUsed": 12564112,
+        "external": 6818805,
+        "arrayBuffers": 556926
+      }
+    },
+    "load": [
+      3.60595703125,
+      3.271484375,
+      3.1220703125
+    ]
+  }
+}
