@@ -98,7 +98,9 @@ export function enforcementFailures(expected: Profile, measurements: readonly Me
     if (rows.length !== 1) { failures.push(`${target.metric}: missing or duplicate measurement`); continue; }
     const row = rows[0];
     const computed = evaluate(target, row.value);
-    if (computed.verdict !== 'pass' || row.verdict !== computed.verdict) failures.push(`${target.metric}: ${computed.verdict}`);
+    if (row.unit !== target.unit || row.bound !== target.bound || row.required !== target.required
+      || row.minimum !== target.minimum || row.reason !== computed.reason
+      || computed.verdict !== 'pass' || row.verdict !== computed.verdict) failures.push(`${target.metric}: ${computed.verdict}`);
   }
   return failures;
 }

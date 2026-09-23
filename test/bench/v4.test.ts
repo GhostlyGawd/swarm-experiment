@@ -62,6 +62,9 @@ test('V4-F02: enforcement rejects misses, unmeasured, inconclusive, deleted, dup
   const pass = evaluate(target, 4);
   assert.equal(enforcementFailures(selected, [pass, pass]).length, 1);
   assert.equal(enforcementFailures(selected, [{ ...evaluate(target, 1), verdict: 'pass' }]).length, 1);
+  for (const altered of [{ bound: '≥0×' }, { unit: 'made-up units' }, { required: false }, { minimum: 0 }, { reason: 'claimed pass' }]) {
+    assert.equal(enforcementFailures(selected, [{ ...pass, ...altered }]).length, 1, 'target metadata and explanation are part of admission');
+  }
   const full = profile('v4-release/1', []);
   assert.equal(new Set(full.targets.map(target => target.requirement)).size, 16);
   assert.equal(enforcementFailures(full, [pass]).length, 15);
