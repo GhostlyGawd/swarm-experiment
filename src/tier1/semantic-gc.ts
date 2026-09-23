@@ -7,14 +7,15 @@
  * total, uniform truth over definitely bound scalar values. It preserves chosen
  * statement scopes, function contracts and loop annotations; it does not infer
  * facts from entry preconditions, local values, heap state or loop invariants.
- * A further opt-in scalar-shim profile coalesces same-signature, call-free,
- * return-only Int/Bool declarations using independently checked total-value
- * equivalence. It changes only callee identities, retaining every argument
- * expression and its evaluation order/count. Both compared frames are empty.
+ * Opt-in scalar-shim V1 coalesces call-free Int/Bool return expressions. V2
+ * additionally expands closed, pure, total helper calls before independent
+ * equivalence checking, refusing partial arguments that expansion could erase.
+ * Both versions change only callee identities, retaining call-site argument
+ * expression order/count. Both compared frames are empty.
  * The trusted export allowlist must match the externally callable surface.
  *
  * Remaining FR-1.5 coverage: broader path-dependent/opaque branch reasoning,
- * call-bearing/non-scalar/general shims and third-party registration/import
+ * non-scalar/general shims and third-party registration/import
  * retirement. Removing an
  * unreachable effectful FunctionDecl is not evidence of adapter-registration
  * cleanup. No general inlining or active-frame rewrite is claimed. Retention is
@@ -43,7 +44,9 @@ import * as b from './build.ts';
 export const SEMANTIC_GC_PROFILE = 'aether.semantic-gc-closed-forwarders/1';
 export const SEMANTIC_GC_BRANCH_PROFILE = 'aether.semantic-gc-closed-branches/1';
 export const SEMANTIC_GC_SHIM_PROFILE = 'aether.semantic-gc-closed-scalar-shims/1';
-export type SemanticGcProfile = typeof SEMANTIC_GC_PROFILE | typeof SEMANTIC_GC_BRANCH_PROFILE | typeof SEMANTIC_GC_SHIM_PROFILE;
+export const SEMANTIC_GC_CALL_SHIM_PROFILE = 'aether.semantic-gc-closed-scalar-shims/2';
+export type SemanticGcProfile = typeof SEMANTIC_GC_PROFILE | typeof SEMANTIC_GC_BRANCH_PROFILE | typeof SEMANTIC_GC_SHIM_PROFILE | typeof SEMANTIC_GC_CALL_SHIM_PROFILE;
+const isShimProfile = (profile: SemanticGcProfile): boolean => profile === SEMANTIC_GC_SHIM_PROFILE || profile === SEMANTIC_GC_CALL_SHIM_PROFILE;
 type FunctionDecl = Extract<Term, { kind: 'FunctionDecl' }>;
 type Module = Extract<Term, { kind: 'Module' }>;
 export type SemanticRetentionKind = 'audit' | 'replay' | 'active-task' | 'unstable-replication';
@@ -119,9 +122,9 @@ export class SemanticGarbageCollector {
   constructor(options: SemanticGcOptions) {
     this.options = { ...options }; identifier(options.repositoryId);
     this.profile = options.profile ?? SEMANTIC_GC_PROFILE;
-    if (![SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE].includes(this.profile)) throw new Error('unsupported semantic GC profile');
+    if (![SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, SEMANTIC_GC_CALL_SHIM_PROFILE].includes(this.profile)) throw new Error('unsupported semantic GC profile');
     this.maxShimComparisons = options.maxShimComparisons ?? 64;
-    if (!Number.isSafeInteger(this.maxShimComparisons) || this.maxShimComparisons < 1 || this.maxShimComparisons > 1024 || this.profile !== SEMANTIC_GC_SHIM_PROFILE && options.maxShimComparisons !== undefined) throw new Error('invalid shim comparison profile');
+    if (!Number.isSafeInteger(this.maxShimComparisons) || this.maxShimComparisons < 1 || this.maxShimComparisons > 1024 || !isShimProfile(this.profile) && options.maxShimComparisons !== undefined) throw new Error('invalid shim comparison profile');
     this.maxBranchProofs = options.maxBranchProofs ?? 64;
     if (!Number.isSafeInteger(this.maxBranchProofs) || this.maxBranchProofs < 1 || this.maxBranchProofs > 256 || this.profile === SEMANTIC_GC_PROFILE && options.maxBranchProofs !== undefined) throw new Error('invalid branch proof profile');
     this.policy = freeze(clone(options.policy)); exactObject(this.policy, ['epoch', 'exports', 'protectedSymbols']); identifier(this.policy.epoch);
@@ -130,7 +133,7 @@ export class SemanticGarbageCollector {
     this.registry = new CapabilityRegistry(); for (const name of options.registry.names) this.registry.define(clone(options.registry.get(name)!));
     this.maxDeclarations = options.maxDeclarations ?? 128; this.maxAstNodes = options.maxAstNodes ?? 4096; this.maxRecords = options.maxRecords ?? 1000;
     for (const [limit, maximum] of [[this.maxDeclarations, 128], [this.maxAstNodes, 10000], [this.maxRecords, 10000]]) if (!Number.isSafeInteger(limit) || limit < 1 || limit > maximum) throw new RangeError('semantic GC resource profile');
-    const profile = { format: this.profile, repositoryId: options.repositoryId, policy: this.policy, registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), maxDeclarations: this.maxDeclarations, maxAstNodes: this.maxAstNodes, maxRecords: this.maxRecords, ...(this.profile !== SEMANTIC_GC_PROFILE ? { maxBranchProofs: this.maxBranchProofs } : {}), ...(this.profile === SEMANTIC_GC_SHIM_PROFILE ? { maxShimComparisons: this.maxShimComparisons } : {}) };
+    const profile = { format: this.profile, repositoryId: options.repositoryId, policy: this.policy, registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), maxDeclarations: this.maxDeclarations, maxAstNodes: this.maxAstNodes, maxRecords: this.maxRecords, ...(this.profile !== SEMANTIC_GC_PROFILE ? { maxBranchProofs: this.maxBranchProofs } : {}), ...(isShimProfile(this.profile) ? { maxShimComparisons: this.maxShimComparisons } : {}) };
     this.configuration = domainDigest('aether.semantic-gc-config/1', profile); this.builderLease = `semantic-gc-builder:${this.configuration}`;
     durableDirectory(options.directory); durableDirectory(join(options.directory, 'proposals')); durableDirectory(join(options.directory, 'retention'));
     this.lock = new JournalLock({ directory: join(options.directory, 'lock'), domain: 'aether.semantic-gc', maxTickets: 100000 });
@@ -303,8 +306,8 @@ export class SemanticGarbageCollector {
     });
     return selections;
   }
-  /** Closed, call-free expressions avoid hiding faults/contract checks while
-   * expanding a callee or discarding an unused inner-call argument. */
+  /** V1 remains call-free. V2 permits only statically expanded closed scalar
+   * calls whose helpers have no contract frame, capabilities or surfaces. */
   private shimExpression(declaration: FunctionDecl): Term {
     if (declaration.purity !== 'pure' || declaration.capabilities.length || declaration.typeParams.length || declaration.surfaces.length || declaration.contract?.kind !== 'Contract' || !emptyContract(declaration.contract) || !scalar(declaration.returns) || declaration.params.some(param => !scalar(param.ty))) throw new Error('unsupported pure scalar shim declaration');
     const parameters = new Set(declaration.params.map(param => param.symbol)), expression = returnExpression(declaration); let remaining = this.maxAstNodes;
@@ -315,12 +318,42 @@ export class SemanticGarbageCollector {
       if (node.kind === 'Un' && ['neg', 'not'].includes(node.op)) { inspect(node.operand); return; }
       if (node.kind === 'Bin' && ['add', 'sub', 'mul', 'div', 'mod', 'eq', 'ne', 'lt', 'le', 'gt', 'ge', 'and', 'or'].includes(node.op)) { inspect(node.left); inspect(node.right); return; }
       if (node.kind === 'Cond') { inspect(node.cond); inspect(node.then); inspect(node.otherwise); return; }
+      if (this.profile === SEMANTIC_GC_CALL_SHIM_PROFILE && node.kind === 'Call') {
+        node.args.forEach(inspect); return;
+      }
       throw new Error(`unsupported scalar shim expression: ${node.kind}`);
     };
     inspect(expression); return expression;
   }
   private shimSelection(source: FunctionDecl, target: FunctionDecl): ShimSelection {
     const store = new GraphStore(); return { symbol: source.symbol, target: target.symbol, sourceDeclaration: store.intern(source), targetDeclaration: store.intern(target) };
+  }
+  /** Expansion can duplicate or discard helper arguments. Require every
+   * argument and helper body to be pure and total before making that rewrite;
+   * the portable equivalence proof then covers the resulting values. */
+  private totalShimExpression(term: Term, functions: ReadonlyMap<SymbolId, FunctionDecl>, active: readonly SymbolId[] = [], budget = { left: this.maxAstNodes }): void {
+    if (--budget.left < 0 || active.length > 32) throw new Error('call-bearing shim totality bound');
+    if (term.kind === 'Var' || term.kind === 'Place' && !term.path.length
+      || term.kind === 'Lit' && (term.ty.t === 'Int' && typeof term.value === 'bigint' || term.ty.t === 'Bool' && typeof term.value === 'boolean')) return;
+    if (term.kind === 'Un' && ['neg', 'not'].includes(term.op)) return this.totalShimExpression(term.operand, functions, active, budget);
+    if (term.kind === 'Bin' && ['add', 'sub', 'mul', 'eq', 'ne', 'lt', 'le', 'gt', 'ge', 'and', 'or'].includes(term.op)) {
+      this.totalShimExpression(term.left, functions, active, budget); this.totalShimExpression(term.right, functions, active, budget); return;
+    }
+    if (term.kind === 'Cond') {
+      this.totalShimExpression(term.cond, functions, active, budget);
+      this.totalShimExpression(term.then, functions, active, budget);
+      this.totalShimExpression(term.otherwise, functions, active, budget); return;
+    }
+    if (term.kind === 'Call') {
+      const target = functions.get(term.callee);
+      if (!target || target.purity !== 'pure' || target.capabilities.length || target.typeParams.length || target.surfaces.length
+        || !emptyContract(target.contract) || target.params.some(param => !scalar(param.ty)) || !scalar(target.returns)
+        || term.args.length !== target.params.length || active.includes(target.symbol))
+        throw new Error('call-bearing shim helper is not closed total scalar code');
+      term.args.forEach(arg => this.totalShimExpression(arg, functions, active, budget));
+      this.totalShimExpression(returnExpression(target), functions, [...active, target.symbol], budget); return;
+    }
+    throw new Error(`call-bearing shim may discard or duplicate a partial expression: ${term.kind}`);
   }
   private compareShimRank(a: FunctionDecl, z: FunctionDecl, fences: ReadonlySet<SymbolId>): number {
     const required = (symbol: SymbolId) => this.policy.exports.includes(symbol) || this.policy.protectedSymbols.includes(symbol) || fences.has(symbol);
@@ -338,7 +371,7 @@ export class SemanticGarbageCollector {
   }
   private validateShims(source: Module, functions: ReadonlyMap<SymbolId, FunctionDecl>, fences: ReadonlySet<SymbolId>, selections: readonly ShimSelection[]): void {
     if (!selections.length) return;
-    if (this.profile !== SEMANTIC_GC_SHIM_PROFILE || selections.length > this.maxShimComparisons) throw new Error('unsupported shim profile/count');
+    if (!isShimProfile(this.profile) || selections.length > this.maxShimComparisons) throw new Error('unsupported shim profile/count');
     const sources = new Set<SymbolId>(), annotations = this.annotationCalls(source), live = this.live(new Map(functions), fences); let previous = '';
     for (const selection of selections) {
       exactObject(selection, ['symbol', 'target', 'sourceDeclaration', 'targetDeclaration']); identifier(selection.symbol); identifier(selection.target); validateDigest(selection.sourceDeclaration, 'ast'); validateDigest(selection.targetDeclaration, 'ast');
@@ -353,7 +386,14 @@ export class SemanticGarbageCollector {
   private shimHarness(source: Module, selection: ShimSelection, targetRoot: NodeRef, obligation: Digest): { module: Module; specification: string; manifest: ExecutionManifestV1 } {
     const functions = this.declarations(source), from = functions.get(selection.symbol), to = functions.get(selection.target);
     if (!from || !to || !same(shape(from), shape(to)) || !same(this.shimSelection(from, to), selection)) throw new Error('changed scalar shim source/target');
-    const left = this.shimExpression(from), right = this.shimExpression(to);
+    const rawLeft = this.shimExpression(from), rawRight = this.shimExpression(to);
+    if (this.profile === SEMANTIC_GC_CALL_SHIM_PROFILE) {
+      this.totalShimExpression(rawLeft, functions); this.totalShimExpression(rawRight, functions);
+    }
+    const left = this.profile === SEMANTIC_GC_CALL_SHIM_PROFILE
+      ? this.expand(rawLeft, new Map(from.params.map(param => [param.symbol, b.v(param.symbol)])), functions, [], { left: this.maxAstNodes }, true) : rawLeft;
+    const right = this.profile === SEMANTIC_GC_CALL_SHIM_PROFILE
+      ? this.expand(rawRight, new Map(to.params.map(param => [param.symbol, b.v(param.symbol)])), functions, [], { left: this.maxAstNodes }, true) : rawRight;
     const selectionDigest = domainDigest('aether.semantic-gc-shim/1', selection), symbols = new SymbolSpace(`semantic-gc-shim:${obligation}:${selectionDigest}`);
     const params = from.params.map((param, index) => b.param(symbols.define(`argument${index}`), param.ty));
     const substitute = (expression: Term, declaration: FunctionDecl): Term => {
@@ -363,11 +403,13 @@ export class SemanticGarbageCollector {
     };
     const fn = b.fn({ symbol: symbols.define('equivalentScalarShims'), params, returns: b.Bool, contract: b.contract({ ensures: [b.clause(b.result(), 'total-scalar-shim-equivalence')] }), body: b.ret(b.eq(substitute(left, from), substitute(right, to))) });
     const module = b.module_({ symbol: symbols.define('scalarShimWitness'), members: [fn], symbolTable: symbols.table() }) as Module;
-    const specification = Buffer.from(encodeCanonical({ profile: this.profile, obligation, sourceRoot: new GraphStore().intern(source), targetRoot, selection, claim: 'For all typed scalar arguments, both call-free expressions terminate normally with equal results. Call-site rewriting preserves original arity, order and single evaluation of every argument, including parameters unused by the selected implementation. No contracts, capabilities, exports, fences or annotation references authorize retirement by this proof alone.' }, WIRE_LIMITS)).toString('utf8');
+    const specification = Buffer.from(encodeCanonical({ profile: this.profile, obligation, sourceRoot: new GraphStore().intern(source), targetRoot, selection, claim: this.profile === SEMANTIC_GC_CALL_SHIM_PROFILE
+      ? 'For all typed scalar arguments, statically expanded closed helper calls terminate normally with equal results. The compared helper graph has empty contract frames, no capabilities, surfaces or recursion. Call-site rewriting preserves argument order and single evaluation. No exports, fences or annotations are retired by this proof alone.'
+      : 'For all typed scalar arguments, both call-free expressions terminate normally with equal results. Call-site rewriting preserves original arity, order and single evaluation of every argument, including parameters unused by the selected implementation. No contracts, capabilities, exports, fences or annotation references authorize retirement by this proof alone.' }, WIRE_LIMITS)).toString('utf8');
     const root = new GraphStore().intern(module); return { module, specification, manifest: witnessManifest(root, specification, obligation, this.profile) };
   }
   private discoverShims(source: Module, manifest: ExecutionManifestV1, fences: ReadonlySet<SymbolId>): ShimSelection[] {
-    if (this.profile !== SEMANTIC_GC_SHIM_PROFILE) return [];
+    if (!isShimProfile(this.profile)) return [];
     const functions = this.declarations(source), live = this.live(functions, fences), annotations = this.annotationCalls(source), candidates = [...functions.values()].filter(decl => { try { this.shimExpression(decl); return true; } catch { return false; } }).sort((a, z) => this.compareShimRank(a, z, fences));
     const representatives: FunctionDecl[] = [], selected: ShimSelection[] = []; let comparisons = 0;
     for (const declaration of candidates) {
@@ -416,23 +458,24 @@ export class SemanticGarbageCollector {
     this.declarations(target);
     return { target, removed: [...functions.keys()].filter(symbol => !live.has(symbol)).sort(), collapsed: [...wrappers].filter(([symbol]) => transparent.has(symbol) && priorLive.has(symbol)).map(([symbol]) => ({ symbol, target: resolve(symbol) })).sort((a, z) => a.symbol.localeCompare(z.symbol)) };
   }
-  private expand(term: Term, environment: ReadonlyMap<SymbolId, Term>, functions: ReadonlyMap<SymbolId, FunctionDecl>, active: readonly SymbolId[] = [], budget = { left: this.maxAstNodes }): Term {
+  private expand(term: Term, environment: ReadonlyMap<SymbolId, Term>, functions: ReadonlyMap<SymbolId, FunctionDecl>, active: readonly SymbolId[] = [], budget = { left: this.maxAstNodes }, strictShim = false): Term {
     if (--budget.left < 0 || active.length > 32) throw new Error('equivalence expansion resource bound');
     switch (term.kind) {
       case 'Lit': if (!scalar(term.ty)) throw new Error('unsupported non-scalar equivalence literal'); return term;
       case 'Var': { const value = environment.get(term.symbol); if (!value) throw new Error('unbound equivalence variable'); return value; }
-      case 'Un': return { ...term, operand: this.expand(term.operand, environment, functions, active, budget) };
-      case 'Bin': return { ...term, left: this.expand(term.left, environment, functions, active, budget), right: this.expand(term.right, environment, functions, active, budget) };
-      case 'Cond': return { ...term, cond: this.expand(term.cond, environment, functions, active, budget), then: this.expand(term.then, environment, functions, active, budget), otherwise: this.expand(term.otherwise, environment, functions, active, budget) };
+      case 'Un': return { ...term, operand: this.expand(term.operand, environment, functions, active, budget, strictShim) };
+      case 'Bin': return { ...term, left: this.expand(term.left, environment, functions, active, budget, strictShim), right: this.expand(term.right, environment, functions, active, budget, strictShim) };
+      case 'Cond': return { ...term, cond: this.expand(term.cond, environment, functions, active, budget, strictShim), then: this.expand(term.then, environment, functions, active, budget, strictShim), otherwise: this.expand(term.otherwise, environment, functions, active, budget, strictShim) };
       case 'Call': {
         const target = functions.get(term.callee); if (!target || target.purity !== 'pure' || target.capabilities.length || target.typeParams.length || target.params.some(param => !scalar(param.ty)) || !scalar(target.returns) || active.includes(target.symbol)) throw new Error('unsupported equivalence call');
-        const args = term.args.map(arg => this.expand(arg, environment, functions, active, budget)); if (args.length !== target.params.length) throw new Error('equivalence arity mismatch');
-        return this.expand(returnExpression(target), new Map(target.params.map((param, index) => [param.symbol, args[index]])), functions, [...active, target.symbol], budget);
+        if (strictShim && (!emptyContract(target.contract) || target.surfaces.length)) throw new Error('call-bearing shim helper has contract or surface behavior');
+        const args = term.args.map(arg => this.expand(arg, environment, functions, active, budget, strictShim)); if (args.length !== target.params.length) throw new Error('equivalence arity mismatch');
+        return this.expand(returnExpression(target), new Map(target.params.map((param, index) => [param.symbol, args[index]])), functions, [...active, target.symbol], budget, strictShim);
       }
       default: throw new Error(`unsupported equivalence expression: ${term.kind}`);
     }
   }
-  private obligation(source: ExecutionManifestV1, target: NodeRef, removed: readonly SymbolId[], collapsed: readonly Wrapper[], branches: readonly BranchSelection[] = [], shims: readonly ShimSelection[] = []): Digest { return domainDigest('aether.semantic-gc-obligation/1', { configuration: this.configuration, profile: this.profile, source: source.astRoot, sourceExecution: executionManifestDigest(source), target, exports: this.policy.exports, removed, collapsed, ...(this.profile !== SEMANTIC_GC_PROFILE ? { branches } : {}), ...(this.profile === SEMANTIC_GC_SHIM_PROFILE ? { shims } : {}) }); }
+  private obligation(source: ExecutionManifestV1, target: NodeRef, removed: readonly SymbolId[], collapsed: readonly Wrapper[], branches: readonly BranchSelection[] = [], shims: readonly ShimSelection[] = []): Digest { return domainDigest('aether.semantic-gc-obligation/1', { configuration: this.configuration, profile: this.profile, source: source.astRoot, sourceExecution: executionManifestDigest(source), target, exports: this.policy.exports, removed, collapsed, ...(this.profile !== SEMANTIC_GC_PROFILE ? { branches } : {}), ...(isShimProfile(this.profile) ? { shims } : {}) }); }
   private harness(source: Module, targetRoot: NodeRef, wrapper: Wrapper, obligation: Digest): { module: Module; specification: string; manifest: ExecutionManifestV1 } {
     const functions = this.declarations(source), decl = functions.get(wrapper.symbol); if (!decl) throw new Error('missing equivalence wrapper');
     const symbols = new SymbolSpace(`semantic-gc:${obligation}:${wrapper.symbol}`), params = decl.params.map((param, index) => b.param(symbols.define(`argument${index}`), param.ty));
@@ -500,7 +543,7 @@ export class SemanticGarbageCollector {
       if (!certificate) throw new Error('unsupported or unproved portable equivalence obligation');
       const root = this.options.store.intern(harness.module, { leaseId: this.builderLease }); witnesses.push({ wrapper: wrapper.symbol, root, specification: harness.specification, manifest: harness.manifest, certificate });
     }
-    const body: Omit<SemanticGcProposal, 'id'> = { format: 'aether.semantic-gc-proposal/1' as const, configuration: this.configuration, profile: this.profile, direction, rollbackOf, sourceManifest, specification, productionAuthorized: false, sourceRoot, targetRoot, exports: this.policy.exports, removed, collapsed, witnesses, obligationDigest, ...(this.profile !== SEMANTIC_GC_PROFILE ? { branches } : {}), ...(this.profile === SEMANTIC_GC_SHIM_PROFILE ? { shims } : {}) };
+    const body: Omit<SemanticGcProposal, 'id'> = { format: 'aether.semantic-gc-proposal/1' as const, configuration: this.configuration, profile: this.profile, direction, rollbackOf, sourceManifest, specification, productionAuthorized: false, sourceRoot, targetRoot, exports: this.policy.exports, removed, collapsed, witnesses, obligationDigest, ...(this.profile !== SEMANTIC_GC_PROFILE ? { branches } : {}), ...(isShimProfile(this.profile) ? { shims } : {}) };
     const proposal: SemanticGcProposal = { ...body, id: domainDigest('aether.semantic-gc-proposal/1', body, WIRE_LIMITS) };
     this.verify(proposal, false);
     this.options.store.retain(`semantic-gc-proposal:${proposal.id}`, [sourceRoot, targetRoot, ...witnesses.map(witness => witness.root), ...branches.map(witness => witness.root), ...shims.map(witness => witness.root)]);
@@ -508,7 +551,7 @@ export class SemanticGarbageCollector {
   }
   readProposal(id: Digest): SemanticGcProposal { validateDigest(id, 'aether.semantic-gc-proposal/1'); const value = this.read(this.path('proposals', id)) as SemanticGcProposal; if (value.id !== id) throw new Error('proposal address mismatch'); this.verify(value, false); return freeze(clone(value)); }
   private verify(proposal: SemanticGcProposal, current: boolean): void {
-    encodeCanonical(proposal, WIRE_LIMITS); exactObject(proposal, ['format', 'configuration', 'profile', 'direction', 'rollbackOf', 'sourceManifest', 'specification', 'productionAuthorized', 'sourceRoot', 'targetRoot', 'exports', 'removed', 'collapsed', 'witnesses', 'obligationDigest', 'id', ...(this.profile !== SEMANTIC_GC_PROFILE ? ['branches'] : []), ...(this.profile === SEMANTIC_GC_SHIM_PROFILE ? ['shims'] : [])]);
+    encodeCanonical(proposal, WIRE_LIMITS); exactObject(proposal, ['format', 'configuration', 'profile', 'direction', 'rollbackOf', 'sourceManifest', 'specification', 'productionAuthorized', 'sourceRoot', 'targetRoot', 'exports', 'removed', 'collapsed', 'witnesses', 'obligationDigest', 'id', ...(this.profile !== SEMANTIC_GC_PROFILE ? ['branches'] : []), ...(isShimProfile(this.profile) ? ['shims'] : [])]);
     const { id, ...body } = proposal;
     if (proposal.productionAuthorized !== false || proposal.format !== 'aether.semantic-gc-proposal/1' || proposal.profile !== this.profile || proposal.configuration !== this.configuration || id !== domainDigest('aether.semantic-gc-proposal/1', body, WIRE_LIMITS) || !same(proposal.exports, this.policy.exports)) throw new Error('semantic GC proposal identity/profile mismatch');
     validateExecutionManifest(proposal.sourceManifest); if (proposal.sourceManifest.semanticsVersion !== 'aether-reference/1') throw new Error('unsupported source semantics for GC equivalence'); if (proposal.sourceManifest.astRoot !== proposal.sourceRoot) throw new Error('rewrite source manifest mismatch');
@@ -517,7 +560,7 @@ export class SemanticGarbageCollector {
     const branches = proposal.branches ?? [];
     for (const witness of branches) exactObject(witness, ['selection', 'root', 'specification', 'manifest', 'certificate']);
     const selections = branches.map(witness => witness.selection);
-    if (this.profile === SEMANTIC_GC_SHIM_PROFILE && (!Array.isArray(proposal.shims) || proposal.shims.length > this.maxShimComparisons)) throw new Error('invalid shim witness coverage');
+    if (isShimProfile(this.profile) && (!Array.isArray(proposal.shims) || proposal.shims.length > this.maxShimComparisons)) throw new Error('invalid shim witness coverage');
     const shims = proposal.shims ?? [];
     for (const witness of shims) exactObject(witness, ['selection', 'root', 'specification', 'manifest', 'certificate']);
     const shimSelections = shims.map(witness => witness.selection);

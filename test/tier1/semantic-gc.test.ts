@@ -11,7 +11,7 @@ import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { capability, type NodeRef, type SymbolId, type CapabilityName } from '../../src/tier1/ids.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import { DurableGraphStore } from '../../src/tier1/durable-store.ts';
-import { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, type SemanticGcOptions, type SemanticGcProposal, type SemanticRetentionKind } from '../../src/tier1/semantic-gc.ts';
+import { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, SEMANTIC_GC_CALL_SHIM_PROFILE, type SemanticGcOptions, type SemanticGcProposal, type SemanticRetentionKind } from '../../src/tier1/semantic-gc.ts';
 import { CausalLineageLedger, signIntent, signSpecRevision, fenceRequirement } from '../../src/tier1/causal-lineage.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
@@ -22,7 +22,7 @@ import { encodeCanonical } from '../../src/fabric/encoding.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
 type FixtureNames = { target: SymbolId; wrapper: SymbolId; entry: SymbolId; sink: SymbolId; dead: SymbolId; fenced: SymbolId; x: SymbolId; w: SymbolId; n: SymbolId; message: SymbolId; log: CapabilityName };
-function fixture(options: { shimProfile?: boolean; protectTarget?: boolean; protectWrapper?: boolean; exportWrapper?: boolean; branchProfile?: boolean; transform?: (module: Module, names: FixtureNames, symbols: SymbolSpace) => Module; nonlinear?: boolean; opaque?: boolean; fenceWrapper?: boolean; booleanWrapper?: boolean } = {}) {
+function fixture(options: { shimProfile?: boolean; callShimProfile?: boolean; protectTarget?: boolean; protectWrapper?: boolean; exportWrapper?: boolean; branchProfile?: boolean; transform?: (module: Module, names: FixtureNames, symbols: SymbolSpace) => Module; nonlinear?: boolean; opaque?: boolean; fenceWrapper?: boolean; booleanWrapper?: boolean } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'aether-semantic-gc-')), store = new DurableGraphStore({ directory: join(directory, 'ast') });
   const symbols = new SymbolSpace('semantic-gc-fixture'), target = symbols.define('increment'), wrapper = symbols.define('forward'), entry = symbols.define('compute'), sink = symbols.define('append'), dead = symbols.define('unused'), fenced = symbols.define('protected');
   const x = symbols.define('x'), w = symbols.define('w'), n = symbols.define('n'), message = symbols.define('message'), log = capability('cap:test:append');
@@ -52,7 +52,7 @@ function fixture(options: { shimProfile?: boolean; protectTarget?: boolean; prot
     return { root, context, evidence, manifest, intent };
   };
   const genesis = artifact(module, []); store.commit('production', genesis.root, null);
-  const gcOptions: SemanticGcOptions = { profile: options.shimProfile ? SEMANTIC_GC_SHIM_PROFILE : options.branchProfile ? SEMANTIC_GC_BRANCH_PROFILE : SEMANTIC_GC_PROFILE, directory: join(directory, 'gc'), repositoryId: 'semantic-gc', store, lineage, registry, policy: { epoch: 'closed-exports/1', exports: [entry, sink, ...(options.exportWrapper ? [wrapper] : [])], protectedSymbols: [...(options.protectTarget ? [target] : []), ...(options.protectWrapper ? [wrapper] : [])] } };
+  const gcOptions: SemanticGcOptions = { profile: options.callShimProfile ? SEMANTIC_GC_CALL_SHIM_PROFILE : options.shimProfile ? SEMANTIC_GC_SHIM_PROFILE : options.branchProfile ? SEMANTIC_GC_BRANCH_PROFILE : SEMANTIC_GC_PROFILE, directory: join(directory, 'gc'), repositoryId: 'semantic-gc', store, lineage, registry, policy: { epoch: 'closed-exports/1', exports: [entry, sink, ...(options.exportWrapper ? [wrapper] : [])], protectedSymbols: [...(options.protectTarget ? [target] : []), ...(options.protectWrapper ? [wrapper] : [])] } };
   const gc = new SemanticGarbageCollector(gcOptions);
   const coordinatorOptions: PromotionCoordinatorOptions = { directory: join(directory, 'governor'), repositoryId: 'semantic-gc', genesisManifest: genesis.manifest, lineage: lineage.admissionAdapter(), authority: () => ({ repositoryId: 'semantic-gc', membershipEpoch: '1', policyEpoch: '1', eligibleGovernors: ['governor'] }), governorKey: () => governor.publicKey, clock: () => 100n };
   const coordinator = new PromotionCoordinator(coordinatorOptions);
@@ -492,6 +492,70 @@ test('scalar shim comparison refuses unequal, nonempty-frame and call-bearing im
       assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
     } finally { f.cleanup(); }
   }
+});
+
+test('V2 call-bearing scalar shim proves a closed helper expansion before redirecting live callers', async () => {
+  const f = scalarShimFixture({ callShimProfile: true, transform(module, names, symbols) {
+    const identity = symbols.define('callShimIdentity'), value = symbols.define('callShimValue');
+    const withHelper = { ...module, members: [...module.members,
+      b.fn({ symbol: identity, params: [b.param(value, b.Int)], returns: b.Int, contract: b.contract({}), body: b.ret(b.v(value)) })] };
+    return changeFunction(withHelper, names.wrapper, decl => ({ ...decl,
+      body: b.ret(b.add(b.call(identity, b.v(names.w)), b.int(1))) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.profile, SEMANTIC_GC_CALL_SHIM_PROFILE);
+    assert.ok(proposal.shims!.some(witness => witness.selection.symbol === f.wrapper && witness.selection.target === f.target));
+    assert.ok(proposal.removed.includes(f.wrapper));
+    assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+    assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(proposal.id).id, proposal.id);
+    assert.throws(() => new SemanticGarbageCollector({ ...f.gcOptions, profile: SEMANTIC_GC_SHIM_PROFILE }), /configuration changed/);
+    const candidate = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!]);
+    await f.gc.promote(proposal.id, f.input(candidate), f.coordinator, f.driver(proposal));
+    assert.equal(f.store.head('production')!.root, proposal.targetRoot);
+    const rollback = f.gc.proposeRollback(proposal.id, candidate.evidence.manifest);
+    const restored = f.artifact(f.module, [candidate.intent!]);
+    await f.gc.promote(rollback.id, f.input(restored), f.coordinator, f.driver(rollback));
+    assert.equal(f.store.head('production')!.root, proposal.sourceRoot);
+  } finally { f.cleanup(); }
+});
+
+test('V2 call-bearing shim keeps a helper with runtime contract checks or partial arithmetic', () => {
+  for (const unsafe of ['contract', 'partial'] as const) {
+    const f = scalarShimFixture({ callShimProfile: true, transform(module, names, symbols) {
+      const helper = symbols.define(`unsafeHelper${unsafe}`), value = symbols.define(`unsafeValue${unsafe}`);
+      const withHelper = { ...module, members: [...module.members,
+        b.fn({ symbol: helper, params: [b.param(value, b.Int)], returns: b.Int,
+          contract: unsafe === 'contract' ? b.contract({ ensures: [b.clause(b.bool(true), 'retained-helper-contract')] }) : b.contract({}),
+          body: b.ret(unsafe === 'partial' ? b.div(b.v(value), b.v(value)) : b.v(value)) })] };
+      return changeFunction(withHelper, names.wrapper, decl => ({ ...decl,
+        body: b.ret(b.add(b.call(helper, b.v(names.w)), b.int(1))) }));
+    } });
+    try {
+      const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+      assert.equal(proposal.shims!.length, 0, unsafe);
+      assert.ok(!proposal.removed.includes(f.wrapper), unsafe);
+      assert.equal(f.store.head('production')!.root, proposal.sourceRoot);
+    } finally { f.cleanup(); }
+  }
+});
+
+test('V2 call-bearing shim refuses to erase an evaluated partial helper argument', () => {
+  const f = scalarShimFixture({ callShimProfile: true, transform(module, names, symbols) {
+    const ignore = symbols.define('ignorePartialArgument'), unused = symbols.define('unusedPartialArgument');
+    let changed = changeFunction(module, names.target, decl => ({ ...decl, body: b.ret(b.int(1)) }));
+    changed = { ...changed, members: [...changed.members,
+      b.fn({ symbol: ignore, params: [b.param(unused, b.Int)], returns: b.Int, contract: b.contract({}), body: b.ret(b.int(0)) })] };
+    return changeFunction(changed, names.wrapper, decl => ({ ...decl,
+      body: b.ret(b.add(b.call(ignore, b.div(b.int(1), b.sub(b.v(names.w), b.v(names.w)))), b.int(1))) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.shims!.length, 0);
+    assert.ok(!proposal.removed.includes(f.wrapper));
+    assert.ok(f.execute(proposal.sourceRoot).values.some(result => !result.ok), 'the discarded argument has an observable fault');
+    assert.equal(f.store.head('production')!.root, proposal.sourceRoot);
+  } finally { f.cleanup(); }
 });
 
 test('scalar shim retirement preserves exports, explicit protection and signed fences even for equivalent bodies', () => {
