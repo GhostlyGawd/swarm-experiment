@@ -1,0 +1,10 @@
+{
+  "format": "aether.packed-native-string-evidence-verification/1",
+  "sourceCommit": "9fbc4a50b2015dfbcaaf33f3a582648d12dab8b6",
+  "pinnedSources": 7,
+  "records": 16,
+  "operations": 256,
+  "samples": 30,
+  "executableMatches": true,
+  "rawObservationsMatch": true
+}

@@ -1,0 +1,14 @@
+✔ authenticated /2 checkpoint gives exact UTF-8 reads, byte equality, and mixed reference reads (632.013917ms)
+✔ compiled /2 parser rejects corrupt dictionary offsets, UTF-8, indexes, bounds, and mixed-version commands (729.841458ms)
+✔ seeded /2 native differential retains raw observations and process latency samples (2892.014042ms)
+✔ actual /1 C mutation enters one authorized, replayable packed correction event (524.182459ms)
+✔ real packed checkpoint enters native executable, preserves aliases, and matches host correction (638.652375ms)
+✔ seeded native differential covers local/wide aliases and all three overflow policies (11723.73775ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13020.787125
