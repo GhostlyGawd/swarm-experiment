@@ -2,6 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as s from '../../src/tier2/smt.ts';
 import { proveWithHardCutoff, V4_SMT_HARD_CUTOFF_MS } from '../../src/tier2/hard-solver.ts';
+import { verifyFunction } from '../../src/tier2/verify.ts';
+import { SymbolSpace } from '../../src/tier1/symbols.ts';
+import * as b from '../../src/tier1/build.ts';
 
 test('v4 isolated SMT path returns exact easy proofs and independently checked counterexamples', () => {
   const tautology = s.or(s.boolVar('p'), s.not(s.boolVar('p')));
@@ -39,4 +42,12 @@ test('bounded input validation rejects cycles, accessors, bad scalars and oversi
   assert.throws(() => proveWithHardCutoff(getter as s.SmtFormula), /tag/); assert.equal(invoked, false);
   assert.throws(() => proveWithHardCutoff(s.eq(s.num(10n ** 129n), s.num(0))), /integer/);
   assert.throws(() => proveWithHardCutoff(s.boolVar('p'), 1501), /cutoff/);
+});
+
+test('opt-in v4 function verification uses the process cutoff and refuses a wider budget', () => {
+  const symbols = new SymbolSpace('hard-verifier'), entry = symbols.define('entry');
+  const declaration = b.fn({ symbol: entry, returns: b.Int, contract: b.contract({ ensures: [b.clause(b.eq(b.result(), b.int(1)), 'exact-one')] }), body: b.ret(b.int(1)) });
+  const report = verifyFunction(declaration, { solverProfile: 'v4-hard/1' });
+  assert.equal(report.verdict, 'proved'); assert.ok(report.elapsedMs < V4_SMT_HARD_CUTOFF_MS);
+  assert.throws(() => verifyFunction(declaration, { solverProfile: 'v4-hard/1', budgetMs: 1501 }), /hard solver budget/);
 });

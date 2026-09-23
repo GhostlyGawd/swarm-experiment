@@ -33,6 +33,7 @@ import type { DischargeProof } from '../tier1/provenance.ts';
 import { GraphStore } from '../tier1/store.ts';
 import * as S from './smt.ts';
 import { DEFAULT_TIMEOUT_MS, prove, type SolverResult } from './solver.ts';
+import { proveWithHardCutoff, V4_SMT_HARD_CUTOFF_MS } from './hard-solver.ts';
 import { underlying } from './typecheck.ts';
 import type { ProofCache } from './proof-cache.ts';
 
@@ -116,6 +117,8 @@ export interface VerifyOptions {
   readonly symbols?: SymbolSpace;
   /** NFR 6.2: 2,000 ms per function, across all of its obligations. */
   readonly budgetMs?: number;
+  /** Opt-in v4 process-isolated SMT cutoff; the reference profile stays compatible. */
+  readonly solverProfile?: 'reference/1' | 'v4-hard/1';
   /** Refuse to explore more paths than this before falling back to fuzzing. */
   readonly maxPaths?: number;
   /** Contracts of functions this one calls, for modular verification. */
@@ -797,6 +800,8 @@ export function verifyFunction(
   if (decl.kind !== 'FunctionDecl') {
     throw new TypeError(`verifyFunction expects a FunctionDecl, got ${decl.kind}`);
   }
+  if (opts.solverProfile !== undefined && opts.solverProfile !== 'reference/1' && opts.solverProfile !== 'v4-hard/1') throw new TypeError('unsupported verification solver profile');
+  if (opts.solverProfile === 'v4-hard/1' && (opts.budgetMs !== undefined && (!Number.isSafeInteger(opts.budgetMs) || opts.budgetMs < 1 || opts.budgetMs > V4_SMT_HARD_CUTOFF_MS))) throw new RangeError('invalid v4 hard solver budget');
   const subject = new GraphStore().intern(decl);
   const cached = opts.proofCache?.get(subject);
   if (cached) {
@@ -806,7 +811,7 @@ export function verifyFunction(
     });
     if (dependenciesCurrent) return cached;
   }
-  const budget = opts.budgetMs ?? DEFAULT_TIMEOUT_MS;
+  const budget = opts.budgetMs ?? (opts.solverProfile === 'v4-hard/1' ? V4_SMT_HARD_CUTOFF_MS : DEFAULT_TIMEOUT_MS);
   const builder = new VcBuilder(opts);
   const pathsExplored = builder.build(decl);
 
@@ -835,7 +840,9 @@ export function verifyFunction(
     }
 
     const at = Date.now();
-    const solved = prove(obligation.formula, { timeoutMs: remaining });
+    const solved = opts.solverProfile === 'v4-hard/1'
+      ? proveWithHardCutoff(obligation.formula, Math.max(1, Math.min(Math.floor(remaining), V4_SMT_HARD_CUTOFF_MS)))
+      : prove(obligation.formula, { timeoutMs: remaining });
     const elapsedMs = Date.now() - at;
     if (solved.status === 'unsat') {
       results.push({ obligation, verdict: 'proved', solver: solved, smtLib, elapsedMs });
