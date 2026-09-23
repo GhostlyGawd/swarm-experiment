@@ -1,0 +1,11 @@
+{
+  "caseId": "wide-boolean/1",
+  "trial": -1,
+  "elapsedNs": "72164708",
+  "innerElapsedMs": 71.7047500000001,
+  "status": "unsat",
+  "reason": null,
+  "model": null,
+  "modelValid": null,
+  "pass": true
+}

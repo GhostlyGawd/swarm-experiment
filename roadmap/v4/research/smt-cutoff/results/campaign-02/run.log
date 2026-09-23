@@ -1,0 +1,67 @@
+{
+  "pass": true,
+  "byCase": [
+    {
+      "caseId": "boolean-tautology/1",
+      "count": 5,
+      "p50Ms": 65.062541,
+      "p95Ms": 67.830584,
+      "p99Ms": 67.830584,
+      "maximumMs": 67.830584,
+      "pass": true
+    },
+    {
+      "caseId": "linear-valid/1",
+      "count": 5,
+      "p50Ms": 67.353958,
+      "p95Ms": 68.600583,
+      "p99Ms": 68.600583,
+      "maximumMs": 68.600583,
+      "pass": true
+    },
+    {
+      "caseId": "linear-counterexample/1",
+      "count": 5,
+      "p50Ms": 65.885125,
+      "p95Ms": 67.971042,
+      "p99Ms": 67.971042,
+      "maximumMs": 67.971042,
+      "pass": true
+    },
+    {
+      "caseId": "wide-boolean/1",
+      "count": 5,
+      "p50Ms": 76.35475,
+      "p95Ms": 78.279208,
+      "p99Ms": 78.279208,
+      "maximumMs": 78.279208,
+      "pass": true
+    },
+    {
+      "caseId": "actual-function/1",
+      "count": 5,
+      "p50Ms": 67.134333,
+      "p95Ms": 68.9795,
+      "p99Ms": 68.9795,
+      "maximumMs": 68.9795,
+      "pass": true
+    },
+    {
+      "caseId": "pigeonhole-hard/1",
+      "count": 5,
+      "p50Ms": 1482.404875,
+      "p95Ms": 1483.466042,
+      "p99Ms": 1483.466042,
+      "maximumMs": 1483.466042,
+      "pass": true
+    }
+  ],
+  "overall": {
+    "count": 30,
+    "p50Ms": 67.830584,
+    "p95Ms": 1482.430166,
+    "p99Ms": 1483.466042,
+    "maximumMs": 1483.466042,
+    "pass": true
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "caseId": "boolean-tautology/1",
+  "trial": 4,
+  "elapsedNs": "64229167",
+  "innerElapsedMs": 64.20216699999992,
+  "status": "unsat",
+  "reason": null,
+  "model": null,
+  "modelValid": null,
+  "pass": true
+}

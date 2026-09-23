@@ -27,3 +27,20 @@ node --experimental-strip-types roadmap/v4/research/smt-cutoff/campaign.ts --ver
 | 4 | 1,483.133 ms | `unknown/timeout` |
 
 The local fixed-query cutoff profile passed all five trials; maximum observed complete wall time was **1,484.199 ms** against the unchanged 1,500 ms limit. This is one hard unsatisfiable Boolean workload on one same-host target. The result has not been integrated into the release-profile measurement inventory, and it does not qualify arbitrary proof construction, external solvers, different hardware or every query shape. V4-NFR-08 therefore remains **unmeasured in release enforcement**.
+
+## Clean-source multi-shape campaign 02
+
+The [versioned campaign runner](campaign-v2.ts) registered clean source `22a1374b4ce8c2a0f81a1b7075f81110042c88a3`, 127 source/package hashes and the Apple M4 Pro / Darwin arm64 / Node 26.7.0 environment before timing. The source ran from a detached clean worktree; [registration, every raw sample, source snapshots and the independent audit](results/campaign-02/) are retained. One warmup and five measured calls were made for each declared case. The outer monotonic clock includes formula construction, validation, child launch, cancellation, result parsing and the actual Aether function check.
+
+| Case | Required outcome | Maximum of five complete calls |
+| --- | --- | ---: |
+| Boolean tautology | `unsat` | 67.831 ms |
+| Valid linear arithmetic | `unsat` | 68.601 ms |
+| Linear counterexample | `sat`, model checked independently | 67.971 ms |
+| 4,096-term Boolean input | `unsat` | 78.279 ms |
+| Actual `verifyFunction` contract | `proved` | 68.980 ms |
+| Nine-into-eight pigeonhole | `unknown/timeout` | 1,483.466 ms |
+
+All **30 measured calls passed** this bounded profile; overall p50 was 67.831 ms, p95 was 1,482.430 ms and maximum was **1,483.466 ms**. The verifier recomputes each sample's limit/outcome, checks a saved counterexample against the original formula, rechecks 127 archived source hashes and recalculates p50/p95/p99/max. The first campaign remains separate historical evidence rather than being overwritten.
+
+This is stronger evidence for the built-in process-isolated solver cutoff on one target. It still does not establish a universal scheduler bound, qualify external solver fallback or every query shape, or supply the release benchmark's full target-specific admission record. V4-NFR-08 remains open in release enforcement. A later qualification must bind the declared supported solver path, environment, source and raw maximum to the release inventory without treating an `unknown` timeout as a proof.
