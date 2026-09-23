@@ -1,0 +1,2912 @@
+{
+  "format": "aether.packed-fused-locality/1",
+  "preregistration": "roadmap/v4/research/packed-fused-locality/PREREGISTRATION.md",
+  "timestamp": "2026-09-23T19:57:30.966Z",
+  "source": {
+    "gitHead": "b6b80c5a757039883fc489e22792727ae8b751f8",
+    "sha256": {
+      "roadmap/v4/research/packed-fused-locality/PREREGISTRATION.md": "b300ded9067661f13cc8aa1a8e4ba695f4a24b3436d54f27f9d1c5309ef2e2a6",
+      "roadmap/v4/research/packed-fused-locality/run.ts": "6f5fabfb4f20ac8451ed8873229ab6545e3021408807408dd4a64a13158f803c",
+      "roadmap/v4/research/packed-fused-locality/native.c": "2f1f5ed413c7d4ae034fa49e48d98f026bf3ca842fe2019f4a92e6f42de388a6",
+      "roadmap/v4/research/packed-fused-locality/adversarial.c": "a9900d8414b9be0d2b596113a160e545b9a4005187296657182b94553c5228ea",
+      "roadmap/v4/research/packed-fused-locality/verify.ts": "521b3cb17195c101b201ebb2d02e33bb8fe0ac51f40b4a5a79d7dad361be46b5",
+      "roadmap/v4/research/packed-heap/abi.c": "b5db4b328b1d2baa16207987c2175c2f312345d37413ef57adc9364891a9084f",
+      "roadmap/v4/research/packed-heap/abi.h": "a54d0ae3a51a6b18c2fa80d6bca8c63baa9d19f57de9d1156cdebaec583467d4",
+      "src/tier3/packed-heap.ts": "bf0ae1bf0f30c3e22de4c5e0d324d9e63655238be17291d315f750643b7d9d1e",
+      "src/tier3/resumable-state.ts": "0a98cdbe98320dadb4a4288dccd216394e29e56ed2b564cf210e1d7cc049a936",
+      "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+      "src/fabric/identity.ts": "a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+      "src/tier1/ids.ts": "73a6cf5a0b6537d879b2b3980ba9b4a1937701d52f97b4bf1deb09acf1e023a5"
+    },
+    "nativeBinarySha256": "2aa9d18d8ad0acab9a9b059c298e94513ff38220a74bd7fec6964a8537314654",
+    "adversarialBinarySha256": "60dfc9605a1c5d5eb6416ce8250ac8b7d371b60340e19042e90082ba352a7b72"
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "release": "25.6.0",
+    "cpu": "Apple M4 Pro",
+    "node": "v26.7.0",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+    "compileArgs": [
+      "-O3",
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-I",
+      "./roadmap/v4/research/packed-heap",
+      "./roadmap/v4/research/packed-heap/abi.c",
+      "./roadmap/v4/research/packed-fused-locality/native.c",
+      "-o",
+      "<temporary-executable>"
+    ],
+    "adversarialCompileArgs": [
+      "-O3",
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-I",
+      "./roadmap/v4/research/packed-heap",
+      "./roadmap/v4/research/packed-heap/abi.c",
+      "./roadmap/v4/research/packed-fused-locality/adversarial.c",
+      "-o",
+      "<temporary-executable>"
+    ]
+  },
+  "adversarial": {
+    "validParityRows": 192192,
+    "exhaustiveCodeRows": 1052672,
+    "invalidCases": 13
+  },
+  "profile": {
+    "counts": [
+      4096,
+      16384
+    ],
+    "distributions": [
+      "local",
+      "cluster",
+      "wide"
+    ],
+    "patterns": [
+      "scan",
+      "scatter",
+      "chase"
+    ],
+    "operationsPerTrial": 100000,
+    "warmups": 5,
+    "measuredTrials": 7,
+    "clock": "CLOCK_MONOTONIC",
+    "units": "nanoseconds"
+  },
+  "cases": [
+    {
+      "count": 4096,
+      "distribution": "local",
+      "mappingChecksum": "17305324502945564402",
+      "aliasTargets": 0,
+      "baselineBytes": 163840,
+      "packedBytes": 140288,
+      "baselineRowBytes": 40,
+      "packedRowBytes": 32,
+      "payloadBytes": 9216,
+      "patterns": [
+        {
+          "name": "scan",
+          "expectedChecksum": "14528059679911116170",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 309000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 312000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 296000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 281000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 261000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 245000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 245000,
+                  "checksum": "14528059679911116170"
+                }
+              ],
+              "medianNs": 281000,
+              "maxNs": 312000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1764000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 1754000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 1631000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 1592000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 1480000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 1474000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 1395000,
+                  "checksum": "14528059679911116170"
+                }
+              ],
+              "medianNs": 1592000,
+              "maxNs": 1764000,
+              "medianRatioToBaseline": 5.665480427046264
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 568000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 592000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 540000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 495000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 478000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 441000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 430000,
+                  "checksum": "14528059679911116170"
+                }
+              ],
+              "medianNs": 495000,
+              "maxNs": 592000,
+              "medianRatioToBaseline": 1.7615658362989324
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 530000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 554000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 526000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 482000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 447000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 417000,
+                  "checksum": "14528059679911116170"
+                },
+                {
+                  "ns": 417000,
+                  "checksum": "14528059679911116170"
+                }
+              ],
+              "medianNs": 482000,
+              "maxNs": 554000,
+              "medianRatioToBaseline": 1.7153024911032029
+            }
+          ]
+        },
+        {
+          "name": "scatter",
+          "expectedChecksum": "903820524649875395",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 222000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 211000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 213000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 213000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 207000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 213000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 212000,
+                  "checksum": "903820524649875395"
+                }
+              ],
+              "medianNs": 213000,
+              "maxNs": 222000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1295000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 1231000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 1238000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 1251000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 1249000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 1245000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 1252000,
+                  "checksum": "903820524649875395"
+                }
+              ],
+              "medianNs": 1249000,
+              "maxNs": 1295000,
+              "medianRatioToBaseline": 5.863849765258216
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 555000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 555000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 549000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 570000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 561000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 566000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 570000,
+                  "checksum": "903820524649875395"
+                }
+              ],
+              "medianNs": 561000,
+              "maxNs": 570000,
+              "medianRatioToBaseline": 2.6338028169014085
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 439000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 441000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 440000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 445000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 444000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 445000,
+                  "checksum": "903820524649875395"
+                },
+                {
+                  "ns": 448000,
+                  "checksum": "903820524649875395"
+                }
+              ],
+              "medianNs": 444000,
+              "maxNs": 448000,
+              "medianRatioToBaseline": 2.084507042253521
+            }
+          ]
+        },
+        {
+          "name": "chase",
+          "expectedChecksum": "11883386420247077776",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 352000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 350000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 350000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 349000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 350000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 349000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 349000,
+                  "checksum": "11883386420247077776"
+                }
+              ],
+              "medianNs": 350000,
+              "maxNs": 352000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1107000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 1141000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 1123000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 1112000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 1125000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 1143000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 1123000,
+                  "checksum": "11883386420247077776"
+                }
+              ],
+              "medianNs": 1123000,
+              "maxNs": 1143000,
+              "medianRatioToBaseline": 3.2085714285714286
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 312000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 345000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 318000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 318000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 339000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 323000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 317000,
+                  "checksum": "11883386420247077776"
+                }
+              ],
+              "medianNs": 318000,
+              "maxNs": 345000,
+              "medianRatioToBaseline": 0.9085714285714286
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 313000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 314000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 322000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 313000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 314000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 314000,
+                  "checksum": "11883386420247077776"
+                },
+                {
+                  "ns": 314000,
+                  "checksum": "11883386420247077776"
+                }
+              ],
+              "medianNs": 314000,
+              "maxNs": 322000,
+              "medianRatioToBaseline": 0.8971428571428571
+            }
+          ]
+        }
+      ],
+      "packedToBaselineAllocationRatio": 0.85625,
+      "fixture": "fixture-4096-local.bin",
+      "fixtureSha256": "70ecf6eea6d733fd0721f555567fc9189b23d724e05ec647435e9599e991de14",
+      "priorFixtureSha256": "70ecf6eea6d733fd0721f555567fc9189b23d724e05ec647435e9599e991de14",
+      "logicalCanonicalBytes": 1485557,
+      "packedImageCanonicalBytes": 1026888,
+      "layoutDigest": "aether.packed-layout/1:b3:cee4614b3776ac2315079834039e4923a329bfe5915ece785349b244a09232da",
+      "imageDigest": "aether.packed-heap-image/1:b3:d17291fb5e4309a11abf824064b2cb3584b0aa65d954a2925a3a3e9744a1a186"
+    },
+    {
+      "count": 4096,
+      "distribution": "cluster",
+      "mappingChecksum": "16082453967815437705",
+      "aliasTargets": 64,
+      "baselineBytes": 163840,
+      "packedBytes": 140288,
+      "baselineRowBytes": 40,
+      "packedRowBytes": 32,
+      "payloadBytes": 9216,
+      "patterns": [
+        {
+          "name": "scan",
+          "expectedChecksum": "6231885276781622782",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 199000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 191000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 199000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 203000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 200000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 200000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 200000,
+                  "checksum": "6231885276781622782"
+                }
+              ],
+              "medianNs": 200000,
+              "maxNs": 203000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1113000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 1121000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 1116000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 1131000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 1119000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 1120000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 1130000,
+                  "checksum": "6231885276781622782"
+                }
+              ],
+              "medianNs": 1120000,
+              "maxNs": 1131000,
+              "medianRatioToBaseline": 5.6
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 347000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 349000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 342000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 348000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 347000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 349000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 349000,
+                  "checksum": "6231885276781622782"
+                }
+              ],
+              "medianNs": 348000,
+              "maxNs": 349000,
+              "medianRatioToBaseline": 1.74
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 347000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 344000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 344000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 367000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 345000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 344000,
+                  "checksum": "6231885276781622782"
+                },
+                {
+                  "ns": 345000,
+                  "checksum": "6231885276781622782"
+                }
+              ],
+              "medianNs": 345000,
+              "maxNs": 367000,
+              "medianRatioToBaseline": 1.725
+            }
+          ]
+        },
+        {
+          "name": "scatter",
+          "expectedChecksum": "14868416967522424347",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 207000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 209000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 209000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 209000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 220000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 212000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 207000,
+                  "checksum": "14868416967522424347"
+                }
+              ],
+              "medianNs": 209000,
+              "maxNs": 220000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1275000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 1247000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 1249000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 1251000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 1271000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 1239000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 1249000,
+                  "checksum": "14868416967522424347"
+                }
+              ],
+              "medianNs": 1249000,
+              "maxNs": 1275000,
+              "medianRatioToBaseline": 5.976076555023924
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 556000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 555000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 561000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 562000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 561000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 555000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 560000,
+                  "checksum": "14868416967522424347"
+                }
+              ],
+              "medianNs": 560000,
+              "maxNs": 562000,
+              "medianRatioToBaseline": 2.6794258373205744
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 447000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 475000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 447000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 447000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 447000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 458000,
+                  "checksum": "14868416967522424347"
+                },
+                {
+                  "ns": 447000,
+                  "checksum": "14868416967522424347"
+                }
+              ],
+              "medianNs": 447000,
+              "maxNs": 475000,
+              "medianRatioToBaseline": 2.138755980861244
+            }
+          ]
+        },
+        {
+          "name": "chase",
+          "expectedChecksum": "9188801458223994624",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 199000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 199000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 199000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 199000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 199000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 202000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 199000,
+                  "checksum": "9188801458223994624"
+                }
+              ],
+              "medianNs": 199000,
+              "maxNs": 202000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1089000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 1106000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 1072000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 1073000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 1076000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 1075000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 1076000,
+                  "checksum": "9188801458223994624"
+                }
+              ],
+              "medianNs": 1076000,
+              "maxNs": 1106000,
+              "medianRatioToBaseline": 5.407035175879397
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 407000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 408000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 408000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 408000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 407000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 419000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 414000,
+                  "checksum": "9188801458223994624"
+                }
+              ],
+              "medianNs": 408000,
+              "maxNs": 419000,
+              "medianRatioToBaseline": 2.050251256281407
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 325000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 318000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 317000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 315000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 315000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 316000,
+                  "checksum": "9188801458223994624"
+                },
+                {
+                  "ns": 318000,
+                  "checksum": "9188801458223994624"
+                }
+              ],
+              "medianNs": 317000,
+              "maxNs": 325000,
+              "medianRatioToBaseline": 1.592964824120603
+            }
+          ]
+        }
+      ],
+      "packedToBaselineAllocationRatio": 0.85625,
+      "fixture": "fixture-4096-cluster.bin",
+      "fixtureSha256": "c158d4bda77d800493656f3558fbce3cd314276abad3c0b513875643b6b70107",
+      "priorFixtureSha256": "c158d4bda77d800493656f3558fbce3cd314276abad3c0b513875643b6b70107",
+      "logicalCanonicalBytes": 1485448,
+      "packedImageCanonicalBytes": 1026888,
+      "layoutDigest": "aether.packed-layout/1:b3:cee4614b3776ac2315079834039e4923a329bfe5915ece785349b244a09232da",
+      "imageDigest": "aether.packed-heap-image/1:b3:12ee224eac06a83da343990641bc9b7c8826c4e851e3217051f8c8978dcb9c8c"
+    },
+    {
+      "count": 4096,
+      "distribution": "wide",
+      "mappingChecksum": "9054116064847471758",
+      "aliasTargets": 1067,
+      "baselineBytes": 163840,
+      "packedBytes": 143360,
+      "baselineRowBytes": 40,
+      "packedRowBytes": 32,
+      "payloadBytes": 12288,
+      "patterns": [
+        {
+          "name": "scan",
+          "expectedChecksum": "3163468589166304987",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 200000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 180000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 179000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 200000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 197000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 200000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 200000,
+                  "checksum": "3163468589166304987"
+                }
+              ],
+              "medianNs": 200000,
+              "maxNs": 200000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1528000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 1512000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 1474000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 1496000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 1524000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 1537000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 1560000,
+                  "checksum": "3163468589166304987"
+                }
+              ],
+              "medianNs": 1524000,
+              "maxNs": 1560000,
+              "medianRatioToBaseline": 7.62
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 347000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 356000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 330000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 339000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 349000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 346000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 339000,
+                  "checksum": "3163468589166304987"
+                }
+              ],
+              "medianNs": 346000,
+              "maxNs": 356000,
+              "medianRatioToBaseline": 1.73
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 524000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 486000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 490000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 484000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 497000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 488000,
+                  "checksum": "3163468589166304987"
+                },
+                {
+                  "ns": 486000,
+                  "checksum": "3163468589166304987"
+                }
+              ],
+              "medianNs": 488000,
+              "maxNs": 524000,
+              "medianRatioToBaseline": 2.44
+            }
+          ]
+        },
+        {
+          "name": "scatter",
+          "expectedChecksum": "10124355756359229213",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 218000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 222000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 220000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 225000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 219000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 214000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 220000,
+                  "checksum": "10124355756359229213"
+                }
+              ],
+              "medianNs": 220000,
+              "maxNs": 225000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1876000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 1828000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 1827000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 1831000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 1830000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 1849000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 1826000,
+                  "checksum": "10124355756359229213"
+                }
+              ],
+              "medianNs": 1830000,
+              "maxNs": 1876000,
+              "medianRatioToBaseline": 8.318181818181818
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 1052000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 966000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 991000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 967000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 956000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 966000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 965000,
+                  "checksum": "10124355756359229213"
+                }
+              ],
+              "medianNs": 966000,
+              "maxNs": 1052000,
+              "medianRatioToBaseline": 4.390909090909091
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 950000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 956000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 954000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 960000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 954000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 956000,
+                  "checksum": "10124355756359229213"
+                },
+                {
+                  "ns": 950000,
+                  "checksum": "10124355756359229213"
+                }
+              ],
+              "medianNs": 954000,
+              "maxNs": 960000,
+              "medianRatioToBaseline": 4.336363636363636
+            }
+          ]
+        },
+        {
+          "name": "chase",
+          "expectedChecksum": "15050647575018644602",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 371000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 321000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 357000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 348000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 314000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 321000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 321000,
+                  "checksum": "15050647575018644602"
+                }
+              ],
+              "medianNs": 321000,
+              "maxNs": 371000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1717000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 1652000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 1600000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 1621000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 1632000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 1618000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 1640000,
+                  "checksum": "15050647575018644602"
+                }
+              ],
+              "medianNs": 1632000,
+              "maxNs": 1717000,
+              "medianRatioToBaseline": 5.08411214953271
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 687000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 685000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 685000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 711000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 692000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 752000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 668000,
+                  "checksum": "15050647575018644602"
+                }
+              ],
+              "medianNs": 687000,
+              "maxNs": 752000,
+              "medianRatioToBaseline": 2.1401869158878504
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 728000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 724000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 723000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 736000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 728000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 723000,
+                  "checksum": "15050647575018644602"
+                },
+                {
+                  "ns": 705000,
+                  "checksum": "15050647575018644602"
+                }
+              ],
+              "medianNs": 724000,
+              "maxNs": 736000,
+              "medianRatioToBaseline": 2.2554517133956384
+            }
+          ]
+        }
+      ],
+      "packedToBaselineAllocationRatio": 0.875,
+      "fixture": "fixture-4096-wide.bin",
+      "fixtureSha256": "32eb1fe48c0f5b7091bb1745fdf2d8ec75db2dcb3546a77c71c69c187da635df",
+      "priorFixtureSha256": "32eb1fe48c0f5b7091bb1745fdf2d8ec75db2dcb3546a77c71c69c187da635df",
+      "logicalCanonicalBytes": 1485530,
+      "packedImageCanonicalBytes": 1031140,
+      "layoutDigest": "aether.packed-layout/1:b3:299b3584f25fa0c0a1d2cbbfd6d7ee089d0b6031bfe79aea814304b4c7f00872",
+      "imageDigest": "aether.packed-heap-image/1:b3:f2b51e3b841ef1d978986df02582d85d387e19f2ba7606588442198c7dc0089d"
+    },
+    {
+      "count": 16384,
+      "distribution": "local",
+      "mappingChecksum": "219119496863073254",
+      "aliasTargets": 0,
+      "baselineBytes": 655360,
+      "packedBytes": 561152,
+      "baselineRowBytes": 40,
+      "packedRowBytes": 32,
+      "payloadBytes": 36864,
+      "patterns": [
+        {
+          "name": "scan",
+          "expectedChecksum": "4469080007345563332",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 204000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 200000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 203000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 201000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 206000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 201000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 200000,
+                  "checksum": "4469080007345563332"
+                }
+              ],
+              "medianNs": 201000,
+              "maxNs": 206000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1123000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 1117000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 1114000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 1106000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 1142000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 1121000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 1116000,
+                  "checksum": "4469080007345563332"
+                }
+              ],
+              "medianNs": 1117000,
+              "maxNs": 1142000,
+              "medianRatioToBaseline": 5.557213930348259
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 349000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 336000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 346000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 349000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 352000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 343000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 346000,
+                  "checksum": "4469080007345563332"
+                }
+              ],
+              "medianNs": 346000,
+              "maxNs": 352000,
+              "medianRatioToBaseline": 1.7213930348258706
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 322000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 323000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 320000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 320000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 320000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 326000,
+                  "checksum": "4469080007345563332"
+                },
+                {
+                  "ns": 323000,
+                  "checksum": "4469080007345563332"
+                }
+              ],
+              "medianNs": 322000,
+              "maxNs": 326000,
+              "medianRatioToBaseline": 1.6019900497512438
+            }
+          ]
+        },
+        {
+          "name": "scatter",
+          "expectedChecksum": "10516270240551770202",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 238000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 239000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 238000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 232000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 224000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 252000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 228000,
+                  "checksum": "10516270240551770202"
+                }
+              ],
+              "medianNs": 238000,
+              "maxNs": 252000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1657000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 1670000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 1593000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 1590000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 1614000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 1608000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 1595000,
+                  "checksum": "10516270240551770202"
+                }
+              ],
+              "medianNs": 1608000,
+              "maxNs": 1670000,
+              "medianRatioToBaseline": 6.756302521008403
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 701000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 691000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 691000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 693000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 691000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 717000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 703000,
+                  "checksum": "10516270240551770202"
+                }
+              ],
+              "medianNs": 693000,
+              "maxNs": 717000,
+              "medianRatioToBaseline": 2.911764705882353
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 548000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 551000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 548000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 549000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 559000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 561000,
+                  "checksum": "10516270240551770202"
+                },
+                {
+                  "ns": 544000,
+                  "checksum": "10516270240551770202"
+                }
+              ],
+              "medianNs": 549000,
+              "maxNs": 561000,
+              "medianRatioToBaseline": 2.30672268907563
+            }
+          ]
+        },
+        {
+          "name": "chase",
+          "expectedChecksum": "3527938233234160464",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 350000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 358000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 350000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 355000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 352000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 353000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 358000,
+                  "checksum": "3527938233234160464"
+                }
+              ],
+              "medianNs": 353000,
+              "maxNs": 358000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1112000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 1121000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 1133000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 1111000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 1127000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 1134000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 1123000,
+                  "checksum": "3527938233234160464"
+                }
+              ],
+              "medianNs": 1123000,
+              "maxNs": 1134000,
+              "medianRatioToBaseline": 3.181303116147309
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 322000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 319000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 316000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 328000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 322000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 316000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 319000,
+                  "checksum": "3527938233234160464"
+                }
+              ],
+              "medianNs": 319000,
+              "maxNs": 328000,
+              "medianRatioToBaseline": 0.9036827195467422
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 314000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 314000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 315000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 315000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 317000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 312000,
+                  "checksum": "3527938233234160464"
+                },
+                {
+                  "ns": 314000,
+                  "checksum": "3527938233234160464"
+                }
+              ],
+              "medianNs": 314000,
+              "maxNs": 317000,
+              "medianRatioToBaseline": 0.8895184135977338
+            }
+          ]
+        }
+      ],
+      "packedToBaselineAllocationRatio": 0.85625,
+      "fixture": "fixture-16384-local.bin",
+      "fixtureSha256": "79487962618eaa2dfb734d4edf0534f8e3717cb45c21449ca906027959730745",
+      "priorFixtureSha256": "79487962618eaa2dfb734d4edf0534f8e3717cb45c21449ca906027959730745",
+      "logicalCanonicalBytes": 5961628,
+      "packedImageCanonicalBytes": 4128389,
+      "layoutDigest": "aether.packed-layout/1:b3:cee4614b3776ac2315079834039e4923a329bfe5915ece785349b244a09232da",
+      "imageDigest": "aether.packed-heap-image/1:b3:7b9c00a8b07d462a5ee01ba951ada5860a527ddd7de57fe644930a83423663bc"
+    },
+    {
+      "count": 16384,
+      "distribution": "cluster",
+      "mappingChecksum": "18407440459616464244",
+      "aliasTargets": 256,
+      "baselineBytes": 655360,
+      "packedBytes": 561152,
+      "baselineRowBytes": 40,
+      "packedRowBytes": 32,
+      "payloadBytes": 36864,
+      "patterns": [
+        {
+          "name": "scan",
+          "expectedChecksum": "12221654514019928164",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 203000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 240000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 206000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 200000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 200000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 203000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 202000,
+                  "checksum": "12221654514019928164"
+                }
+              ],
+              "medianNs": 203000,
+              "maxNs": 240000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1120000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 1115000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 1128000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 1098000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 1102000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 1101000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 1115000,
+                  "checksum": "12221654514019928164"
+                }
+              ],
+              "medianNs": 1115000,
+              "maxNs": 1128000,
+              "medianRatioToBaseline": 5.4926108374384235
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 334000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 379000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 349000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 326000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 330000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 327000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 330000,
+                  "checksum": "12221654514019928164"
+                }
+              ],
+              "medianNs": 330000,
+              "maxNs": 379000,
+              "medianRatioToBaseline": 1.625615763546798
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 342000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 400000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 353000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 338000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 337000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 342000,
+                  "checksum": "12221654514019928164"
+                },
+                {
+                  "ns": 342000,
+                  "checksum": "12221654514019928164"
+                }
+              ],
+              "medianNs": 342000,
+              "maxNs": 400000,
+              "medianRatioToBaseline": 1.6847290640394088
+            }
+          ]
+        },
+        {
+          "name": "scatter",
+          "expectedChecksum": "2764576585910532008",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 231000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 239000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 237000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 236000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 265000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 234000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 226000,
+                  "checksum": "2764576585910532008"
+                }
+              ],
+              "medianNs": 236000,
+              "maxNs": 265000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1584000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 1598000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 1570000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 1592000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 1613000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 1623000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 1579000,
+                  "checksum": "2764576585910532008"
+                }
+              ],
+              "medianNs": 1592000,
+              "maxNs": 1623000,
+              "medianRatioToBaseline": 6.745762711864407
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 713000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 685000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 674000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 685000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 696000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 682000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 689000,
+                  "checksum": "2764576585910532008"
+                }
+              ],
+              "medianNs": 685000,
+              "maxNs": 713000,
+              "medianRatioToBaseline": 2.902542372881356
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 616000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 541000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 551000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 546000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 548000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 536000,
+                  "checksum": "2764576585910532008"
+                },
+                {
+                  "ns": 538000,
+                  "checksum": "2764576585910532008"
+                }
+              ],
+              "medianNs": 546000,
+              "maxNs": 616000,
+              "medianRatioToBaseline": 2.3135593220338984
+            }
+          ]
+        },
+        {
+          "name": "chase",
+          "expectedChecksum": "424325825603094528",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 199000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 202000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 205000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 201000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 178000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 199000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 198000,
+                  "checksum": "424325825603094528"
+                }
+              ],
+              "medianNs": 199000,
+              "maxNs": 205000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1050000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 1076000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 1061000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 1078000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 1067000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 1057000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 1088000,
+                  "checksum": "424325825603094528"
+                }
+              ],
+              "medianNs": 1067000,
+              "maxNs": 1088000,
+              "medianRatioToBaseline": 5.36180904522613
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 663000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 668000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 671000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 670000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 659000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 659000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 660000,
+                  "checksum": "424325825603094528"
+                }
+              ],
+              "medianNs": 663000,
+              "maxNs": 671000,
+              "medianRatioToBaseline": 3.3316582914572863
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 299000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 298000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 287000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 298000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 295000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 294000,
+                  "checksum": "424325825603094528"
+                },
+                {
+                  "ns": 295000,
+                  "checksum": "424325825603094528"
+                }
+              ],
+              "medianNs": 295000,
+              "maxNs": 299000,
+              "medianRatioToBaseline": 1.4824120603015076
+            }
+          ]
+        }
+      ],
+      "packedToBaselineAllocationRatio": 0.85625,
+      "fixture": "fixture-16384-cluster.bin",
+      "fixtureSha256": "2a66df79b769687c7b0f0f0e4dfc0ef2993d6f14172069538cf033d4309cc0e9",
+      "priorFixtureSha256": "2a66df79b769687c7b0f0f0e4dfc0ef2993d6f14172069538cf033d4309cc0e9",
+      "logicalCanonicalBytes": 5961470,
+      "packedImageCanonicalBytes": 4128389,
+      "layoutDigest": "aether.packed-layout/1:b3:cee4614b3776ac2315079834039e4923a329bfe5915ece785349b244a09232da",
+      "imageDigest": "aether.packed-heap-image/1:b3:40854adaade6903c64dd10c72a51e516288e78a8de793832a78340c10d860150"
+    },
+    {
+      "count": 16384,
+      "distribution": "wide",
+      "mappingChecksum": "17407760161213417352",
+      "aliasTargets": 4310,
+      "baselineBytes": 655360,
+      "packedBytes": 577536,
+      "baselineRowBytes": 40,
+      "packedRowBytes": 32,
+      "payloadBytes": 53248,
+      "patterns": [
+        {
+          "name": "scan",
+          "expectedChecksum": "16857059862516260969",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 201000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 203000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 203000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 202000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 205000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 216000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 203000,
+                  "checksum": "16857059862516260969"
+                }
+              ],
+              "medianNs": 203000,
+              "maxNs": 216000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1614000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 1610000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 1653000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 1636000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 1633000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 1646000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 1639000,
+                  "checksum": "16857059862516260969"
+                }
+              ],
+              "medianNs": 1636000,
+              "maxNs": 1653000,
+              "medianRatioToBaseline": 8.05911330049261
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 423000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 435000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 449000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 435000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 425000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 427000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 435000,
+                  "checksum": "16857059862516260969"
+                }
+              ],
+              "medianNs": 435000,
+              "maxNs": 449000,
+              "medianRatioToBaseline": 2.142857142857143
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 633000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 640000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 639000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 662000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 644000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 651000,
+                  "checksum": "16857059862516260969"
+                },
+                {
+                  "ns": 642000,
+                  "checksum": "16857059862516260969"
+                }
+              ],
+              "medianNs": 642000,
+              "maxNs": 662000,
+              "medianRatioToBaseline": 3.1625615763546797
+            }
+          ]
+        },
+        {
+          "name": "scatter",
+          "expectedChecksum": "1892049616767325979",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 248000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 293000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 279000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 274000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 268000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 270000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 258000,
+                  "checksum": "1892049616767325979"
+                }
+              ],
+              "medianNs": 270000,
+              "maxNs": 293000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 2480000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 2347000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 2439000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 2432000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 2434000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 2373000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 2386000,
+                  "checksum": "1892049616767325979"
+                }
+              ],
+              "medianNs": 2432000,
+              "maxNs": 2480000,
+              "medianRatioToBaseline": 9.007407407407408
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 1150000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1146000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1156000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1170000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1137000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1169000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1156000,
+                  "checksum": "1892049616767325979"
+                }
+              ],
+              "medianNs": 1156000,
+              "maxNs": 1170000,
+              "medianRatioToBaseline": 4.281481481481482
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 1155000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1158000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1174000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1170000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1154000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1169000,
+                  "checksum": "1892049616767325979"
+                },
+                {
+                  "ns": 1186000,
+                  "checksum": "1892049616767325979"
+                }
+              ],
+              "medianNs": 1169000,
+              "maxNs": 1186000,
+              "medianRatioToBaseline": 4.32962962962963
+            }
+          ]
+        },
+        {
+          "name": "chase",
+          "expectedChecksum": "13489820213371270402",
+          "arms": [
+            {
+              "name": "baseline",
+              "samples": [
+                {
+                  "ns": 324000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 356000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 342000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 337000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 331000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 314000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 336000,
+                  "checksum": "13489820213371270402"
+                }
+              ],
+              "medianNs": 336000,
+              "maxNs": 356000,
+              "medianRatioToBaseline": 1
+            },
+            {
+              "name": "packedAbi",
+              "samples": [
+                {
+                  "ns": 1687000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 1693000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 1712000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 1653000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 1747000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 1649000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 1677000,
+                  "checksum": "13489820213371270402"
+                }
+              ],
+              "medianNs": 1687000,
+              "maxNs": 1747000,
+              "medianRatioToBaseline": 5.020833333333333
+            },
+            {
+              "name": "packedValidated",
+              "samples": [
+                {
+                  "ns": 677000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 684000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 667000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 689000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 663000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 676000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 668000,
+                  "checksum": "13489820213371270402"
+                }
+              ],
+              "medianNs": 676000,
+              "maxNs": 689000,
+              "medianRatioToBaseline": 2.011904761904762
+            },
+            {
+              "name": "packedFusedChecked",
+              "samples": [
+                {
+                  "ns": 722000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 749000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 775000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 730000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 756000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 738000,
+                  "checksum": "13489820213371270402"
+                },
+                {
+                  "ns": 733000,
+                  "checksum": "13489820213371270402"
+                }
+              ],
+              "medianNs": 738000,
+              "maxNs": 775000,
+              "medianRatioToBaseline": 2.1964285714285716
+            }
+          ]
+        }
+      ],
+      "packedToBaselineAllocationRatio": 0.88125,
+      "fixture": "fixture-16384-wide.bin",
+      "fixtureSha256": "aed17cae3e8da3d530e864f52da02607ad3c338bdd7c6b77afece1c2862d6891",
+      "priorFixtureSha256": "aed17cae3e8da3d530e864f52da02607ad3c338bdd7c6b77afece1c2862d6891",
+      "logicalCanonicalBytes": 5961598,
+      "packedImageCanonicalBytes": 4152139,
+      "layoutDigest": "aether.packed-layout/1:b3:e22df88e450a74d2fea902f6ca5df30e7495c39eed002b3d970b2a19b4edcc82",
+      "imageDigest": "aether.packed-heap-image/1:b3:94ecd91b897c94112ee9ae74fc6450bb6cf6fef3c9adcab996efdc0274382386"
+    }
+  ]
+}
