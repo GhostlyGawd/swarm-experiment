@@ -14,7 +14,7 @@ import { domainDigest, type ExecutionManifestV1 } from '../../src/fabric/identit
 import { checkpointDigest } from '../../src/tier3/resumable-state.ts';
 import { ResumableRuntime } from '../../src/tier3/resumable-runtime.ts';
 import { PackedHeap, packResumableCheckpoint, type PackedLayout } from '../../src/tier3/packed-heap.ts';
-import { PackedNativeProcessRunner, PackedNativeRun, type NativeOperation } from '../../src/tier4/packed-native-process.ts';
+import { executePackedCheckpointNative, PackedNativeProcessRunner, PackedNativeRun, type NativeOperation } from '../../src/tier4/packed-native-process.ts';
 
 test('V2 runner executes a private copy of digest-pinned bytes and binds an unforgeable native run', () => {
   const directory = mkdtempSync(join(tmpdir(), 'aether-packed-native-production-'));
@@ -85,7 +85,13 @@ test('V2 runner executes a private copy of digest-pinned bytes and binds an unfo
     exposed.bytes = source.heap.bytes;
     assert.equal(PackedNativeProcessRunner.assertRun(run, request).imageDigest, request.candidateImageDigest);
 
-    writeFileSync(executable, 'changed executable bytes');
+    const script = join(directory, 'script');
+    writeFileSync(script, '#!/bin/sh\necho H -\n', { mode: 0o700 });
+    assert.throws(() => executePackedCheckpointNative({ packed: source, program: runtime.program,
+      expectedSnapshotDigest: source.snapshotDigest, expectedLayoutDigest: source.heap.layoutDigest,
+      executable: script, expectedExecutableSha256: `sha256:${createHash('sha256').update(readFileSync(script)).digest('hex')}`,
+      operations: [] }), /must be a binary image/);
+    writeFileSync(executable, Buffer.concat([readFileSync(executable), Buffer.from('changed executable bytes')]));
     assert.throws(() => PackedNativeProcessRunner.executeVerified(runner, source, request), /digest mismatch/);
     assert.equal(PackedNativeProcessRunner.executionCount(runner), 2);
   } finally { rmSync(directory, { recursive: true, force: true }); }

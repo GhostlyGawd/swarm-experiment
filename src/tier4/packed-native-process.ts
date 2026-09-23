@@ -59,6 +59,10 @@ function readBoundedExecutable(path: string): Buffer {
     }
     if (readSync(fd, Buffer.alloc(1), 0, 1, null) !== 0)
       throw new TypeError('native executable changed while reading');
+    const magic = bytes.subarray(0, 4).toString('hex');
+    if (!['7f454c46', 'feedface', 'feedfacf', 'cefaedfe', 'cffaedfe', 'cafebabe', 'bebafeca', 'cafebabf', 'bfbafeca'].includes(magic) &&
+        bytes.subarray(0, 2).toString('hex') !== '4d5a')
+      throw new TypeError('native executable must be a binary image');
     return bytes;
   } finally { closeSync(fd); }
 }
