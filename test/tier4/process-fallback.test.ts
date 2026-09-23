@@ -183,6 +183,44 @@ test('SIGKILL after host call intent is recovered only with durable noncommit ev
   } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
 
+test('SIGKILL at effect request can abort only after the durable pre-dispatch state is inspected', async () => {
+  const directory = temp(), f = processFallbackFixture(directory, 'post-effect-fault'); let host: ProcessHost | undefined;
+  try {
+    const fixtureUrl = pathToFileURL(resolve('test/tier4/process-fallback-fixture.ts')).href;
+    const script = `const {processFallbackFixture}=await import(${JSON.stringify(fixtureUrl)});const f=processFallbackFixture(${JSON.stringify(directory)},'post-effect-fault');const {supervisor}=await f.open({key:${JSON.stringify(f.key)},hostPhase:p=>{if(p==='effect-requested')process.kill(process.pid,'SIGKILL')}});await supervisor.call([{tag:'int',value:'7'}],{operationId:'crash-before-dispatch'});`;
+    const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], { encoding: 'utf8', timeout: 15_000 });
+    assert.equal(child.signal, 'SIGKILL', child.stderr);
+    const opened = await f.open(); host = opened.host;
+    const id = host.status().unresolved[0];
+    const disposition = host.operationEffectDisposition(id);
+    assert.equal(disposition?.effects[0].state, 'requested');
+    assert.equal(disposition?.safeToAbortBeforeEffects, true);
+    const result = await opened.supervisor.call(arg, { operationId: 'crash-before-dispatch' });
+    assert.equal(result.state, 'completed'); if (result.state === 'completed') assert.equal(result.tier, 2);
+    assert.equal(f.calls(), 1);
+  } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('SIGKILL inside the sink leaves dispatch indeterminate and never starts Tier 2', async () => {
+  const directory = temp(), f = processFallbackFixture(directory, 'post-effect-fault'); let host: ProcessHost | undefined;
+  try {
+    const fixtureUrl = pathToFileURL(resolve('test/tier4/process-fallback-fixture.ts')).href;
+    const script = `const {processFallbackFixture}=await import(${JSON.stringify(fixtureUrl)});const f=processFallbackFixture(${JSON.stringify(directory)},'post-effect-fault',undefined,undefined,()=>process.kill(process.pid,'SIGKILL'));const {supervisor}=await f.open({key:${JSON.stringify(f.key)}});await supervisor.call([{tag:'int',value:'7'}],{operationId:'crash-inside-sink'});`;
+    const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], { encoding: 'utf8', timeout: 15_000 });
+    assert.equal(child.signal, 'SIGKILL', child.stderr);
+    const opened = await f.open(); host = opened.host;
+    const id = host.status().unresolved[0];
+    const disposition = host.operationEffectDisposition(id);
+    assert.equal(disposition?.possibleExternalCommit, true);
+    assert.equal(disposition?.effects[0].state, 'dispatching');
+    const blocked = await opened.supervisor.call(arg, { operationId: 'crash-inside-sink' });
+    assert.deepEqual(plain(blocked), { state: 'blocked', tier: 1, operationId: 'crash-inside-sink', code: 'effect_reconciliation_required', productionAuthorized: false });
+    assert.equal(f.calls(), 1);
+    assert.deepEqual(plain(await opened.supervisor.call(arg, { operationId: 'crash-inside-sink' })), plain(blocked));
+    assert.equal(f.calls(), 1);
+  } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('fresh Tier 2 grants are required after Tier 1 fails', async () => {
   const directory = temp(), f = processFallbackFixture(directory, 'pre-effect-fault'); let host: ProcessHost | undefined;
   try {

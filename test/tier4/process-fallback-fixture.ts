@@ -13,7 +13,7 @@ import { ProcessHost, type ProcessHostOptions, type ProcessHostPhase } from '../
 import { ProcessFallbackSupervisor, type ProcessFallbackOptions } from '../../src/tier4/process-fallback.ts';
 import type { TopologyPlan } from '../../src/tier4/topology.ts';
 
-export function processFallbackFixture(directory: string, mode: 'pre-effect-fault' | 'post-effect-fault' | 'both-fault' | 'tier1-success', fault?: ProcessFallbackOptions['fault'], hostPhase?: (phase: ProcessHostPhase) => void) {
+export function processFallbackFixture(directory: string, mode: 'pre-effect-fault' | 'post-effect-fault' | 'both-fault' | 'tier1-success', fault?: ProcessFallbackOptions['fault'], hostPhase?: (phase: ProcessHostPhase) => void, afterSink?: () => void) {
   const s = new SymbolSpace('process-fallback-fixture'), tier1 = s.define('tier1'), tier2 = s.define('tier2'), arg = s.define('arg');
   const effect = capability('cap:fallback:testsink'), registry = new CapabilityRegistry();
   registry.define({ name: effect, domain: 'fallback', operation: 'testsink', arity: 1, description: 'test sink', effectful: true });
@@ -31,7 +31,7 @@ export function processFallbackFixture(directory: string, mode: 'pre-effect-faul
   const { privateKey } = generateKeyPairSync('ed25519');
   const key = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
   const sinkCallsFile = join(directory, 'sink-calls');
-  const sink: EffectAdapter = { id: 'fallback-sink/1', semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true }, execute: () => { appendFileSync(sinkCallsFile, 'call\n'); return { tag: 'null' }; }, reconcile: () => ({ state: 'unknown' }) };
+  const sink: EffectAdapter = { id: 'fallback-sink/1', semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true }, execute: () => { appendFileSync(sinkCallsFile, 'call\n'); afterSink?.(); return { tag: 'null' }; }, reconcile: () => ({ state: 'unknown' }) };
   const hostOptions: ProcessHostOptions = { directory: join(directory, 'host'), module, manifest, plan, registry, sealer: new CapabilitySealer(new Uint8Array(32).fill(17), () => 100), authorizeRecovery: () => true, onPhase: phase => hostPhase?.(phase),
     effectRouterFactory: context => {
       const path = join(directory, 'effects', domainDigest('aether.process-fallback-effect-directory/1', context.operationId).split(':').at(-1)!);
