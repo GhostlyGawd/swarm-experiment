@@ -32,7 +32,15 @@ function validateFormula(value: unknown): asserts value is SmtFormula {
   };
   const args = (value: unknown, depth: number, kind: 'formula' | 'term'): void => {
     if (!Array.isArray(value) || nodeTypes.isProxy(value) || active.has(value) || value.length > MAX_NODES) throw new TypeError('invalid SMT arguments');
-    active.add(value); for (const item of value) visit(item, depth + 1, kind); active.delete(value);
+    if (Reflect.ownKeys(value).length !== value.length + 1) throw new TypeError('invalid SMT argument array shape');
+    active.add(value);
+    try {
+      for (let index = 0; index < value.length; index++) {
+        const item = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!item || !('value' in item)) throw new TypeError('SMT argument accessors and holes are forbidden');
+        visit(item.value, depth + 1, kind);
+      }
+    } finally { active.delete(value); }
   };
   const visit = (item: unknown, depth: number, kind: 'formula' | 'term'): void => {
     const k = enter(item, depth);

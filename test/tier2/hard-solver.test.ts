@@ -40,6 +40,10 @@ test('bounded input validation rejects cycles, accessors, bad scalars and oversi
   let invoked = false;
   const getter = Object.defineProperty({}, 'k', { get() { invoked = true; return 'true'; }, enumerable: true });
   assert.throws(() => proveWithHardCutoff(getter as s.SmtFormula), /tag/); assert.equal(invoked, false);
+  const array = [s.boolVar('p')];
+  Object.defineProperty(array, '0', { get() { invoked = true; return s.boolVar('p'); }, enumerable: true });
+  assert.throws(() => proveWithHardCutoff({ k: 'and', args: array }), /accessors/); assert.equal(invoked, false);
+  assert.throws(() => proveWithHardCutoff({ k: 'or', args: new Array(2) as s.SmtFormula[] }), /array shape/);
   assert.throws(() => proveWithHardCutoff(s.eq(s.num(10n ** 129n), s.num(0))), /integer/);
   assert.throws(() => proveWithHardCutoff(s.boolVar('p'), 1501), /cutoff/);
 });
