@@ -134,6 +134,11 @@ test('strict pure worker call cannot publish state after invocation grant revoca
       onPhase: phase => { if (phase === 'call-before-commit') { beforeCommit = true; epochs.revoke(PROCESS_INVOKE, []); } } };
     host = await ProcessHost.open(options);
     const ref = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(0) }, { operationId: 'alice' });
+    const invoke = host.issueScopedTokens(setter)[0];
+    const narrowed = grants.attenuate(invoke, { capability: PROCESS_INVOKE, audience: setter, path: [...invoke.body.path, 'limited'] }, 60_000);
+    await assert.rejects(host.call(setter, [reference(ref)], { operationId: 'narrow-invoke', tokens: [narrowed] }), /authority_denied/);
+    assert.equal(beforeCommit, false);
+    assert.deepEqual(balances(await host.snapshot()), ['0']);
     const result = await host.call(setter, [reference(ref)], { operationId: 'revoked-at-commit', tokens: host.issueScopedTokens(setter) });
     assert.equal(beforeCommit, true); assert.equal(result.state, 'indeterminate');
     if (result.state === 'indeterminate') assert.match(result.reason, /authority_denied/);

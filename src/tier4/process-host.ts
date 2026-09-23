@@ -738,7 +738,9 @@ export class ProcessHost {
         const matches = tokens.filter(token => (token as ScopedGrantV2).body.capability === cap);
         const scoped = matches[0] as ScopedGrantV2 | undefined;
         if (!scoped || matches.length !== 1 || basePath.some((part, index) => scoped.body.path[index] !== part)
-          || !this.options.scopedGrants.verify(scoped, { capability: cap, audience: symbol, path: scoped.body.path })) throw new Error(`authority_denied: missing valid ${cap}`);
+          || cap === PROCESS_INVOKE && scoped.body.path.length !== basePath.length
+          || !this.options.scopedGrants.verify(scoped, { capability: cap, audience: symbol,
+            path: cap === PROCESS_INVOKE ? basePath : scoped.body.path })) throw new Error(`authority_denied: missing valid ${cap}`);
       }
       this.checkRevocations(symbol, unit, generation, 'live'); return;
     }
