@@ -1,0 +1,11 @@
+✔ both AE4 grammars restore every imported V7 root, identity and byte-exact term (604.555166ms)
+✔ unshipped dependencies and unvalidated snapshot objects are rejected (12.014708ms)
+✔ complete message rejects target substitution, truncation and extra bytes (50.53025ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 810.820708
