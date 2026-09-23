@@ -13,11 +13,12 @@
  */
 
 import type { CapabilityName } from '../tier1/ids.ts';
-import { capability } from '../tier1/ids.ts';
+import { capability, capability as capabilityName } from '../tier1/ids.ts';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { atomicWrite, encodeStored, readStored } from '../tier1/persistence.ts';
+import { exactObject, identifier } from '../fabric/encoding.ts';
 
 /** What a capability lets its holder do, and to what. */
 export interface CapabilityDescriptor {
@@ -230,8 +231,14 @@ export class CapabilitySealer {
 
   constructor(key: Uint8Array = randomBytes(32), clock: () => number = () => Date.now()) {
     if (key.byteLength < 32) throw new RangeError('capability sealing keys must be at least 32 bytes');
-    this.key = key;
+    this.key = Buffer.from(key);
     this.clock = clock;
+  }
+
+  private now(): number {
+    const value = this.clock();
+    if (!Number.isSafeInteger(value) || value < 0) throw new TypeError('invalid capability clock');
+    return value;
   }
 
   private mac(token: Omit<CapabilityToken, 'signature'>): string {
@@ -241,25 +248,37 @@ export class CapabilitySealer {
   }
 
   issue(capability: CapabilityName, scope: string, ttlMs = 60_000): CapabilityToken {
+    capability = capabilityName(capability); identifier(scope);
+    if (!Number.isSafeInteger(ttlMs) || ttlMs < 1) throw new TypeError('invalid capability lifetime');
+    const expiresAt = this.now() + ttlMs;
+    if (!Number.isSafeInteger(expiresAt)) throw new RangeError('capability expiry overflow');
     const unsigned = {
-      capability, scope, expiresAt: this.clock() + ttlMs,
+      capability, scope, expiresAt,
       nonce: randomBytes(16).toString('hex'),
     };
     return { ...unsigned, signature: this.mac(unsigned) };
   }
 
-  verify(token: CapabilityToken, scope = token.scope): boolean {
-    if (token.scope !== scope || token.expiresAt < this.clock()) return false;
-    const expected = Buffer.from(this.mac(token), 'hex');
-    const actual = Buffer.from(token.signature, 'hex');
-    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  verify(token: CapabilityToken, scope?: string): boolean {
+    try {
+      const row = exactObject(token, ['capability', 'scope', 'expiresAt', 'nonce', 'signature']);
+      const targetScope = scope ?? row.scope;
+      capabilityName(row.capability as string); identifier(row.scope); identifier(targetScope);
+      if (!Number.isSafeInteger(row.expiresAt) || (row.expiresAt as number) < 1 || typeof row.nonce !== 'string' || !/^[0-9a-f]{32}$/.test(row.nonce) || typeof row.signature !== 'string' || !/^[0-9a-f]{64}$/.test(row.signature)) return false;
+      if (token.scope !== targetScope || token.expiresAt <= this.now()) return false;
+      const expected = Buffer.from(this.mac(token), 'hex');
+      const actual = Buffer.from(token.signature, 'hex');
+      return expected.length === actual.length && timingSafeEqual(expected, actual);
+    } catch { return false; }
   }
 
-  /** Re-seal a subset for a narrower scope; widening is impossible without the key. */
+  /** Legacy opaque scopes cannot be ordered; subset only within the same scope.
+   * Hierarchical resource attenuation uses ScopedGrantAuthority v2. */
   attenuate(tokens: readonly CapabilityToken[], capabilities: readonly CapabilityName[], scope: string): CapabilityToken[] {
     const allowed = new Set(capabilities);
-    return tokens
-      .filter((token) => this.verify(token) && allowed.has(token.capability))
-      .map((token) => this.issue(token.capability, scope, Math.max(0, token.expiresAt - this.clock())));
+    const valid = tokens.filter(token => this.verify(token));
+    if (valid.some(token => token.scope !== scope)) throw new Error('legacy capability scope cannot be changed by attenuation');
+    return valid.filter(token => allowed.has(token.capability))
+      .map(token => this.issue(token.capability, scope, token.expiresAt - this.now()));
   }
 }
