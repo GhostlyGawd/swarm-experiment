@@ -7,10 +7,15 @@
  * total, uniform truth over definitely bound scalar values. It preserves chosen
  * statement scopes, function contracts and loop annotations; it does not infer
  * facts from entry preconditions, local values, heap state or loop invariants.
+ * A further opt-in scalar-shim profile coalesces same-signature, call-free,
+ * return-only Int/Bool declarations using independently checked total-value
+ * equivalence. It changes only callee identities, retaining every argument
+ * expression and its evaluation order/count. Both compared frames are empty.
  * The trusted export allowlist must match the externally callable surface.
  *
  * Remaining FR-1.5 coverage: broader path-dependent/opaque branch reasoning,
- * general obsolete-shim recognition and third-party adapter/import retirement. Removing an
+ * call-bearing/non-scalar/general shims and third-party registration/import
+ * retirement. Removing an
  * unreachable effectful FunctionDecl is not evidence of adapter-registration
  * cleanup. No general inlining or active-frame rewrite is claimed. Retention is
  * conservative and nonexpiring, so this does not reclaim protected history.
@@ -37,7 +42,8 @@ import * as b from './build.ts';
 
 export const SEMANTIC_GC_PROFILE = 'aether.semantic-gc-closed-forwarders/1';
 export const SEMANTIC_GC_BRANCH_PROFILE = 'aether.semantic-gc-closed-branches/1';
-export type SemanticGcProfile = typeof SEMANTIC_GC_PROFILE | typeof SEMANTIC_GC_BRANCH_PROFILE;
+export const SEMANTIC_GC_SHIM_PROFILE = 'aether.semantic-gc-closed-scalar-shims/1';
+export type SemanticGcProfile = typeof SEMANTIC_GC_PROFILE | typeof SEMANTIC_GC_BRANCH_PROFILE | typeof SEMANTIC_GC_SHIM_PROFILE;
 type FunctionDecl = Extract<Term, { kind: 'FunctionDecl' }>;
 type Module = Extract<Term, { kind: 'Module' }>;
 export type SemanticRetentionKind = 'audit' | 'replay' | 'active-task' | 'unstable-replication';
@@ -46,9 +52,11 @@ export interface SemanticGcPolicy { readonly epoch: string; readonly exports: re
 export interface SemanticGcOptions {
   readonly directory: string; readonly repositoryId: string; readonly store: DurableGraphStore; readonly lineage: CausalLineageLedger;
   readonly registry: CapabilityRegistry; readonly policy: SemanticGcPolicy;
-  /** Opt in to portable total-condition pruning; old journals remain unchanged. */
+  /** Opt in to total-condition pruning or certified scalar-shim coalescing.
+   * Existing forwarder and branch journal profiles remain unchanged. */
   readonly profile?: SemanticGcProfile;
   readonly maxBranchProofs?: number;
+  readonly maxShimComparisons?: number;
   readonly maxDeclarations?: number; readonly maxAstNodes?: number; readonly maxRecords?: number;
 }
 interface Wrapper { readonly symbol: SymbolId; readonly target: SymbolId }
@@ -56,6 +64,8 @@ interface BranchStep { readonly field: string; readonly index: number }
 interface BranchSelection { readonly symbol: SymbolId; readonly path: readonly BranchStep[]; readonly kind: 'If' | 'Cond'; readonly site: NodeRef; readonly condition: NodeRef; readonly value: boolean }
 interface BranchLocation { readonly declaration: FunctionDecl; readonly term: Extract<Term, { kind: 'If' | 'Cond' }>; readonly path: readonly BranchStep[]; readonly environment: ReadonlyMap<SymbolId, Ty> }
 interface BranchWitness { readonly selection: BranchSelection; readonly root: NodeRef; readonly specification: string; readonly manifest: ExecutionManifestV1; readonly certificate: PortableCertificateV1 }
+interface ShimSelection { readonly symbol: SymbolId; readonly target: SymbolId; readonly sourceDeclaration: NodeRef; readonly targetDeclaration: NodeRef }
+interface ShimWitness { readonly selection: ShimSelection; readonly root: NodeRef; readonly specification: string; readonly manifest: ExecutionManifestV1; readonly certificate: PortableCertificateV1 }
 interface RewritePlan { readonly removed: readonly SymbolId[]; readonly collapsed: readonly Wrapper[]; readonly target: Module }
 interface EquivalenceWitness { readonly wrapper: SymbolId; readonly root: NodeRef; readonly specification: string; readonly manifest: ExecutionManifestV1; readonly certificate: PortableCertificateV1 }
 export interface SemanticGcProposal {
@@ -65,6 +75,7 @@ export interface SemanticGcProposal {
   readonly sourceRoot: NodeRef; readonly targetRoot: NodeRef; readonly exports: readonly SymbolId[];
   readonly removed: readonly SymbolId[]; readonly collapsed: readonly Wrapper[]; readonly witnesses: readonly EquivalenceWitness[];
   readonly branches?: readonly BranchWitness[];
+  readonly shims?: readonly ShimWitness[];
   readonly obligationDigest: Digest; readonly id: Digest;
 }
 const WIRE_LIMITS = { maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024, maxObjects: 500000, maxDepth: 64 };
@@ -104,10 +115,13 @@ export class SemanticGarbageCollector {
   private readonly builderLease: string;
   readonly profile: SemanticGcProfile;
   private readonly maxBranchProofs: number;
+  private readonly maxShimComparisons: number;
   constructor(options: SemanticGcOptions) {
     this.options = { ...options }; identifier(options.repositoryId);
     this.profile = options.profile ?? SEMANTIC_GC_PROFILE;
-    if (![SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE].includes(this.profile)) throw new Error('unsupported semantic GC profile');
+    if (![SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE].includes(this.profile)) throw new Error('unsupported semantic GC profile');
+    this.maxShimComparisons = options.maxShimComparisons ?? 64;
+    if (!Number.isSafeInteger(this.maxShimComparisons) || this.maxShimComparisons < 1 || this.maxShimComparisons > 1024 || this.profile !== SEMANTIC_GC_SHIM_PROFILE && options.maxShimComparisons !== undefined) throw new Error('invalid shim comparison profile');
     this.maxBranchProofs = options.maxBranchProofs ?? 64;
     if (!Number.isSafeInteger(this.maxBranchProofs) || this.maxBranchProofs < 1 || this.maxBranchProofs > 256 || this.profile === SEMANTIC_GC_PROFILE && options.maxBranchProofs !== undefined) throw new Error('invalid branch proof profile');
     this.policy = freeze(clone(options.policy)); exactObject(this.policy, ['epoch', 'exports', 'protectedSymbols']); identifier(this.policy.epoch);
@@ -116,7 +130,7 @@ export class SemanticGarbageCollector {
     this.registry = new CapabilityRegistry(); for (const name of options.registry.names) this.registry.define(clone(options.registry.get(name)!));
     this.maxDeclarations = options.maxDeclarations ?? 128; this.maxAstNodes = options.maxAstNodes ?? 4096; this.maxRecords = options.maxRecords ?? 1000;
     for (const [limit, maximum] of [[this.maxDeclarations, 128], [this.maxAstNodes, 10000], [this.maxRecords, 10000]]) if (!Number.isSafeInteger(limit) || limit < 1 || limit > maximum) throw new RangeError('semantic GC resource profile');
-    const profile = { format: this.profile, repositoryId: options.repositoryId, policy: this.policy, registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), maxDeclarations: this.maxDeclarations, maxAstNodes: this.maxAstNodes, maxRecords: this.maxRecords, ...(this.profile === SEMANTIC_GC_BRANCH_PROFILE ? { maxBranchProofs: this.maxBranchProofs } : {}) };
+    const profile = { format: this.profile, repositoryId: options.repositoryId, policy: this.policy, registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), maxDeclarations: this.maxDeclarations, maxAstNodes: this.maxAstNodes, maxRecords: this.maxRecords, ...(this.profile !== SEMANTIC_GC_PROFILE ? { maxBranchProofs: this.maxBranchProofs } : {}), ...(this.profile === SEMANTIC_GC_SHIM_PROFILE ? { maxShimComparisons: this.maxShimComparisons } : {}) };
     this.configuration = domainDigest('aether.semantic-gc-config/1', profile); this.builderLease = `semantic-gc-builder:${this.configuration}`;
     durableDirectory(options.directory); durableDirectory(join(options.directory, 'proposals')); durableDirectory(join(options.directory, 'retention'));
     this.lock = new JournalLock({ directory: join(options.directory, 'lock'), domain: 'aether.semantic-gc', maxTickets: 100000 });
@@ -227,7 +241,7 @@ export class SemanticGarbageCollector {
   private applyBranches(source: Module, selections: readonly BranchSelection[]): { module: Module; locations: Map<string, BranchLocation> } {
     const locations = new Map<string, BranchLocation>();
     if (!selections.length) return { module: source, locations };
-    if (this.profile !== SEMANTIC_GC_BRANCH_PROFILE || selections.length > this.maxBranchProofs) throw new Error('unsupported branch selection profile/count');
+    if (this.profile === SEMANTIC_GC_PROFILE || selections.length > this.maxBranchProofs) throw new Error('unsupported branch selection profile/count');
     const wanted = new Map<string, BranchSelection>();
     for (const selection of selections) {
       exactObject(selection, ['symbol', 'path', 'kind', 'site', 'condition', 'value']); identifier(selection.symbol); validateDigest(selection.site, 'ast'); validateDigest(selection.condition, 'ast');
@@ -273,7 +287,7 @@ export class SemanticGarbageCollector {
     const root = new GraphStore().intern(module); return { module, specification, manifest: witnessManifest(root, specification, obligation, this.profile) };
   }
   private discoverBranches(source: Module, manifest: ExecutionManifestV1): BranchSelection[] {
-    if (this.profile !== SEMANTIC_GC_BRANCH_PROFILE) return [];
+    if (this.profile === SEMANTIC_GC_PROFILE) return [];
     const selections: BranchSelection[] = []; let attempted = 0;
     this.walkBranches(source, location => {
       if (attempted++ >= this.maxBranchProofs) return null;
@@ -289,7 +303,90 @@ export class SemanticGarbageCollector {
     });
     return selections;
   }
-  private rewrite(source: Module, fences: ReadonlySet<SymbolId>, branches: readonly BranchSelection[] = []): RewritePlan {
+  /** Closed, call-free expressions avoid hiding faults/contract checks while
+   * expanding a callee or discarding an unused inner-call argument. */
+  private shimExpression(declaration: FunctionDecl): Term {
+    if (declaration.purity !== 'pure' || declaration.capabilities.length || declaration.typeParams.length || declaration.surfaces.length || declaration.contract?.kind !== 'Contract' || !emptyContract(declaration.contract) || !scalar(declaration.returns) || declaration.params.some(param => !scalar(param.ty))) throw new Error('unsupported pure scalar shim declaration');
+    const parameters = new Set(declaration.params.map(param => param.symbol)), expression = returnExpression(declaration); let remaining = this.maxAstNodes;
+    const inspect = (node: Term): void => {
+      if (--remaining < 0) throw new Error('shim expression resource bound');
+      if (node.kind === 'Var' || node.kind === 'Place' && !node.path.length) { if (!parameters.has(node.symbol)) throw new Error('free variable in scalar shim'); return; }
+      if (node.kind === 'Lit' && (node.ty.t === 'Int' && typeof node.value === 'bigint' || node.ty.t === 'Bool' && typeof node.value === 'boolean')) return;
+      if (node.kind === 'Un' && ['neg', 'not'].includes(node.op)) { inspect(node.operand); return; }
+      if (node.kind === 'Bin' && ['add', 'sub', 'mul', 'div', 'mod', 'eq', 'ne', 'lt', 'le', 'gt', 'ge', 'and', 'or'].includes(node.op)) { inspect(node.left); inspect(node.right); return; }
+      if (node.kind === 'Cond') { inspect(node.cond); inspect(node.then); inspect(node.otherwise); return; }
+      throw new Error(`unsupported scalar shim expression: ${node.kind}`);
+    };
+    inspect(expression); return expression;
+  }
+  private shimSelection(source: FunctionDecl, target: FunctionDecl): ShimSelection {
+    const store = new GraphStore(); return { symbol: source.symbol, target: target.symbol, sourceDeclaration: store.intern(source), targetDeclaration: store.intern(target) };
+  }
+  private compareShimRank(a: FunctionDecl, z: FunctionDecl, fences: ReadonlySet<SymbolId>): number {
+    const required = (symbol: SymbolId) => this.policy.exports.includes(symbol) || this.policy.protectedSymbols.includes(symbol) || fences.has(symbol);
+    const size = (declaration: FunctionDecl) => { let count = 0; const pending = [this.shimExpression(declaration)]; while (pending.length) { count++; pending.push(...children(pending.pop()!)); } return count; };
+    return Number(required(z.symbol)) - Number(required(a.symbol)) || size(a) - size(z) || (a.symbol < z.symbol ? -1 : a.symbol > z.symbol ? 1 : 0);
+  }
+  private annotationCalls(source: Module): ReadonlySet<SymbolId> {
+    const found = new Set<SymbolId>();
+    for (const member of source.members) if (member.kind === 'FunctionDecl') {
+      if (member.contract) for (const symbol of this.calls(member.contract)) found.add(symbol);
+      const pending = member.body ? [member.body] : [];
+      while (pending.length) { const node = pending.pop()!; if (node.kind === 'While') for (const annotation of [...node.invariants, ...(node.variant ? [node.variant] : [])]) for (const symbol of this.calls(annotation)) found.add(symbol); if (node.kind === 'Contract' || node.kind === 'Clause') for (const symbol of this.calls(node)) found.add(symbol); pending.push(...children(node)); }
+    }
+    return found;
+  }
+  private validateShims(source: Module, functions: ReadonlyMap<SymbolId, FunctionDecl>, fences: ReadonlySet<SymbolId>, selections: readonly ShimSelection[]): void {
+    if (!selections.length) return;
+    if (this.profile !== SEMANTIC_GC_SHIM_PROFILE || selections.length > this.maxShimComparisons) throw new Error('unsupported shim profile/count');
+    const sources = new Set<SymbolId>(), annotations = this.annotationCalls(source), live = this.live(new Map(functions), fences); let previous = '';
+    for (const selection of selections) {
+      exactObject(selection, ['symbol', 'target', 'sourceDeclaration', 'targetDeclaration']); identifier(selection.symbol); identifier(selection.target); validateDigest(selection.sourceDeclaration, 'ast'); validateDigest(selection.targetDeclaration, 'ast');
+      if (sources.has(selection.symbol) || selection.symbol <= previous) throw new Error('duplicate or reordered shim selection'); previous = selection.symbol; sources.add(selection.symbol);
+      const from = functions.get(selection.symbol), to = functions.get(selection.target);
+      if (!from || !to || from.symbol === to.symbol || !live.has(from.symbol) || this.policy.exports.includes(from.symbol) || this.policy.protectedSymbols.includes(from.symbol) || fences.has(from.symbol) || annotations.has(from.symbol)) throw new Error('shim is exported, protected, annotated, absent or not live');
+      this.shimExpression(from); this.shimExpression(to);
+      if (!same(shape(from), shape(to)) || !same(this.shimSelection(from, to), selection) || this.compareShimRank(to, from, fences) >= 0) throw new Error('shim signature, declaration or canonical target mismatch');
+    }
+    if (selections.some(selection => sources.has(selection.target))) throw new Error('shim targets must be retained canonical representatives');
+  }
+  private shimHarness(source: Module, selection: ShimSelection, targetRoot: NodeRef, obligation: Digest): { module: Module; specification: string; manifest: ExecutionManifestV1 } {
+    const functions = this.declarations(source), from = functions.get(selection.symbol), to = functions.get(selection.target);
+    if (!from || !to || !same(shape(from), shape(to)) || !same(this.shimSelection(from, to), selection)) throw new Error('changed scalar shim source/target');
+    const left = this.shimExpression(from), right = this.shimExpression(to);
+    const selectionDigest = domainDigest('aether.semantic-gc-shim/1', selection), symbols = new SymbolSpace(`semantic-gc-shim:${obligation}:${selectionDigest}`);
+    const params = from.params.map((param, index) => b.param(symbols.define(`argument${index}`), param.ty));
+    const substitute = (expression: Term, declaration: FunctionDecl): Term => {
+      const names = new Map(declaration.params.map((param, index) => [param.symbol, params[index].symbol]));
+      const visit = (node: Term): Term => node.kind === 'Var' || node.kind === 'Place' ? b.v(names.get(node.symbol)!) : withLinkGroups(node, new Map(linkGroups(node).map(group => [group.field, group.links.map(visit)])));
+      return visit(expression);
+    };
+    const fn = b.fn({ symbol: symbols.define('equivalentScalarShims'), params, returns: b.Bool, contract: b.contract({ ensures: [b.clause(b.result(), 'total-scalar-shim-equivalence')] }), body: b.ret(b.eq(substitute(left, from), substitute(right, to))) });
+    const module = b.module_({ symbol: symbols.define('scalarShimWitness'), members: [fn], symbolTable: symbols.table() }) as Module;
+    const specification = Buffer.from(encodeCanonical({ profile: this.profile, obligation, sourceRoot: new GraphStore().intern(source), targetRoot, selection, claim: 'For all typed scalar arguments, both call-free expressions terminate normally with equal results. Call-site rewriting preserves original arity, order and single evaluation of every argument, including parameters unused by the selected implementation. No contracts, capabilities, exports, fences or annotation references authorize retirement by this proof alone.' }, WIRE_LIMITS)).toString('utf8');
+    const root = new GraphStore().intern(module); return { module, specification, manifest: witnessManifest(root, specification, obligation, this.profile) };
+  }
+  private discoverShims(source: Module, manifest: ExecutionManifestV1, fences: ReadonlySet<SymbolId>): ShimSelection[] {
+    if (this.profile !== SEMANTIC_GC_SHIM_PROFILE) return [];
+    const functions = this.declarations(source), live = this.live(functions, fences), annotations = this.annotationCalls(source), candidates = [...functions.values()].filter(decl => { try { this.shimExpression(decl); return true; } catch { return false; } }).sort((a, z) => this.compareShimRank(a, z, fences));
+    const representatives: FunctionDecl[] = [], selected: ShimSelection[] = []; let comparisons = 0;
+    for (const declaration of candidates) {
+      let matched = false;
+      if (live.has(declaration.symbol) && !this.policy.exports.includes(declaration.symbol) && !this.policy.protectedSymbols.includes(declaration.symbol) && !fences.has(declaration.symbol) && !annotations.has(declaration.symbol)) for (const representative of representatives) {
+        if (!same(shape(declaration), shape(representative))) continue;
+        if (comparisons++ >= this.maxShimComparisons) break;
+        const selection = this.shimSelection(declaration, representative);
+        try {
+          const probe = domainDigest('aether.semantic-gc-shim-discovery/1', { profile: this.profile, source: executionManifestDigest(manifest), selection });
+          const harness = this.shimHarness(source, selection, manifest.astRoot as NodeRef, probe);
+          if (generatePortableCertificate(harness.module, { ...harness, expectedManifest: harness.manifest })) { selected.push(selection); matched = true; break; }
+        } catch { /* Unsupported or non-total comparisons cannot retire code. */ }
+      }
+      if (!matched) representatives.push(declaration);
+    }
+    return selected.sort((a, z) => a.symbol < z.symbol ? -1 : a.symbol > z.symbol ? 1 : 0);
+  }
+  private rewrite(source: Module, fences: ReadonlySet<SymbolId>, branches: readonly BranchSelection[] = [], shims: readonly ShimSelection[] = []): RewritePlan {
     source = this.applyBranches(source, branches).module;
     const functions = this.declarations(source), wrappers = new Map<SymbolId, SymbolId>();
     for (const decl of functions.values()) {
@@ -299,10 +396,13 @@ export class SemanticGarbageCollector {
       const target = functions.get(expression.callee)!; if (!same(shape(decl), shape(target))) continue;
       wrappers.set(decl.symbol, target.symbol);
     }
+    const transparent = new Set(wrappers.keys());
+    this.validateShims(source, functions, fences, shims);
+    for (const shim of shims) wrappers.set(shim.symbol, shim.target);
     const resolve = (symbol: SymbolId): SymbolId => { const visited = new Set<SymbolId>(); while (wrappers.has(symbol)) { if (visited.has(symbol)) throw new Error('recursive forwarding wrapper is unsupported'); visited.add(symbol); symbol = wrappers.get(symbol)!; } return symbol; };
     for (const symbol of wrappers.keys()) resolve(symbol);
     const replaceCalls = (term: Term): Term => {
-      if (this.profile === SEMANTIC_GC_BRANCH_PROFILE) {
+      if (this.profile !== SEMANTIC_GC_PROFILE) {
         if (term.kind === 'Contract' || term.kind === 'Clause') return term;
         if (term.kind === 'While') return { ...term, cond: replaceCalls(term.cond), body: replaceCalls(term.body) };
       }
@@ -311,9 +411,10 @@ export class SemanticGarbageCollector {
     };
     const rewritten = new Map([...functions].map(([symbol, decl]) => [symbol, { ...decl, body: decl.body ? replaceCalls(decl.body) : null }]));
     const live = this.live(rewritten, fences), priorLive = this.live(functions, fences);
+    if (shims.some(shim => live.has(shim.symbol))) throw new Error('shim remains live through a preserved boundary');
     const target: Module = { ...source, members: source.members.filter(member => member.kind !== 'FunctionDecl' || live.has(member.symbol)).map(member => member.kind === 'FunctionDecl' ? rewritten.get(member.symbol)! : member) };
     this.declarations(target);
-    return { target, removed: [...functions.keys()].filter(symbol => !live.has(symbol)).sort(), collapsed: [...wrappers].filter(([symbol]) => priorLive.has(symbol)).map(([symbol]) => ({ symbol, target: resolve(symbol) })).sort((a, z) => a.symbol.localeCompare(z.symbol)) };
+    return { target, removed: [...functions.keys()].filter(symbol => !live.has(symbol)).sort(), collapsed: [...wrappers].filter(([symbol]) => transparent.has(symbol) && priorLive.has(symbol)).map(([symbol]) => ({ symbol, target: resolve(symbol) })).sort((a, z) => a.symbol.localeCompare(z.symbol)) };
   }
   private expand(term: Term, environment: ReadonlyMap<SymbolId, Term>, functions: ReadonlyMap<SymbolId, FunctionDecl>, active: readonly SymbolId[] = [], budget = { left: this.maxAstNodes }): Term {
     if (--budget.left < 0 || active.length > 32) throw new Error('equivalence expansion resource bound');
@@ -331,7 +432,7 @@ export class SemanticGarbageCollector {
       default: throw new Error(`unsupported equivalence expression: ${term.kind}`);
     }
   }
-  private obligation(source: ExecutionManifestV1, target: NodeRef, removed: readonly SymbolId[], collapsed: readonly Wrapper[], branches: readonly BranchSelection[] = []): Digest { return domainDigest('aether.semantic-gc-obligation/1', { configuration: this.configuration, profile: this.profile, source: source.astRoot, sourceExecution: executionManifestDigest(source), target, exports: this.policy.exports, removed, collapsed, ...(this.profile === SEMANTIC_GC_BRANCH_PROFILE ? { branches } : {}) }); }
+  private obligation(source: ExecutionManifestV1, target: NodeRef, removed: readonly SymbolId[], collapsed: readonly Wrapper[], branches: readonly BranchSelection[] = [], shims: readonly ShimSelection[] = []): Digest { return domainDigest('aether.semantic-gc-obligation/1', { configuration: this.configuration, profile: this.profile, source: source.astRoot, sourceExecution: executionManifestDigest(source), target, exports: this.policy.exports, removed, collapsed, ...(this.profile !== SEMANTIC_GC_PROFILE ? { branches } : {}), ...(this.profile === SEMANTIC_GC_SHIM_PROFILE ? { shims } : {}) }); }
   private harness(source: Module, targetRoot: NodeRef, wrapper: Wrapper, obligation: Digest): { module: Module; specification: string; manifest: ExecutionManifestV1 } {
     const functions = this.declarations(source), decl = functions.get(wrapper.symbol); if (!decl) throw new Error('missing equivalence wrapper');
     const symbols = new SymbolSpace(`semantic-gc:${obligation}:${wrapper.symbol}`), params = decl.params.map((param, index) => b.param(symbols.define(`argument${index}`), param.ty));
@@ -368,14 +469,23 @@ export class SemanticGarbageCollector {
     return this.lock.run(() => {
       this.options.lineage.assertCurrent(executionManifestDigest(sourceManifest)); this.options.lineage.assertNodeCurrent(executionManifestDigest(sourceManifest), sourceManifest.astRoot as NodeRef);
       const source = this.options.store.hydrate(sourceManifest.astRoot as NodeRef); const functions = this.declarations(source); void functions;
-      if (source.kind !== 'Module') throw new Error('expected module'); const specification = this.sourceSpecification(sourceManifest); const branches = this.discoverBranches(source, sourceManifest); const plan = this.rewrite(source, this.fenceSymbols(sourceManifest, specification), branches);
+      if (source.kind !== 'Module') throw new Error('expected module'); const specification = this.sourceSpecification(sourceManifest); const branches = this.discoverBranches(source, sourceManifest), fences = this.fenceSymbols(sourceManifest, specification);
+      const shims = this.discoverShims(this.applyBranches(source, branches).module, sourceManifest, fences);
+      const plan = this.rewrite(source, fences, branches, shims);
       const targetRoot = this.options.store.intern(plan.target, { leaseId: this.builderLease }); if (targetRoot === sourceManifest.astRoot) return null;
-      return this.recordProposal(sourceManifest, targetRoot, plan.removed, plan.collapsed, 'cleanup', null, source, specification, branches);
+      return this.recordProposal(sourceManifest, targetRoot, plan.removed, plan.collapsed, 'cleanup', null, source, specification, branches, shims);
     }, 5000);
   }
-  private recordProposal(sourceManifest: ExecutionManifestV1, targetRoot: NodeRef, removed: readonly SymbolId[], collapsed: readonly Wrapper[], direction: 'cleanup' | 'rollback', rollbackOf: Digest | null, witnessSource: Module, specification: string, branchSelections: readonly BranchSelection[] = []): SemanticGcProposal {
-    const sourceRoot = sourceManifest.astRoot as NodeRef, obligationDigest = this.obligation(sourceManifest, targetRoot, removed, collapsed, branchSelections), witnesses: EquivalenceWitness[] = [];
-    const transformed = this.applyBranches(witnessSource, branchSelections), branches: BranchWitness[] = [];
+  private recordProposal(sourceManifest: ExecutionManifestV1, targetRoot: NodeRef, removed: readonly SymbolId[], collapsed: readonly Wrapper[], direction: 'cleanup' | 'rollback', rollbackOf: Digest | null, witnessSource: Module, specification: string, branchSelections: readonly BranchSelection[] = [], shimSelections: readonly ShimSelection[] = []): SemanticGcProposal {
+    const sourceRoot = sourceManifest.astRoot as NodeRef, obligationDigest = this.obligation(sourceManifest, targetRoot, removed, collapsed, branchSelections, shimSelections), witnesses: EquivalenceWitness[] = [];
+    const transformed = this.applyBranches(witnessSource, branchSelections), branches: BranchWitness[] = [], shims: ShimWitness[] = [];
+    for (const selection of shimSelections) {
+      const harness = this.shimHarness(transformed.module, selection, targetRoot, obligationDigest);
+      const certificate = generatePortableCertificate(harness.module, { ...harness, expectedManifest: harness.manifest });
+      if (!certificate) throw new Error('unproved total scalar shim equivalence');
+      const root = this.options.store.intern(harness.module, { leaseId: this.builderLease });
+      shims.push({ selection, root, specification: harness.specification, manifest: harness.manifest, certificate });
+    }
     for (const selection of branchSelections) {
       const location = transformed.locations.get(this.branchKey(selection))!;
       const harness = this.branchHarness(witnessSource, location, selection, targetRoot, obligationDigest);
@@ -390,34 +500,43 @@ export class SemanticGarbageCollector {
       if (!certificate) throw new Error('unsupported or unproved portable equivalence obligation');
       const root = this.options.store.intern(harness.module, { leaseId: this.builderLease }); witnesses.push({ wrapper: wrapper.symbol, root, specification: harness.specification, manifest: harness.manifest, certificate });
     }
-    const body: Omit<SemanticGcProposal, 'id'> = { format: 'aether.semantic-gc-proposal/1' as const, configuration: this.configuration, profile: this.profile, direction, rollbackOf, sourceManifest, specification, productionAuthorized: false, sourceRoot, targetRoot, exports: this.policy.exports, removed, collapsed, witnesses, obligationDigest, ...(this.profile === SEMANTIC_GC_BRANCH_PROFILE ? { branches } : {}) };
+    const body: Omit<SemanticGcProposal, 'id'> = { format: 'aether.semantic-gc-proposal/1' as const, configuration: this.configuration, profile: this.profile, direction, rollbackOf, sourceManifest, specification, productionAuthorized: false, sourceRoot, targetRoot, exports: this.policy.exports, removed, collapsed, witnesses, obligationDigest, ...(this.profile !== SEMANTIC_GC_PROFILE ? { branches } : {}), ...(this.profile === SEMANTIC_GC_SHIM_PROFILE ? { shims } : {}) };
     const proposal: SemanticGcProposal = { ...body, id: domainDigest('aether.semantic-gc-proposal/1', body, WIRE_LIMITS) };
     this.verify(proposal, false);
-    this.options.store.retain(`semantic-gc-proposal:${proposal.id}`, [sourceRoot, targetRoot, ...witnesses.map(witness => witness.root), ...branches.map(witness => witness.root)]);
+    this.options.store.retain(`semantic-gc-proposal:${proposal.id}`, [sourceRoot, targetRoot, ...witnesses.map(witness => witness.root), ...branches.map(witness => witness.root), ...shims.map(witness => witness.root)]);
     this.immutable('proposals', proposal.id, proposal); return freeze(clone(proposal));
   }
   readProposal(id: Digest): SemanticGcProposal { validateDigest(id, 'aether.semantic-gc-proposal/1'); const value = this.read(this.path('proposals', id)) as SemanticGcProposal; if (value.id !== id) throw new Error('proposal address mismatch'); this.verify(value, false); return freeze(clone(value)); }
   private verify(proposal: SemanticGcProposal, current: boolean): void {
-    encodeCanonical(proposal, WIRE_LIMITS); exactObject(proposal, ['format', 'configuration', 'profile', 'direction', 'rollbackOf', 'sourceManifest', 'specification', 'productionAuthorized', 'sourceRoot', 'targetRoot', 'exports', 'removed', 'collapsed', 'witnesses', 'obligationDigest', 'id', ...(this.profile === SEMANTIC_GC_BRANCH_PROFILE ? ['branches'] : [])]);
+    encodeCanonical(proposal, WIRE_LIMITS); exactObject(proposal, ['format', 'configuration', 'profile', 'direction', 'rollbackOf', 'sourceManifest', 'specification', 'productionAuthorized', 'sourceRoot', 'targetRoot', 'exports', 'removed', 'collapsed', 'witnesses', 'obligationDigest', 'id', ...(this.profile !== SEMANTIC_GC_PROFILE ? ['branches'] : []), ...(this.profile === SEMANTIC_GC_SHIM_PROFILE ? ['shims'] : [])]);
     const { id, ...body } = proposal;
     if (proposal.productionAuthorized !== false || proposal.format !== 'aether.semantic-gc-proposal/1' || proposal.profile !== this.profile || proposal.configuration !== this.configuration || id !== domainDigest('aether.semantic-gc-proposal/1', body, WIRE_LIMITS) || !same(proposal.exports, this.policy.exports)) throw new Error('semantic GC proposal identity/profile mismatch');
     validateExecutionManifest(proposal.sourceManifest); if (proposal.sourceManifest.semanticsVersion !== 'aether-reference/1') throw new Error('unsupported source semantics for GC equivalence'); if (proposal.sourceManifest.astRoot !== proposal.sourceRoot) throw new Error('rewrite source manifest mismatch');
     const fences = this.fenceSymbols(proposal.sourceManifest, proposal.specification);
-    if (this.profile === SEMANTIC_GC_BRANCH_PROFILE && (!Array.isArray(proposal.branches) || proposal.branches.length > this.maxBranchProofs)) throw new Error('invalid branch witness coverage');
+    if (this.profile !== SEMANTIC_GC_PROFILE && (!Array.isArray(proposal.branches) || proposal.branches.length > this.maxBranchProofs)) throw new Error('invalid branch witness coverage');
     const branches = proposal.branches ?? [];
     for (const witness of branches) exactObject(witness, ['selection', 'root', 'specification', 'manifest', 'certificate']);
     const selections = branches.map(witness => witness.selection);
+    if (this.profile === SEMANTIC_GC_SHIM_PROFILE && (!Array.isArray(proposal.shims) || proposal.shims.length > this.maxShimComparisons)) throw new Error('invalid shim witness coverage');
+    const shims = proposal.shims ?? [];
+    for (const witness of shims) exactObject(witness, ['selection', 'root', 'specification', 'manifest', 'certificate']);
+    const shimSelections = shims.map(witness => witness.selection);
     const source = this.options.store.hydrate(proposal.sourceRoot), target = this.options.store.hydrate(proposal.targetRoot); this.declarations(source); this.declarations(target);
     if (source.kind !== 'Module' || target.kind !== 'Module') throw new Error('rewrite modules required');
     let plan: RewritePlan, witnessSource: Module;
-    if (proposal.direction === 'cleanup') { if (proposal.rollbackOf !== null) throw new Error('cleanup has rollback predecessor'); plan = this.rewrite(source, fences, selections); witnessSource = source; if (new GraphStore().intern(plan.target) !== proposal.targetRoot) throw new Error('unsupported or unsafe candidate rewrite'); }
+    if (proposal.direction === 'cleanup') { if (proposal.rollbackOf !== null) throw new Error('cleanup has rollback predecessor'); plan = this.rewrite(source, fences, selections, shimSelections); witnessSource = source; if (new GraphStore().intern(plan.target) !== proposal.targetRoot) throw new Error('unsupported or unsafe candidate rewrite'); }
     else if (proposal.direction === 'rollback' && proposal.rollbackOf !== null) {
       const prior = this.read(this.path('proposals', proposal.rollbackOf)) as SemanticGcProposal; if (prior.direction !== 'cleanup') throw new Error('rollback cannot chain another rollback');
       const previous = this.readProposal(proposal.rollbackOf); if (previous.direction !== 'cleanup' || previous.targetRoot !== proposal.sourceRoot || previous.sourceRoot !== proposal.targetRoot) throw new Error('rollback is not the exact inverse cleanup');
-      plan = this.rewrite(target, fences, selections); witnessSource = target; if (new GraphStore().intern(plan.target) !== proposal.sourceRoot) throw new Error('rollback proof relation changed');
+      plan = this.rewrite(target, fences, selections, shimSelections); witnessSource = target; if (new GraphStore().intern(plan.target) !== proposal.sourceRoot) throw new Error('rollback proof relation changed');
     } else throw new Error('unsupported rewrite direction');
-    if (!same(proposal.removed, plan.removed) || !same(proposal.collapsed, plan.collapsed) || proposal.obligationDigest !== this.obligation(proposal.sourceManifest, proposal.targetRoot, plan.removed, plan.collapsed, selections) || proposal.witnesses.length !== plan.collapsed.length) throw new Error('incomplete rewrite equivalence relation');
+    if (!same(proposal.removed, plan.removed) || !same(proposal.collapsed, plan.collapsed) || proposal.obligationDigest !== this.obligation(proposal.sourceManifest, proposal.targetRoot, plan.removed, plan.collapsed, selections, shimSelections) || proposal.witnesses.length !== plan.collapsed.length) throw new Error('incomplete rewrite equivalence relation');
     const transformed = this.applyBranches(witnessSource, selections);
+    for (const witness of shims) {
+      const expected = this.shimHarness(transformed.module, witness.selection, proposal.targetRoot, proposal.obligationDigest);
+      if (witness.root !== expected.manifest.astRoot || witness.specification !== expected.specification || !same(witness.manifest, expected.manifest) || new GraphStore().intern(this.options.store.hydrate(witness.root)) !== expected.manifest.astRoot) throw new Error('stale or substituted shim witness');
+      checkPortableCertificate(expected.module, witness.certificate, { expectedManifest: expected.manifest, specification: expected.specification });
+    }
     for (const witness of branches) {
       const expected = this.branchHarness(witnessSource, transformed.locations.get(this.branchKey(witness.selection))!, witness.selection, proposal.targetRoot, proposal.obligationDigest);
       if (witness.root !== expected.manifest.astRoot || witness.specification !== expected.specification || !same(witness.manifest, expected.manifest) || new GraphStore().intern(this.options.store.hydrate(witness.root)) !== expected.manifest.astRoot) throw new Error('stale or substituted branch witness');
@@ -435,7 +554,7 @@ export class SemanticGarbageCollector {
     return this.lock.run(() => {
       const previous = this.readProposal(cleanupId); if (previous.direction !== 'cleanup' || currentManifest.astRoot !== previous.targetRoot) throw new Error('rollback parent is not the cleaned artifact');
       this.options.lineage.assertCurrent(executionManifestDigest(currentManifest)); const original = this.options.store.hydrate(previous.sourceRoot); if (original.kind !== 'Module') throw new Error('rollback source module missing');
-      return this.recordProposal(currentManifest, previous.sourceRoot, previous.removed, previous.collapsed, 'rollback', cleanupId, original, this.sourceSpecification(currentManifest), (previous.branches ?? []).map(witness => witness.selection));
+      return this.recordProposal(currentManifest, previous.sourceRoot, previous.removed, previous.collapsed, 'rollback', cleanupId, original, this.sourceSpecification(currentManifest), (previous.branches ?? []).map(witness => witness.selection), (previous.shims ?? []).map(witness => witness.selection));
     }, 5000);
   }
   /** Strict F08 is the only production path. Signed current candidate evidence

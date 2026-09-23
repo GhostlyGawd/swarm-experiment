@@ -11,7 +11,7 @@ import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { capability, type NodeRef, type SymbolId, type CapabilityName } from '../../src/tier1/ids.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import { DurableGraphStore } from '../../src/tier1/durable-store.ts';
-import { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, type SemanticGcOptions, type SemanticGcProposal, type SemanticRetentionKind } from '../../src/tier1/semantic-gc.ts';
+import { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, type SemanticGcOptions, type SemanticGcProposal, type SemanticRetentionKind } from '../../src/tier1/semantic-gc.ts';
 import { CausalLineageLedger, signIntent, signSpecRevision, fenceRequirement } from '../../src/tier1/causal-lineage.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
@@ -22,7 +22,7 @@ import { encodeCanonical } from '../../src/fabric/encoding.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
 type FixtureNames = { target: SymbolId; wrapper: SymbolId; entry: SymbolId; sink: SymbolId; dead: SymbolId; fenced: SymbolId; x: SymbolId; w: SymbolId; n: SymbolId; message: SymbolId; log: CapabilityName };
-function fixture(options: { branchProfile?: boolean; transform?: (module: Module, names: FixtureNames, symbols: SymbolSpace) => Module; nonlinear?: boolean; opaque?: boolean; fenceWrapper?: boolean; booleanWrapper?: boolean } = {}) {
+function fixture(options: { shimProfile?: boolean; protectTarget?: boolean; protectWrapper?: boolean; exportWrapper?: boolean; branchProfile?: boolean; transform?: (module: Module, names: FixtureNames, symbols: SymbolSpace) => Module; nonlinear?: boolean; opaque?: boolean; fenceWrapper?: boolean; booleanWrapper?: boolean } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'aether-semantic-gc-')), store = new DurableGraphStore({ directory: join(directory, 'ast') });
   const symbols = new SymbolSpace('semantic-gc-fixture'), target = symbols.define('increment'), wrapper = symbols.define('forward'), entry = symbols.define('compute'), sink = symbols.define('append'), dead = symbols.define('unused'), fenced = symbols.define('protected');
   const x = symbols.define('x'), w = symbols.define('w'), n = symbols.define('n'), message = symbols.define('message'), log = capability('cap:test:append');
@@ -52,7 +52,7 @@ function fixture(options: { branchProfile?: boolean; transform?: (module: Module
     return { root, context, evidence, manifest, intent };
   };
   const genesis = artifact(module, []); store.commit('production', genesis.root, null);
-  const gcOptions: SemanticGcOptions = { profile: options.branchProfile ? SEMANTIC_GC_BRANCH_PROFILE : SEMANTIC_GC_PROFILE, directory: join(directory, 'gc'), repositoryId: 'semantic-gc', store, lineage, registry, policy: { epoch: 'closed-exports/1', exports: [entry, sink], protectedSymbols: [] } };
+  const gcOptions: SemanticGcOptions = { profile: options.shimProfile ? SEMANTIC_GC_SHIM_PROFILE : options.branchProfile ? SEMANTIC_GC_BRANCH_PROFILE : SEMANTIC_GC_PROFILE, directory: join(directory, 'gc'), repositoryId: 'semantic-gc', store, lineage, registry, policy: { epoch: 'closed-exports/1', exports: [entry, sink, ...(options.exportWrapper ? [wrapper] : [])], protectedSymbols: [...(options.protectTarget ? [target] : []), ...(options.protectWrapper ? [wrapper] : [])] } };
   const gc = new SemanticGarbageCollector(gcOptions);
   const coordinatorOptions: PromotionCoordinatorOptions = { directory: join(directory, 'governor'), repositoryId: 'semantic-gc', genesisManifest: genesis.manifest, lineage: lineage.admissionAdapter(), authority: () => ({ repositoryId: 'semantic-gc', membershipEpoch: '1', policyEpoch: '1', eligibleGovernors: ['governor'] }), governorKey: () => governor.publicKey, clock: () => 100n };
   const coordinator = new PromotionCoordinator(coordinatorOptions);
@@ -398,5 +398,151 @@ test('persisted branch witnesses are checked with the portable proof producer re
     const { SemanticGarbageCollector: IndependentConsumer } = await import(pathToFileURL(join(consumer, 'src/tier1/semantic-gc.ts')).href);
     const reader = new IndependentConsumer(f.gcOptions);
     assert.equal(reader.readProposal(proposal.id).id, proposal.id);
+  } finally { f.cleanup(); rmSync(consumer, { recursive: true, force: true }); }
+});
+
+const scalarShimFixture = (extra: Parameters<typeof fixture>[0] = {}) => fixture({ ...extra, shimProfile: true, protectTarget: true, transform(module, names, symbols) {
+  const changed = changeFunction(module, names.wrapper, decl => ({ ...decl, body: b.ret(b.add(b.add(b.v(names.w), b.int(0)), b.int(1))) }));
+  return extra?.transform ? extra.transform(changed, names, symbols) : changed;
+} });
+
+test('scalar shim profile retires a non-forwarding arithmetic adapter with a portable total-equivalence certificate', () => {
+  const f = scalarShimFixture();
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.profile, SEMANTIC_GC_SHIM_PROFILE); assert.equal(proposal.shims!.length, 1); assert.equal(proposal.collapsed.length, 0);
+    assert.equal(proposal.shims![0].selection.symbol, f.wrapper); assert.equal(proposal.shims![0].selection.target, f.target);
+    assert.ok(proposal.removed.includes(f.wrapper)); assert.ok(!proposal.removed.includes(f.target));
+    assert.equal(proposal.shims![0].certificate.format, 'aether.portable-ast-proof/1');
+    assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+    assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(proposal.id).id, proposal.id);
+    assert.equal(f.gc.propose(f.genesis.evidence.manifest)!.id, proposal.id);
+    assert.equal(f.store.head('production')!.root, proposal.sourceRoot);
+  } finally { f.cleanup(); }
+});
+
+test('scalar shim comparison handles Boolean conditional adapters that the uniform-branch profile cannot simplify', () => {
+  const f = fixture({ shimProfile: true, protectTarget: true, booleanWrapper: true, transform(module, names) {
+    return changeFunction(module, names.wrapper, decl => ({ ...decl, body: b.ret(b.cond(b.v(names.w), b.bool(false), b.bool(true))) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.branches!.length, 0); assert.equal(proposal.shims!.length, 1); assert.equal(proposal.collapsed.length, 0);
+    assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+  } finally { f.cleanup(); }
+});
+
+test('scalar shim redirection evaluates every original argument once and in order even when parameters are reused or unused', () => {
+  const f = fixture({ shimProfile: true, protectTarget: true, transform(module, names, symbols) {
+    const secondModern = symbols.define('secondModern'), secondLegacy = symbols.define('secondLegacy'), firstEffect = symbols.define('firstEffect'), secondEffect = symbols.define('secondEffect');
+    let source = changeFunction(module, names.target, decl => ({ ...decl, params: [...decl.params, b.param(secondModern, b.Int)], body: b.ret(b.mul(b.int(2), b.v(names.x))) }));
+    source = changeFunction(source, names.wrapper, decl => ({ ...decl, params: [...decl.params, b.param(secondLegacy, b.Int)], body: b.ret(b.add(b.add(b.v(names.w), b.v(names.w)), b.sub(b.v(secondLegacy), b.v(secondLegacy)))) }));
+    source = { ...source, members: [...source.members,
+      b.fn({ symbol: firstEffect, params: [], returns: b.Int, purity: 'effectful', capabilities: [names.log], contract: b.contract({}), body: b.block(b.exprStmt(b.invoke(names.log, b.str('first-argument'))), b.ret(b.int(3))) }),
+      b.fn({ symbol: secondEffect, params: [], returns: b.Int, purity: 'effectful', capabilities: [names.log], contract: b.contract({}), body: b.block(b.exprStmt(b.invoke(names.log, b.str('second-argument'))), b.ret(b.int(7))) }),
+    ] };
+    return changeFunction(source, names.entry, decl => ({ ...decl, purity: 'effectful', capabilities: [names.log], body: b.ret(b.call(names.wrapper, b.call(firstEffect), b.call(secondEffect))) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!; assert.equal(proposal.shims!.length, 1);
+    const before = f.execute(proposal.sourceRoot), after = f.execute(proposal.targetRoot); assert.deepEqual(after, before);
+    assert.deepEqual(after.effects, [...Array.from({ length: 5 }, () => [['first-argument'], ['second-argument']]).flat(), ['preserved effect']]);
+    assert.ok(after.values.every(result => result.ok && result.value === 6n));
+  } finally { f.cleanup(); }
+});
+
+test('scalar shim retirement is opt-in; the branch-only profile retains non-forwarding adapters', () => {
+  const f = fixture({ branchProfile: true, protectTarget: true, transform(module, names) {
+    return changeFunction(module, names.wrapper, decl => ({ ...decl, body: b.ret(b.add(b.add(b.v(names.w), b.int(0)), b.int(1))) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!; assert.equal(proposal.shims, undefined); assert.ok(!proposal.removed.includes(f.wrapper));
+    assert.throws(() => new SemanticGarbageCollector({ ...f.gcOptions, profile: SEMANTIC_GC_SHIM_PROFILE }), /configuration changed/);
+  } finally { f.cleanup(); }
+});
+
+test('scalar shim cleanup and reverse rollback remain bound to newly signed lineage, governor approval and retained proof roots', async () => {
+  const f = scalarShimFixture();
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!, candidate = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!]);
+    await f.gc.promote(proposal.id, f.input(candidate), f.coordinator, f.driver(proposal));
+    const rollback = f.gc.proposeRollback(proposal.id, candidate.evidence.manifest);
+    assert.equal(rollback.shims!.length, 1); assert.notEqual(rollback.shims![0].manifest.specRoot, proposal.shims![0].manifest.specRoot);
+    const restored = f.artifact(f.module, [candidate.intent!]);
+    await f.gc.promote(rollback.id, f.input(restored), f.coordinator, f.driver(rollback));
+    assert.equal(f.store.head('production')!.root, proposal.sourceRoot); f.gc.collect();
+    for (const witness of [...proposal.shims!, ...rollback.shims!]) assert.ok(f.store.get(witness.root));
+    assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+    assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(rollback.id).id, rollback.id);
+  } finally { f.cleanup(); }
+});
+
+test('scalar shim comparison refuses unequal, nonempty-frame and call-bearing implementations', () => {
+  for (const scenario of ['unequal', 'target-contract', 'callee-contract', 'call-bearing'] as const) {
+    const f = scalarShimFixture({ transform(module, names, symbols) {
+      if (scenario === 'unequal') return changeFunction(module, names.wrapper, decl => ({ ...decl, body: b.ret(b.add(b.v(names.w), b.int(2))) }));
+      if (scenario === 'target-contract') return changeFunction(module, names.target, decl => ({ ...decl, contract: b.contract({ ensures: [b.clause(b.bool(true), 'target-check-retained')] }) }));
+      if (scenario === 'callee-contract') return changeFunction(module, names.wrapper, decl => ({ ...decl, contract: b.contract({ ensures: [b.clause(b.bool(true), 'adapter-check-retained')] }) }));
+      const identity = symbols.define('identityHelper'), value = symbols.define('identityValue');
+      return changeFunction({ ...module, members: [...module.members, b.fn({ symbol: identity, params: [b.param(value, b.Int)], returns: b.Int, contract: b.contract({}), body: b.ret(b.v(value)) })] }, names.wrapper, decl => ({ ...decl, body: b.ret(b.add(b.call(identity, b.v(names.w)), b.int(1))) }));
+    } });
+    try {
+      const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+      assert.equal(proposal.shims!.length, 0, scenario); assert.ok(!proposal.removed.includes(f.wrapper), scenario);
+      assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+    } finally { f.cleanup(); }
+  }
+});
+
+test('scalar shim retirement preserves exports, explicit protection and signed fences even for equivalent bodies', () => {
+  for (const options of [{ exportWrapper: true }, { protectWrapper: true }, { fenceWrapper: true }]) {
+    const f = scalarShimFixture(options);
+    try {
+      const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+      assert.equal(proposal.shims!.length, 0); assert.ok(!proposal.removed.includes(f.wrapper));
+      assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+    } finally { f.cleanup(); }
+  }
+});
+
+test('transparent forwarding and general scalar shim proofs compose without target cycles', () => {
+  const f = scalarShimFixture({ transform(module, names, symbols) {
+    const forwarder = symbols.define('forwardToAdapter'), argument = symbols.define('forwardArgument');
+    const source = { ...module, members: [...module.members, b.fn({ symbol: forwarder, params: [b.param(argument, b.Int)], returns: b.Int, contract: b.contract({}), body: b.ret(b.call(names.wrapper, b.v(argument))) })] };
+    return changeFunction(source, names.entry, decl => ({ ...decl, body: b.ret(b.add(b.call(forwarder, b.v(names.n)), b.int(10))) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.shims!.length, 1); assert.equal(proposal.collapsed.length, 1); assert.equal(proposal.collapsed[0].target, f.target);
+    assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
+    assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(proposal.id).id, proposal.id);
+  } finally { f.cleanup(); }
+});
+
+test('scalar shim admission rejects missing proofs, changed declaration identity and alternate result code', () => {
+  const f = scalarShimFixture();
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    const forge = (changes: Partial<SemanticGcProposal>) => { const { id: _id, ...body } = { ...proposal, ...changes }; const changed = { ...body, id: domainDigest('aether.semantic-gc-proposal/1', body) }; writeFileSync(join(f.directory, 'gc/proposals', `${changed.id.split(':').at(-1)}.json`), encodeCanonical(changed)); return changed.id; };
+    assert.throws(() => f.gc.readProposal(forge({ shims: [] })), /unsafe candidate|incomplete/);
+    const incomplete = proposal.shims!.map(witness => ({ ...witness, certificate: { ...witness.certificate, certificates: [] } }));
+    assert.throws(() => f.gc.readProposal(forge({ shims: incomplete })), /coverage/);
+    const changed = proposal.shims!.map(witness => ({ ...witness, selection: { ...witness.selection, sourceDeclaration: witness.selection.targetDeclaration } }));
+    assert.throws(() => f.gc.readProposal(forge({ shims: changed })), /declaration|target mismatch/);
+    const candidate = f.store.hydrate(proposal.targetRoot); if (candidate.kind !== 'Module') throw new Error('module missing');
+    const wrongRoot = f.store.intern(changeFunction(candidate, f.entry, decl => ({ ...decl, body: b.ret(b.int(-1234)) })), { leaseId: 'wrong-shim-code' });
+    assert.throws(() => f.gc.readProposal(forge({ targetRoot: wrongRoot })), /unsafe candidate/);
+    assert.equal(f.store.head('production')!.root, proposal.sourceRoot);
+  } finally { f.cleanup(); }
+});
+
+test('scalar shim certificates remain independently checkable with proof search disabled', async () => {
+  const f = scalarShimFixture(), consumer = mkdtempSync(join(tmpdir(), 'aether-gc-shim-consumer-'));
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    cpSync(resolve('src'), join(consumer, 'src'), { recursive: true }); writeFileSync(join(consumer, 'package.json'), '{"type":"module"}\n');
+    writeFileSync(join(consumer, 'src/tier2/portable-proof-producer.ts'), "export function generatePortableCertificate() { throw new Error('proof search disabled'); }\n");
+    const { SemanticGarbageCollector: Consumer } = await import(pathToFileURL(join(consumer, 'src/tier1/semantic-gc.ts')).href);
+    assert.equal(new Consumer(f.gcOptions).readProposal(proposal.id).id, proposal.id);
   } finally { f.cleanup(); rmSync(consumer, { recursive: true, force: true }); }
 });
