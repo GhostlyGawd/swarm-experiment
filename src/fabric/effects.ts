@@ -5,6 +5,7 @@ import { atomicWrite } from '../tier1/persistence.ts';
 import { decimal, decodeCanonical, encodeCanonical, encodingLimits, exactObject, identifier, validateTaggedValue, type EncodingLimits, type TaggedValueV1 } from './encoding.ts';
 import { domainDigest, validateDigest, type Digest } from './identity.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
+import { advanceWitnessHead, assertEffectJournalWitness, readWitnessHead, type EffectJournalWitness } from './effect-journal-witness.ts';
 
 export type ExecutionMode = 'live' | 'speculative' | 'shadow' | 'replay';
 export interface EffectRequestV1 {
@@ -84,6 +85,8 @@ export interface EffectEventV1 {
   readonly outcome: EffectOutcome | null;
 }
 interface EffectJournalV1 { format: 'aether.effect-journal/1'; clockDomain: string; records: EffectEventV1[] }
+interface EffectJournalV2 { format: 'aether.effect-journal/2'; clockDomain: string; witnessDigest: Digest; revision: string; records: EffectEventV1[] }
+type EffectJournal = EffectJournalV1 | EffectJournalV2;
 export interface EffectBrokerOptions {
   readonly directory: string;
   readonly mode?: ExecutionMode;
@@ -98,6 +101,9 @@ export interface EffectBrokerOptions {
   readonly budgets?: EffectBudget;
   readonly limits?: Partial<EncodingLimits>;
   readonly replayEvents?: readonly EffectEventV1[];
+  /** Opt-in complete-journal CAS outside this directory. Provider custody is
+   * a separate deployment obligation; a reloadable factory must not supply it. */
+  readonly witness?: EffectJournalWitness;
   /** Fault-injection/observability hook; runs before a proposed journal replacement. */
   readonly beforePersist?: (event: EffectEventV1) => void;
   /** Immutable ticket slots prevent ABA lock reuse. Exhaustion fails closed;
@@ -179,7 +185,12 @@ export class DurableEffectBroker {
     identifier(options.clockDomain);
     this.options = options; this.limits = encodingLimits(options.limits); this.mode = options.mode ?? 'live';
     if (!['live', 'speculative', 'shadow', 'replay'].includes(this.mode)) throw new TypeError('unknown execution mode');
-    this.file = join(options.directory, 'effects.json');
+    if (options.witness) {
+      assertEffectJournalWitness(options.witness);
+      if (options.witness.clockDomain !== options.clockDomain) throw new TypeError('effect witness clock domain mismatch');
+      if (existsSync(join(options.directory, 'effects.json'))) throw new Error('legacy effect journal requires explicit offline migration');
+    } else if (existsSync(join(options.directory, 'effects-v2.json'))) throw new Error('witnessed effect journal requires its original authority');
+    this.file = join(options.directory, options.witness ? 'effects-v2.json' : 'effects.json');
     mkdirSync(options.directory, { recursive: true });
     if (existsSync(join(options.directory, 'effects.lock')) || existsSync(join(options.directory, 'effects.lock.recovery'))) throw new Error('legacy effect lock layout requires explicit offline migration');
     this.journalLock = new JournalLock({ directory: join(options.directory, 'effect-lock-tickets'), domain: 'aether.effect-lock', limits: this.limits, maxTickets: options.maxLockTickets, fault: options.lockFault, busyError: 'effect_broker_busy: explicit dead-owner recovery required after a crash' });
@@ -251,7 +262,39 @@ export class DurableEffectBroker {
       identities.add(key);
     }
   }
-  private read(): EffectJournalV1 {
+  private read(): EffectJournal {
+    if (this.options.witness) {
+      const witness = this.options.witness, head = readWitnessHead(witness);
+      if (head.journal === null) {
+        if (existsSync(this.file)) throw new Error('local effect journal is ahead of witness genesis');
+        return { format: 'aether.effect-journal/2', clockDomain: this.options.clockDomain,
+          witnessDigest: witness.digest, revision: '0', records: [] };
+      }
+      if (Buffer.byteLength(head.journal) > this.limits.maxFrameBytes) throw new RangeError('witness journal frame limit exceeded');
+      const j = exactObject(decodeCanonical(Buffer.from(head.journal), this.limits), ['format', 'clockDomain', 'witnessDigest', 'revision', 'records']);
+      if (j.format !== 'aether.effect-journal/2' || j.clockDomain !== this.options.clockDomain || j.witnessDigest !== witness.digest
+        || j.revision !== head.revision || !Array.isArray(j.records)
+        || Buffer.from(encodeCanonical(j, this.limits)).toString('utf8') !== head.journal)
+        throw new TypeError('witnessed effect journal identity/canonical mismatch');
+      this.validateOrderedEvents(j.records);
+      if (existsSync(this.file)) {
+        if (statSync(this.file).size > this.limits.maxFrameBytes) throw new RangeError('local journal frame limit exceeded');
+        const local = readFileSync(this.file, 'utf8');
+        if (local !== head.journal) {
+          let older = false;
+          try {
+            const prior = exactObject(decodeCanonical(Buffer.from(local), this.limits), ['format', 'clockDomain', 'witnessDigest', 'revision', 'records']);
+            decimal(prior.revision, this.limits);
+            older = prior.format === 'aether.effect-journal/2' && prior.clockDomain === this.options.clockDomain
+              && prior.witnessDigest === witness.digest && BigInt(prior.revision) < BigInt(head.revision);
+          } catch { /* A corrupt or same-revision file is quarantined. */ }
+          if (!older) throw new Error('local effect journal diverges from witness');
+          atomicWrite(this.file, head.journal);
+        }
+      } else atomicWrite(this.file, head.journal);
+      const fd = openSync(this.options.directory, 'r'); try { fsyncSync(fd); } finally { closeSync(fd); }
+      return j as unknown as EffectJournalV2;
+    }
     if (!existsSync(this.file)) return { format: 'aether.effect-journal/1', clockDomain: this.options.clockDomain, records: [] };
     if (statSync(this.file).size > this.limits.maxFrameBytes) throw new RangeError('journal frame limit exceeded');
     const j = exactObject(decodeCanonical(readFileSync(this.file), this.limits), ['format', 'clockDomain', 'records']);
@@ -259,23 +302,30 @@ export class DurableEffectBroker {
     this.validateOrderedEvents(j.records);
     return j as unknown as EffectJournalV1;
   }
-  private persist(journal: EffectJournalV1, event: EffectEventV1): void {
+  private persist(journal: EffectJournal, event: EffectEventV1): void {
     this.validateEvent(event);
     const records = [...journal.records]; records[Number(event.sequence)] = event;
-    const next = { ...journal, records };
+    const next = journal.format === 'aether.effect-journal/2'
+      ? { ...journal, revision: String(BigInt(journal.revision) + 1n), records }
+      : { ...journal, records };
     const encoded = encodeCanonical(next, this.limits);
     this.options.beforePersist?.(immutable(copy(event, this.limits)));
+    if (journal.format === 'aether.effect-journal/2') {
+      if (!this.options.witness) throw new Error('effect witness missing at publication');
+      advanceWitnessHead(this.options.witness, journal.revision, Buffer.from(encoded).toString('utf8'));
+    }
     atomicWrite(this.file, Buffer.from(encoded).toString('utf8'));
     const fd = openSync(this.options.directory, 'r'); try { fsyncSync(fd); } finally { closeSync(fd); }
     journal.records = records;
+    if (journal.format === 'aether.effect-journal/2') journal.revision = (next as EffectJournalV2).revision;
   }
   private key(request: EffectRequestV1): string { return JSON.stringify([request.executionId, request.effectId]); }
-  private find(journal: EffectJournalV1, request: EffectRequestV1): EffectEventV1 | undefined {
+  private find(journal: EffectJournal, request: EffectRequestV1): EffectEventV1 | undefined {
     const event = journal.records.find(e => this.key(e.request) === this.key(request));
     if (event && event.requestDigest !== effectRequestDigest(request, this.limits)) throw new Error('effect_identity_conflict');
     return event;
   }
-  private step(journal: EffectJournalV1, event: EffectEventV1, state: EffectEventV1['state'], updates: Partial<EffectEventV1> = {}): EffectEventV1 {
+  private step(journal: EffectJournal, event: EffectEventV1, state: EffectEventV1['state'], updates: Partial<EffectEventV1> = {}): EffectEventV1 {
     const next: EffectEventV1 = { ...event, ...updates, state, recordedAt: this.time(), transitions: [...event.transitions, { state, time: this.time(), dispatchStarted: updates.dispatchStarted ?? event.dispatchStarted }] };
     this.persist(journal, next); return next;
   }

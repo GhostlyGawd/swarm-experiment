@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Opt-in witnessed effect journal — 2026-09-23
+
+- Added `aether.effect-journal/2` with a separately supplied complete-journal witness and a revision on every transition. Witness CAS precedes local publication and sink entry; reopen restores missing/older local bytes and refuses divergent same-revision bytes or witness rollback during the anchor lifetime. V1 histories remain explicit and byte-preserved.
+- Focused tests exercise forged local terminal receipts, deletion, rollback, uncertain witness acknowledgment after the dispatch marker, wrong witness identity and V1/V2 adoption refusal. The in-memory test provider is not independent production custody. Host cache, replay, external sink attestation and OS-separated witness service remain open, so T2-04 and NFR-16 do not close.
+
 ## Active gate visibility — 2026-09-23
 
 - The generated tracker now distinguishes seven active tasks with verified prerequisites from unstarted tasks that are ready. Its former “Ready now: none” label hid active work.
