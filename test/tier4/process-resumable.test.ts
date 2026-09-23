@@ -1,6 +1,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, existsSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,9 +17,11 @@ import { domainDigest, type ExecutionManifestV1 } from '../../src/fabric/identit
 import { runtimeSnapshotDigest } from '../../src/fabric/snapshot.ts';
 import { checkpointDigest, machineClone } from '../../src/tier3/resumable-state.ts';
 import { ResumableRuntime } from '../../src/tier3/resumable-runtime.ts';
+import { packResumableCheckpoint, type PackedLayout } from '../../src/tier3/packed-heap.ts';
 import { ProcessHost, type ProcessHostOptions } from '../../src/tier4/process-host.ts';
 import { ProcessResumableSession, type ProcessResumableOptions } from '../../src/tier4/process-resumable.ts';
-import { seedProcessCheckpoint, seededProcessReference } from '../../src/tier4/process-checkpoint-contract.ts';
+import { checkpointControlDigest, seedProcessCheckpoint, seededProcessReference } from '../../src/tier4/process-checkpoint-contract.ts';
+import { executePackedCheckpointNative } from '../../roadmap/v4/research/packed-native-bridge/bridge.ts';
 import type { TopologyPlan } from '../../src/tier4/topology.ts';
 const dirs: string[] = [];
 function temporary() { const dir = mkdtempSync(join(tmpdir(), 'aether-process-checkpoint-')); dirs.push(dir); return dir; }
@@ -48,6 +51,172 @@ async function source(f: ReturnType<typeof fixture>, host: ProcessHost) {
   return { before, ref, mapped, native, runtime, base: seed.checkpoint, initial: runtime.snapshot() };
 }
 function sessionOptions(f: ReturnType<typeof fixture>, host: ProcessHost): ProcessResumableOptions { return { host, module: f.module, runtime: { manifest: f.manifest, registry: f.registry }, tokens: () => host.issueTokens(f.main) }; }
+
+test('actual native packed candidate is one durable ProcessHost control across retry, reopen and publication', async () => {
+  const f = fixture(); let host: ProcessHost | undefined, revokeAtCommit = false;
+  const hostOptions: ProcessHostOptions = {...f.options, onPhase: phase => {
+    if (phase === 'checkpoint-control-before-commit' && revokeAtCommit) f.allow(false);
+  }};
+  try {
+    host = await ProcessHost.open(hostOptions);
+    const input = await source(f, host), folder = temporary(), executable = join(folder, 'packed-native');
+    execFileSync('cc', ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
+      new URL('../../roadmap/v4/research/packed-native-bridge/native.c', import.meta.url).pathname,
+      new URL('../../roadmap/v4/research/packed-heap/abi.c', import.meta.url).pathname, '-o', executable]);
+    const executableSha256 = `sha256:${createHash('sha256').update(readFileSync(executable)).digest('hex')}`;
+    const layout: PackedLayout = { typeName: (f.type as Extract<Ty, {t: 'Record'}>).name,
+      fields: [{name: 'value', kind: 'int', min: '0', max: '100', overflow: 'trap'}] };
+    const packed = packResumableCheckpoint(input.initial, input.runtime.program, [layout]);
+    const runNative = (source: typeof packed) => executePackedCheckpointNative({packed: source, program: input.runtime.program,
+      expectedSnapshotDigest: source.snapshotDigest, expectedLayoutDigest: source.heap.layoutDigest,
+      executable, expectedExecutableSha256: executableSha256,
+      operations: [{kind: 'addInt', id: input.mapped.objectId, field: 'value', increment: '15'}]});
+    const predicted = runNative(packed);
+    let executions = 0;
+    const withNative = (current: ProcessHost): ProcessResumableOptions => ({...sessionOptions(f, current), nativePacked: {
+      artifactDigest: f.manifest.target.artifactDigest, executableSha256,
+      execute: source => { executions++; return runNative(source).candidateHeap; }
+    }});
+    let session = await ProcessResumableSession.begin(withNative(host), input.base, input.initial,
+      {operationId: 'packed-control-job', symbol: f.main, expectedGeneration: '1', expectedSnapshot: runtimeSnapshotDigest(input.before)});
+    const request = {kind: 'packed-v1' as const, format: 'aether.process-packed-control/1' as const,
+      operationId: 'packed-control-one', expectedCheckpoint: checkpointDigest(input.initial),
+      layoutDigest: packed.heap.layoutDigest, sourceImageDigest: packed.heap.imageDigest,
+      candidateImageDigest: predicted.candidateHeap.imageDigest,
+      artifactDigest: f.manifest.target.artifactDigest, executableSha256};
+    f.allow(false);
+    await assert.rejects(session.correctPacked(request, [layout]), /authorization_denied/);
+    assert.equal(executions, 0); f.allow(true);
+    await assert.rejects(session.correctPacked({...request, operationId: 'wrong-candidate', candidateImageDigest: packed.heap.imageDigest}, [layout]), /candidate identity mismatch/);
+    assert.equal(checkpointDigest(await host.readCheckpoint(session.binding.id)), checkpointDigest(input.initial));
+    const noOp = ProcessResumableSession.reopen({...withNative(host), nativePacked: {
+      artifactDigest: f.manifest.target.artifactDigest, executableSha256,
+      execute: source => source.heap
+    }}, session.binding.id);
+    await assert.rejects(noOp.correctPacked({...request, operationId: 'no-op-candidate', candidateImageDigest: packed.heap.imageDigest}, [layout]), /control does not match|empty packed control/);
+    assert.equal(checkpointDigest(await host.readCheckpoint(session.binding.id)), checkpointDigest(input.initial));
+    revokeAtCommit = true;
+    await assert.rejects(session.correctPacked(request, [layout]), /authorization_denied/);
+    assert.equal(checkpointDigest(await host.readCheckpoint(session.binding.id)), checkpointDigest(input.initial));
+    revokeAtCommit = false; f.allow(true);
+    const receipt = await session.correctPacked(request, [layout]);
+    assert.equal(executions, 3);
+    assert.deepEqual(await session.correctPacked(request, [layout]), receipt);
+    assert.equal(executions, 3, 'a committed same-ID retry must not rerun native code');
+    const corrected = await host.readCheckpoint(session.binding.id);
+    assert.equal(corrected.core.records[0].fields[0][1].tag, 'int');
+    assert.equal((corrected.core.records[0].fields[0][1] as {value: string}).value, '20');
+    assert.match(corrected.events.at(-1)!.op, /^packed-correction:/);
+    assert.deepEqual(await host.snapshot(), input.before);
+    await assert.rejects(session.correctPacked({...request, operationId: 'stale-packed'}, [layout]), /stale checkpoint control/);
+    await host.close(); host = await ProcessHost.open(hostOptions);
+    session = ProcessResumableSession.reopen(withNative(host), session.binding.id);
+    assert.deepEqual(await session.correctPacked(request, [layout]), receipt);
+    assert.equal(executions, 3);
+    assert.equal((await session.run()).state, 'completed');
+    await session.commit();
+    const mapped = await session.publishedReference(input.mapped);
+    const result = await host.call(f.read, [{tag: 'ref', value: mapped}], {operationId: 'read-native-packed-published', tokens: host.issueTokens(f.read)});
+    assert.equal(result.state, 'completed');
+    if (result.state === 'completed' && result.execution.ok) assert.equal((result.execution.value as {value: string}).value, '24');
+    else assert.fail('published native packed correction was not visible to worker');
+    const sidecar = join(f.options.directory, 'checkpoint-packed-layouts', `${request.layoutDigest.split(':').at(-1)!}.json`);
+    const sidecarBytes = readFileSync(sidecar);
+    await host.close(); host = undefined;
+    const journalPath = join(f.options.directory, 'host.json'), journalBytes = readFileSync(journalPath);
+    const forgedJournal = JSON.parse(journalBytes.toString('utf8'));
+    const forgedControl = {...forgedJournal.checkpointControls[0], request: {
+      ...forgedJournal.checkpointControls[0].request, candidateImageDigest: request.sourceImageDigest}};
+    const {id: _oldId, ...forgedBody} = forgedControl;
+    forgedJournal.checkpointControls[0] = {...forgedBody, id: checkpointControlDigest(forgedBody)};
+    writeFileSync(journalPath, JSON.stringify(forgedJournal));
+    await assert.rejects(ProcessHost.open(hostOptions), /packed control candidate image mismatch/);
+    writeFileSync(journalPath, journalBytes);
+    writeFileSync(sidecar, '[]');
+    await assert.rejects(ProcessHost.open(hostOptions), /packed layout digest mismatch/);
+    writeFileSync(sidecar, sidecarBytes);
+  } finally { await host?.close(); }
+});
+
+test('packed control survives real controller SIGKILL before and after durable decision', async () => {
+  for (const boundary of ['checkpoint-control-before-commit', 'checkpoint-control-committed']) {
+    const f = fixture(); let host: ProcessHost | undefined;
+    try {
+      host = await ProcessHost.open(f.options);
+      const input = await source(f, host), directory = f.options.directory, executable = join(temporary(), 'native');
+      execFileSync('cc', ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
+        new URL('../../roadmap/v4/research/packed-native-bridge/native.c', import.meta.url).pathname,
+        new URL('../../roadmap/v4/research/packed-heap/abi.c', import.meta.url).pathname, '-o', executable]);
+      const executableSha256 = `sha256:${createHash('sha256').update(readFileSync(executable)).digest('hex')}`;
+      const layout: PackedLayout = {typeName: (f.type as Extract<Ty, {t: 'Record'}>).name,
+        fields: [{name: 'value', kind: 'int', min: '0', max: '100', overflow: 'trap'}]};
+      const packed = packResumableCheckpoint(input.initial, input.runtime.program, [layout]);
+      const runNative = (source: typeof packed) => executePackedCheckpointNative({packed: source, program: input.runtime.program,
+        expectedSnapshotDigest: source.snapshotDigest, expectedLayoutDigest: source.heap.layoutDigest,
+        executable, expectedExecutableSha256: executableSha256, operations: [{kind: 'addInt', id: input.mapped.objectId, field: 'value', increment: '15'}]});
+      const request = {kind: 'packed-v1' as const, format: 'aether.process-packed-control/1' as const,
+        operationId: `packed-kill-${boundary}`, expectedCheckpoint: checkpointDigest(input.initial),
+        layoutDigest: packed.heap.layoutDigest, sourceImageDigest: packed.heap.imageDigest,
+        candidateImageDigest: runNative(packed).candidateHeap.imageDigest,
+        artifactDigest: f.manifest.target.artifactDigest, executableSha256};
+      const session = await ProcessResumableSession.begin({...sessionOptions(f, host), nativePacked: {
+        artifactDigest: request.artifactDigest, executableSha256, execute: source => runNative(source).candidateHeap
+      }}, input.base, input.initial,
+      {operationId: `packed-lease-${boundary}`, symbol: f.main, expectedGeneration: '1', expectedSnapshot: runtimeSnapshotDigest(input.before)});
+      const id = session.binding.id;
+      writeFileSync(join(directory, 'packed-child-input.json'), encodeStored({module: f.module, manifest: f.manifest, plan: f.options.plan,
+        main: f.main, id, request, layout, executable, mappedId: input.mapped.objectId}));
+      const moduleUrl = (path: string) => JSON.stringify(new URL(path, import.meta.url).href);
+      writeFileSync(join(directory, 'packed-controller.ts'), `
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { decodeStored } from ${moduleUrl('../../src/tier1/persistence.ts')};
+import { CapabilityRegistry, CapabilitySealer } from ${moduleUrl('../../src/tier2/ocap.ts')};
+import { ProcessHost } from ${moduleUrl('../../src/tier4/process-host.ts')};
+import { ProcessResumableSession } from ${moduleUrl('../../src/tier4/process-resumable.ts')};
+import { compileResumableProgram } from ${moduleUrl('../../src/tier3/resumable-program.ts')};
+import { executePackedCheckpointNative } from ${moduleUrl('../../roadmap/v4/research/packed-native-bridge/bridge.ts')};
+const directory = ${JSON.stringify(directory)}, boundary = ${JSON.stringify(boundary)};
+const f = decodeStored(readFileSync(join(directory, 'packed-child-input.json'), 'utf8'));
+const registry = new CapabilityRegistry(), program = compileResumableProgram(f.module, {manifest:f.manifest, registry});
+const host = await ProcessHost.open({directory, module:f.module, manifest:f.manifest, registry, plan:f.plan,
+  sealer:new CapabilitySealer(new Uint8Array(32).fill(19)), authorizeCheckpoint:()=>true,
+  onPhase:phase=>{if(phase===boundary)process.kill(process.pid,'SIGKILL');}});
+const session = ProcessResumableSession.reopen({host,module:f.module,runtime:{manifest:f.manifest,registry},
+  tokens:()=>host.issueTokens(f.main),nativePacked:{artifactDigest:f.request.artifactDigest,
+  executableSha256:f.request.executableSha256,execute:source=>executePackedCheckpointNative({packed:source,program,
+  expectedSnapshotDigest:source.snapshotDigest,expectedLayoutDigest:source.heap.layoutDigest,executable:f.executable,
+  expectedExecutableSha256:f.request.executableSha256,operations:[{kind:'addInt',id:f.mappedId,field:'value',increment:'15'}]}).candidateHeap}},f.id);
+await session.correctPacked(f.request,[f.layout]);
+throw Error('expected SIGKILL');
+`);
+      await host.close(); host = undefined;
+      const killed = spawnSync(process.execPath, ['--experimental-strip-types', join(directory, 'packed-controller.ts')],
+        {encoding: 'utf8', timeout: 90000});
+      assert.equal(killed.signal, 'SIGKILL', `${boundary}: ${killed.stderr}`);
+      host = await ProcessHost.open(f.options);
+      let reruns = 0;
+      const resumed = ProcessResumableSession.reopen({...sessionOptions(f, host), nativePacked: {
+        artifactDigest: request.artifactDigest, executableSha256,
+        execute: source => {reruns++; return runNative(source).candidateHeap;}
+      }}, id);
+      const receipt = await resumed.correctPacked(request, [layout]);
+      assert.deepEqual(await resumed.correctPacked(request, [layout]), receipt);
+      assert.equal(reruns, boundary === 'checkpoint-control-before-commit' ? 1 : 0);
+      const corrected = await host.readCheckpoint(id);
+      assert.equal((corrected.core.records[0].fields[0][1] as {value: string}).value, '20');
+      assert.deepEqual(await host.snapshot(), input.before);
+      assert.equal((await resumed.run()).state, 'completed');
+      await resumed.commit();
+      const mapped = await resumed.publishedReference(input.mapped);
+      const result = await host.call(f.read, [{tag: 'ref', value: mapped}],
+        {operationId: `packed-kill-read-${boundary}`, tokens: host.issueTokens(f.read)});
+      assert.equal(result.state, 'completed');
+      if (result.state === 'completed' && result.execution.ok) assert.equal((result.execution.value as {value: string}).value, '24');
+      else assert.fail('packed correction was not recovered');
+    } finally {await host?.close();}
+  }
+});
 
 test('checkpoint lease preserves nonempty frames/tasks and publishes state to actual production workers', async () => {
   const f = fixture(); let host: ProcessHost | undefined, second: ProcessHost | undefined;

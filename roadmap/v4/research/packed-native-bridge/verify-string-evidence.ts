@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +17,7 @@ const evidence = JSON.parse(readFileSync(path, 'utf8')) as {
   latencyNs: { median: number; maximum: number };
 };
 assert.equal(evidence.format, 'aether.packed-native-string-differential/2');
+assert.match(evidence.sourceCommit, /^[0-9a-f]{40}$/);
 assert.deepEqual(evidence.registration, { seed: '0x6c327a91', generator: 'xorshift32', records: 16, operations: 256, samples: 30 });
 assert.equal(evidence.operations.length, 256);
 assert.equal(evidence.observations.length, 256);
@@ -26,15 +27,17 @@ const sorted = [...evidence.samplesNs].sort((a, b) => a - b);
 assert.deepEqual(evidence.latencyNs, { median: (sorted[14] + sorted[15]) / 2, maximum: sorted[29] });
 for (const item of evidence.sources) {
   assert.match(item.path, /^(roadmap\/v4\/research\/(?:packed-native-bridge|packed-heap)\/|src\/tier3\/)[a-z0-9.-]+$/);
-  assert.equal(sha256(readFileSync(join(root, item.path))), item.sha256, `current source ${item.path}`);
   const committed = execFileSync('git', ['show', `${evidence.sourceCommit}:${item.path}`], { cwd: root, maxBuffer: 4 * 1024 * 1024 });
   assert.equal(sha256(committed), item.sha256, `committed source ${item.path}`);
 }
 const folder = mkdtempSync(join(tmpdir(), 'aether-native-string-verify-'));
 try {
+  const checkout = join(folder, 'source');
+  execFileSync('git', ['worktree', 'add', '--detach', checkout, evidence.sourceCommit], {cwd: root, stdio: 'ignore'});
+  symlinkSync(join(root, 'node_modules'), join(checkout, 'node_modules'), 'dir');
   const rerunPath = join(folder, 'rerun.json');
   execFileSync(process.execPath, ['--test', '--experimental-strip-types', 'roadmap/v4/research/packed-native-bridge/bridge-strings.test.ts'], {
-    cwd: root, env: { ...process.env, AETHER_PACKED_NATIVE_STRING_EVIDENCE: rerunPath },
+    cwd: checkout, env: { ...process.env, AETHER_PACKED_NATIVE_STRING_EVIDENCE: rerunPath },
     encoding: 'utf8', timeout: 60000, maxBuffer: 1024 * 1024,
   });
   const rerun = JSON.parse(readFileSync(rerunPath, 'utf8')) as typeof evidence;
@@ -46,4 +49,7 @@ try {
     sourceCommit: evidence.sourceCommit, pinnedSources: evidence.sources.length,
     records: evidence.registration.records, operations: evidence.registration.operations,
     samples: evidence.registration.samples, executableMatches: true, rawObservationsMatch: true }, null, 2));
-} finally { rmSync(folder, { recursive: true, force: true }); }
+} finally {
+  try { execFileSync('git', ['worktree', 'remove', '--force', join(folder, 'source')], {cwd: root, stdio: 'ignore'}); }
+  finally { rmSync(folder, {recursive: true, force: true}); }
+}

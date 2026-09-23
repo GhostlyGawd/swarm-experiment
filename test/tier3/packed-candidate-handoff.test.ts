@@ -20,13 +20,22 @@ function fixture() {
     specRoot: digest('spec'), dependencies: [], semanticsVersion: 'aether-reference/1', compilerDigest: digest('compiler'),
     target: {abiVersion: 'resumable/1', profileDigest: digest('target'), artifactDigest: digest('artifact')},
     capabilityPolicyDigest: digest('caps'), evidencePolicyDigest: digest('evidence')};
+  const targetName = typeName('type:test:packed_candidate_target');
+  const targetTy = {t: 'Record' as const, name: targetName, fields: [['count', b.Int], ['label', b.Str]] as const};
+  const foreignName = typeName('type:test:packed_candidate_foreign');
+  const foreignTy = {t: 'Record' as const, name: foreignName, fields: [['count', b.Int], ['label', b.Str]] as const};
   const name = typeName('type:test:packed_candidate_node');
-  const ty = {t: 'Record' as const, name, fields: [['count', b.Int], ['label', b.Str], ['next', b.Unit]] as const};
+  const ty = {t: 'Record' as const, name, fields: [['count', b.Int], ['label', b.Str], ['next', targetTy]] as const};
   const layout: PackedLayout = {typeName: name, fields: [
     {name: 'count', kind: 'int', min: '0', max: '100', overflow: 'trap'},
     {name: 'label', kind: 'string', maxUtf8Bytes: 32},
-    {name: 'next', kind: 'ref', maxRelative: 2}
+    {name: 'next', kind: 'ref', maxRelative: 4}
   ]};
+  const targetLayout: PackedLayout = {typeName: targetName, fields: [
+    {name: 'count', kind: 'int', min: '0', max: '100', overflow: 'trap'},
+    {name: 'label', kind: 'string', maxUtf8Bytes: 32}
+  ]};
+  const foreignLayout: PackedLayout = {...targetLayout, typeName: foreignName};
   let expectedCandidate: Digest | null = null, observedSubject: PackedCandidateSubject | null = null;
   const options = {manifest, registry: new CapabilityRegistry(), executionId: 'packed-candidate-execution',
     authorizeCorrection: () => true,
@@ -34,16 +43,19 @@ function fixture() {
       observedSubject = subject; return subject.candidateImageDigest === expectedCandidate;
     }};
   const runtime = new ResumableRuntime(module, options);
-  const first = runtime.allocateRecord(ty, {count: 3n, label: 'alpha', next: null});
-  const second = runtime.allocateRecord(ty, {count: 7n, label: 'βeta', next: null});
-  runtime.correctRecord(second, 'next', first);
-  const before = runtime.snapshot(), sourceDigest = checkpointDigest(before), packed = packResumableCheckpoint(before, runtime.program, [layout]);
+  const targetOne = runtime.allocateRecord(targetTy, {count: 11n, label: 'one'});
+  const targetTwo = runtime.allocateRecord(targetTy, {count: 12n, label: 'two'});
+  const foreign = runtime.allocateRecord(foreignTy, {count: 13n, label: 'other'});
+  const first = runtime.allocateRecord(ty, {count: 3n, label: 'alpha', next: targetOne});
+  const second = runtime.allocateRecord(ty, {count: 7n, label: 'βeta', next: targetOne});
+  const layouts = [layout, targetLayout, foreignLayout];
+  const before = runtime.snapshot(), sourceDigest = checkpointDigest(before), packed = packResumableCheckpoint(before, runtime.program, layouts);
   const candidate = PackedHeap.fromImage(packed.heap, packed.heap.layoutDigest);
   candidate.set(String(first.addr), 'count', {tag: 'int', value: '8'});
   candidate.set(String(first.addr), 'label', {tag: 'string', value: 'λambda'});
-  candidate.set(String(second.addr), 'next', {tag: 'ref', value: {heapId: first.heapId, objectId: String(second.addr), ownerEpoch: second.ownerEpoch}});
+  candidate.set(String(second.addr), 'next', {tag: 'ref', value: {heapId: targetTwo.heapId, objectId: String(targetTwo.addr), ownerEpoch: targetTwo.ownerEpoch}});
   expectedCandidate = candidate.image().imageDigest;
-  return {runtime, module, options, first, second, layout, before, sourceDigest, packed, candidate: candidate.image(),
+  return {runtime, module, options, first, second, targetOne, targetTwo, foreign, layouts, before, sourceDigest, packed, candidate: candidate.image(),
     get observedSubject() {return observedSubject;}, set expectedCandidate(value: Digest | null) {expectedCandidate = value;}};
 }
 
@@ -61,8 +73,8 @@ test('native packed candidate becomes one authorized, replayable correction even
   assert.equal(after.events.at(-1)?.delta[0].section, 'records');
   assert.equal(f.runtime.readRecord(f.first).get('count'), 8n);
   assert.equal(f.runtime.readRecord(f.first).get('label'), 'λambda');
-  assert.deepEqual(f.runtime.readRecord(f.second).get('next'), f.second);
-  const repacked = packResumableCheckpoint(after, f.runtime.program, [f.layout]);
+  assert.deepEqual(f.runtime.readRecord(f.second).get('next'), f.targetTwo);
+  const repacked = packResumableCheckpoint(after, f.runtime.program, f.layouts);
   assert.equal(repacked.heap.bytes, f.candidate.bytes);
   assert.equal(repacked.heap.stringBytes, f.candidate.stringBytes);
   const reopened = new ResumableRuntime(f.module, f.options);
@@ -95,6 +107,13 @@ test('stale, altered, unauthorised and identity-changing candidates leave runtim
   const forged = {...body, imageDigest: domainDigest('aether.packed-heap-image/2', body)};
   assert.throws(() => f.runtime.commitPackedCandidate(f.packed, forged, f.sourceDigest, f.packed.heap.layoutDigest), /row identity/);
   assert.equal(checkpointDigest(f.runtime.snapshot()), before);
+  const wrongType = PackedHeap.fromImage(f.packed.heap, f.packed.heap.layoutDigest);
+  wrongType.set(String(f.second.addr), 'next', {tag: 'ref', value: {
+    heapId: f.foreign.heapId, objectId: String(f.foreign.addr), ownerEpoch: f.foreign.ownerEpoch}});
+  f.expectedCandidate = wrongType.image().imageDigest;
+  assert.throws(() => f.runtime.commitPackedCandidate(f.packed, wrongType.image(), f.sourceDigest, f.packed.heap.layoutDigest), /typed record|type mismatch/);
+  assert.equal(checkpointDigest(f.runtime.snapshot()), before);
+  f.expectedCandidate = f.candidate.imageDigest;
   assert.throws(() => f.runtime.commitPackedCandidate(f.packed, f.candidate, f.sourceDigest,
     domainDigest('aether.packed-candidate-test/1', 'wrong-layout')), /layout digest/);
   assert.equal(checkpointDigest(f.runtime.snapshot()), before);

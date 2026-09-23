@@ -12,6 +12,7 @@ import { checkpointDigest, eventDigest, machineDigest, MACHINE_LIMITS, machineCl
 import type { ResumableProgram } from '../tier3/resumable-program.ts';
 import type { Ty } from '../tier1/ast.ts';
 import { validateMachineResult } from '../tier3/resumable-types.ts';
+import { PackedHeap, packResumableCheckpoint, type PackedLayout } from '../tier3/packed-heap.ts';
 import type { SymbolId } from '../tier1/ids.ts';
 
 export interface ProcessCheckpointBinding {
@@ -28,11 +29,14 @@ export interface ProcessCheckpointReceipt {
   readonly checkpoint: Digest; readonly beforeSnapshot: Digest; readonly afterSnapshot: Digest;
   readonly effectAudit: Digest; readonly eventHead: Digest; readonly eventCursor: string;
 }
-export type ProcessCheckpointAction = 'begin' | 'run' | 'commit' | 'reconcile' | 'abort' | 'correct' | 'rewind';
+export type ProcessCheckpointAction = 'begin' | 'run' | 'commit' | 'reconcile' | 'abort' | 'correct' | 'rewind' | 'packed';
 export type ProcessCheckpointControlRequest = { readonly operationId: string; readonly expectedCheckpoint: Digest } & (
   { readonly kind: 'rewind'; readonly steps: number } |
   { readonly kind: 'local'; readonly frameId: string; readonly symbol: SymbolId; readonly value: TaggedValueV1 } |
-  { readonly kind: 'record'; readonly reference: LogicalRefV1; readonly field: string; readonly value: TaggedValueV1 });
+  { readonly kind: 'record'; readonly reference: LogicalRefV1; readonly field: string; readonly value: TaggedValueV1 } |
+  { readonly kind: 'packed-v1'; readonly format: 'aether.process-packed-control/1'; readonly layoutDigest: Digest;
+    readonly sourceImageDigest: Digest; readonly candidateImageDigest: Digest; readonly artifactDigest: Digest;
+    readonly executableSha256: string });
 export interface ProcessCheckpointControl {
   readonly format: 'aether.process-checkpoint-control/1'; readonly id: Digest; readonly binding: Digest;
   readonly request: ProcessCheckpointControlRequest; readonly beforeCheckpoint: Digest; readonly afterCheckpoint: Digest;
@@ -40,22 +44,60 @@ export interface ProcessCheckpointControl {
 }
 export interface ProcessCheckpointAuthorization { readonly action: ProcessCheckpointAction; readonly binding: ProcessCheckpointBinding; readonly control?: ProcessCheckpointControlRequest }
 export const checkpointControlDigest = (value: Omit<ProcessCheckpointControl, 'id'>): Digest => domainDigest('aether.process-checkpoint-control/1', value);
+const sameType = (a: Ty | null, b: Ty | null): boolean => Buffer.from(encodeCanonical(a, MACHINE_LIMITS)).equals(Buffer.from(encodeCanonical(b, MACHINE_LIMITS)));
 export function validateCheckpointControlRequest(value: ProcessCheckpointControlRequest): void {
   const keys = ['operationId', 'expectedCheckpoint', 'kind'];
-  if (value.kind === 'rewind') keys.push('steps'); else if (value.kind === 'local') keys.push('frameId', 'symbol', 'value'); else if (value.kind === 'record') keys.push('reference', 'field', 'value'); else throw new TypeError('unsupported checkpoint control');
+  if (value.kind === 'rewind') keys.push('steps'); else if (value.kind === 'local') keys.push('frameId', 'symbol', 'value'); else if (value.kind === 'record') keys.push('reference', 'field', 'value');
+  else if (value.kind === 'packed-v1') keys.push('format', 'layoutDigest', 'sourceImageDigest', 'candidateImageDigest', 'artifactDigest', 'executableSha256'); else throw new TypeError('unsupported checkpoint control');
   exactObject(value, keys); identifier(value.operationId); validateDigest(value.expectedCheckpoint, 'aether.resumable-state/1');
   if (value.kind === 'rewind') { if (!Number.isSafeInteger(value.steps) || value.steps < 1 || value.steps > 4096) throw new RangeError('invalid control rewind distance'); }
+  else if (value.kind === 'packed-v1') {
+    if (value.format !== 'aether.process-packed-control/1' || !/^aether\.packed-layout\/[12]:b3:[0-9a-f]{64}$/.test(value.layoutDigest) ||
+      !/^aether\.packed-heap-image\/[12]:b3:[0-9a-f]{64}$/.test(value.sourceImageDigest) ||
+      !/^aether\.packed-heap-image\/[12]:b3:[0-9a-f]{64}$/.test(value.candidateImageDigest) ||
+      !/^sha256:[0-9a-f]{64}$/.test(value.executableSha256)) throw new TypeError('invalid packed checkpoint control identity');
+    validateDigest(value.artifactDigest);
+  }
   else {
     validateTaggedValue(value.value); if (!['null', 'bool', 'int', 'string', 'ref'].includes(value.value.tag)) throw new TypeError('checkpoint corrections require scalar/reference values');
     if (value.kind === 'local') { decimal(value.frameId); identifier(value.symbol); } else { validateLogicalRef(value.reference); identifier(value.field); }
   }
 }
-export function validateCheckpointControlTransition(request: ProcessCheckpointControlRequest, before: ResumableSnapshot, after: ResumableSnapshot, program: ResumableProgram): void {
+export function validateCheckpointControlTransition(request: ProcessCheckpointControlRequest, before: ResumableSnapshot, after: ResumableSnapshot, program: ResumableProgram, layouts?: readonly PackedLayout[]): void {
   validateCheckpointControlRequest(request); validateCheckpointExtension(before, after, program, request.kind !== 'rewind');
   const event = after.events.at(-1);
-  if (request.expectedCheckpoint !== checkpointDigest(before) || after.events.length !== before.events.length + 1 || event?.code !== 'host' || event.op !== (request.kind === 'rewind' ? `rewind-v1:${request.steps}` : 'correction')) throw new TypeError('checkpoint control does not match the authorized transition');
+  if (request.expectedCheckpoint !== checkpointDigest(before) || after.events.length !== before.events.length + 1 || event?.code !== 'host' ||
+      request.kind !== 'packed-v1' && event.op !== (request.kind === 'rewind' ? `rewind-v1:${request.steps}` : 'correction')) throw new TypeError('checkpoint control does not match the authorized transition');
   if (request.kind === 'rewind') return; // Version 2 validator checks every inverse section against the exact target.
   if (before.core.state !== 'running' || !before.core.frames.length || before.core.frames.some(frame => frame.pc >= program.codes.find(code => code.id === frame.code)!.returnPc)) throw new Error('checkpoint correction requires a running body before postcondition evaluation; rewind first');
+  if (request.kind === 'packed-v1') {
+    if (!layouts || request.artifactDigest !== program.manifest.target.artifactDigest ||
+        event.effect !== null || event.delta.length !== 1 || event.delta[0].section !== 'records') throw new TypeError('packed control artifact or event mismatch');
+    const source = packResumableCheckpoint(before, program, layouts).heap;
+    if (source.layoutDigest !== request.layoutDigest || source.imageDigest !== request.sourceImageDigest) throw new TypeError('packed control source image mismatch');
+    if (before.core.records.length !== after.core.records.length) throw new TypeError('packed control row count changed');
+    const candidateRecords = machineClone(after.core.records), changes: { row: number; field: number; value: MachineValue }[] = [];
+    for (let row = 0; row < candidateRecords.length; row++) {
+      const prior = before.core.records[row], next = candidateRecords[row];
+      if (prior.id !== next.id || prior.epoch !== next.epoch || !sameType(prior.ty, next.ty) || prior.fields.length !== next.fields.length) throw new TypeError('packed control row identity changed');
+      next.version = prior.version;
+      for (let field = 0; field < prior.fields.length; field++) {
+        if (prior.fields[field][0] !== next.fields[field][0]) throw new TypeError('packed control field identity changed');
+        if (!Buffer.from(encodeCanonical(prior.fields[field][1], MACHINE_LIMITS)).equals(Buffer.from(encodeCanonical(next.fields[field][1], MACHINE_LIMITS))))
+          changes.push({ row, field, value: next.fields[field][1] });
+      }
+    }
+    if (!changes.length) throw new TypeError('empty packed control');
+    const candidate = PackedHeap.pack(candidateRecords, after.core.heapId, layouts).image();
+    if (candidate.imageDigest !== request.candidateImageDigest) throw new TypeError('packed control candidate image mismatch');
+    const subject = { format: 'aether.packed-candidate-correction/1', sourceSnapshotDigest: request.expectedCheckpoint,
+      sourceImageDigest: request.sourceImageDigest, candidateImageDigest: request.candidateImageDigest,
+      layoutDigest: request.layoutDigest, programDigest: program.digest, manifestDigest: program.manifestDigest,
+      changesDigest: domainDigest('aether.packed-candidate-changes/1', changes, MACHINE_LIMITS) };
+    if (event.op !== `packed-correction:${domainDigest('aether.packed-candidate-correction/1', subject, MACHINE_LIMITS)}`)
+      throw new TypeError('packed control event subject mismatch');
+    return;
+  }
   const expected = machineClone(before.core), value = machineClone(request.value) as MachineValue;
   if (request.kind === 'record') {
     const record = expected.records.find(record => record.id === request.reference.objectId && record.epoch === request.reference.ownerEpoch);
@@ -156,6 +198,31 @@ export function readProcessCheckpoint(directory: string, digest: Digest, program
   const file = blobPath(directory, digest); if (statSync(file).size > MACHINE_LIMITS.maxFrameBytes) throw new RangeError('process checkpoint byte limit');
   const snapshot = decodeCanonical(readFileSync(file), MACHINE_LIMITS); validateResumableSnapshot(snapshot, program);
   if (checkpointDigest(snapshot) !== digest) throw new TypeError('process checkpoint digest mismatch'); return snapshot;
+}
+function packedLayoutPath(directory: string, digest: Digest): string {
+  if (!/^aether\.packed-layout\/[12]:b3:[0-9a-f]{64}$/.test(digest)) throw new TypeError('invalid process packed layout digest');
+  return join(directory, 'checkpoint-packed-layouts', `${digest.split(':').at(-1)!}.json`);
+}
+/** An immutable fsynced sidecar keeps potentially large layout tables out of
+ * the ProcessHost journal while binding each packed control to exact bytes. */
+export function writeProcessPackedLayout(directory: string, layouts: readonly PackedLayout[]): Digest {
+  const checked = machineClone(layouts), digest = PackedHeap.pack([], 'heap:layout-validation', checked).image().layoutDigest;
+  const file = packedLayoutPath(directory, digest), folder = dirname(file), bytes = encodeCanonical(checked, MACHINE_LIMITS);
+  ensure(folder);
+  if (existsSync(file)) { if (!Buffer.from(readFileSync(file)).equals(Buffer.from(bytes))) throw new TypeError('packed layout address collision/corruption'); return digest; }
+  const temporary = join(folder, `.layout-${process.pid}-${randomUUID()}`), fd = openSync(temporary, 'wx', 0o600);
+  try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
+  try { try { linkSync(temporary, file); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; if (!Buffer.from(readFileSync(file)).equals(Buffer.from(bytes))) throw new TypeError('packed layout address collision/corruption'); } sync(folder); }
+  finally { unlinkSync(temporary); }
+  return digest;
+}
+export function readProcessPackedLayout(directory: string, digest: Digest): readonly PackedLayout[] {
+  const file = packedLayoutPath(directory, digest);
+  if (statSync(file).size > MACHINE_LIMITS.maxFrameBytes) throw new RangeError('process packed layout byte limit');
+  const layouts = decodeCanonical(readFileSync(file), MACHINE_LIMITS) as unknown as PackedLayout[];
+  if (!Array.isArray(layouts) || PackedHeap.pack([], 'heap:layout-validation', layouts).image().layoutDigest !== digest)
+    throw new TypeError('process packed layout digest mismatch');
+  return layouts;
 }
 export function validateCheckpointEffectAudit(snapshot: ResumableSnapshot, events: readonly EffectEventV1[]): void {
   encodeCanonical(events); if (!Array.isArray(events) || events.length !== snapshot.core.effectPrefix.length) throw new TypeError('checkpoint effect audit coverage mismatch');

@@ -104,7 +104,9 @@ class Validator {
     if (ty.t === 'Seq') { if (value.tag !== 'sequence') throw new TypeError('typed boundary expects Seq'); for (const item of this.core.sequences.find(row => row.id === value.id)!.items) this.check(ty.element, item, depth + 1, region); return; }
     if (ty.t === 'Result') { if (value.tag !== 'result') throw new TypeError('typed boundary expects Result'); const row = this.core.results.find(row => row.id === value.id)!; this.check(row.variant === 'ok' ? ty.ok : ty.err, row.value, depth + 1, region); return; }
     if (ty.t === 'Record') {
-      const row = this.row(value); (region ?? this.borrowed).add(row.id); const key = `${row.id}:${JSON.stringify(ty)}:${region === null ? 'borrowed' : this.owned.indexOf(region)}`; if (this.seen.has(key)) return; this.seen.add(key);
+      const row = this.row(value);
+      if (row.ty?.t !== 'Record' || row.ty.name !== ty.name) throw new TypeError('typed record identity mismatch');
+      (region ?? this.borrowed).add(row.id); const key = `${row.id}:${JSON.stringify(ty)}:${region === null ? 'borrowed' : this.owned.indexOf(region)}`; if (this.seen.has(key)) return; this.seen.add(key);
       for (const [name, type] of ty.fields) { const field = row.fields.find(([field]) => field === name); if (!field) throw new TypeError('missing typed record field'); this.check(type, field[1], depth + 1, region); }
       for (const [name, child] of row.fields) if (!ty.fields.some(([field]) => field === name)) this.mark(child, region ?? this.borrowed, depth + 1); return;
     }

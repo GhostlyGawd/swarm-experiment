@@ -506,6 +506,11 @@ export class ResumableRuntime {
         touched.add(change.row);
       }
       for (const index of touched) this.core.records[index].version = String(BigInt(this.core.records[index].version) + 1n);
+      for (const index of touched) {
+        const row = this.core.records[index];
+        if (row.ty === null) throw new TypeError('packed candidate requires typed record');
+        validateMachineResult(row.ty, { tag: 'ref', value: { heapId: this.core.heapId, objectId: row.id, ownerEpoch: row.epoch } }, this.core, this.program);
+      }
       const repacked = PackedHeap.pack(this.core.records, this.core.heapId, candidate.layouts).image();
       if (repacked.bytes !== candidate.bytes || repacked.stringBytes !== candidate.stringBytes ||
           !equalBytes(repacked.stringEntries ?? [], candidate.stringEntries ?? [])) throw new TypeError('native candidate did not map to corrected logical state');

@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Fused native row reader and durable packed ProcessHost control — 2026-09-23
+
+- The checked C ABI now has a fused bounded-row reader. A preregistered Apple M4 Pro campaign pins unchanged locality fixtures, 504 raw samples, exhaustive reference-code checks and sanitizer results. It is 1.92–3.62× faster than the old checked ABI, yet slower than native pointers in 16 of 18 patterns; G2 and release targets remain open.
+- Added `aether.process-packed-control/1` under the exclusive ProcessHost checkpoint lease. The request binds exact source, layout, candidate, artifact and executable identities; the layout is stored in an fsynced content-addressed sidecar. Reopen reconstructs the candidate from logical state and checks the one-event subject. Actual C execution, same-ID retry, pre/post-decision SIGKILL, reopen and production worker publication pass focused tests. The native executor remains a trusted callback, so external native attestation and full T3-10 remain open.
+- Packed corrections now typecheck touched records, rejecting an in-bounds reference to a record of the wrong declared type. The runtime typed boundary checks record-name identity consistently with the language type relation.
+
 ## Native packed candidate handoff and C string ABI — 2026-09-23
 
 - The compiled C process bridge now reads and compares bounded UTF-8 dictionary strings from authenticated `/2` packed checkpoints. Its `/1` textual frame remains unchanged; `/2` adds checked dictionary offsets, UTF-8 validation, field bounds and exact differential output. A source-pinned campaign retains 256 string operations and 30 process round trips. It does not measure guest boot.

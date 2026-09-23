@@ -6,10 +6,12 @@ Run from the repository root:
 
 ```sh
 node --experimental-strip-types roadmap/v4/research/packed-native-locality/run.ts roadmap/v4/research/packed-native-locality/results/local-01
-node --experimental-strip-types roadmap/v4/research/packed-native-locality/verify.ts roadmap/v4/research/packed-native-locality/results/local-01/report.json
+node --experimental-strip-types roadmap/v4/research/packed-native-locality/verify-historical.ts roadmap/v4/research/packed-native-locality/results/local-01/report.json
 ```
 
 The campaign retains binary logical-plus-packed fixtures and raw samples in `results/local-01/`. The report includes the compiler and hardware identity, source and fixture SHA-256 values, allocation and canonical serialization byte counts, per-trial checksums and nanoseconds, medians, maxima, and ratios. A corrupted packed fixture is rejected by the C driver before timing; the verifier rejects altered summary statistics.
+
+The historical wrapper checks out the report's pinned source commit and runs its original verifier there. Later changes to the shared packed ABI therefore do not substitute a new C binary into this retained measurement.
 
 ## Measured result, Apple M4 Pro
 

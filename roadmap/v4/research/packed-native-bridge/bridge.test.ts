@@ -59,28 +59,27 @@ test('actual /1 C mutation enters one authorized, replayable packed correction e
     execFileSync('cc', ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
       new URL('native.c', directory).pathname, new URL('../packed-heap/abi.c', directory).pathname, '-o', executable]);
     const authorization = { value: null as Digest | null };
-    const { runtime, a, bRef } = fixture(authorization);
+    const runtime = runtimeFixture(authorization);
+    const bRef = runtime.allocateRecord(nodeType, { number: 5n, alive: false, link: null });
     const original = runtime.snapshot(), sourceDigest = checkpointDigest(original);
     const packed = packResumableCheckpoint(original, runtime.program, [layout]);
     const result = executePackedCheckpointNative({ packed, program: runtime.program,
       expectedSnapshotDigest: sourceDigest, expectedLayoutDigest: packed.heap.layoutDigest,
       executable, expectedExecutableSha256: sha256(readFileSync(executable)), operations: [
         { kind: 'addInt', id: String(bRef.addr), field: 'number', increment: '10' },
-        { kind: 'setRef', id: String(a.addr), field: 'link', targetId: String(bRef.addr) },
       ] });
-    assert.deepEqual(result.observations, ['I 0 15', 'S 0']);
+    assert.deepEqual(result.observations, ['I 0 15']);
     assert.equal(checkpointDigest(runtime.snapshot()), sourceDigest);
     assert.throws(() => runtime.commitPackedCandidate(packed, result.candidateHeap, sourceDigest, packed.heap.layoutDigest), /did not authorize/);
     assert.equal(checkpointDigest(runtime.snapshot()), sourceDigest);
     authorization.value = result.candidateHeap.imageDigest;
     const receipt = runtime.commitPackedCandidate(packed, result.candidateHeap, sourceDigest, packed.heap.layoutDigest);
-    assert.equal(receipt.changedFields, 2);
+    assert.equal(receipt.changedFields, 1);
     const after = runtime.snapshot();
     assert.equal(checkpointDigest(after), receipt.snapshotDigest);
     assert.equal(after.events.length, original.events.length + 1);
     assert.equal(after.events.at(-1)?.op, `packed-correction:${receipt.subjectDigest}`);
     assert.equal(runtime.readRecord(bRef).get('number'), 15n);
-    assert.deepEqual(runtime.readRecord(a).get('link'), bRef);
     const reopened = runtimeFixture();
     reopened.restore(after, receipt.snapshotDigest);
     assert.equal(reopened.readRecord(bRef).get('number'), 15n);

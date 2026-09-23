@@ -27,7 +27,8 @@ import { callGraph, DEFAULT_COST_MODEL, type TopologyPlan } from './topology.ts'
 import { compileResumableProgram, type ResumableProgram } from '../tier3/resumable-program.ts';
 import { validateExecutedCheckpoint } from '../tier3/resumable-runtime.ts';
 import { checkpointDigest, eventDigest, type ResumableSnapshot } from '../tier3/resumable-state.ts';
-import { validateProcessCheckpointBinding, processCheckpointBindingDigest, processCheckpointReceiptDigest, validateCheckpointExtension, assertBaseProjection, projectProcessCheckpoint, processReferenceFromCheckpoint, writeProcessCheckpoint, readProcessCheckpoint, retainedProcessCheckpointExists, writeCheckpointEffectAudit, readCheckpointEffectAudit, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointAuthorization, type ProcessCheckpointAction, type ProcessCheckpointControlRequest, type ProcessCheckpointControl, checkpointControlDigest, validateCheckpointControlRequest, validateCheckpointControlTransition } from './process-checkpoint-contract.ts';
+import { validateProcessCheckpointBinding, processCheckpointBindingDigest, processCheckpointReceiptDigest, validateCheckpointExtension, assertBaseProjection, projectProcessCheckpoint, processReferenceFromCheckpoint, writeProcessCheckpoint, readProcessCheckpoint, retainedProcessCheckpointExists, writeCheckpointEffectAudit, readCheckpointEffectAudit, writeProcessPackedLayout, readProcessPackedLayout, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointAuthorization, type ProcessCheckpointAction, type ProcessCheckpointControlRequest, type ProcessCheckpointControl, checkpointControlDigest, validateCheckpointControlRequest, validateCheckpointControlTransition } from './process-checkpoint-contract.ts';
+import type { PackedLayout } from '../tier3/packed-heap.ts';
 import { validateProcessArguments, validateProcessResult, validateProcessAllocation } from './process-type-validation.ts';
 
 export const PROCESS_INVOKE = capability('cap:process:invoke');
@@ -618,12 +619,22 @@ export class ProcessHost {
   checkpointStatus(bindingId: Digest): Readonly<ProcessCheckpointLease> {
     const lease = this.read().checkpointLeases?.find(item => item.binding.id === bindingId); if (!lease) throw new Error('unknown checkpoint lease'); return freeze(copy(lease));
   }
+  async retainPackedLayout(bindingId: Digest, layouts: readonly PackedLayout[], tokens: readonly ProcessInvocationGrant[]): Promise<Digest> {
+    layouts = freeze(copy(layouts)); tokens = freeze(copy([...tokens]));
+    return this.lock.runAsync(async () => {
+      this.assertOpen(); const journal = this.read(), lease = journal.checkpointLeases?.find(item => item.binding.id === bindingId);
+      if (!lease || lease.state !== 'active') throw new Error('packed layout requires an active checkpoint lease');
+      this.checkpointAuthority('packed', lease.binding, tokens);
+      if (journal.generation !== lease.binding.generation || journal.heads.at(-1)!.digest !== lease.binding.processHead) throw new Error('packed layout lease lost production ownership');
+      return writeProcessPackedLayout(this.options.directory, layouts);
+    }, this.options.lockWaitMs ?? 5000);
+  }
   /** Trusted backend transaction. The policy hook remains mandatory; fresh
    * invocation grants are additionally required for run/commit. The callback
    * cannot observe another writer between checkpoint and heap publication. */
   async withCheckpoint<T>(bindingId: Digest, action: Exclude<ProcessCheckpointAction, 'begin'>, tokens: readonly ProcessInvocationGrant[], operation: (access: ProcessCheckpointAccess) => Promise<T>, control?: ProcessCheckpointControlRequest): Promise<T> {
-    if ((action === 'correct' || action === 'rewind') !== (control !== undefined)) throw new TypeError('checkpoint control action requires an exact request');
-    if (control) { validateCheckpointControlRequest(control); control = freeze(copy(control)); if ((action === 'rewind') !== (control.kind === 'rewind')) throw new TypeError('checkpoint control action mismatch'); }
+    if ((action === 'correct' || action === 'rewind' || action === 'packed') !== (control !== undefined)) throw new TypeError('checkpoint control action requires an exact request');
+    if (control) { validateCheckpointControlRequest(control); control = freeze(copy(control)); if ((action === 'rewind') !== (control.kind === 'rewind') || (action === 'packed') !== (control.kind === 'packed-v1')) throw new TypeError('checkpoint control action mismatch'); }
     tokens = freeze(copy([...tokens]));
     return this.lock.runAsync(async () => {
       this.assertOpen(); const journal = this.read(), lease = journal.checkpointLeases?.find(item => item.binding.id === bindingId);
@@ -653,7 +664,8 @@ export class ProcessHost {
         finishControl: (snapshot, effectAudit) => {
           assertAuthority(); if (!control || priorControl) throw new Error('checkpoint control already applied or missing');
           const previous = readProcessCheckpoint(this.options.directory, executionOrigin, program);
-          validateExecutedCheckpoint(snapshot, executionOrigin, program.digest); validateCheckpointControlTransition(control, previous, snapshot, program);
+          validateExecutedCheckpoint(snapshot, executionOrigin, program.digest); validateCheckpointControlTransition(control, previous, snapshot, program,
+            control.kind === 'packed-v1' ? readProcessPackedLayout(this.options.directory, control.layoutDigest) : undefined);
           const initial = readProcessCheckpoint(this.options.directory, lease.binding.initialCheckpoint, program); validateCheckpointExtension(initial, snapshot, program);
           if (control.kind === 'rewind' && previous.events.length - control.steps < initial.events.length) throw new Error('rewind crosses the checkpoint ownership boundary');
           if (previous.core.state === 'blocked') throw new Error('checkpoint control requires resolved effects');
@@ -684,7 +696,7 @@ export class ProcessHost {
   private checkpointProgram(): ResumableProgram { return this.checkpointProgramCache ??= compileResumableProgram(this.module, { manifest: this.manifest, registry: this.registry }); }
   private checkpointAuthority(action: ProcessCheckpointAction, binding: ProcessCheckpointBinding, tokens: readonly ProcessInvocationGrant[], control?: ProcessCheckpointControlRequest): void {
     if (this.options.authorizeCheckpoint?.({ action, binding: freeze(copy(binding)), ...(control ? { control: freeze(copy(control)) } : {}) }) !== true) throw new Error('checkpoint_authorization_denied');
-    if (action === 'begin' || action === 'run' || action === 'commit' || action === 'correct' || action === 'rewind') this.authorize(binding.symbol, binding.unit, binding.generation, tokens);
+    if (action === 'begin' || action === 'run' || action === 'commit' || action === 'correct' || action === 'rewind' || action === 'packed') this.authorize(binding.symbol, binding.unit, binding.generation, tokens);
   }
   async close(): Promise<void> { this.closed = true; if (this.active) this.active.cancelled = true; await this.stopWorkers(); }
 
@@ -1215,7 +1227,8 @@ export class ProcessHost {
         const beforeIndex = lease.checkpoints.indexOf(control.beforeCheckpoint);
         if (beforeIndex < 0 || lease.checkpoints[beforeIndex + 1] !== control.afterCheckpoint) throw new Error('checkpoint control lost its durable state ordering');
         const before = readProcessCheckpoint(this.options.directory, control.beforeCheckpoint, program), after = readProcessCheckpoint(this.options.directory, control.afterCheckpoint, program);
-        validateCheckpointControlTransition(control.request, before, after, program);
+        validateCheckpointControlTransition(control.request, before, after, program,
+          control.request.kind === 'packed-v1' ? readProcessPackedLayout(this.options.directory, control.request.layoutDigest) : undefined);
         if (readCheckpointEffectAudit(this.options.directory, control.effectAudit, before).length !== control.effectCount) throw new Error('checkpoint replay barrier differs from retained effects');
         const previous = (journal.checkpointControls ?? []).find(item => item.id === control.previous);
         if (previous && BigInt(before.core.effectCursor) < BigInt(previous.effectCount)) throw new Error('control bypassed checkpoint replay debt');
@@ -1226,7 +1239,7 @@ export class ProcessHost {
       }
       for (const lease of journal.checkpointLeases) {
         const latest = readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, program), initial = readProcessCheckpoint(this.options.directory, lease.binding.initialCheckpoint, program);
-        for (const event of latest.events.slice(initial.events.length)) if (event.code === 'host' && (event.op === 'correction' || event.op.startsWith('rewind-v1:'))) {
+        for (const event of latest.events.slice(initial.events.length)) if (event.code === 'host' && (event.op === 'correction' || event.op.startsWith('rewind-v1:') || event.op.startsWith('packed-correction:'))) {
           if (auditedEvents.get(lease.binding.id)?.get(Number(event.sequence)) !== eventDigest(event)) throw new Error('checkpoint history contains an unaudited control');
         }
         const barrier = (journal.checkpointControls ?? []).filter(control => control.binding === lease.binding.id).at(-1);

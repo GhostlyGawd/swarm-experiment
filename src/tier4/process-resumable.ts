@@ -13,6 +13,7 @@ import { underlying } from '../tier2/typecheck.ts';
 import { validateMachineResult, instantiateMachineType } from '../tier3/resumable-types.ts';
 import type { Value } from '../tier3/values.ts';
 import { ResumableRuntime, type ResumableRuntimeOptions, type ResumableEffects, type ResumableRunResult } from '../tier3/resumable-runtime.ts';
+import { packResumableCheckpoint, type PackedHeapImage, type PackedLayout, type PackedResumableCheckpoint } from '../tier3/packed-heap.ts';
 import { checkpointDigest, machineClone, type ResumableSnapshot, type MachineValue, type MachineCore } from '../tier3/resumable-state.ts';
 import type { ProcessHost, ProcessCheckpointAccess, ProcessInvocationGrant } from './process-host.ts';
 import { projectProcessCheckpoint, processReferenceFromCheckpoint, validateCheckpointControlRequest, type ProcessCheckpointBinding, type ProcessCheckpointReceipt, type ProcessCheckpointControlRequest, type ProcessCheckpointControl } from './process-checkpoint-contract.ts';
@@ -25,8 +26,12 @@ export interface ProcessResumableEffectsContext {
 }
 export interface ProcessResumableOptions {
   readonly host: ProcessHost; readonly module: Term;
-  readonly runtime: Omit<ResumableRuntimeOptions, 'executionId' | 'heapId' | 'ownerEpoch' | 'mode' | 'branchId' | 'capabilities' | 'effects' | 'onSafePoint' | 'fault' | 'authorizeCorrection'>;
+  readonly runtime: Omit<ResumableRuntimeOptions, 'executionId' | 'heapId' | 'ownerEpoch' | 'mode' | 'branchId' | 'capabilities' | 'effects' | 'onSafePoint' | 'fault' | 'authorizeCorrection' | 'authorizePackedCandidate'>;
   readonly tokens: () => readonly ProcessInvocationGrant[];
+  /** Trusted native executor. The control request binds its exact admitted
+   * artifact, executable bytes, source image and expected candidate digest. */
+  readonly nativePacked?: { readonly artifactDigest: Digest; readonly executableSha256: string;
+    readonly execute: (source: PackedResumableCheckpoint, request: Extract<ProcessCheckpointControlRequest, { kind: 'packed-v1' }>) => PackedHeapImage | Promise<PackedHeapImage> };
   /** Trusted host adapter factory; use a broker namespace specific to binding.id. */
   readonly effects?: (context: ProcessResumableEffectsContext) => ResumableEffects;
   readonly onCheckpoint?: (checkpoint: ResumableSnapshot) => void;
@@ -153,16 +158,25 @@ export class ProcessResumableSession {
   }
   /** Corrections are typed, explicitly authorized control operations. The
    * expected checkpoint and operation ID make retries safe across restart. */
-  async correct(request: Exclude<ProcessCheckpointControlRequest, { kind: 'rewind' }>): Promise<ProcessCheckpointControl> { return this.control(request); }
+  async correct(request: Exclude<ProcessCheckpointControlRequest, { kind: 'rewind' } | { kind: 'packed-v1' }>): Promise<ProcessCheckpointControl> { return this.control(request); }
+  async correctPacked(request: Extract<ProcessCheckpointControlRequest, { kind: 'packed-v1' }>, layouts: readonly PackedLayout[]): Promise<ProcessCheckpointControl> {
+    validateCheckpointControlRequest(request); request = machineClone(request); layouts = machineClone(layouts);
+    if (!this.options.nativePacked || this.options.nativePacked.artifactDigest !== request.artifactDigest ||
+        this.options.nativePacked.executableSha256 !== request.executableSha256) throw new TypeError('native packed executor identity mismatch');
+    if (await this.options.host.retainPackedLayout(this.binding.id, layouts, this.options.tokens()) !== request.layoutDigest) throw new TypeError('packed control layout identity mismatch');
+    return this.control(request, layouts);
+  }
   async rewind(request: Extract<ProcessCheckpointControlRequest, { kind: 'rewind' }>): Promise<ProcessCheckpointControl> { return this.control(request); }
-  private async control(request: ProcessCheckpointControlRequest): Promise<ProcessCheckpointControl> {
+  private async control(request: ProcessCheckpointControlRequest, packedLayouts?: readonly PackedLayout[]): Promise<ProcessCheckpointControl> {
     validateCheckpointControlRequest(request); request = machineClone(request);
-    return this.options.host.withCheckpoint(this.binding.id, request.kind === 'rewind' ? 'rewind' : 'correct', this.options.tokens(), async access => {
+    return this.options.host.withCheckpoint(this.binding.id, request.kind === 'rewind' ? 'rewind' : request.kind === 'packed-v1' ? 'packed' : 'correct', this.options.tokens(), async access => {
       if (access.controlReceipt) return access.controlReceipt;
       const snapshot = access.checkpoint, resources = this.resources(access, () => snapshot), events = this.events(resources);
       if (events.some(event => event.outcome === null || event.outcome.state === 'indeterminate')) throw new Error('checkpoint control requires reconciled effects');
       if (request.kind !== 'rewind') {
         if (snapshot.core.state !== 'running' || !snapshot.core.frames.length || snapshot.core.frames.some(frame => frame.pc >= access.program.codes.find(code => code.id === frame.code)!.returnPc)) throw new Error('checkpoint correction requires a running body before postcondition evaluation; rewind first');
+      }
+      if (request.kind !== 'rewind' && request.kind !== 'packed-v1') {
         let type: Ty | undefined;
         if (request.kind === 'record') {
           const record = snapshot.core.records.find(row => row.id === request.reference.objectId && row.epoch === request.reference.ownerEpoch);
@@ -185,12 +199,30 @@ export class ProcessResumableSession {
       }
       const entry = access.program.codes.find(code => code.id === `function:${this.binding.symbol}`)!;
       const runtime = new ResumableRuntime(this.options.module, { ...this.options.runtime, executionId: snapshot.core.executionId, heapId: snapshot.core.heapId, ownerEpoch: snapshot.core.ownerEpoch, mode: 'live', branchId: null,
-        capabilities: () => { access.assertAuthority(); return entry.capabilities; }, authorizeCorrection: () => { access.assertAuthority(); return true; } });
+        capabilities: () => { access.assertAuthority(); return entry.capabilities; }, authorizeCorrection: () => { access.assertAuthority(); return true; },
+        authorizePackedCandidate: (_snapshot, subject) => {
+          access.assertAuthority();
+          return request.kind === 'packed-v1' && subject.sourceSnapshotDigest === request.expectedCheckpoint &&
+            subject.sourceImageDigest === request.sourceImageDigest && subject.candidateImageDigest === request.candidateImageDigest &&
+            subject.layoutDigest === request.layoutDigest && request.artifactDigest === access.program.manifest.target.artifactDigest;
+        } });
       if (runtime.program.digest !== access.program.digest) throw new TypeError('checkpoint control compiler mismatch');
       runtime.restore(snapshot, checkpointDigest(snapshot));
       if (request.kind === 'rewind') runtime.rewindRetainingHistory(request.steps);
       else if (request.kind === 'local') runtime.correctLocal(request.frameId, request.symbol, correctionValue(request.value));
-      else runtime.correctRecord({ addr: Number(request.reference.objectId), heapId: request.reference.heapId, ownerEpoch: request.reference.ownerEpoch } as Value & { addr: number }, request.field, correctionValue(request.value));
+      else if (request.kind === 'record') runtime.correctRecord({ addr: Number(request.reference.objectId), heapId: request.reference.heapId, ownerEpoch: request.reference.ownerEpoch } as Value & { addr: number }, request.field, correctionValue(request.value));
+      else {
+        const native = this.options.nativePacked;
+        if (!native || !packedLayouts || native.artifactDigest !== request.artifactDigest || native.executableSha256 !== request.executableSha256)
+          throw new TypeError('native packed executor identity mismatch');
+        const source = packResumableCheckpoint(snapshot, access.program, packedLayouts);
+        if (source.heap.layoutDigest !== request.layoutDigest || source.heap.imageDigest !== request.sourceImageDigest)
+          throw new TypeError('native packed source identity mismatch');
+        const candidate = await native.execute(source, request);
+        access.assertAuthority();
+        if (candidate.imageDigest !== request.candidateImageDigest) throw new TypeError('native packed candidate identity mismatch');
+        runtime.commitPackedCandidate(source, candidate, request.expectedCheckpoint, request.layoutDigest);
+      }
       access.assertAuthority(); return access.finishControl(runtime.snapshot(), events);
     }, request);
   }
