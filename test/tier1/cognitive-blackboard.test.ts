@@ -56,6 +56,7 @@ test('typed task state survives restart, preserves AST identity and separates cl
   assert.equal(decision.item.kind, 'decision');
   assert.deepEqual(f.store.get(f.subject), before);
   const reopened = new CognitiveBlackboard(f.options); f.setPrincipal('reader');
+  assert.deepEqual(reopened.listForNode(f.manifest, f.subject), [id]);
   const view = reopened.view(id);
   assert.deepEqual(view.entries.map(entry => entry.item.kind), ['claim', 'hypothesis', 'delegation', 'evidence', 'decision']);
   assert.deepEqual(view.verifiedEvidenceIds, [evidence.id]);
@@ -73,7 +74,9 @@ test('ACL, compare-and-swap and retention deny unauthorized or stale changes', (
   assert.throws(() => board.create(f.manifest, f.subject, [], [], { maxEntries: 2, expiresAt: 2_000 }), /creation denied/);
   f.setPrincipal('owner');
   const id = board.create(f.manifest, f.subject, ['reader'], ['writer'], { maxEntries: 2, expiresAt: 2_000 });
+  assert.throws(() => new CognitiveBlackboard({ ...f.options, maxBoards: 1 }).create(f.manifest, f.subject, [], [], { maxEntries: 1, expiresAt: 2_000 }), /count limit/);
   f.setPrincipal('intruder'); assert.throws(() => board.view(id), /access denied/);
+  assert.deepEqual(board.listForNode(f.manifest, f.subject), []);
   assert.throws(() => board.append(id, { kind: 'claim', text: 'forged', confidence: 1 }), /access denied/);
   f.setPrincipal('reader'); assert.equal(board.view(id).entries.length, 0);
   assert.throws(() => board.append(id, { kind: 'claim', text: 'write', confidence: 1 }), /access denied/);
@@ -89,6 +92,7 @@ test('ACL, compare-and-swap and retention deny unauthorized or stale changes', (
   assert.throws(() => board.configure(id, { owner: 'owner', readers: [], writers: [] }, { maxEntries: 3, expiresAt: 2_000 }, 4), /cannot be extended/);
   board.configure(id, { owner: 'owner', readers: [], writers: ['writer'] }, { maxEntries: 1, expiresAt: 2_000 }, 4);
   f.setPrincipal('reader'); assert.throws(() => board.view(id), /access denied/);
+  assert.deepEqual(board.listForNode(f.manifest, f.subject), []);
   f.setPrincipal('owner'); assert.equal(board.view(id).entries.length, 1);
 });
 
@@ -98,10 +102,12 @@ test('expiry, subject binding and invalidated lineage fail closed', () => {
   const board = new CognitiveBlackboard(options);
   assert.throws(() => board.create(f.manifest, f.d('other') as typeof f.subject, [], [], { maxEntries: 1, expiresAt: 2_000 }));
   const id = board.create(f.manifest, f.subject, [], [], { maxEntries: 1, expiresAt: 2_000 });
+  assert.deepEqual(board.listForNode(f.manifest, f.subject), [id]);
   f.setCurrent(false);
   assert.throws(() => board.append(id, { kind: 'claim', text: 'stale', confidence: 5 }), /stale manifest/);
   f.setCurrent(true);
   now = 2_000; assert.throws(() => board.view(id), /retention expired/);
+  assert.deepEqual(board.listForNode(f.manifest, f.subject), []);
   assert.equal(board.sweep(id), true);
   assert.throws(() => board.view(id));
 });

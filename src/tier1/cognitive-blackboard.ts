@@ -6,7 +6,7 @@
  * nor an evidence digest supplied by an agent is authority by itself.
  */
 import { randomUUID } from 'node:crypto';
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { decodeCanonical, encodeCanonical, exactObject, identifier, validString } from '../fabric/encoding.ts';
 import { domainDigest, executionManifestDigest, metadataSidecar, validateDigest, type Digest, type ExecutionManifestV1, type MetadataSidecarV1 } from '../fabric/identity.ts';
@@ -44,7 +44,7 @@ export interface CognitiveBlackboardOptions {
   /** Trusted verifier checks the actual artifact, subject and proof at admission. */
   readonly verifyEvidence: (evidence: Digest, manifest: Digest, subject: NodeRef, verifier: string) => boolean;
   readonly now?: () => number;
-  readonly maxBytes?: number; readonly waitMs?: number; readonly maxRetentionMs?: number;
+  readonly maxBytes?: number; readonly waitMs?: number; readonly maxRetentionMs?: number; readonly maxBoards?: number;
 }
 interface BoardState {
   readonly format: 'aether.blackboard/1'; readonly repositoryId: string;
@@ -109,11 +109,13 @@ export class CognitiveBlackboard {
   private readonly maximum: number;
   private readonly waitMs: number;
   private readonly maxRetentionMs: number;
+  private readonly maxBoards: number;
   constructor(options: CognitiveBlackboardOptions) {
     identifier(options.repositoryId);
     this.options = options; this.maximum = options.maxBytes ?? 1024 * 1024; this.waitMs = options.waitMs ?? 10_000;
     this.maxRetentionMs = options.maxRetentionMs ?? 30 * 24 * 60 * 60 * 1000;
-    if (!Number.isSafeInteger(this.maximum) || this.maximum < 4096 || this.maximum > 8 * 1024 * 1024 || !Number.isSafeInteger(this.waitMs) || this.waitMs < 0 || !Number.isSafeInteger(this.maxRetentionMs) || this.maxRetentionMs < 1) throw new TypeError('invalid blackboard limits');
+    this.maxBoards = options.maxBoards ?? 10_000;
+    if (!Number.isSafeInteger(this.maximum) || this.maximum < 4096 || this.maximum > 8 * 1024 * 1024 || !Number.isSafeInteger(this.waitMs) || this.waitMs < 0 || !Number.isSafeInteger(this.maxRetentionMs) || this.maxRetentionMs < 1 || !Number.isSafeInteger(this.maxBoards) || this.maxBoards < 1 || this.maxBoards > 100_000) throw new TypeError('invalid blackboard limits');
     mkdirSync(options.directory, { recursive: true, mode: 0o700 });
     const lockDirectory = join(options.directory, 'lock'); mkdirSync(lockDirectory, { recursive: true, mode: 0o700 });
     this.lock = new JournalLock({ directory: lockDirectory, domain: 'aether.blackboard', maxTickets: 100_000 });
@@ -121,6 +123,11 @@ export class CognitiveBlackboard {
   private actor(): string { const value = this.options.actor(); identifier(value); return value; }
   private now(): number { const value = (this.options.now ?? Date.now)(); if (!Number.isSafeInteger(value) || value < 0) throw new TypeError('invalid trusted clock'); return value; }
   private path(id: Digest): string { validateDigest(id, 'aether.blackboard/1'); return join(this.options.directory, `${id.split(':').at(-1)}.json`); }
+  private boardFiles(): string[] {
+    const files = readdirSync(this.options.directory).filter(name => /^[0-9a-f]{64}\.json$/.test(name));
+    if (files.length > this.maxBoards) throw new RangeError('blackboard count limit');
+    return files;
+  }
   private read(id: Digest): BoardState {
     const path = this.path(id); if (statSync(path).size > this.maximum) throw new RangeError('blackboard byte limit');
     const envelope = exactObject(decodeCanonical(readFileSync(path), { maxFrameBytes: this.maximum, maxDecompressedBytes: this.maximum }), ['format', 'state', 'checksum']);
@@ -152,6 +159,7 @@ export class CognitiveBlackboard {
     const nonce = randomUUID(), id = boardId(this.options.repositoryId, digest, subject, nonce);
     this.lock.recoverDeadWriter(false);
     return this.lock.run(() => {
+      if (this.boardFiles().length >= this.maxBoards) throw new RangeError('blackboard count limit');
       if (existsSync(this.path(id))) { const existing = this.read(id); this.permitted(existing, actor, true); throw new Error('blackboard already exists'); }
       this.save({ format: 'aether.blackboard/1', repositoryId: this.options.repositoryId, id, nonce, manifest, subject, acl: { owner: actor, readers, writers }, policy: retention, revision: 1, entries: [] });
       return id;
@@ -189,6 +197,20 @@ export class CognitiveBlackboard {
     const retained = new Set(state.entries.map(entry => entry.id));
     const verifiedEvidenceIds = current ? state.entries.filter(entry => entry.item.kind === 'evidence' && retained.has(entry.item.claim) && this.options.verifyEvidence(entry.item.evidence, manifest, state.subject, entry.item.verifier)).map(entry => entry.id) : [];
     return { id, manifest, subject: state.subject, sidecar, sidecarDigest: digest, acl: state.acl, policy: state.policy, revision: state.revision, entries: state.entries, verifiedEvidenceIds, current };
+  }
+  /** Discover retained sidecars for a node without exposing other agents' boards. */
+  listForNode(manifest: ExecutionManifestV1, subject: NodeRef): readonly Digest[] {
+    const actor = this.actor(), manifestDigest = executionManifestDigest(manifest);
+    this.options.store.get(subject);
+    const visible: Digest[] = [];
+    for (const name of this.boardFiles()) {
+      const id = `aether.blackboard/1:b3:${name.slice(0, -5)}`;
+      const state = this.read(id);
+      if (state.subject !== subject || executionManifestDigest(state.manifest) !== manifestDigest) continue;
+      try { this.permitted(state, actor, false); visible.push(id); }
+      catch (error) { if (!(error instanceof Error) || !/^(blackboard access denied|blackboard retention expired)$/.test(error.message)) throw error; }
+    }
+    return visible.sort();
   }
   configure(id: Digest, nextAcl: BlackboardAcl, nextPolicy: BlackboardPolicy, expectedRevision: number): void {
     const actor = this.actor(); acl(nextAcl); policy(nextPolicy);
