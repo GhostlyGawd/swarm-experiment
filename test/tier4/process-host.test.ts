@@ -9,7 +9,8 @@ import { buildLedgerExample, ACCOUNT, CAP_LEDGER_APPEND } from '../../src/exampl
 import { CapabilitySealer, CapabilityRegistry, RevocationList } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
-import { effectResourcePolicyDigest, signEffectResourcePolicy, type EffectResourcePolicyBodyV1 } from '../../src/tier2/effect-resource-policy.ts';
+import { effectResourcePolicyDigest, effectResourcePolicyDigestV2, signEffectResourcePolicy, signEffectResourcePolicyV2, type EffectResourcePolicyBodyV1, type EffectResourcePolicyBodyV2 } from '../../src/tier2/effect-resource-policy.ts';
+import { adapterArtifactForSource, admitAdapterSource, admittedAdapterArtifactDigest } from '../../src/tier2/adapter-artifact.ts';
 import { createEvidenceManifest } from '../../src/fabric/evidence.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
 import { DurableEffectBroker, effectAdapterDigest, type EffectAdapter } from '../../src/fabric/effects.ts';
@@ -219,6 +220,37 @@ test('signed process policy refuses a changed adapter before dispatch', async ()
     assert.equal(calls, 0);
     assert.deepEqual(balances(await host.snapshot()), ['100', '0']);
   } finally { await host?.close(); f.cleanup(); }
+});
+
+test('v2 process policy requires the exact loader-admitted adapter bytes before a real sink', async () => {
+  const f = fixture(), { epochs, grants } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  const globals = globalThis as Record<string, unknown>;
+  try {
+    globals.__aetherV2SinkCalls = 0;
+    const source = new TextEncoder().encode(`export default {id:'loaded-ledger/1',semantics:{readOnly:false,atomicIdempotency:false,transactional:false,reconciliation:true},execute(){globalThis.__aetherV2SinkCalls++;return{tag:'null'};},reconcile(){return{state:'unknown'};}};`);
+    const artifact = adapterArtifactForSource(source, CAP_LEDGER_APPEND, 'loaded-ledger/1', { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true });
+    const adapter = await admitAdapterSource(source, artifact), artifactDigest = admittedAdapterArtifactDigest(adapter)!;
+    const body: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: grants.repositoryId,
+      astRoot: f.options.manifest.astRoot, policyEpoch: epochs.policyEpoch,
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: adapter.id,
+        adapterDigest: effectAdapterDigest(adapter), adapterArtifactDigest: artifactDigest }] };
+    const manifestValue = { ...f.options.manifest, capabilityPolicyDigest: effectResourcePolicyDigestV2(body) }, keys = generateKeyPairSync('ed25519');
+    let active: EffectAdapter = adapter;
+    host = await ProcessHost.open({ ...f.options, manifest: manifestValue, scopedGrants: grants,
+      signedEffectResourcePolicy: signEffectResourcePolicyV2(body, 'artifact-policy', keys.privateKey), effectResourceSignerKey: keys.publicKey,
+      currentEffectPolicyEpoch: () => epochs.policyEpoch,
+      effectRouterFactory: context => factory(f.directory, manifestValue, CAP_LEDGER_APPEND, active)(context) });
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const args = [reference(alice), reference(bob), integer(10)], scope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
+    assert.equal((await host.call(f.ex.symbols.transfer, args, { operationId: 'approved-bytes', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) })).state, 'completed');
+    assert.equal(globals.__aetherV2SinkCalls, 1);
+    active = { ...adapter };
+    const denied = await host.call(f.ex.symbols.transfer, args, { operationId: 'unbranded-copy', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) });
+    assert.match(JSON.stringify(denied), /effect_indeterminate|artifact is outside signed resource policy/);
+    assert.equal(globals.__aetherV2SinkCalls, 1);
+    assert.deepEqual(balances(await host.snapshot()), ['90', '10']);
+  } finally { await host?.close(); f.cleanup(); delete globals.__aetherV2SinkCalls; }
 });
 
 test('strict scoped grants remain bound through an actual cross-process nested call', async () => {

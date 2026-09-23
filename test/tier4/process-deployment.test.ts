@@ -16,7 +16,8 @@ import { ACCOUNT, CAP_LEDGER_APPEND, buildLedgerExample } from '../../src/exampl
 import { CapabilitySealer, RevocationList } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
-import { effectResourcePolicyDigest, signEffectResourcePolicy, type EffectResourcePolicyBodyV1 } from '../../src/tier2/effect-resource-policy.ts';
+import { effectResourcePolicyDigest, effectResourcePolicyDigestV2, signEffectResourcePolicy, signEffectResourcePolicyV2, type EffectResourcePolicyBodyV1, type EffectResourcePolicyBodyV2 } from '../../src/tier2/effect-resource-policy.ts';
+import { adapterArtifactDigest, adapterArtifactForSource, admitAdapterSource } from '../../src/tier2/adapter-artifact.ts';
 import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
 import { DurableEffectBroker, type EffectAdapter } from '../../src/fabric/effects.ts';
 import { JournalLock } from '../../src/fabric/journal-lock.ts';
@@ -33,12 +34,17 @@ const text = (value: string): TaggedValueV1 => ({ tag: 'string', value });
 const reference = (ref: LogicalRefV1, epoch = ref.ownerEpoch): TaggedValueV1 => ({ tag: 'ref', value: { ...ref, ownerEpoch: epoch } });
 const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const DEPLOYMENT_LEDGER_ADAPTER_DIGEST = domainDigest('aether.effect-adapter/1', { id: 'deployment-ledger/1', semantics: { readOnly: false, atomicIdempotency: true, transactional: false, reconciliation: true } });
+const ARTIFACT_SINK_SEMANTICS = { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true } as const;
+const ARTIFACT_SINK_SOURCE = new TextEncoder().encode(`export default {id:'admitted-ledger/1',semantics:{readOnly:false,atomicIdempotency:false,transactional:false,reconciliation:true},execute(){globalThis.__deploymentArtifactCalls++;return{tag:'null'};},reconcile(){return{state:'unknown'};}};`);
+const ARTIFACT_SINK_DESCRIPTOR = adapterArtifactForSource(ARTIFACT_SINK_SOURCE, CAP_LEDGER_APPEND, 'admitted-ledger/1', ARTIFACT_SINK_SEMANTICS);
+const ARTIFACT_SINK_DIGEST = adapterArtifactDigest(ARTIFACT_SINK_DESCRIPTOR);
+const ARTIFACT_SINK_ADAPTER_DIGEST = domainDigest('aether.effect-adapter/1', { id: ARTIFACT_SINK_DESCRIPTOR.id, semantics: ARTIFACT_SINK_SEMANTICS });
 
 // Recreated in a separate coordinator process for the actual process-death tests.
-function hostFactory(directory: string, artifact: ProcessArtifactV1) {
+function hostFactory(directory: string, artifact: ProcessArtifactV1, overrideSink?: EffectAdapter) {
   const sealer = new CapabilitySealer(new Uint8Array(32).fill(7), () => 100);
   const sinkLock = new JournalLock({ directory: join(directory, 'sink-lock'), domain: 'aether.deployment-test-sink' });
-  const sink: EffectAdapter = { id: 'deployment-ledger/1', semantics: { readOnly: false, atomicIdempotency: true, transactional: false, reconciliation: true },
+  const sink: EffectAdapter = overrideSink ?? { id: 'deployment-ledger/1', semantics: { readOnly: false, atomicIdempotency: true, transactional: false, reconciliation: true },
     execute: request => sinkLock.run(() => {
       const file = join(directory, 'ledger.json'), rows = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : [];
       const id = `${request.executionId}/${request.effectId}`;
@@ -57,7 +63,7 @@ function hostFactory(directory: string, artifact: ProcessArtifactV1) {
     return new BrokerEffectRouter({ broker, manifest: artifact.manifest, executionId: context.operationId, policyEpoch: '1', deadline: '1000', adapters: new Map([[CAP_LEDGER_APPEND, sink]]), grant: () => 'governor-ledger-grant' });
   } };
 }
-function fixture(signedPolicy = false) {
+function fixture(signedPolicy: boolean | 'artifact-v2' = false) {
   const directory = mkdtempSync(join(tmpdir(), 'aether-process-deployment-'));
   const ex = buildLedgerExample('deployment-ledger'), keys = generateKeyPairSync('ed25519');
   const sum = ex.syms.define('composed-sum');
@@ -73,9 +79,13 @@ function fixture(signedPolicy = false) {
     const total = b.fn({ symbol: sum, returns: b.Int, contract: b.contract({ ensures: [b.clause(b.ge(b.result(), b.int(18)), 'minimum_sum')] }), body: b.block(b.ret(b.add(b.int(left), b.int(right)))) });
     const module: Term = { ...base, members: [...members, total, b.typeDecl(typeName('type:deployment:marker'), b.Int)], symbolTable: ex.syms.table() };
     const digest = (value: string) => domainDigest('aether.deployment-test/1', value);
-    const resourcePolicy: EffectResourcePolicyBodyV1 = { format: 'aether.effect-resource-policy/1', repositoryId: 'deployment-test', astRoot: new GraphStore().intern(module), policyEpoch: '0',
+    const astRoot = new GraphStore().intern(module);
+    const resourcePolicy: EffectResourcePolicyBodyV1 = { format: 'aether.effect-resource-policy/1', repositoryId: 'deployment-test', astRoot, policyEpoch: '0',
       rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: 'deployment-ledger/1', adapterDigest: DEPLOYMENT_LEDGER_ADAPTER_DIGEST }] };
-    return { module, registry: ex.capabilities, specification: 'Ledger conservation and composed total at least eighteen.', semanticsVersion: 'reference/1', compilerDigest: digest('compiler'), capabilityPolicyDigest: signedPolicy ? effectResourcePolicyDigest(resourcePolicy) : digest('effects-policy'),
+    const artifactPolicy: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: 'deployment-test', astRoot, policyEpoch: '0',
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR.id,
+        adapterDigest: ARTIFACT_SINK_ADAPTER_DIGEST, adapterArtifactDigest: ARTIFACT_SINK_DIGEST }] };
+    return { module, registry: ex.capabilities, specification: 'Ledger conservation and composed total at least eighteen.', semanticsVersion: 'reference/1', compilerDigest: digest('compiler'), capabilityPolicyDigest: signedPolicy === 'artifact-v2' ? effectResourcePolicyDigestV2(artifactPolicy) : signedPolicy ? effectResourcePolicyDigest(resourcePolicy) : digest('effects-policy'),
       target: { abiVersion: 'process/1', profileDigest: digest('two-workers'), artifactDigest: digest(encodeIR(module).text) }, policy: { ...DEFAULT_EVIDENCE_POLICY, requireFormal: false } };
   };
   const plan = (swap = false): TopologyPlan => ({ shape: 'containers', units: [
@@ -165,7 +175,9 @@ test('process deployment factory serves a signed effect resource policy bound to
       effectResourceSignerKey: keys.publicKey, currentEffectPolicyEpoch: () => epochs.policyEpoch };
   }]]);
   try {
-    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, factories });
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, factories }), /artifact deployment profile requires signed code-provenance policy v2/);
+    assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false);
+    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-signed-v3', factories });
     assert.equal(deployment.status().capabilityProfile, 'scoped-signed-v3');
     const { alice, bob } = await accounts(deployment), args = [reference(alice), reference(bob), integer(10)];
     const aliceScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
@@ -175,6 +187,36 @@ test('process deployment factory serves a signed effect resource policy bound to
     const denied = await deployment.call(f.ex.symbols.transfer, args, { operationId: 'signed-deployment-denied', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, bobScope) });
     assert.match(JSON.stringify(denied), /authority_denied|effect_indeterminate/); assert.equal(f.rows().length, 1);
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('fresh production deployment serves exact loader-admitted adapter bytes under signed v2 policy', async () => {
+  const f = fixture('artifact-v2'); let deployment: ProcessDeployment | undefined;
+  const globals = globalThis as Record<string, unknown>;
+  const epochs = new DurableGrantEpochs({ directory: join(f.directory, 'artifact-grant-epochs'), repositoryId: 'deployment-test' });
+  const scopedGrants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(57), repositoryId: 'deployment-test', clock: () => 100,
+    policyEpoch: () => epochs.policyEpoch, revocationEpoch: () => epochs.epoch,
+    isRevoked: (cap, path) => epochs.isRevoked(cap, path), authorizeIssue: () => true, authorizeDelegate: () => true });
+  const keys = generateKeyPairSync('ed25519'), adapter = await admitAdapterSource(ARTIFACT_SINK_SOURCE, ARTIFACT_SINK_DESCRIPTOR);
+  const factories = new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => {
+    const body: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: scopedGrants.repositoryId,
+      astRoot: artifact.manifest.astRoot, policyEpoch: epochs.policyEpoch,
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR.id,
+        adapterDigest: ARTIFACT_SINK_ADAPTER_DIGEST, adapterArtifactDigest: ARTIFACT_SINK_DIGEST }] };
+    assert.equal(effectResourcePolicyDigestV2(body), artifact.manifest.capabilityPolicyDigest);
+    return { ...hostFactory(f.directory, artifact, adapter), scopedGrants,
+      signedEffectResourcePolicy: signEffectResourcePolicyV2(body, 'deployment-artifact-policy', keys.privateKey),
+      effectResourceSignerKey: keys.publicKey, currentEffectPolicyEpoch: () => epochs.policyEpoch };
+  }]]);
+  try {
+    globals.__deploymentArtifactCalls = 0;
+    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, factories });
+    assert.equal(deployment.status().capabilityProfile, 'scoped-artifact-v4');
+    const { alice, bob } = await accounts(deployment), scope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
+    const result = await deployment.call(f.ex.symbols.transfer, [reference(alice), reference(bob), integer(10)],
+      { operationId: 'artifact-approved', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) });
+    assert.equal(result.state, 'completed'); assert.equal(globals.__deploymentArtifactCalls, 1);
+    assert.deepEqual(await balances(deployment), ['90', '10']);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); delete globals.__deploymentArtifactCalls; }
 });
 
 test('F08 process deployment: rejected composition, approved migration/body change and rollback preserve real ledger state', async () => {

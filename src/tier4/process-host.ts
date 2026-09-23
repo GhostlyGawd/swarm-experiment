@@ -8,11 +8,11 @@ import { atomicWrite } from '../tier1/persistence.ts';
 import { capability, type CapabilityName, type NodeRef, type SymbolId } from '../tier1/ids.ts';
 import { CapabilityRegistry, CapabilitySealer, RevocationList, type CapabilityToken } from '../tier2/ocap.ts';
 import { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2 } from '../tier2/scoped-grants.ts';
-import { assertSignedEffectResourcePolicy, assertEffectResourceAdapter, effectResourcePath as signedEffectResourcePath, effectResourcePolicyDigest, type SignedEffectResourcePolicyV1 } from '../tier2/effect-resource-policy.ts';
+import { assertSignedEffectResourcePolicy, assertSignedEffectResourcePolicyV2, assertEffectResourceAdapter, assertEffectResourceAdapterV2, effectResourcePath as signedEffectResourcePath, effectResourcePathV2, effectResourcePolicyDigest, effectResourcePolicyDigestV2, type SignedEffectResourcePolicyV1, type SignedEffectResourcePolicyV2 } from '../tier2/effect-resource-policy.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { ProductionRuntime } from '../tier3/compile.ts';
 import type { EffectEventV1 } from '../fabric/effects.ts';
-import { EffectInvocationError, type RuntimeEffectRouter } from '../tier3/effects.ts';
+import { EffectInvocationError, brokerAdapterIdentity, type RuntimeEffectRouter } from '../tier3/effects.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
 import type { Value } from '../tier3/values.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
@@ -116,7 +116,7 @@ export interface ProcessHostOptions {
   /** Versioned identity of the independently trusted adapter policy above. */
   readonly effectResourcePolicyDigest?: Digest;
   /** Content-bound policy for deterministic target extraction in strict mode. */
-  readonly signedEffectResourcePolicy?: SignedEffectResourcePolicyV1;
+  readonly signedEffectResourcePolicy?: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2;
   readonly effectResourceSignerKey?: KeyObject | string;
   readonly currentEffectPolicyEpoch?: () => string;
   readonly revocations?: RevocationList;
@@ -188,7 +188,7 @@ export class ProcessHost {
   private readonly manifest: ExecutionManifestV1;
   private readonly registry: CapabilityRegistry;
   private readonly configuration: Digest;
-  private readonly signedEffectResourcePolicy: SignedEffectResourcePolicyV1 | null;
+  private readonly signedEffectResourcePolicy: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2 | null;
   private readonly file: string;
   private readonly lock: JournalLock;
   private readonly declarations = new Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>();
@@ -211,7 +211,10 @@ export class ProcessHost {
     this.manifest = decodeExecutionManifest(encodeExecutionManifest(options.manifest));
     if (new GraphStore().intern(this.module) !== this.manifest.astRoot) throw new TypeError('ProcessHost module/manifest mismatch');
     if (signed) {
-      assertSignedEffectResourcePolicy(options.signedEffectResourcePolicy, this.manifest, options.scopedGrants!.repositoryId,
+      if (options.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2')
+        assertSignedEffectResourcePolicyV2(options.signedEffectResourcePolicy, this.manifest, options.scopedGrants!.repositoryId,
+          options.currentEffectPolicyEpoch!(), options.effectResourceSignerKey!);
+      else assertSignedEffectResourcePolicy(options.signedEffectResourcePolicy, this.manifest, options.scopedGrants!.repositoryId,
         options.currentEffectPolicyEpoch!(), options.effectResourceSignerKey!);
       this.signedEffectResourcePolicy = freeze(copy(options.signedEffectResourcePolicy!));
     } else this.signedEffectResourcePolicy = null;
@@ -224,7 +227,8 @@ export class ProcessHost {
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
     this.configuration = domainDigest('aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
-      ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy ? effectResourcePolicyDigest(this.signedEffectResourcePolicy.body) : options.effectResourcePolicyDigest ?? null,
+      ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2' ? effectResourcePolicyDigestV2(this.signedEffectResourcePolicy.body)
+        : this.signedEffectResourcePolicy ? effectResourcePolicyDigest(this.signedEffectResourcePolicy.body) : options.effectResourcePolicyDigest ?? null,
         effectResourcePolicySigner: this.signedEffectResourcePolicy?.signer ?? null } : {}) });
     ensureDurableDirectory(options.directory);
     this.file = join(options.directory, 'host.json');
@@ -635,9 +639,13 @@ export class ProcessHost {
       if (router.mode !== active.mode) throw new Error('effect router mode does not match execution/recovery mode');
       router.bind(this.manifest.astRoot as NodeRef);
       if (this.signedEffectResourcePolicy) {
-        const actual = router.adapterIdentity?.(request.capability);
-        if (!actual) throw new Error('signed effect policy requires an inspectable adapter');
-        assertEffectResourceAdapter(this.signedEffectResourcePolicy, request.capability, actual);
+        if (this.signedEffectResourcePolicy.format === 'aether.signed-effect-resource-policy/2')
+          assertEffectResourceAdapterV2(this.signedEffectResourcePolicy, request.capability, brokerAdapterIdentity(router, request.capability));
+        else {
+          const actual = router.adapterIdentity?.(request.capability);
+          if (!actual) throw new Error('signed effect policy requires an inspectable adapter');
+          assertEffectResourceAdapter(this.signedEffectResourcePolicy, request.capability, actual);
+        }
       }
       this.assertActive(active); this.checkRevocation(request.capability, unit, active.journal.generation, active.mode);
       if (active.mode === 'live') this.authorize(active.call.symbol, active.call.unit, active.journal.generation, active.tokens);
@@ -699,9 +707,15 @@ export class ProcessHost {
     const context = freeze({ capability: request.capability, from: request.from, unit, generation: active.journal.generation, args: copy(args) });
     let suffix: readonly string[];
     if (this.signedEffectResourcePolicy) {
-      assertSignedEffectResourcePolicy(this.signedEffectResourcePolicy, this.manifest, this.options.scopedGrants!.repositoryId,
-        this.options.currentEffectPolicyEpoch!(), this.options.effectResourceSignerKey!);
-      suffix = signedEffectResourcePath(this.signedEffectResourcePolicy, request.capability, args);
+      if (this.signedEffectResourcePolicy.format === 'aether.signed-effect-resource-policy/2') {
+        assertSignedEffectResourcePolicyV2(this.signedEffectResourcePolicy, this.manifest, this.options.scopedGrants!.repositoryId,
+          this.options.currentEffectPolicyEpoch!(), this.options.effectResourceSignerKey!);
+        suffix = effectResourcePathV2(this.signedEffectResourcePolicy, request.capability, args);
+      } else {
+        assertSignedEffectResourcePolicy(this.signedEffectResourcePolicy, this.manifest, this.options.scopedGrants!.repositoryId,
+          this.options.currentEffectPolicyEpoch!(), this.options.effectResourceSignerKey!);
+        suffix = signedEffectResourcePath(this.signedEffectResourcePolicy, request.capability, args);
+      }
     } else suffix = this.options.effectResourcePath?.(context) ?? [];
     if (!Array.isArray(suffix)) throw new Error('invalid trusted effect resource policy');
     return [...this.scopedGrantPath(active.call.unit, active.journal.generation), ...suffix];

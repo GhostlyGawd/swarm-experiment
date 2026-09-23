@@ -68,3 +68,62 @@ export function assertEffectResourceAdapter(policy: SignedEffectResourcePolicyV1
   const rule = policy.body.rules.find(item => item.capability === name);
   if (!rule || rule.adapterId !== actual.id || rule.adapterDigest !== actual.digest) throw new Error('effect adapter is outside signed resource policy');
 }
+
+/** Version 2 additionally binds the exact admitted adapter source artifact. */
+export interface EffectResourceRuleV2 extends EffectResourceRuleV1 { readonly adapterArtifactDigest: Digest }
+export interface EffectResourcePolicyBodyV2 {
+  readonly format: 'aether.effect-resource-policy/2'; readonly repositoryId: string;
+  readonly astRoot: Digest; readonly policyEpoch: string; readonly rules: readonly EffectResourceRuleV2[];
+}
+export interface SignedEffectResourcePolicyV2 { readonly format: 'aether.signed-effect-resource-policy/2'; readonly body: EffectResourcePolicyBodyV2; readonly signer: string; readonly signature: string }
+export function validateEffectResourcePolicyBodyV2(value: unknown): asserts value is EffectResourcePolicyBodyV2 {
+  encodeCanonical(value);
+  const body = exactObject(value, ['format', 'repositoryId', 'astRoot', 'policyEpoch', 'rules']);
+  if (body.format !== 'aether.effect-resource-policy/2' || !isNodeRef(body.astRoot)) throw new TypeError('invalid effect resource policy v2 subject');
+  identifier(body.repositoryId); decimal(body.policyEpoch);
+  if (!Array.isArray(body.rules) || body.rules.length < 1 || body.rules.length > 128) throw new TypeError('effect resource policy v2 requires bounded rules');
+  let previous = '';
+  for (const item of body.rules) {
+    const rule = exactObject(item, ['capability', 'prefix', 'argument', 'adapterId', 'adapterDigest', 'adapterArtifactDigest']);
+    capability(rule.capability as string); path(rule.prefix); identifier(rule.adapterId);
+    validateDigest(rule.adapterDigest, 'aether.effect-adapter/1'); validateDigest(rule.adapterArtifactDigest, 'aether.effect-adapter-artifact/1');
+    if ((rule.capability as string) <= previous || rule.argument !== null && (!Number.isSafeInteger(rule.argument) || (rule.argument as number) < 0 || (rule.argument as number) > 31)) throw new TypeError('noncanonical or invalid effect resource rule v2');
+    previous = rule.capability as string;
+  }
+}
+export function effectResourcePolicyDigestV2(body: EffectResourcePolicyBodyV2): Digest {
+  validateEffectResourcePolicyBodyV2(body); return domainDigest('aether.effect-resource-policy/2', body);
+}
+function signingBytesV2(body: EffectResourcePolicyBodyV2, signer: string): Uint8Array {
+  return encodeCanonical({ domain: 'aether.effect-resource-policy-signature/2', body, signer });
+}
+export function signEffectResourcePolicyV2(body: EffectResourcePolicyBodyV2, signer: string, key: KeyObject | string): SignedEffectResourcePolicyV2 {
+  validateEffectResourcePolicyBodyV2(body); identifier(signer);
+  const privateKey = typeof key === 'string' ? createPrivateKey(key) : key;
+  if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'ed25519') throw new TypeError('Ed25519 policy signing key required');
+  return { format: 'aether.signed-effect-resource-policy/2', body, signer, signature: sign(null, signingBytesV2(body, signer), privateKey).toString('base64') };
+}
+export function assertSignedEffectResourcePolicyV2(value: unknown, manifest: ExecutionManifestV1, repositoryId: string, currentEpoch: string, key: KeyObject | string): asserts value is SignedEffectResourcePolicyV2 {
+  encodeCanonical(value); const policy = exactObject(value, ['format', 'body', 'signer', 'signature']);
+  if (policy.format !== 'aether.signed-effect-resource-policy/2') throw new TypeError('unsupported signed effect resource policy v2');
+  validateEffectResourcePolicyBodyV2(policy.body); identifier(policy.signer); identifier(repositoryId); decimal(currentEpoch);
+  const body = policy.body as EffectResourcePolicyBodyV2;
+  if (body.repositoryId !== repositoryId || body.astRoot !== manifest.astRoot || body.policyEpoch !== currentEpoch || effectResourcePolicyDigestV2(body) !== manifest.capabilityPolicyDigest) throw new Error('stale or foreign effect resource policy v2');
+  if (typeof policy.signature !== 'string' || !/^[A-Za-z0-9+/]{86}==$/.test(policy.signature)) throw new TypeError('invalid effect policy v2 signature');
+  const signature = Buffer.from(policy.signature, 'base64'), publicKey = typeof key === 'string' ? createPublicKey(key) : key.type === 'private' ? createPublicKey(key) : key;
+  if (publicKey.asymmetricKeyType !== 'ed25519' || signature.toString('base64') !== policy.signature || !verify(null, signingBytesV2(body, policy.signer as string), publicKey, signature)) throw new TypeError('untrusted effect resource policy v2 signer');
+}
+export function effectResourcePathV2(policy: SignedEffectResourcePolicyV2, name: CapabilityName, args: readonly TaggedValueV1[]): readonly string[] {
+  validateEffectResourcePolicyBodyV2(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule) throw new Error('effect capability has no signed v2 resource rule');
+  if (rule.argument === null) return [...rule.prefix];
+  const value = args[rule.argument];
+  if (!value || value.tag !== 'string' || !SEGMENT.test(value.value) || value.value === '.' || value.value === '..') throw new TypeError('effect target is outside signed resource grammar');
+  return [...rule.prefix, value.value];
+}
+export function assertEffectResourceAdapterV2(policy: SignedEffectResourcePolicyV2, name: CapabilityName, actual: Readonly<{ id: string; digest: Digest; artifactDigest: Digest | null }>): void {
+  validateEffectResourcePolicyBodyV2(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule || rule.adapterId !== actual.id || rule.adapterDigest !== actual.digest || rule.adapterArtifactDigest !== actual.artifactDigest) throw new Error('effect adapter artifact is outside signed resource policy v2');
+}
