@@ -40,14 +40,48 @@ test('transactional revocation abort writes terminal evidence before refunding t
     assert.equal(f.bridge.records()[0].settlement!.operation.kind, 'refund');
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
-test('absence of nontransactional sink evidence fails closed; predispatch rejection cannot guess a refund', () => {
+test('nontransactional predispatch refusal refunds only after durable broker noncommit', () => {
   const directory = temp(); try {
     let allowed = true;
     const f = openBridgeFixture(directory, { transactional: false, authorize: () => allowed, brokerFault: event => { if (event.dispatchStarted) allowed = false; } }), request = effectRequest();
-    assert.throws(() => f.broker.dispatch(request, f.adapter), /indeterminate/);
-    assert.equal(f.sink(request), null); same(f.ledger.snapshot('budget-service').inflight, amount(10));
-    assert.equal(f.broker.reconcile(request, f.adapter).state, 'indeterminate'); same(f.ledger.snapshot('budget-service').inflight, amount(10));
+    assert.deepEqual(f.broker.dispatch(request, f.adapter), { state: 'rejected', code: 'authorization_denied' });
+    assert.equal(f.sink(request), null); same(f.ledger.snapshot('budget-service').inflight, amount(0));
+    same(f.ledger.snapshot('budget-service').available, amount(10));
+    assert.equal(f.bridge.records()[0].settlement?.operation.kind, 'refund');
+    const event = f.broker.events()[0]; assert.equal(event.state, 'rejected'); assert.equal(event.dispatchStarted, false);
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+test('missing sink and missing terminal broker decision leave nontransactional funds inflight', () => {
+  const directory = temp(); try {
+    const f = openBridgeFixture(directory, { transactional: false }), request = effectRequest();
+    assert.equal(f.bridge.reserve(request), true);
+    assert.throws(() => f.bridge.release(request), /indeterminate/);
+    assert.equal(f.sink(request), null); same(f.ledger.snapshot('budget-service').inflight, amount(10));
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+test('process death at each terminal refund handoff recovers the exact broker noncommit', () => {
+  for (const phase of ['after-intent', 'after-ledger', 'after-receipt'] as const) {
+    const directory = temp(); try {
+      openBridgeFixture(directory, { transactional: false });
+      const code = `const {openBridgeFixture,effectRequest}=await import(${JSON.stringify(pathToFileURL(resolve('test/tier2/resource-budget-bridge-fixture.ts')).href)});
+      let allowed=true;const f=openBridgeFixture(${JSON.stringify(directory)},{transactional:false,authorize:()=>allowed,
+        brokerFault:event=>{if(event.dispatchStarted)allowed=false;},
+        bridgeFault:(point,operation)=>{if(point===${JSON.stringify(phase)}&&operation==='refund')process.kill(process.pid,'SIGKILL');}});
+      f.broker.dispatch(effectRequest(),f.adapter);`;
+      const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', code], { encoding: 'utf8' });
+      assert.equal(child.signal, 'SIGKILL', child.stderr);
+      const f = openBridgeFixture(directory, { transactional: false }), request = effectRequest();
+      f.broker.recoverDeadWriter();
+      const event = f.broker.events()[0]; assert.equal(event.state, 'rejected'); assert.equal(event.dispatchStarted, false);
+      assert.equal(f.sink(request), null);
+      same(f.ledger.snapshot('budget-service').inflight, amount(phase === 'after-intent' ? 10 : 0));
+      same(f.broker.dispatch(request, f.adapter), { state: 'rejected', code: 'authorization_denied' });
+      same(f.ledger.snapshot('budget-service').available, amount(10)); same(f.ledger.snapshot('budget-service').inflight, amount(0));
+      const sequence = f.ledger.snapshot('budget-service').sequence;
+      same(f.broker.reconcile(request, f.adapter), { state: 'rejected', code: 'authorization_denied' });
+      assert.equal(f.ledger.snapshot('budget-service').sequence, sequence);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  }
 });
 test('sink-committed uncertainty reconciles the same effect without a second dispatch or charge', () => {
   const directory = temp(); try {

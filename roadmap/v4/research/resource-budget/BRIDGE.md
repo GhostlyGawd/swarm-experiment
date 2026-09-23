@@ -77,23 +77,30 @@ before mutation, between durable intent and ledger application, and before
 returning success. The ledger independently verifies current owner authority and
 settlement evidence at its own commit boundary.
 
-## Why generic release still fails closed
+## Durable broker noncommit and its limit
 
-The existing `EffectBudget.release(request)` hook carries no versioned broker
-noncommit certificate. A transactional adapter can supply a durable terminal
-tombstone through `abort`/`reconcile`; the bridge verifies it and refunds. Merely
-finding no nontransactional sink record does not establish terminal noncommit.
-The tested generic predispatch rejection therefore leaves funds inflight and
-reconciliation indeterminate, even though the fixture's sink was not called.
-There is no guessed refund or automatic retry of a potentially irreversible call.
+The broker now publishes a terminal `rejected` or `aborted` event before it asks
+the budget service to refund. Its locked journal records the exact effect request,
+the prior dispatch marker and a final `dispatchStarted: false` decision. That
+terminal event cannot later become a dispatch. If refund fails or the process
+dies, an exact retry or authorized reconciliation repeats the idempotent release
+against the saved noncommit event.
 
-The next shared integration step is an optional **versioned release-context
-hook**, minted inside the broker's locked state machine. It must bind the exact
-request and authoritative durable event/terminal decision and establish that no
-dispatch can later commit. It needs current cleanup authority and a checkable
-certificate or trusted host capability; an unverified `neverDispatched: true`
-Boolean is insufficient. This proposal is documented only—no shared hook or
-broker transition has been added in this slice.
+The bounded nontransactional fixture has no `prepare` callback. Its trusted
+observer reads the broker's canonical durable journal and returns a versioned
+`aether.budget-broker-noncommit/1` digest only when the exact request has a
+terminal, no-dispatch outcome and no sink row. The ledger's independent
+`verifySettlement` callback reads that broker journal again and binds the event,
+request, zero charge and inner evidence before refunding. Missing sink data
+**without** the broker decision remains unknown and keeps funds inflight.
+Transactional adapters still require their terminal sink tombstone, and an
+uncertain dispatch is never refunded from a broker event alone.
+
+This is one trusted local broker/ledger composition. A production budget service
+must independently authenticate its broker journal or receive a separately
+checkable terminal certificate, enforce cleanup authority and bind every
+spending capability to a required reservation. The local event is not a proof
+against privileged replacement of all broker metadata.
 
 ## Actual broker tests and remaining work
 
@@ -105,7 +112,11 @@ checks that ledger funds are inflight before committing its sink row. Tests cove
 - Unused refund handles and refusal to reuse terminal grants.
 - Actual `budget_exhausted` selection of an explicitly declared **host** fallback.
 - Revocation after transactional prepare, terminal abort and verified refund.
-- Nontransactional release with missing evidence staying encumbered.
+- Nontransactional predispatch refusal refunded only after a durable terminal
+  broker decision; missing terminal evidence stays encumbered.
+- Real process death after refund intent, ledger application and receipt
+  retention, each after the broker's terminal decision, followed by exact
+  idempotent recovery.
 - Sink-committed uncertainty and exact reconciliation.
 - Actual replay, shadow and speculative brokers avoiding live budget hooks;
   direct isolated bridge mutation is rejected.
@@ -123,12 +134,14 @@ node --experimental-strip-types --test test/tier2/resource-budget-bridge.test.ts
 npm run typecheck
 ```
 
-The focused result after independent review is **9/9 tests passing**, including the six-window
-process-crash matrix. Tests use a durable local sink with a fixed fixture tariff,
-not paid APIs or a production billing provider.
+The expanded focused bridge suite has **11 cases**, including the six-window
+process-crash matrix and three terminal-refund crash windows. Tests use a durable
+local sink with a fixed fixture tariff, not paid APIs or a production billing
+provider.
 
 Remaining T2-05 work includes static linear resource types, compiler-checked
 exhaustion branches, trusted production token/time/memory/cost meters, complete
-effect policy coverage, general release evidence, controlled grant renewal, and
-production end-to-end authority/replay integration. The host fallback test is
-runtime outcome evidence; it is not a claim that static economic typing passes.
+effect policy coverage, externally checkable production release evidence,
+controlled grant renewal, and production end-to-end authority/replay integration.
+The host fallback test is runtime outcome evidence; it is not a claim that static
+economic typing passes.

@@ -42,6 +42,20 @@ test('F04/G2 request IDs and durable receipts survive reopening; identical retri
   assert.equal(events[0].observedAt, '100'); assert.equal(events[0].recordedAt, '100');
 });
 
+test('cached committed receipts never call current cleanup policy or release a budget', () => {
+  let active = true, calls = 0;
+  const opts: EffectBrokerOptions = { ...options(), authorize: () => {
+    if (!active) throw new Error('historical receipt queried current policy'); return true;
+  }, authorizeReconciliation: () => { throw new Error('committed receipt queried cleanup policy'); },
+    budgets: { reserve: () => true, consume: () => {}, release: () => { throw new Error('committed budget released'); } } };
+  const broker = new DurableEffectBroker(opts), sink = adapter(() => { calls++; return result; });
+  const input = request('cached-budget', { budgetReservationId: 'reserved:cached' });
+  const receipt = broker.dispatch(input, sink); assert.equal(receipt.state, 'committed'); active = false;
+  assert.deepEqual(encodeCanonical(broker.dispatch(input, sink)), encodeCanonical(receipt));
+  assert.deepEqual(encodeCanonical(broker.reconcile(input, sink)), encodeCanonical(receipt));
+  assert.equal(calls, 1);
+});
+
 test('F04/G2 changed payload, manifest, policy, grant, deadline and reservation cannot reuse a live effect ID', () => {
   const broker = new DurableEffectBroker(options()); const sink = adapter(); const r = request(); broker.dispatch(r, sink);
   const other: TaggedValueV1 = { tag: 'null' };

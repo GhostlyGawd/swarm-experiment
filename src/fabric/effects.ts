@@ -59,7 +59,8 @@ export interface EffectBudget {
   /** All three hooks must be durable/idempotent by executionId + effectId, not by invocation count. */
   reserve(request: EffectRequestV1): boolean;
   consume(request: EffectRequestV1, value: TaggedValueV1): void;
-  /** Release only the unused reservation. The broker never releases an uncertain or committed effect. */
+  /** Release only the unused reservation after durable terminal noncommit.
+   * Repeated release must be safe, including if no reservation was acquired. */
   release(request: EffectRequestV1): void;
 }
 export interface EffectEventV1 {
@@ -260,6 +261,12 @@ export class DurableEffectBroker {
     this.persist(journal, next); return next;
   }
   private uncertain(event: EffectEventV1): EffectOutcome { return { state: 'indeterminate', recoveryId: event.requestDigest }; }
+  private terminalBudgetReleaseNeeded(request: EffectRequestV1, event: EffectEventV1): boolean {
+    return request.budgetReservationId !== null && this.options.budgets !== undefined
+      && (event.outcome?.state === 'rejected' || event.outcome?.state === 'aborted')
+      && (event.transitions.some(transition => transition.state === 'reserved')
+        || event.outcome.state === 'aborted' && event.outcome.code === 'recovered_before_dispatch');
+  }
   private authorize(request: EffectRequestV1, signal?: AbortSignal): string | null {
     if (signal?.aborted) return 'cancelled';
     if (BigInt(this.time()) > BigInt(request.deadline)) return 'deadline_exceeded';
@@ -343,6 +350,8 @@ export class DurableEffectBroker {
       const old = this.find(journal, request);
       if (old) {
         if (old.adapterId !== adapter.id || old.adapterSemanticsDigest !== semanticsDigest) throw new Error('effect_adapter_conflict');
+        if (this.terminalBudgetReleaseNeeded(request, old)
+          && (this.options.authorizeReconciliation ?? this.options.authorize)(request) === true) this.options.budgets!.release(request);
         return old.outcome ?? this.uncertain(old);
       }
       const now = this.time();
@@ -357,9 +366,10 @@ export class DurableEffectBroker {
       let reserved = false;
       const abort = (code: string): EffectOutcome => {
         if (event.prepared !== null) adapter.abort?.(request, event.prepared);
-        if (reserved) this.options.budgets!.release(request);
         const outcome: EffectOutcome = { state: code === 'cancelled' ? 'aborted' : 'rejected', code };
-        event = this.step(journal, event, outcome.state, { outcome }); return outcome;
+        event = this.step(journal, event, outcome.state, { outcome });
+        if (reserved) this.options.budgets!.release(request);
+        return outcome;
       };
       try {
         let refusal = this.authorize(request, options.signal);
@@ -408,19 +418,22 @@ export class DurableEffectBroker {
       const journal = this.read(); const found = this.find(journal, request);
       if (!found) throw new Error('unknown_effect');
       if (found.adapterId !== adapter.id || found.adapterSemanticsDigest !== semanticsDigest) throw new Error('effect_adapter_conflict');
-      if (found.outcome && found.outcome.state !== 'indeterminate') return found.outcome;
+      if (found.outcome && found.outcome.state !== 'indeterminate') {
+        if (this.terminalBudgetReleaseNeeded(request, found)
+          && (this.options.authorizeReconciliation ?? this.options.authorize)(request) === true) this.options.budgets!.release(request);
+        return found.outcome;
+      }
       let event = found;
       // Reconciliation authority never implies permission to dispatch. The read-only
       // adapter query must be allowed under current policy (including after revocation).
       if (!(this.options.authorizeReconciliation ?? this.options.authorize)(request)) return this.uncertain(event);
       if (!event.dispatchStarted) {
+        if (request.budgetReservationId !== null && !this.options.budgets) return this.uncertain(event);
         if (adapter.semantics.transactional) adapter.abort!(request, event.prepared);
-        if (request.budgetReservationId !== null) {
-          if (!this.options.budgets) return this.uncertain(event);
-          this.options.budgets.release(request);
-        }
         const outcome: EffectOutcome = { state: 'aborted', code: 'recovered_before_dispatch' };
-        this.step(journal, event, 'aborted', { outcome }); return outcome;
+        event = this.step(journal, event, 'aborted', { outcome });
+        if (request.budgetReservationId !== null) this.options.budgets!.release(request);
+        return outcome;
       }
       if (!adapter.reconcile) return this.uncertain(event);
       const resolution = adapter.reconcile(request, event.prepared);
@@ -429,12 +442,11 @@ export class DurableEffectBroker {
       if (!['committed', 'not_committed', 'unknown'].includes(String(response.state))) throw new TypeError('invalid reconciliation response');
       if (resolution.state === 'unknown') return this.uncertain(event);
       if (resolution.state === 'not_committed') {
-        if (request.budgetReservationId !== null) {
-          if (!this.options.budgets) return this.uncertain(event);
-          this.options.budgets.release(request);
-        }
+        if (request.budgetReservationId !== null && !this.options.budgets) return this.uncertain(event);
         const outcome: EffectOutcome = { state: 'aborted', code: 'sink_confirmed_not_committed' };
-        this.step(journal, event, 'aborted', { outcome }); return outcome;
+        event = this.step(journal, event, 'aborted', { outcome });
+        if (request.budgetReservationId !== null) this.options.budgets!.release(request);
+        return outcome;
       }
       validateTaggedValue(resolution.value, this.limits);
       if (request.budgetReservationId !== null) {
