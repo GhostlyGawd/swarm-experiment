@@ -106,6 +106,13 @@ async function topologyMatrix() {
     record({ id: 'topology/direct/stale-epoch', boundary: 'TopologyHost.dispatch', attack: 'stale-epoch', expected: 'deny-zero-sink-unchanged-heap',
       observed: stale.ok ? 'completed' : stale.fault.kind, denied: !stale.ok && stale.fault.kind === 'authority',
       sinkBefore: 0, sinkAfter: 0, heapBefore: before, heapAfter: heap() });
+    const policyOld = host.issueTokens(setter);
+    epochs.advancePolicy(epochs.policyEpoch);
+    const stalePolicy = host.dispatch({ id: 'topology-stale-policy', from: null, to: setter, args: [accountRef], capabilities: policyOld });
+    record({ id: 'topology/direct/stale-policy', boundary: 'TopologyHost.dispatch', attack: 'policy-epoch-advanced',
+      expected: 'deny-zero-sink-unchanged-heap', observed: stalePolicy.ok ? 'completed' : stalePolicy.fault.kind,
+      denied: !stalePolicy.ok && stalePolicy.fault.kind === 'authority',
+      sinkBefore: 0, sinkAfter: 0, heapBefore: before, heapAfter: heap() });
     const short = host.issueTokens(setter, 10); setTime(111);
     const expired = host.dispatch({ id: 'topology-expired', from: null, to: setter, args: [accountRef], capabilities: short });
     record({ id: 'topology/direct/expired', boundary: 'TopologyHost.dispatch', attack: 'expired', expected: 'deny-zero-sink-unchanged-heap',
@@ -211,6 +218,13 @@ async function processMatrix() {
     catch (error) { observed = String(error); denied = /authority_denied/.test(observed); }
     record({ id: 'process/direct/stale-epoch', boundary: 'ProcessHost.call', attack: 'stale-epoch', expected: 'deny-zero-sink-unchanged-heap',
       observed, denied, sinkBefore: calls, sinkAfter: calls, heapBefore: before, heapAfter: await heap() });
+    const policyOld = host.issueScopedTokens(ex.symbols.transfer);
+    epochs.advancePolicy(epochs.policyEpoch);
+    try { await host.call(ex.symbols.transfer, args, { operationId: 'process-stale-policy', tokens: policyOld }); observed = 'completed'; denied = false; }
+    catch (error) { observed = String(error); denied = /authority_denied/.test(observed); }
+    record({ id: 'process/direct/stale-policy', boundary: 'ProcessHost.call', attack: 'policy-epoch-advanced',
+      expected: 'deny-zero-sink-unchanged-heap', observed, denied,
+      sinkBefore: calls, sinkAfter: calls, heapBefore: before, heapAfter: await heap() });
     const short = host.issueScopedTokens(ex.symbols.transfer, 10); setTime(111);
     try { await host.call(ex.symbols.transfer, args, { operationId: 'process-expired', tokens: short }); observed = 'completed'; denied = false; }
     catch (error) { observed = String(error); denied = /authority_denied/.test(observed); }
@@ -371,6 +385,13 @@ async function deploymentMatrix() {
     try { await deployment.call(setter, args, { operationId: 'deploy-stale', tokens: [valid] }); observed = 'completed'; denied = false; }
     catch (error) { observed = String(error); denied = /authority_denied/.test(observed); }
     record({ id: 'deployment/direct/stale-epoch', boundary: 'ProcessDeployment.call', attack: 'stale-epoch',
+      expected: 'deny-zero-sink-unchanged-heap', observed, denied, sinkBefore: 0, sinkAfter: 0,
+      heapBefore: before, heapAfter: await heap() });
+    const policyOld = deployment.issueScopedTokens(setter);
+    epochs.advancePolicy(epochs.policyEpoch);
+    try { await deployment.call(setter, args, { operationId: 'deploy-stale-policy', tokens: policyOld }); observed = 'completed'; denied = false; }
+    catch (error) { observed = String(error); denied = /authority_denied/.test(observed); }
+    record({ id: 'deployment/direct/stale-policy', boundary: 'ProcessDeployment.call', attack: 'policy-epoch-advanced',
       expected: 'deny-zero-sink-unchanged-heap', observed, denied, sinkBefore: 0, sinkAfter: 0,
       heapBefore: before, heapAfter: await heap() });
     const short = deployment.issueScopedTokens(setter, 10); setTime(111);

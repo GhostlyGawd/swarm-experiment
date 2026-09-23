@@ -29,7 +29,7 @@ for (const [path, digest] of Object.entries(report.sourceHashes)) {
 const required = [];
 for (const boundary of ['topology/direct', 'process/direct', 'deployment/direct']) {
   for (const attack of ['missing', 'forged', 'wrong-audience', 'wrong-path', 'narrowed',
-    'extra', 'duplicate', 'edited-policy', 'revoked', 'stale-epoch', 'expired'])
+    'extra', 'duplicate', 'edited-policy', 'revoked', 'stale-epoch', 'stale-policy', 'expired'])
     required.push(boundary + '/' + attack);
 }
 required.push(
