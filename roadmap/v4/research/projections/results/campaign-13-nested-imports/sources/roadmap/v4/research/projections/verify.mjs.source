@@ -1,0 +1,37 @@
+#!/usr/bin/env node
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {join} from 'node:path';
+import {countTokens} from '../../../../src/util/tokens.ts';
+import {decode,IrContext} from '../../../../src/tier1/agent-ir.ts';
+import {decodeAgentIrBinary,decodeAgentIrModel} from '../../../../src/tier1/agent-ir-v2.ts';
+import {parseExecutable,parseExecutableBundle} from '../../../../src/projection/executable.ts';
+import {GraphStore} from '../../../../src/tier1/store.ts';
+const directory=process.argv[2]??'roadmap/v4/research/projections/results/campaign-03';
+const report=JSON.parse(readFileSync(join(directory,'report.json'))),artifacts=JSON.parse(readFileSync(join(directory,'artifacts.json')));
+const sha=x=>createHash('sha256').update(x).digest('hex');
+assert.equal(JSON.parse(readFileSync('node_modules/js-tiktoken/package.json')).version,report.tokenizerPackage.version);
+for(const source of report.sources)assert.equal(sha(readFileSync(join(directory,'sources',source.path+'.source'))),source.sha256);
+if(report.atomicRuntime){const libraries=JSON.parse(readFileSync(join(directory,'runtime-artifacts.json')));for(const[key,targets]of Object.entries(libraries))for(const[target,source]of Object.entries(targets)){const recorded=report[key][target];assert.equal(recorded.bytes,Buffer.byteLength(source));assert.equal(recorded.sha256,sha(source));for(const tokenizer of report.tokenizers)assert.equal(recorded.tokens[tokenizer],countTokens(source,tokenizer));}}
+let messages=0,dependencyMessages=0;
+for(const artifact of artifacts){
+ const ctx=new IrContext(),store=new GraphStore();
+ const message=(file,key)=>file.dependencyModules?JSON.stringify({entry:file[key],dependencies:file.dependencyModules.map(d=>d[key])}):file[key];
+ const nativeMessage=(file,target)=>file.nativeDependencies?JSON.stringify({entry:file.native[target],dependencies:file.nativeDependencies[target]}):file.native[target];
+ const binarySize=file=>[file,...(file.dependencyModules??[])].reduce((n,f)=>n+Buffer.from(f.binary,'base64').length,0);
+ const warmMessages=artifact.warmAe1Messages.map((entry,i)=>artifact.warmAe1DependencyMessages?JSON.stringify({entry,dependencies:artifact.warmAe1DependencyMessages[i]}):entry);
+ for(let i=0;i<artifact.files.length;i++){
+  const file=artifact.files[i];assert.equal(store.intern(decode(artifact.warmAe1Messages[i],ctx)),file.root);
+  const check=f=>{assert.equal(store.intern(decode(f.ae1)),f.root);assert.equal(store.intern(decodeAgentIrModel(f.ae2)),f.root);assert.equal(store.intern(decodeAgentIrBinary(Buffer.from(f.binary,'base64'))),f.root);};check(file);
+  for(let j=0;j<(file.dependencyModules?.length??0);j++){const dep=file.dependencyModules[j];check(dep);assert.equal(store.intern(decode(artifact.warmAe1DependencyMessages[i][j],ctx)),dep.root);dependencyMessages++;}
+  for(const[target,source]of Object.entries(file.native)){
+   if(file.nativeDependencies){const parsed=parseExecutableBundle({target,source,dependencies:new Map(Object.entries(file.nativeDependencies[target]))});assert.equal(store.intern(parsed.module),file.root);assert.deepEqual([...parsed.modules.keys()].sort(),file.dependencyModules.map(d=>d.root).sort());}
+   else assert.equal(store.intern(parseExecutable(source,target)),file.root);
+  }messages++;
+ }
+ for(const tokenizer of report.tokenizers){const row=report.rows.find(r=>r.workload===artifact.id&&r.tokenizer===tokenizer),count=s=>countTokens(s,tokenizer),first=artifact.files[0];assert.equal(row.cold.legacyTsReviewTokens,count(message(first,'legacyTypeScript')));assert.equal(row.cold.ae2Tokens,count(message(first,'ae2')));assert.equal(row.cold.ae1Tokens,count(message(first,'ae1')));assert.equal(row.cold.binaryBytes,binarySize(first));for(const target of Object.keys(first.native))assert.equal(row.cold.nativeTokens[target],count(nativeMessage(first,target)));assert.equal(row.session.legacyTsReviewTokens,artifact.files.reduce((n,f)=>n+count(message(f,'legacyTypeScript')),0));assert.equal(row.session.ae2CompleteMessages,artifact.files.reduce((n,f)=>n+count(message(f,'ae2')),0));assert.equal(row.session.ae1SharedDictionaryTokens,warmMessages.reduce((n,s)=>n+count(s),0));}
+}
+for(const row of report.aggregate){const rows=report.rows.filter(r=>r.tokenizer===row.tokenizer),baseline=rows.reduce((n,r)=>n+r.cold.legacyTsReviewTokens,0),candidate=rows.reduce((n,r)=>n+r.cold.ae2Tokens,0);assert.equal(row.ratioOfSums,baseline/candidate);assert.equal(row.meetsFourfoldDiagnostic,baseline/candidate>=4);}
+assert.equal(report.qualifiedReleaseDensity,false);assert.equal(report.coverage?report.coverage.length:report.unsupportedWorkloads.length,3);
+console.log(JSON.stringify({format:'aether.projection-token-audit/1',passed:true,messages,dependencyMessages,tokenizers:report.tokenizers,sourceSnapshots:report.sources.length,aggregate:report.aggregate},null,2));
