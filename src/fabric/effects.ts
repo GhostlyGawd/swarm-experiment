@@ -117,7 +117,7 @@ export function validateEffectRequest(value: unknown, limits: Partial<EncodingLi
 export function effectRequestDigest(request: EffectRequestV1, limits: Partial<EncodingLimits> = {}): Digest {
   validateEffectRequest(request, limits); return domainDigest('aether.effect/1', request, limits);
 }
-function adapterDigest(adapter: EffectAdapter): Digest {
+export function effectAdapterDigest(adapter: EffectAdapter): Digest {
   identifier(adapter.id);
   const d = exactObject(adapter.semantics, ['readOnly', 'atomicIdempotency', 'transactional', 'reconciliation']);
   if (Object.values(d).some(v => typeof v !== 'boolean')) throw new TypeError('invalid adapter semantics');
@@ -269,7 +269,7 @@ export class DurableEffectBroker {
   /** Replay is isolated from current grants; exactly matches the recorded logical event sequence. */
   private replay(request: EffectRequestV1, adapter: EffectAdapter): EffectOutcome {
     const event = this.trace[this.cursor];
-    if (!event || event.requestDigest !== effectRequestDigest(request, this.limits) || event.adapterId !== adapter.id || event.adapterSemanticsDigest !== adapterDigest(adapter) || event.outcome === null || event.outcome.state === 'indeterminate') throw new Error('replay_mismatch');
+    if (!event || event.requestDigest !== effectRequestDigest(request, this.limits) || event.adapterId !== adapter.id || event.adapterSemanticsDigest !== effectAdapterDigest(adapter) || event.outcome === null || event.outcome.state === 'indeterminate') throw new Error('replay_mismatch');
     this.cursor++; return immutable(copy(event.outcome, this.limits));
   }
   /** Restore only an isolated immutable trace cursor. No live adapter, grant,
@@ -337,7 +337,7 @@ export class DurableEffectBroker {
       if (!this.buffered.some(r => this.key(r) === key)) this.buffered.push(request);
       return { state: 'rejected', code: 'isolated_intent_buffered' };
     }
-    const semanticsDigest = adapterDigest(adapter);
+    const semanticsDigest = effectAdapterDigest(adapter);
     return this.locked(() => {
       const journal = this.read();
       const old = this.find(journal, request);
@@ -403,7 +403,7 @@ export class DurableEffectBroker {
   reconcile(input: EffectRequestV1, adapter: EffectAdapter): EffectOutcome {
     if (this.mode !== 'live') throw new Error('isolated_reconciliation_forbidden');
     validateEffectRequest(input, this.limits); const request = immutable(copy(input, this.limits));
-    const semanticsDigest = adapterDigest(adapter);
+    const semanticsDigest = effectAdapterDigest(adapter);
     return this.locked(() => {
       const journal = this.read(); const found = this.find(journal, request);
       if (!found) throw new Error('unknown_effect');

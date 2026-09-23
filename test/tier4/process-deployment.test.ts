@@ -10,11 +10,13 @@ import * as b from '../../src/tier1/build.ts';
 import type { Term } from '../../src/tier1/ast.ts';
 import { typeName } from '../../src/tier1/ids.ts';
 import { encode as encodeIR } from '../../src/tier1/agent-ir.ts';
+import { GraphStore } from '../../src/tier1/store.ts';
 import { atomicWrite } from '../../src/tier1/persistence.ts';
 import { ACCOUNT, CAP_LEDGER_APPEND, buildLedgerExample } from '../../src/examples/ledger.ts';
 import { CapabilitySealer, RevocationList } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
+import { effectResourcePolicyDigest, signEffectResourcePolicy, type EffectResourcePolicyBodyV1 } from '../../src/tier2/effect-resource-policy.ts';
 import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
 import { DurableEffectBroker, type EffectAdapter } from '../../src/fabric/effects.ts';
 import { JournalLock } from '../../src/fabric/journal-lock.ts';
@@ -30,6 +32,7 @@ const integer = (value: number): TaggedValueV1 => ({ tag: 'int', value: String(v
 const text = (value: string): TaggedValueV1 => ({ tag: 'string', value });
 const reference = (ref: LogicalRefV1, epoch = ref.ownerEpoch): TaggedValueV1 => ({ tag: 'ref', value: { ...ref, ownerEpoch: epoch } });
 const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+const DEPLOYMENT_LEDGER_ADAPTER_DIGEST = domainDigest('aether.effect-adapter/1', { id: 'deployment-ledger/1', semantics: { readOnly: false, atomicIdempotency: true, transactional: false, reconciliation: true } });
 
 // Recreated in a separate coordinator process for the actual process-death tests.
 function hostFactory(directory: string, artifact: ProcessArtifactV1) {
@@ -54,7 +57,7 @@ function hostFactory(directory: string, artifact: ProcessArtifactV1) {
     return new BrokerEffectRouter({ broker, manifest: artifact.manifest, executionId: context.operationId, policyEpoch: '1', deadline: '1000', adapters: new Map([[CAP_LEDGER_APPEND, sink]]), grant: () => 'governor-ledger-grant' });
   } };
 }
-function fixture() {
+function fixture(signedPolicy = false) {
   const directory = mkdtempSync(join(tmpdir(), 'aether-process-deployment-'));
   const ex = buildLedgerExample('deployment-ledger'), keys = generateKeyPairSync('ed25519');
   const sum = ex.syms.define('composed-sum');
@@ -70,7 +73,9 @@ function fixture() {
     const total = b.fn({ symbol: sum, returns: b.Int, contract: b.contract({ ensures: [b.clause(b.ge(b.result(), b.int(18)), 'minimum_sum')] }), body: b.block(b.ret(b.add(b.int(left), b.int(right)))) });
     const module: Term = { ...base, members: [...members, total, b.typeDecl(typeName('type:deployment:marker'), b.Int)], symbolTable: ex.syms.table() };
     const digest = (value: string) => domainDigest('aether.deployment-test/1', value);
-    return { module, registry: ex.capabilities, specification: 'Ledger conservation and composed total at least eighteen.', semanticsVersion: 'reference/1', compilerDigest: digest('compiler'), capabilityPolicyDigest: digest('effects-policy'),
+    const resourcePolicy: EffectResourcePolicyBodyV1 = { format: 'aether.effect-resource-policy/1', repositoryId: 'deployment-test', astRoot: new GraphStore().intern(module), policyEpoch: '0',
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: 'deployment-ledger/1', adapterDigest: DEPLOYMENT_LEDGER_ADAPTER_DIGEST }] };
+    return { module, registry: ex.capabilities, specification: 'Ledger conservation and composed total at least eighteen.', semanticsVersion: 'reference/1', compilerDigest: digest('compiler'), capabilityPolicyDigest: signedPolicy ? effectResourcePolicyDigest(resourcePolicy) : digest('effects-policy'),
       target: { abiVersion: 'process/1', profileDigest: digest('two-workers'), artifactDigest: digest(encodeIR(module).text) }, policy: { ...DEFAULT_EVIDENCE_POLICY, requireFormal: false } };
   };
   const plan = (swap = false): TopologyPlan => ({ shape: 'containers', units: [
@@ -131,6 +136,34 @@ test('strict process deployment carries scoped grants through the production hos
     await assert.rejects(ProcessDeployment.open(f.options), /configuration|profile/i);
     deployment = await ProcessDeployment.open({ ...f.options, factories: strictFactory });
     assert.deepEqual(await balances(deployment), ['90', '10']);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('process deployment factory serves a signed effect resource policy bound to the admitted artifact', async () => {
+  const f = fixture(true); let deployment: ProcessDeployment | undefined;
+  const epochs = new DurableGrantEpochs({ directory: join(f.directory, 'signed-grant-epochs'), repositoryId: 'deployment-test' });
+  const scopedGrants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(33), repositoryId: 'deployment-test', clock: () => 100,
+    policyEpoch: () => epochs.policyEpoch, revocationEpoch: () => epochs.epoch,
+    isRevoked: (cap, path) => epochs.isRevoked(cap, path), authorizeIssue: () => true, authorizeDelegate: () => true });
+  const keys = generateKeyPairSync('ed25519');
+  const factories = new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => {
+    const body: EffectResourcePolicyBodyV1 = { format: 'aether.effect-resource-policy/1', repositoryId: scopedGrants.repositoryId,
+      astRoot: artifact.manifest.astRoot, policyEpoch: epochs.policyEpoch,
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: 'deployment-ledger/1', adapterDigest: DEPLOYMENT_LEDGER_ADAPTER_DIGEST }] };
+    assert.equal(effectResourcePolicyDigest(body), artifact.manifest.capabilityPolicyDigest);
+    return { ...hostFactory(f.directory, artifact), scopedGrants,
+      signedEffectResourcePolicy: signEffectResourcePolicy(body, 'deployment-policy', keys.privateKey),
+      effectResourceSignerKey: keys.publicKey, currentEffectPolicyEpoch: () => epochs.policyEpoch };
+  }]]);
+  try {
+    deployment = await ProcessDeployment.open({ ...f.options, factories });
+    const { alice, bob } = await accounts(deployment), args = [reference(alice), reference(bob), integer(10)];
+    const aliceScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
+    const valid = await deployment.call(f.ex.symbols.transfer, args, { operationId: 'signed-deployment-valid', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, aliceScope) });
+    assert.equal(valid.state, 'completed'); assert.equal(f.rows().length, 1);
+    const bobScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'bob']]]);
+    const denied = await deployment.call(f.ex.symbols.transfer, args, { operationId: 'signed-deployment-denied', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, bobScope) });
+    assert.match(JSON.stringify(denied), /authority_denied|effect_indeterminate/); assert.equal(f.rows().length, 1);
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });
 

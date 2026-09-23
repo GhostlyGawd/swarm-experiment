@@ -1,12 +1,14 @@
 import type { CapabilityName, NodeRef } from '../tier1/ids.ts';
 import { decodeExecutionManifest, encodeExecutionManifest, executionManifestDigest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import { validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
-import { DurableEffectBroker, effectPayloadDigest, type EffectAdapter, type EffectOutcome, type ExecutionMode } from '../fabric/effects.ts';
+import { DurableEffectBroker, effectPayloadDigest, effectAdapterDigest, type EffectAdapter, type EffectOutcome, type ExecutionMode } from '../fabric/effects.ts';
 import { isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
 
 export interface RuntimeEffectRouter {
   readonly mode: ExecutionMode;
   bind(root: NodeRef): void;
+  /** Optional adapter descriptor; signed-policy hosts require this before dispatch. */
+  adapterIdentity?(capability: CapabilityName): Readonly<{ id: string; digest: string }>;
   invoke(capability: CapabilityName, args: readonly Value[]): Value;
   /** Must return an isolated router. A fork must never inherit live dispatch. */
   fork(): RuntimeEffectRouter;
@@ -54,6 +56,11 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   bind(root: NodeRef): void {
     if (root !== this.root) throw new TypeError('effect router execution manifest does not match loaded code');
     this.bound = true;
+  }
+  adapterIdentity(capability: CapabilityName): Readonly<{ id: string; digest: string }> {
+    const adapter = this.options.adapters.get(capability);
+    if (!adapter) throw new Error(`no broker adapter for ${capability}`);
+    return { id: adapter.id, digest: effectAdapterDigest(adapter) };
   }
   fork(): RuntimeEffectRouter {
     if (!this.options.isolatedFork) throw new Error('broker-backed fork requires an isolated effect router');

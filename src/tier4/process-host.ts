@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, type KeyObject } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, statSync, openSync, fsyncSync, closeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { walk, type Term, type Ty } from '../tier1/ast.ts';
@@ -8,6 +8,7 @@ import { atomicWrite } from '../tier1/persistence.ts';
 import { capability, type CapabilityName, type NodeRef, type SymbolId } from '../tier1/ids.ts';
 import { CapabilityRegistry, CapabilitySealer, RevocationList, type CapabilityToken } from '../tier2/ocap.ts';
 import { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2 } from '../tier2/scoped-grants.ts';
+import { assertSignedEffectResourcePolicy, assertEffectResourceAdapter, effectResourcePath as signedEffectResourcePath, effectResourcePolicyDigest, type SignedEffectResourcePolicyV1 } from '../tier2/effect-resource-policy.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { ProductionRuntime } from '../tier3/compile.ts';
 import type { EffectEventV1 } from '../fabric/effects.ts';
@@ -114,6 +115,10 @@ export interface ProcessHostOptions {
   readonly effectResourcePath?: (request: Readonly<{ capability: CapabilityName; from: SymbolId; unit: string; generation: string; args: readonly TaggedValueV1[] }>) => readonly string[];
   /** Versioned identity of the independently trusted adapter policy above. */
   readonly effectResourcePolicyDigest?: Digest;
+  /** Content-bound policy for deterministic target extraction in strict mode. */
+  readonly signedEffectResourcePolicy?: SignedEffectResourcePolicyV1;
+  readonly effectResourceSignerKey?: KeyObject | string;
+  readonly currentEffectPolicyEpoch?: () => string;
   readonly revocations?: RevocationList;
   readonly effectRouterFactory?: (context: ProcessEffectContext) => RuntimeEffectRouter;
   /** Privileged adoption/resumption of exact checkpoint state. No implicit authority from checkpoint bytes. */
@@ -183,6 +188,7 @@ export class ProcessHost {
   private readonly manifest: ExecutionManifestV1;
   private readonly registry: CapabilityRegistry;
   private readonly configuration: Digest;
+  private readonly signedEffectResourcePolicy: SignedEffectResourcePolicyV1 | null;
   private readonly file: string;
   private readonly lock: JournalLock;
   private readonly declarations = new Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>();
@@ -196,10 +202,19 @@ export class ProcessHost {
   private constructor(options: ProcessHostOptions) {
     if (options.effectResourcePath && !options.scopedGrants || !!options.effectResourcePath !== !!options.effectResourcePolicyDigest) throw new TypeError('strict effect resource policy requires an exact policy digest');
     if (options.effectResourcePolicyDigest) validateDigest(options.effectResourcePolicyDigest, 'aether.effect-resource-policy/1');
+    const signed = options.signedEffectResourcePolicy !== undefined;
+    if (signed && (!options.scopedGrants || options.effectResourcePath || options.effectResourcePolicyDigest)
+      || signed !== (options.effectResourceSignerKey !== undefined)
+      || signed !== (options.currentEffectPolicyEpoch !== undefined)) throw new TypeError('signed effect resource policy requires strict grants, signer key, and epoch source');
     this.options = { ...options, plan: JSON.parse(planBytes(options.plan)) as TopologyPlan, initialSnapshot: options.initialSnapshot ? copy(options.initialSnapshot) : undefined };
     this.module = decodeIR(encodeIR(options.module).text);
     this.manifest = decodeExecutionManifest(encodeExecutionManifest(options.manifest));
     if (new GraphStore().intern(this.module) !== this.manifest.astRoot) throw new TypeError('ProcessHost module/manifest mismatch');
+    if (signed) {
+      assertSignedEffectResourcePolicy(options.signedEffectResourcePolicy, this.manifest, options.scopedGrants!.repositoryId,
+        options.currentEffectPolicyEpoch!(), options.effectResourceSignerKey!);
+      this.signedEffectResourcePolicy = freeze(copy(options.signedEffectResourcePolicy!));
+    } else this.signedEffectResourcePolicy = null;
     const members = this.module.kind === 'Module' ? this.module.members : [this.module];
     for (const member of members) if (member.kind === 'FunctionDecl') this.declarations.set(member.symbol, member);
     if (!this.declarations.size) throw new Error('ProcessHost needs function declarations');
@@ -209,7 +224,8 @@ export class ProcessHost {
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
     this.configuration = domainDigest('aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
-      ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: options.effectResourcePolicyDigest ?? null } : {}) });
+      ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy ? effectResourcePolicyDigest(this.signedEffectResourcePolicy.body) : options.effectResourcePolicyDigest ?? null,
+        effectResourcePolicySigner: this.signedEffectResourcePolicy?.signer ?? null } : {}) });
     ensureDurableDirectory(options.directory);
     this.file = join(options.directory, 'host.json');
     this.lock = new JournalLock({ directory: join(options.directory, 'host-lock'), domain: 'aether.process-host-lock', busyError: 'process_host_busy: another state transition is active' });
@@ -618,9 +634,18 @@ export class ProcessHost {
       const router = this.options.effectRouterFactory(freeze({ operationId: id, rootOperationId: active.call.operationId, unit, generation: active.journal.generation, manifest: copy(this.manifest), capability: request.capability, mode: active.mode, snapshot: copy(active.snapshot) }));
       if (router.mode !== active.mode) throw new Error('effect router mode does not match execution/recovery mode');
       router.bind(this.manifest.astRoot as NodeRef);
+      if (this.signedEffectResourcePolicy) {
+        const actual = router.adapterIdentity?.(request.capability);
+        if (!actual) throw new Error('signed effect policy requires an inspectable adapter');
+        assertEffectResourceAdapter(this.signedEffectResourcePolicy, request.capability, actual);
+      }
       this.assertActive(active); this.checkRevocation(request.capability, unit, active.journal.generation, active.mode);
       if (active.mode === 'live') this.authorize(active.call.symbol, active.call.unit, active.journal.generation, active.tokens);
-      if (resourcePath) this.authorizeScopedEffect(active, request.capability, resourcePath);
+      if (resourcePath) {
+        const currentPath = this.scopedEffectPath(active, request, unit, taggedArgs);
+        if (!equal(currentPath, resourcePath)) throw new Error('effect resource changed before sink dispatch');
+        this.authorizeScopedEffect(active, request.capability, currentPath);
+      }
       const value = router.invoke(request.capability, request.args);
       const tagged = encodeProcessValue(value, this.scope(active.journal, unit), active.snapshot);
       effect.state = 'committed'; effect.value = tagged; effect.code = null; effect.outcomeDigest = effectOutcomeDigest(effect); this.persist(active.journal);
@@ -672,7 +697,12 @@ export class ProcessHost {
   }
   private scopedEffectPath(active: Active, request: ProcessEffectRequest, unit: string, args: readonly TaggedValueV1[]): readonly string[] {
     const context = freeze({ capability: request.capability, from: request.from, unit, generation: active.journal.generation, args: copy(args) });
-    const suffix = this.options.effectResourcePath?.(context) ?? [];
+    let suffix: readonly string[];
+    if (this.signedEffectResourcePolicy) {
+      assertSignedEffectResourcePolicy(this.signedEffectResourcePolicy, this.manifest, this.options.scopedGrants!.repositoryId,
+        this.options.currentEffectPolicyEpoch!(), this.options.effectResourceSignerKey!);
+      suffix = signedEffectResourcePath(this.signedEffectResourcePolicy, request.capability, args);
+    } else suffix = this.options.effectResourcePath?.(context) ?? [];
     if (!Array.isArray(suffix)) throw new Error('invalid trusted effect resource policy');
     return [...this.scopedGrantPath(active.call.unit, active.journal.generation), ...suffix];
   }

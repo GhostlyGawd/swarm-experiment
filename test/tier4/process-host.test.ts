@@ -4,13 +4,15 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, openSync, fsyncSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
+import { generateKeyPairSync } from 'node:crypto';
 import { buildLedgerExample, ACCOUNT, CAP_LEDGER_APPEND } from '../../src/examples/ledger.ts';
 import { CapabilitySealer, CapabilityRegistry, RevocationList } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
+import { effectResourcePolicyDigest, signEffectResourcePolicy, type EffectResourcePolicyBodyV1 } from '../../src/tier2/effect-resource-policy.ts';
 import { createEvidenceManifest } from '../../src/fabric/evidence.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
-import { DurableEffectBroker, type EffectAdapter } from '../../src/fabric/effects.ts';
+import { DurableEffectBroker, effectAdapterDigest, type EffectAdapter } from '../../src/fabric/effects.ts';
 import type { TaggedValueV1, LogicalRefV1 } from '../../src/fabric/encoding.ts';
 import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
 import { ProcessHost, PROCESS_INVOKE, type ProcessHostOptions, type ProcessEffectContext } from '../../src/tier4/process-host.ts';
@@ -155,6 +157,67 @@ test('trusted effect resource policy denies a valid grant for the wrong ledger t
     await host.close(); host = undefined;
     await assert.rejects(ProcessHost.open({ ...f.options, scopedGrants: grants,
       effectResourcePolicyDigest: domainDigest('aether.effect-resource-policy/1', 'different-policy'), effectResourcePath: () => [] }), /configuration|profile/i);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('signed resource policy binds a real process effect to its manifest and current grant epoch', async () => {
+  const f = fixture(), { epochs, grants } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  try {
+    let calls = 0;
+    const sink: EffectAdapter = { id: 'signed-ledger-sink/1', semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true }, execute: () => { calls++; return { tag: 'null' }; }, reconcile: () => ({ state: 'unknown' }) };
+    const body: EffectResourcePolicyBodyV1 = { format: 'aether.effect-resource-policy/1', repositoryId: grants.repositoryId,
+      astRoot: f.options.manifest.astRoot, policyEpoch: epochs.policyEpoch,
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: sink.id, adapterDigest: effectAdapterDigest(sink) }] };
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+    const signedEffectResourcePolicy = signEffectResourcePolicy(body, 'ledger-policy', privateKey);
+    const signedManifest = { ...f.options.manifest, capabilityPolicyDigest: effectResourcePolicyDigest(body) };
+    let rotateAtEffect = false;
+    let effectPolicyEpoch = epochs.policyEpoch;
+    const signedOptions: ProcessHostOptions = { ...f.options, manifest: signedManifest,
+      effectRouterFactory: factory(f.directory, signedManifest, CAP_LEDGER_APPEND, sink),
+      scopedGrants: grants, signedEffectResourcePolicy, effectResourceSignerKey: publicKey, currentEffectPolicyEpoch: () => effectPolicyEpoch,
+      onPhase: phase => { if (phase === 'effect-requested' && rotateAtEffect) { rotateAtEffect = false; effectPolicyEpoch = '1'; } } };
+    await assert.rejects(ProcessHost.open({ ...signedOptions, effectResourceSignerKey: generateKeyPairSync('ed25519').publicKey }), /untrusted/);
+    await assert.rejects(ProcessHost.open({ ...signedOptions, manifest: f.options.manifest }), /stale or foreign/);
+    host = await ProcessHost.open(signedOptions);
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const args = [reference(alice), reference(bob), integer(10)];
+    const aliceScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
+    const valid = await host.call(f.ex.symbols.transfer, args, { operationId: 'signed-alice', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, aliceScope) });
+    assert.equal(valid.state, 'completed'); assert.equal(calls, 1);
+    const bobScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'bob']]]);
+    const denied = await host.call(f.ex.symbols.transfer, args, { operationId: 'signed-bob', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, bobScope) });
+    assert.equal(calls, 1); assert.match(JSON.stringify(denied), /authority_denied|effect_indeterminate/);
+    rotateAtEffect = true;
+    const raced = await host.call(f.ex.symbols.transfer, args, { operationId: 'signed-race', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, aliceScope) });
+    assert.equal(calls, 1); assert.match(JSON.stringify(raced), /effect_indeterminate|stale or foreign/);
+  } finally { await host?.close(); f.cleanup(); }
+});
+
+test('signed process policy refuses a changed adapter before dispatch', async () => {
+  const f = fixture(), { epochs, grants } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  try {
+    let calls = 0;
+    const approved: EffectAdapter = { id: 'approved-ledger/1', semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: true },
+      execute: () => ({ tag: 'null' }), reconcile: () => ({ state: 'unknown' }) };
+    const changed: EffectAdapter = { ...approved, id: 'changed-ledger/1', execute: () => { calls++; return { tag: 'null' }; } };
+    const body: EffectResourcePolicyBodyV1 = { format: 'aether.effect-resource-policy/1', repositoryId: grants.repositoryId,
+      astRoot: f.options.manifest.astRoot, policyEpoch: epochs.policyEpoch,
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: approved.id, adapterDigest: effectAdapterDigest(approved) }] };
+    const manifestValue = { ...f.options.manifest, capabilityPolicyDigest: effectResourcePolicyDigest(body) };
+    const keys = generateKeyPairSync('ed25519');
+    host = await ProcessHost.open({ ...f.options, manifest: manifestValue, scopedGrants: grants,
+      signedEffectResourcePolicy: signEffectResourcePolicy(body, 'adapter-policy', keys.privateKey), effectResourceSignerKey: keys.publicKey,
+      currentEffectPolicyEpoch: () => epochs.policyEpoch, effectRouterFactory: factory(f.directory, manifestValue, CAP_LEDGER_APPEND, changed) });
+    const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
+    const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
+    const aliceScope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
+    const result = await host.call(f.ex.symbols.transfer, [reference(alice), reference(bob), integer(10)],
+      { operationId: 'changed-adapter', tokens: host.issueScopedTokens(f.ex.symbols.transfer, 60000, aliceScope) });
+    assert.match(JSON.stringify(result), /effect_indeterminate|outside signed resource policy/);
+    assert.equal(calls, 0);
+    assert.deepEqual(balances(await host.snapshot()), ['100', '0']);
   } finally { await host?.close(); f.cleanup(); }
 });
 

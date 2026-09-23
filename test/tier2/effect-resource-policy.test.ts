@@ -1,0 +1,33 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { generateKeyPairSync } from 'node:crypto';
+import { buildLedgerExample, CAP_LEDGER_APPEND } from '../../src/examples/ledger.ts';
+import { createEvidenceManifest } from '../../src/fabric/evidence.ts';
+import { domainDigest } from '../../src/fabric/identity.ts';
+import { effectAdapterDigest } from '../../src/fabric/effects.ts';
+import { assertEffectResourceAdapter, assertSignedEffectResourcePolicy, effectResourcePath, effectResourcePolicyDigest, signEffectResourcePolicy, validateEffectResourcePolicyBody, type EffectResourcePolicyBodyV1 } from '../../src/tier2/effect-resource-policy.ts';
+
+test('signed resource policy binds extraction to exact manifest, repository, epoch, and Ed25519 signer', () => {
+  const ex = buildLedgerExample('signed-resource-policy');
+  const digest = (value: string) => domainDigest('aether.resource-policy-test/1', value);
+  const base = createEvidenceManifest({ module: ex.module, registry: ex.capabilities, specification: 'Bound resources.', semanticsVersion: 'reference/1', compilerDigest: digest('compiler'), capabilityPolicyDigest: digest('placeholder'), target: { abiVersion: 'process/1', profileDigest: digest('profile'), artifactDigest: digest('artifact') } });
+  const adapter = { id: 'test-ledger/1', semantics: { readOnly: false, atomicIdempotency: false, transactional: false, reconciliation: false }, execute: () => ({ tag: 'null' as const }) };
+  const body: EffectResourcePolicyBodyV1 = { format: 'aether.effect-resource-policy/1', repositoryId: 'repository', astRoot: base.astRoot, policyEpoch: '0', rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: adapter.id, adapterDigest: effectAdapterDigest(adapter) }] };
+  const manifest = { ...base, capabilityPolicyDigest: effectResourcePolicyDigest(body) };
+  const { privateKey, publicKey } = generateKeyPairSync('ed25519'), other = generateKeyPairSync('ed25519');
+  const policy = signEffectResourcePolicy(body, 'policy-signer', privateKey);
+  assertSignedEffectResourcePolicy(policy, manifest, 'repository', '0', publicKey);
+  assert.doesNotThrow(() => assertEffectResourceAdapter(policy, CAP_LEDGER_APPEND, { id: adapter.id, digest: effectAdapterDigest(adapter) }));
+  assert.throws(() => assertEffectResourceAdapter(policy, CAP_LEDGER_APPEND, { id: adapter.id, digest: digest('other-adapter') }), /outside signed resource policy/);
+  assert.deepEqual(effectResourcePath(policy, CAP_LEDGER_APPEND, [{ tag: 'string', value: 'alice' }]), ['ledger', 'alice']);
+  assert.throws(() => effectResourcePath(policy, CAP_LEDGER_APPEND, [{ tag: 'int', value: '1' }]), /outside signed resource grammar/);
+  assert.throws(() => effectResourcePath(policy, CAP_LEDGER_APPEND, [{ tag: 'string', value: '..' }]), /outside signed resource grammar/);
+  assert.throws(() => assertSignedEffectResourcePolicy(policy, base, 'repository', '0', publicKey), /stale or foreign/);
+  assert.throws(() => assertSignedEffectResourcePolicy(policy, manifest, 'other-repository', '0', publicKey), /stale or foreign/);
+  assert.throws(() => assertSignedEffectResourcePolicy(policy, manifest, 'repository', '1', publicKey), /stale or foreign/);
+  assert.throws(() => assertSignedEffectResourcePolicy(policy, { ...manifest, astRoot: digest('other-ast') }, 'repository', '0', publicKey), /stale or foreign/);
+  assert.throws(() => assertSignedEffectResourcePolicy(policy, manifest, 'repository', '0', other.publicKey), /untrusted/);
+  assert.throws(() => assertSignedEffectResourcePolicy({ ...policy, signature: 'A'.repeat(86) + '==' }, manifest, 'repository', '0', publicKey), /untrusted/);
+  assert.throws(() => validateEffectResourcePolicyBody({ ...body, rules: [{ ...body.rules[0], prefix: ['..'] }] }), /invalid effect resource path/);
+  assert.throws(() => validateEffectResourcePolicyBody({ ...body, rules: [body.rules[0], body.rules[0]] }), /noncanonical/);
+});
