@@ -14,4 +14,16 @@ node --experimental-strip-types roadmap/v4/research/smt-cutoff/campaign.ts --run
 node --experimental-strip-types roadmap/v4/research/smt-cutoff/campaign.ts --verify roadmap/v4/research/smt-cutoff/results/NEW-CAMPAIGN
 ```
 
-A clean exact-source campaign on the target hardware is still required before V4-NFR-08 can be marked measured or passed in the release profile.
+## Clean-source campaign 01
+
+[Registration](results/campaign-01/registration.json) and [raw results](results/campaign-01/results.json) bind committed source `9f6caec49a36eea7d4720d6b04f442cfbf821060`, six exact source/package pins, an empty Git status and the Apple M4 Pro / Darwin arm64 / Node 26.7.0 environment. The experiment used an isolated detached worktree while other development files were changing. All raw warmup and five measured trial files are retained and verified without rerunning timing.
+
+| Measured hard-query trial | Complete wall time | Result |
+| --- | ---: | --- |
+| 0 | 1,483.808 ms | `unknown/timeout` |
+| 1 | 1,484.199 ms | `unknown/timeout` |
+| 2 | 1,483.035 ms | `unknown/timeout` |
+| 3 | 1,483.971 ms | `unknown/timeout` |
+| 4 | 1,483.133 ms | `unknown/timeout` |
+
+The local fixed-query cutoff profile passed all five trials; maximum observed complete wall time was **1,484.199 ms** against the unchanged 1,500 ms limit. This is one hard unsatisfiable Boolean workload on one same-host target. The result has not been integrated into the release-profile measurement inventory, and it does not qualify arbitrary proof construction, external solvers, different hardware or every query shape. V4-NFR-08 therefore remains **unmeasured in release enforcement**.

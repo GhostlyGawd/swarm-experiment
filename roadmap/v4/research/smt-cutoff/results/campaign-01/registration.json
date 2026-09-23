@@ -1,0 +1,31 @@
+{
+  "format": "aether.smt-cutoff-campaign/1",
+  "profile": {
+    "format": "aether.smt-cutoff-campaign/1",
+    "query": "pigeonhole-9-into-8/1",
+    "warmups": 1,
+    "trials": 5,
+    "maximumMs": 1500,
+    "requireHardCancellation": true
+  },
+  "profileDigest": "baa77c30466a638444e5a30ada040f3c56ef9b5433526320d575d2e493136dae",
+  "sources": {
+    "roadmap/v4/research/smt-cutoff/campaign.ts": "3d8b3afe992d9a2b46f0ec20f4d0f43738d7bc514be19599f2953cf586193f07",
+    "src/tier2/hard-solver.ts": "27c756c22b3a1f634d04cc23f4ee41e5492109a19b8c88f99ea4720a7a242135",
+    "src/tier2/solver.ts": "97a78f1e654402bb9e55d1d34d8d71689417ac8710144984cc306f31d624cf77",
+    "src/tier2/smt.ts": "bcb8cfa291cf52294e56150808a89b012e56ab7242e2b807c3f2310f59aa3628",
+    "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+    "package-lock.json": "472041ed211ffa638f64690103b93f19f0135b42ebd541c59004fb530daa74d4"
+  },
+  "gitHead": "9f6caec49a36eea7d4720d6b04f442cfbf821060",
+  "gitStatus": "",
+  "at": "2026-09-23T05:32:36.284Z",
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "release": "25.6.0",
+    "node": "v26.7.0",
+    "cpu": "Apple M4 Pro",
+    "logicalCpus": 12
+  }
+}

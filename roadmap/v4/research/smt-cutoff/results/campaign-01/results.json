@@ -1,0 +1,57 @@
+{
+  "format": "aether.smt-cutoff-campaign/1",
+  "profileDigest": "baa77c30466a638444e5a30ada040f3c56ef9b5433526320d575d2e493136dae",
+  "warmup": {
+    "trial": -1,
+    "elapsedNs": "1485000792",
+    "solverElapsedMs": 1484.5290420000001,
+    "status": "unknown",
+    "reason": "timeout",
+    "pass": true
+  },
+  "samples": [
+    {
+      "trial": 0,
+      "elapsedNs": "1483808375",
+      "solverElapsedMs": 1483.5933750000002,
+      "status": "unknown",
+      "reason": "timeout",
+      "pass": true
+    },
+    {
+      "trial": 1,
+      "elapsedNs": "1484199458",
+      "solverElapsedMs": 1483.8725000000004,
+      "status": "unknown",
+      "reason": "timeout",
+      "pass": true
+    },
+    {
+      "trial": 2,
+      "elapsedNs": "1483034791",
+      "solverElapsedMs": 1482.9345000000003,
+      "status": "unknown",
+      "reason": "timeout",
+      "pass": true
+    },
+    {
+      "trial": 3,
+      "elapsedNs": "1483970583",
+      "solverElapsedMs": 1483.8646669999998,
+      "status": "unknown",
+      "reason": "timeout",
+      "pass": true
+    },
+    {
+      "trial": 4,
+      "elapsedNs": "1483133125",
+      "solverElapsedMs": 1483.0095000000001,
+      "status": "unknown",
+      "reason": "timeout",
+      "pass": true
+    }
+  ],
+  "pass": true,
+  "maximumObservedMs": 1484.199458,
+  "requiredMaximumMs": 1500
+}

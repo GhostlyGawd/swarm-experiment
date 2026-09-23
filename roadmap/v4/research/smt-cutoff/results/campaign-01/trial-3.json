@@ -1,0 +1,8 @@
+{
+  "trial": 3,
+  "elapsedNs": "1483970583",
+  "solverElapsedMs": 1483.8646669999998,
+  "status": "unknown",
+  "reason": "timeout",
+  "pass": true
+}
