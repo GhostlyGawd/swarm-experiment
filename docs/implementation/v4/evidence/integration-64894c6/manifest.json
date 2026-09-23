@@ -1,0 +1,70 @@
+{
+  "format": "aether.v4-integration-failed/1",
+  "subjectCommit": "64894c6f8a60dca87d365583d341e0f913a3b0df",
+  "specVersion": "0.1.0",
+  "workingTreeDirty": false,
+  "recordedAt": "2026-09-23T03:13:35.344036+00:00",
+  "checks": [
+    {
+      "command": "npm test (includes build)",
+      "exitCode": 1,
+      "tests": 630,
+      "passed": 629,
+      "failed": 1,
+      "artifact": "tests.log"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "artifact": "typecheck.log"
+    },
+    {
+      "command": "npm run roadmap:check",
+      "exitCode": 0,
+      "artifact": "roadmap.log"
+    },
+    {
+      "command": "npm run roadmap:v4:check",
+      "exitCode": 0,
+      "artifact": "roadmap-v4.log"
+    },
+    {
+      "command": "node --test --experimental-strip-types test/projection/composites.test.ts test/projection/ledger-native.test.ts (corrected working source)",
+      "exitCode": 0,
+      "tests": 7,
+      "artifact": "isolation-fix-focused.log"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "REVIEW.md",
+      "sha256": "d256f7250014321a55e70e5f1e81d6e9e1c8290d3e96d5ed54ad050aee207c6f",
+      "bytes": 979
+    },
+    {
+      "path": "tests.log",
+      "sha256": "9fb728df2eab28390af756ab2d0b459bb14f5b99850748aca5ce42a49d6e2061",
+      "bytes": 66002
+    },
+    {
+      "path": "typecheck.log",
+      "sha256": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a",
+      "bytes": 69
+    },
+    {
+      "path": "roadmap.log",
+      "sha256": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+      "bytes": 135
+    },
+    {
+      "path": "roadmap-v4.log",
+      "sha256": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+      "bytes": 182
+    },
+    {
+      "path": "isolation-fix-focused.log",
+      "sha256": "6f424572f206e7d5866a730a0e09f4c40ac456b2d936255610a8c59a5552533e",
+      "bytes": 946
+    }
+  ]
+}

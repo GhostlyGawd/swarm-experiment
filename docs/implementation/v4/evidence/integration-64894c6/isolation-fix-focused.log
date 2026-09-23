@@ -1,0 +1,15 @@
+✔ composite profiles preserve exact AST identities and parse visible collection/field edits (174.402417ms)
+✔ actual typescript composite execution preserves aliasing, old records, lazy Result branches, callbacks and write order (138.479167ms)
+✔ actual python composite execution preserves aliasing, old records, lazy Result branches, callbacks and write order (78.852292ms)
+✔ actual rust composite execution preserves aliasing, old records, lazy Result branches, callbacks and write order (7088.858542ms)
+✔ actual typescript standard ledger preserves aliases, transfer/settle contracts and grants (147.787792ms)
+✔ actual python standard ledger preserves aliases, transfer/settle contracts and grants (96.961708ms)
+✔ actual rust standard ledger preserves aliases, transfer/settle contracts and grants (6912.663583ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7671.999416
