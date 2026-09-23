@@ -1,0 +1,26 @@
+{
+  "format": "aether.frost-research-failure/1",
+  "result": "failed-before-DKG-completion",
+  "requestedTrials": 10,
+  "attemptsCompleted": 1,
+  "signaturesProduced": 0,
+  "sourceHashes": {
+    "roadmap/v4/research/frost/Cargo.lock": "83b32873d5c1bf46ac8257c0bbc0aaf41f7ecd3ed317742d8bb7726327f70b2c",
+    "roadmap/v4/research/frost/Cargo.toml": "d23afe7c63f8c2f9dae7005f1c22b6eb9a450d8d0abbe1cca44e398a5dc5245d",
+    "roadmap/v4/research/frost/run.mjs": "239354c1a863139936498ae141e2779a3a10b526546ae6a8db6bcfc2363ca7a4",
+    "roadmap/v4/research/frost/src/lib.rs": "833fef077e0729accfe5a683faa763dde320da6d549c8ed07be1763e4d64ded7",
+    "roadmap/v4/research/frost/src/main.rs": "b84a9f61b50688f3a5bb0428a3a12edac7ea6e79946401e129d8739a024fbf9c",
+    "roadmap/v4/research/frost/tests/protocol.rs": "fcdfca61fea2b8ca3c4535b56dd0112944b8cf720eeb337c1006a91c140ea70a",
+    "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+    "src/fabric/identity.ts": "a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+    "src/fabric/promotion.ts": "34c2dc8f0b61ebc23829c4a9d5004731ec80c034f7ed6029227ee0c12e8e327f",
+    "src/fabric/quorum-crypto.ts": "10d1fa45c13688ce57a1c99052a92d3845dc55dac493066684263ed747bac0a5"
+  },
+  "sourceHead": null,
+  "sourceHeadNote": "Failed run ended before final manifest generation; exact captured source hashes are retained instead.",
+  "observedError": "participant rejected: invalid request schema",
+  "diagnosedCause": "serde internally tagged enum package-map keys buffered as strings: invalid type string 2, expected u16",
+  "fix": "Explicit canonical participant map decoder, refusing duplicate and noncanonical keys; actual JSON-wire regression added.",
+  "supersedingCampaign": "../campaign-02",
+  "otherDevelopmentFailure": "cargo fmt rejected a comma-separated let declaration in tests; corrected before compilation."
+}

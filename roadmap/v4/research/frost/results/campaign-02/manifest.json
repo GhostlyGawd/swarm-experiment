@@ -1,0 +1,1190 @@
+{
+  "format": "aether.frost-research-campaign/1",
+  "createdAt": "2026-09-23T03:27:20.067Z",
+  "sourceHead": "a0e704fe779498ab28677e24e7bc5640175f2749",
+  "sourceHashes": {
+    "roadmap/v4/research/frost/Cargo.toml": "d23afe7c63f8c2f9dae7005f1c22b6eb9a450d8d0abbe1cca44e398a5dc5245d",
+    "roadmap/v4/research/frost/Cargo.lock": "83b32873d5c1bf46ac8257c0bbc0aaf41f7ecd3ed317742d8bb7726327f70b2c",
+    "roadmap/v4/research/frost/src/lib.rs": "9ffbf8bc88c593c36fbfdcfe08ee670c00c83a3aac93a433e423a09e8c018968",
+    "roadmap/v4/research/frost/src/main.rs": "6ecd8842894cfe67fc2e17fa1df70af8aa205b7f25243d755d185e86358c2e1a",
+    "roadmap/v4/research/frost/tests/protocol.rs": "e28faf9723b51934b275ba3a48c3622d9ee98c28a83e5566e6bfe1cd53b1b687",
+    "roadmap/v4/research/frost/run.mjs": "239354c1a863139936498ae141e2779a3a10b526546ae6a8db6bcfc2363ca7a4",
+    "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+    "src/fabric/quorum-crypto.ts": "10d1fa45c13688ce57a1c99052a92d3845dc55dac493066684263ed747bac0a5",
+    "src/fabric/identity.ts": "a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+    "src/fabric/promotion.ts": "34c2dc8f0b61ebc23829c4a9d5004731ec80c034f7ed6029227ee0c12e8e327f"
+  },
+  "binarySha256": "c651256d4e7b1608afad4c6523b2689457ce439fd9a31769d76174fa184a4375",
+  "cargoLockSha256": "83b32873d5c1bf46ac8257c0bbc0aaf41f7ecd3ed317742d8bb7726327f70b2c",
+  "toolchain": {
+    "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "node": "v26.7.0",
+    "openssl": "3.6.4"
+  },
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "release": "25.6.0",
+    "cpu": "Apple M4 Pro"
+  },
+  "buildNs": "76018791",
+  "trials": 10,
+  "signatures": 40,
+  "results": [
+    {
+      "trial": 0,
+      "verification": [
+        {
+          "participants": [
+            1,
+            2,
+            3
+          ],
+          "opensslVerified": true,
+          "verifyNs": "378584",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            2,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "74875",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "72083",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            2,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "74834",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        }
+      ],
+      "dkgNs": "12402416",
+      "signingNs": [
+        "1332375",
+        "1345250",
+        "1272542",
+        "1235333"
+      ],
+      "aggregateNs": [
+        "182750",
+        "179084",
+        "180542",
+        "178125"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 1,
+      "verification": [
+        {
+          "participants": [
+            1,
+            2,
+            3
+          ],
+          "opensslVerified": true,
+          "verifyNs": "95208",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            2,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "73041",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "70750",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            2,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "69292",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        }
+      ],
+      "dkgNs": "14168917",
+      "signingNs": [
+        "1359375",
+        "1314291",
+        "1301166",
+        "1305875"
+      ],
+      "aggregateNs": [
+        "183292",
+        "176750",
+        "176666",
+        "187208"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 2,
+      "verification": [
+        {
+          "participants": [
+            1,
+            2,
+            3
+          ],
+          "opensslVerified": true,
+          "verifyNs": "91875",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            2,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "90584",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "70708",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            2,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "70917",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        }
+      ],
+      "dkgNs": "14971541",
+      "signingNs": [
+        "1356042",
+        "1333875",
+        "1300625",
+        "1285334"
+      ],
+      "aggregateNs": [
+        "182833",
+        "175875",
+        "175583",
+        "179500"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 3,
+      "verification": [
+        {
+          "participants": [
+            1,
+            2,
+            3
+          ],
+          "opensslVerified": true,
+          "verifyNs": "97000",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            2,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "73958",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "75167",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            2,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "69958",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        }
+      ],
+      "dkgNs": "16024000",
+      "signingNs": [
+        "1360041",
+        "1357750",
+        "1290959",
+        "1261209"
+      ],
+      "aggregateNs": [
+        "180375",
+        "176542",
+        "178667",
+        "185333"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 4,
+      "verification": [
+        {
+          "participants": [
+            1,
+            2,
+            3
+          ],
+          "opensslVerified": true,
+          "verifyNs": "94584",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            2,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "91208",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "68667",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            2,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "68750",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        }
+      ],
+      "dkgNs": "15317125",
+      "signingNs": [
+        "1388000",
+        "1351500",
+        "1281208",
+        "1260958"
+      ],
+      "aggregateNs": [
+        "180250",
+        "175208",
+        "180292",
+        "185666"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 5,
+      "verification": [
+        {
+          "participants": [
+            1,
+            2,
+            3
+          ],
+          "opensslVerified": true,
+          "verifyNs": "94875",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            2,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "80875",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "69458",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            2,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "69375",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        }
+      ],
+      "dkgNs": "15639375",
+      "signingNs": [
+        "1391042",
+        "1327166",
+        "1329291",
+        "1238792"
+      ],
+      "aggregateNs": [
+        "183084",
+        "184625",
+        "187750",
+        "174459"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 6,
+      "verification": [
+        {
+          "participants": [
+            1,
+            2,
+            3
+          ],
+          "opensslVerified": true,
+          "verifyNs": "87041",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            2,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "71125",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "69292",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            2,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "69833",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        }
+      ],
+      "dkgNs": "11942875",
+      "signingNs": [
+        "1379167",
+        "1373750",
+        "1314208",
+        "1283917"
+      ],
+      "aggregateNs": [
+        "185083",
+        "181667",
+        "181250",
+        "177167"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 7,
+      "verification": [
+        {
+          "participants": [
+            1,
+            2,
+            3
+          ],
+          "opensslVerified": true,
+          "verifyNs": "85125",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            2,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "69708",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "71167",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            2,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "74375",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        }
+      ],
+      "dkgNs": "15071416",
+      "signingNs": [
+        "1378625",
+        "1329292",
+        "1309959",
+        "1256083"
+      ],
+      "aggregateNs": [
+        "182250",
+        "176584",
+        "177583",
+        "176583"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 8,
+      "verification": [
+        {
+          "participants": [
+            1,
+            2,
+            3
+          ],
+          "opensslVerified": true,
+          "verifyNs": "95041",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            2,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "71959",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "70542",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            2,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "69458",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        }
+      ],
+      "dkgNs": "13996459",
+      "signingNs": [
+        "1340958",
+        "1249084",
+        "1232292",
+        "1286750"
+      ],
+      "aggregateNs": [
+        "181334",
+        "174000",
+        "177250",
+        "172167"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    },
+    {
+      "trial": 9,
+      "verification": [
+        {
+          "participants": [
+            1,
+            2,
+            3
+          ],
+          "opensslVerified": true,
+          "verifyNs": "86166",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            2,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "69958",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            1,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "69834",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        },
+        {
+          "participants": [
+            2,
+            3,
+            4
+          ],
+          "opensslVerified": true,
+          "verifyNs": "68458",
+          "rejectedSubjectChanges": [
+            "view",
+            "phase",
+            "membershipEpoch",
+            "policyEpoch",
+            "proposal",
+            "expectedParent",
+            "candidateManifest",
+            "parentBlock",
+            "roster",
+            "block"
+          ],
+          "rejectedFamilyChange": true,
+          "existingVoteAdmission": false
+        }
+      ],
+      "dkgNs": "17233666",
+      "signingNs": [
+        "1363666",
+        "1335083",
+        "1306291",
+        "1286875"
+      ],
+      "aggregateNs": [
+        "188541",
+        "181000",
+        "177875",
+        "175792"
+      ],
+      "round1Bytes": 2004,
+      "round2Bytes": 444
+    }
+  ],
+  "measurements": {
+    "dkgIncludingFourProcessLaunchAndLocalIpc": {
+      "count": 10,
+      "minNs": 11942875,
+      "medianNs": 15071416,
+      "maxNs": 17233666
+    },
+    "signingIncludingLocalIpcAndFrostVerify": {
+      "count": 40,
+      "minNs": 1232292,
+      "medianNs": 1314291,
+      "maxNs": 1391042
+    },
+    "aggregate": {
+      "count": 40,
+      "minNs": 172167,
+      "medianNs": 180250,
+      "maxNs": 188541
+    },
+    "independentOpenSslVerify": {
+      "count": 40,
+      "minNs": 68458,
+      "medianNs": 72083,
+      "maxNs": 378584
+    }
+  },
+  "limitations": [
+    "Trusted coordinator/local pipes observe confidential DKG round2 packages; this is not a secure network DKG deployment.",
+    "Four participant processes hold private state; no keys or nonces are persisted or resumed. Process loss aborts that session.",
+    "Fixture family/role metadata and public share transcript are retained; a group signature alone does not attest operator enrollment or family independence.",
+    "Distinct prototype group envelope retains the exact current quorum vote body; existing individual-vote/QC admission rejects it.",
+    "No production key ceremony, authenticated broadcast, confidential transport, durable nonce journal, membership handoff, threshold QC admission or formal audit is completed.",
+    "Finite same-host timings include IPC and stated process launch costs; no WAN, throughput or product latency gate is qualified."
+  ]
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "trial": 0,
+    "status": 1,
+    "signal": null,
+    "stderr": "prototype failed: participant rejected: \"invalid request schema\"\n",
+    "wallNs": "224645416"
+  }
+]

@@ -1,0 +1,97 @@
+aether-frost-prototype v0.1.0 (/Users/rhenmcleod/Repositories/swarm-experiment/roadmap/v4/research/frost)
+├── frost-ed25519 v3.0.0
+│   ├── curve25519-dalek v4.1.3
+│   │   ├── cfg-if v1.0.5
+│   │   ├── rand_core v0.6.4
+│   │   │   └── getrandom v0.2.17
+│   │   │       ├── cfg-if v1.0.5
+│   │   │       └── libc v0.2.189
+│   │   ├── subtle v2.6.1
+│   │   └── zeroize v1.9.0
+│   │       └── zeroize_derive v1.5.0 (proc-macro)
+│   │           ├── proc-macro2 v1.0.107
+│   │           │   └── unicode-ident v1.0.26
+│   │           ├── quote v1.0.47
+│   │           │   └── proc-macro2 v1.0.107 (*)
+│   │           └── syn v2.0.119
+│   │               ├── proc-macro2 v1.0.107 (*)
+│   │               ├── quote v1.0.47 (*)
+│   │               └── unicode-ident v1.0.26
+│   │   [build-dependencies]
+│   │   └── rustc_version v0.4.1
+│   │       └── semver v1.0.28
+│   ├── document-features v0.2.12 (proc-macro)
+│   │   └── litrs v1.0.0
+│   ├── frost-core v3.0.0
+│   │   ├── byteorder v1.5.0
+│   │   ├── const-crc32-nostd v1.3.1
+│   │   ├── derive-getters v0.5.0 (proc-macro)
+│   │   │   ├── proc-macro2 v1.0.107 (*)
+│   │   │   ├── quote v1.0.47 (*)
+│   │   │   └── syn v2.0.119 (*)
+│   │   ├── document-features v0.2.12 (proc-macro) (*)
+│   │   ├── hex v0.4.3
+│   │   ├── itertools v0.14.0
+│   │   │   └── either v1.18.0
+│   │   ├── postcard v1.1.3
+│   │   │   ├── cobs v0.3.0
+│   │   │   │   └── thiserror v2.0.20
+│   │   │   │       └── thiserror-impl v2.0.20 (proc-macro)
+│   │   │   │           ├── proc-macro2 v1.0.107 (*)
+│   │   │   │           ├── quote v1.0.47 (*)
+│   │   │   │           └── syn v3.0.6
+│   │   │   │               ├── proc-macro2 v1.0.107 (*)
+│   │   │   │               ├── quote v1.0.47 (*)
+│   │   │   │               └── unicode-ident v1.0.26
+│   │   │   ├── heapless v0.7.17
+│   │   │   │   ├── hash32 v0.2.1
+│   │   │   │   │   └── byteorder v1.5.0
+│   │   │   │   ├── serde v1.0.228
+│   │   │   │   │   ├── serde_core v1.0.228
+│   │   │   │   │   └── serde_derive v1.0.228 (proc-macro)
+│   │   │   │   │       ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │       ├── quote v1.0.47 (*)
+│   │   │   │   │       └── syn v2.0.119 (*)
+│   │   │   │   └── stable_deref_trait v1.2.1
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── rustc_version v0.4.1 (*)
+│   │   │   └── serde v1.0.228 (*)
+│   │   ├── rand_core v0.6.4 (*)
+│   │   ├── serde v1.0.228 (*)
+│   │   ├── serdect v0.2.0
+│   │   │   ├── base16ct v0.2.0
+│   │   │   └── serde v1.0.228 (*)
+│   │   ├── thiserror v2.0.20 (*)
+│   │   ├── visibility v0.1.1 (proc-macro)
+│   │   │   ├── proc-macro2 v1.0.107 (*)
+│   │   │   ├── quote v1.0.47 (*)
+│   │   │   └── syn v2.0.119 (*)
+│   │   ├── zeroize v1.9.0 (*)
+│   │   └── zeroize_derive v1.5.0 (proc-macro) (*)
+│   ├── frost-rerandomized v3.0.0
+│   │   ├── derive-getters v0.5.0 (proc-macro) (*)
+│   │   ├── document-features v0.2.12 (proc-macro) (*)
+│   │   ├── frost-core v3.0.0 (*)
+│   │   ├── hex v0.4.3
+│   │   └── rand_core v0.6.4 (*)
+│   ├── rand_core v0.6.4 (*)
+│   └── sha2 v0.10.9
+│       ├── cfg-if v1.0.5
+│       ├── cpufeatures v0.2.17
+│       │   └── libc v0.2.189
+│       └── digest v0.10.7
+│           ├── block-buffer v0.10.4
+│           │   └── generic-array v0.14.7
+│           │       └── typenum v1.20.1
+│           │       [build-dependencies]
+│           │       └── version_check v0.9.5
+│           └── crypto-common v0.1.7
+│               ├── generic-array v0.14.7 (*)
+│               └── typenum v1.20.1
+├── rand_core v0.6.4 (*)
+├── serde v1.0.228 (*)
+└── serde_json v1.0.145
+    ├── itoa v1.0.18
+    ├── memchr v2.8.3
+    ├── ryu v1.0.23
+    └── serde_core v1.0.228
