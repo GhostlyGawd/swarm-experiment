@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { capability } from '../../src/tier1/ids.ts';
-import { adapterArtifactDigest, adapterArtifactForSource, admitAdapterSource, admittedAdapterArtifactDigest, importFreeAdapterArtifactForSource, legacyAdapterArtifactForSource } from '../../src/tier2/adapter-artifact.ts';
+import { adapterArtifactDigest, adapterArtifactForSource, admitAdapterSource, admittedAdapterArtifactDigest, importFreeAdapterArtifactForSource, legacyAdapterArtifactForSource, wasmAdapterArtifactForBytes } from '../../src/tier2/adapter-artifact.ts';
 import { DurableEffectBroker, effectAdapterDigest, effectPayloadDigest } from '../../src/fabric/effects.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
 
@@ -18,6 +18,20 @@ execute(request){globalThis.__aetherAdapterCalls=(globalThis.__aetherAdapterCall
 reconcile(){return{state:'not_committed'};}};`;
 const bytes = (value: string): Uint8Array => new TextEncoder().encode(value);
 const globals = globalThis as Record<string, unknown>;
+
+test('V3 Wasm descriptor binds bytes, fixed read-only semantics and finite resource limits', async () => {
+  const wasm = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
+  const artifact = wasmAdapterArtifactForBytes(wasm, cap, 'wasm-increment/1', { maxMemoryPages: 1, timeoutMs: 250 });
+  assert.equal(artifact.format, 'aether.effect-adapter-artifact/3');
+  assert.equal(artifact.sourceSha256, createHash('sha256').update(wasm).digest('hex'));
+  assert.deepEqual(artifact.semantics, { readOnly: true, atomicIdempotency: true, transactional: false, reconciliation: true });
+  assert.notEqual(adapterArtifactDigest(artifact), adapterArtifactDigest({ ...artifact, timeoutMs: 251 }));
+  assert.throws(() => adapterArtifactDigest({ ...artifact, semantics: { ...artifact.semantics, readOnly: false } }), /bounded Wasm adapter descriptor/);
+  assert.throws(() => adapterArtifactDigest({ ...artifact, sourceProfile: 'aether.adapter-js-import-free/1' as typeof artifact.sourceProfile }), /Wasm adapter source profile/);
+  assert.throws(() => wasmAdapterArtifactForBytes(wasm, cap, 'wasm-increment/1', { maxMemoryPages: 257, timeoutMs: 250 }), /bounded Wasm adapter descriptor/);
+  assert.throws(() => wasmAdapterArtifactForBytes(wasm, cap, 'wasm-increment/1', { maxMemoryPages: 1, timeoutMs: 5001 }), /bounded Wasm adapter descriptor/);
+  await assert.rejects(admitAdapterSource(wasm, artifact), /requires isolated Wasm admission/);
+});
 
 test('approved exact adapter bytes mint one immutable code-provenance identity', async () => {
   delete globals.__aetherAdapterLoads; delete globals.__aetherAdapterCalls;

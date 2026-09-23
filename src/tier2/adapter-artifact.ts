@@ -29,21 +29,44 @@ export interface AdapterArtifactV2 {
   readonly sourceSha256: string;
   readonly sourceProfile: 'aether.adapter-js-import-free/1';
 }
-export type AdapterArtifact = AdapterArtifactV1 | AdapterArtifactV2;
+/** Source identity and limits for a separately executed, import-free Wasm
+ * scalar guest. Admission still requires checking the actual module bytes. */
+export interface AdapterArtifactV3 {
+  readonly format: 'aether.effect-adapter-artifact/3';
+  readonly capability: CapabilityName;
+  readonly id: string;
+  readonly semantics: EffectAdapter['semantics'];
+  readonly sourceSha256: string;
+  readonly sourceProfile: 'aether.adapter-wasm-i32-readonly/1';
+  readonly maxMemoryPages: number;
+  readonly timeoutMs: number;
+}
+export type AdapterArtifact = AdapterArtifactV1 | AdapterArtifactV2 | AdapterArtifactV3;
 const admitted = new WeakMap<EffectAdapter, Digest>();
 const SHA256 = /^[0-9a-f]{64}$/;
 const MAX_SOURCE_BYTES = 1024 * 1024;
+const MAX_WASM_BYTES = 64 * 1024;
+const WASM_SEMANTICS = Object.freeze({ readOnly: true, atomicIdempotency: true, transactional: false, reconciliation: true });
 function validateArtifact(value: unknown): asserts value is AdapterArtifact {
   encodeCanonical(value);
   const format = (value as { format?: unknown }).format;
-  if (format !== 'aether.effect-adapter-artifact/1' && format !== 'aether.effect-adapter-artifact/2') throw new TypeError('unsupported adapter artifact version');
+  if (format !== 'aether.effect-adapter-artifact/1' && format !== 'aether.effect-adapter-artifact/2'
+    && format !== 'aether.effect-adapter-artifact/3') throw new TypeError('unsupported adapter artifact version');
   const artifact = exactObject(value, format === 'aether.effect-adapter-artifact/1'
     ? ['format', 'capability', 'id', 'semantics', 'sourceSha256']
-    : ['format', 'capability', 'id', 'semantics', 'sourceSha256', 'sourceProfile']);
+    : format === 'aether.effect-adapter-artifact/2'
+      ? ['format', 'capability', 'id', 'semantics', 'sourceSha256', 'sourceProfile']
+      : ['format', 'capability', 'id', 'semantics', 'sourceSha256', 'sourceProfile', 'maxMemoryPages', 'timeoutMs']);
   if (format === 'aether.effect-adapter-artifact/2' && artifact.sourceProfile !== 'aether.adapter-js-import-free/1') throw new TypeError('unsupported adapter source profile');
+  if (format === 'aether.effect-adapter-artifact/3' && artifact.sourceProfile !== 'aether.adapter-wasm-i32-readonly/1') throw new TypeError('unsupported Wasm adapter source profile');
   capability(artifact.capability as string); identifier(artifact.id);
   const semantics = exactObject(artifact.semantics, ['readOnly', 'atomicIdempotency', 'transactional', 'reconciliation']);
   if (Object.values(semantics).some(flag => typeof flag !== 'boolean')) throw new TypeError('invalid declared adapter semantics');
+  if (format === 'aether.effect-adapter-artifact/3'
+    && (semantics.readOnly !== true || semantics.atomicIdempotency !== true || semantics.transactional !== false || semantics.reconciliation !== true
+      || !Number.isSafeInteger(artifact.maxMemoryPages) || (artifact.maxMemoryPages as number) < 1 || (artifact.maxMemoryPages as number) > 256
+      || !Number.isSafeInteger(artifact.timeoutMs) || (artifact.timeoutMs as number) < 1 || (artifact.timeoutMs as number) > 5000))
+    throw new TypeError('invalid bounded Wasm adapter descriptor');
   if (typeof artifact.sourceSha256 !== 'string' || !SHA256.test(artifact.sourceSha256)) throw new TypeError('invalid adapter source hash');
 }
 export function adapterArtifactDigest(artifact: AdapterArtifact): Digest {
@@ -68,6 +91,16 @@ export function adapterArtifactForSource(source: Uint8Array, capabilityName: Cap
   validateArtifact(artifact); return artifact;
 }
 export const importFreeAdapterArtifactForSource = adapterArtifactForSource;
+/** Describe exact Wasm bytes; this does not itself authorize or instantiate
+ * the module. An independent signed policy must approve this digest. */
+export function wasmAdapterArtifactForBytes(bytes: Uint8Array, capabilityName: CapabilityName, id: string,
+  limits: Readonly<{ maxMemoryPages: number; timeoutMs: number }>): AdapterArtifactV3 {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength < 1 || bytes.byteLength > MAX_WASM_BYTES) throw new RangeError('Wasm adapter source byte bound');
+  const artifact: AdapterArtifactV3 = { format: 'aether.effect-adapter-artifact/3', capability: capabilityName, id,
+    semantics: { ...WASM_SEMANTICS }, sourceSha256: createHash('sha256').update(bytes).digest('hex'),
+    sourceProfile: 'aether.adapter-wasm-i32-readonly/1', maxMemoryPages: limits.maxMemoryPages, timeoutMs: limits.timeoutMs };
+  validateArtifact(artifact); return artifact;
+}
 /** Parse complete module syntax. Strings, comments, and regex text do not count
  * as imports. Unsupported syntax fails closed before any source is evaluated.
  * This is dependency closure for trusted JS, not hostile-code isolation. */
@@ -87,6 +120,7 @@ export interface AdapterAdmissionOptions { readonly legacyProfile?: 'aether.adap
  * A caller choosing both bytes and expected hash has no external authority. */
 export async function admitAdapterSource(source: Uint8Array, artifact: AdapterArtifact, options: AdapterAdmissionOptions = {}): Promise<EffectAdapter> {
   validateArtifact(artifact);
+  if (artifact.format === 'aether.effect-adapter-artifact/3') throw new TypeError('Wasm artifact requires isolated Wasm admission');
   // Capture caller-owned metadata before the first await. No later decision
   // may observe a mutable descriptor supplied by the caller.
   const approved = decodeCanonical(encodeCanonical(artifact)) as unknown as AdapterArtifact;
