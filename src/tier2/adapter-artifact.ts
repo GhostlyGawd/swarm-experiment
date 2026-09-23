@@ -44,6 +44,7 @@ export interface AdapterArtifactV3 {
 }
 export type AdapterArtifact = AdapterArtifactV1 | AdapterArtifactV2 | AdapterArtifactV3;
 const admitted = new WeakMap<EffectAdapter, Digest>();
+const admittedWasmCapability = new WeakMap<EffectAdapter, CapabilityName>();
 const SHA256 = /^[0-9a-f]{64}$/;
 const MAX_SOURCE_BYTES = 1024 * 1024;
 const MAX_WASM_BYTES = 64 * 1024;
@@ -116,6 +117,7 @@ export function admitWasmAdapterBytes(bytes: Uint8Array, artifact: AdapterArtifa
   if (effectAdapterDigest(adapter) !== domainDigest('aether.effect-adapter/1', { id: approved.id, semantics: approved.semantics }))
     throw new TypeError('Wasm adapter implementation differs from approved descriptor');
   admitted.set(adapter, adapterArtifactDigest(approved));
+  admittedWasmCapability.set(adapter, approved.capability);
   return adapter;
 }
 /** Parse complete module syntax. Strings, comments, and regex text do not count
@@ -176,4 +178,7 @@ export function admittedAdapterArtifactDigest(adapter: EffectAdapter): Digest | 
   const value = admitted.get(adapter);
   if (!value) return null;
   effectAdapterDigest(adapter); return value;
+}
+export function admittedWasmAdapterCapability(adapter: EffectAdapter): CapabilityName | null {
+  return admittedWasmCapability.get(adapter) ?? null;
 }

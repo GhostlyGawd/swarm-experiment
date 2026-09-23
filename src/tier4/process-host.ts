@@ -8,12 +8,12 @@ import { atomicWrite } from '../tier1/persistence.ts';
 import { capability, type CapabilityName, type NodeRef, type SymbolId } from '../tier1/ids.ts';
 import { CapabilityRegistry, CapabilitySealer, RevocationList, type CapabilityToken } from '../tier2/ocap.ts';
 import { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2 } from '../tier2/scoped-grants.ts';
-import { assertSignedEffectResourcePolicy, assertSignedEffectResourcePolicyV2, assertSignedEffectResourcePolicyV3, assertEffectResourceAdapter, assertEffectResourceAdapterV2, assertEffectResourceAdapterV3, effectResourcePath as signedEffectResourcePath, effectResourcePathV2, effectResourcePathV3, effectResourcePolicyDigest, effectResourcePolicyDigestV2, effectResourcePolicyDigestV3, type SignedEffectResourcePolicyV1, type SignedEffectResourcePolicyV2, type SignedEffectResourcePolicyV3 } from '../tier2/effect-resource-policy.ts';
+import { assertSignedEffectResourcePolicy, assertSignedEffectResourcePolicyV2, assertSignedEffectResourcePolicyV3, assertSignedEffectResourcePolicyV4, assertEffectResourceAdapter, assertEffectResourceAdapterV2, assertEffectResourceAdapterV3, assertEffectResourceAdapterV4, effectResourcePath as signedEffectResourcePath, effectResourcePathV2, effectResourcePathV3, effectResourcePathV4, effectResourcePolicyDigest, effectResourcePolicyDigestV2, effectResourcePolicyDigestV3, effectResourcePolicyDigestV4, type SignedEffectResourcePolicyV1, type SignedEffectResourcePolicyV2, type SignedEffectResourcePolicyV3, type SignedEffectResourcePolicyV4 } from '../tier2/effect-resource-policy.ts';
 import { assertEffectSignerAnchor, assertAnchoredEffectPolicy, type EffectSignerAnchor } from '../tier2/effect-signer-anchor.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { ProductionRuntime } from '../tier3/compile.ts';
-import type { EffectEventV1 } from '../fabric/effects.ts';
-import { EffectInvocationError, brokerAdapterIdentity, brokerBind, brokerInvoke, brokerMode, type RuntimeEffectRouter } from '../tier3/effects.ts';
+import { effectPayloadDigest, type EffectEventV1, type EffectRequestV1 } from '../fabric/effects.ts';
+import { EffectInvocationError, brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerInvoke, brokerReconcileLast, brokerReconcileRecorded, brokerMode, type RuntimeEffectRouter } from '../tier3/effects.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
 import type { Value } from '../tier3/values.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
@@ -64,7 +64,7 @@ interface CallRecord {
   executionDigest: Digest | null;
   effects: EffectRecord[]; failure: string | null;
   boundaries: CallBoundary[];
-  recovery: { strategy: 'isolated-replay' | 'abort-before-effects'; evidenceDigest: Digest } | null;
+  recovery: { strategy: 'isolated-replay' | 'abort-before-effects' | 'abort-readonly-wasm'; evidenceDigest: Digest } | null;
 }
 interface MigrationRecord {
   migrationId: string; requestDigest: Digest; symbol: SymbolId; target: string;
@@ -111,6 +111,11 @@ export interface ProcessEffectContext {
   readonly capability: CapabilityName;
   readonly mode: 'live' | 'replay';
   readonly snapshot: RuntimeSnapshotV1;
+  /** Signed V4 profile only; factory must use these exact host values. */
+  readonly policyEpoch?: string;
+  readonly deadline?: string;
+  readonly clockDomain?: string;
+  readonly grantRef?: string;
 }
 export type ProcessHostPhase = 'call-intent' | 'boundary' | 'effect-requested' | 'effect-recorded' | 'call-before-commit' | 'call-committed' | 'migration-requested' | 'migration-prepared' | 'migration-before-commit' | 'migration-committed' | 'migration-finalized' | 'checkpoint-started' | 'checkpoint-saved' | 'checkpoint-before-commit' | 'checkpoint-committed' | 'checkpoint-aborted' | 'checkpoint-control-before-commit' | 'checkpoint-control-committed';
 export interface ProcessHostOptions {
@@ -127,11 +132,13 @@ export interface ProcessHostOptions {
   /** Versioned identity of the independently trusted adapter policy above. */
   readonly effectResourcePolicyDigest?: Digest;
   /** Content-bound policy for deterministic target extraction in strict mode. */
-  readonly signedEffectResourcePolicy?: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3;
+  readonly signedEffectResourcePolicy?: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3 | SignedEffectResourcePolicyV4;
   /** Independent production trust source; not supplied by a reloadable services factory. */
   readonly effectSignerAnchor?: EffectSignerAnchor;
   /** Explicitly reopen anchored V2 journals under their original host-config/2 identity. */
   readonly legacyAnchoredEffectPolicy?: 'anchored-v2';
+  /** New isolated Wasm signed-policy profile with host-config/4 identity. */
+  readonly anchoredEffectPolicyProfile?: 'isolated-wasm-v4';
   /** Compatibility-only signer authority for explicitly selected old profiles. */
   readonly effectResourceSignerKey?: KeyObject | string;
   readonly currentEffectPolicyEpoch?: () => string;
@@ -141,7 +148,7 @@ export interface ProcessHostOptions {
   readonly effectRouterFactory?: (context: ProcessEffectContext) => RuntimeEffectRouter;
   /** Privileged adoption/resumption of exact checkpoint state. No implicit authority from checkpoint bytes. */
   readonly authorizeCheckpoint?: (request: ProcessCheckpointAuthorization) => boolean;
-  readonly authorizeRecovery?: (operationId: string, strategy: 'isolated-replay' | 'abort-before-effects') => boolean;
+  readonly authorizeRecovery?: (operationId: string, strategy: 'isolated-replay' | 'abort-before-effects' | 'abort-readonly-wasm') => boolean;
   /** Caller must authorize any same-schema manifest/epoch rebinding before opening a new deployment directory. */
   readonly initialSnapshot?: RuntimeSnapshotV1;
   readonly initialGeneration?: string;
@@ -206,7 +213,7 @@ export class ProcessHost {
   private readonly manifest: ExecutionManifestV1;
   private readonly registry: CapabilityRegistry;
   private readonly configuration: Digest;
-  private readonly signedEffectResourcePolicy: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3 | null;
+  private readonly signedEffectResourcePolicy: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3 | SignedEffectResourcePolicyV4 | null;
   private readonly file: string;
   private readonly lock: JournalLock;
   private readonly declarations = new Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>();
@@ -222,6 +229,11 @@ export class ProcessHost {
     if (options.effectResourcePolicyDigest) validateDigest(options.effectResourcePolicyDigest, 'aether.effect-resource-policy/1');
     const signed = options.signedEffectResourcePolicy !== undefined;
     const anchored = options.effectSignerAnchor !== undefined;
+    if (options.anchoredEffectPolicyProfile !== undefined && options.anchoredEffectPolicyProfile !== 'isolated-wasm-v4')
+      throw new TypeError('invalid isolated Wasm anchored effect policy profile');
+    if (options.anchoredEffectPolicyProfile && (!anchored || options.legacyAnchoredEffectPolicy
+      || options.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/4'))
+      throw new TypeError('isolated Wasm policy requires an independent anchor and signed policy v4');
     if (options.legacyAnchoredEffectPolicy !== undefined && options.legacyAnchoredEffectPolicy !== 'anchored-v2')
       throw new TypeError('invalid legacy anchored effect policy profile');
     if (options.legacyAnchoredEffectPolicy !== undefined && (!anchored || options.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/2'))
@@ -232,6 +244,8 @@ export class ProcessHost {
       throw new TypeError('anchored ProcessHost cannot use legacy signer trust');
     if (signed && !anchored && options.legacyEffectSignerTrust !== 'factory-v1')
       throw new TypeError('unanchored signed effect policy requires explicit legacy signer trust profile');
+    if (signed && !anchored && options.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4')
+      throw new TypeError('isolated Wasm policy requires independent signer anchor');
     if (!signed && options.legacyEffectSignerTrust !== undefined)
       throw new TypeError('legacy signer trust profile requires a signed effect policy');
     if (anchored) {
@@ -240,8 +254,9 @@ export class ProcessHost {
         || options.effectResourceSignerKey !== undefined || options.currentEffectPolicyEpoch !== undefined
         || options.effectResourcePath !== undefined || options.effectResourcePolicyDigest !== undefined
         || signed && options.signedEffectResourcePolicy?.format !== (options.legacyAnchoredEffectPolicy === 'anchored-v2'
-          ? 'aether.signed-effect-resource-policy/2' : 'aether.signed-effect-resource-policy/3'))
-        throw new TypeError('anchored ProcessHost requires independent signer authority and signed policy v3 (or explicit anchored-v2 compatibility)');
+          ? 'aether.signed-effect-resource-policy/2' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4'
+            ? 'aether.signed-effect-resource-policy/4' : 'aether.signed-effect-resource-policy/3'))
+        throw new TypeError('anchored ProcessHost requires independent signer authority and signed policy v3 or an explicit anchored-v2/isolated-wasm-v4 profile');
     }
     if (signed && (!options.scopedGrants || options.effectResourcePath || options.effectResourcePolicyDigest)
       || !anchored && (signed !== (options.effectResourceSignerKey !== undefined)
@@ -251,11 +266,13 @@ export class ProcessHost {
     this.manifest = decodeExecutionManifest(encodeExecutionManifest(options.manifest));
     if (new GraphStore().intern(this.module) !== this.manifest.astRoot) throw new TypeError('ProcessHost module/manifest mismatch');
     if (anchored && [...walk(this.module)].some(node => node.kind === 'Invoke') && !signed)
-      throw new TypeError('anchored effectful ProcessHost requires signed policy v3');
+      throw new TypeError('anchored effectful ProcessHost requires a signed effect policy');
     if (signed) {
       if (anchored)
-        assertAnchoredEffectPolicy(options.effectSignerAnchor!, options.signedEffectResourcePolicy as SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3,
-          this.manifest, options.scopedGrants!.repositoryId, options.legacyAnchoredEffectPolicy);
+        assertAnchoredEffectPolicy(options.effectSignerAnchor!, options.signedEffectResourcePolicy as SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3 | SignedEffectResourcePolicyV4,
+          this.manifest, options.scopedGrants!.repositoryId, options.anchoredEffectPolicyProfile ? 'anchored-v4' : options.legacyAnchoredEffectPolicy);
+      else if (options.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4')
+        throw new TypeError('isolated Wasm policy requires independent signer anchor');
       else if (options.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/3')
         assertSignedEffectResourcePolicyV3(options.signedEffectResourcePolicy, this.manifest, options.scopedGrants!.repositoryId,
           options.currentEffectPolicyEpoch!(), options.effectResourceSignerKey!);
@@ -274,8 +291,9 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest(anchored ? options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
-      ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/3' ? effectResourcePolicyDigestV3(this.signedEffectResourcePolicy.body)
+    this.configuration = domainDigest(anchored ? options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+      ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4' ? effectResourcePolicyDigestV4(this.signedEffectResourcePolicy.body)
+        : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/3' ? effectResourcePolicyDigestV3(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2' ? effectResourcePolicyDigestV2(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy ? effectResourcePolicyDigest(this.signedEffectResourcePolicy.body) : options.effectResourcePolicyDigest ?? null,
         effectResourcePolicySigner: this.signedEffectResourcePolicy?.signer ?? null } : {}),
@@ -305,7 +323,7 @@ export class ProcessHost {
             if (journal.generation !== migration.toGeneration || journal.plan !== migration.afterPlan || runtimeSnapshotDigest(journal.snapshot) !== runtimeSnapshotDigest(migration.after!)) throw new Error('migration decision/state mismatch');
           }
         }
-        host.persist(journal); await host.ensureWorkers(journal);
+        host.persist(journal); host.preflightV4Host(journal); await host.ensureWorkers(journal);
         for (const migration of journal.migrations) if (migration.state === 'committed') migration.state = 'finalized';
         host.persist(journal);
       }, options.lockWaitMs ?? 5000);
@@ -313,6 +331,36 @@ export class ProcessHost {
     } catch (error) { await host.close(); throw error; }
   }
   get generation(): string { return this.read().generation; }
+  /** Check the actual generation and heap presented by a ready host, without
+   * issuing an effect or granting the factory any external sink authority. */
+  private preflightV4Host(journal: HostJournal): void {
+    const policy = this.signedEffectResourcePolicy;
+    if (policy?.format !== 'aether.signed-effect-resource-policy/4') return;
+    if (!this.options.effectRouterFactory) throw new TypeError('isolated Wasm host requires a broker adapter factory');
+    const plan = JSON.parse(journal.plan) as TopologyPlan, manifestDigest = executionManifestDigest(this.manifest);
+    for (const rule of policy.body.rules) {
+      const unit = plan.units.find(candidate => candidate.capabilities.includes(rule.capability)
+        && candidate.members.some(symbol => this.declarations.get(symbol)?.capabilities.includes(rule.capability)));
+      if (!unit) throw new TypeError('isolated Wasm host rule has no executable placement');
+      const operationId = domainDigest('aether.process-wasm-host-preflight/1', {
+        configuration: this.configuration, generation: journal.generation, capability: rule.capability,
+      });
+      const grantRef = domainDigest('aether.process-effect-grant-ref/1', {
+        configuration: this.configuration, operationId, capability: rule.capability, policyEpoch: policy.body.policyEpoch,
+      });
+      const router = this.options.effectRouterFactory(freeze({ operationId, rootOperationId: operationId,
+        unit: unit.id, generation: journal.generation, manifest: copy(this.manifest), capability: rule.capability,
+        mode: 'live' as const, snapshot: copy(journal.snapshot), policyEpoch: policy.body.policyEpoch,
+        deadline: rule.deadline, clockDomain: rule.clockDomain, grantRef }));
+      if (brokerMode(router) !== 'live') throw new TypeError('isolated Wasm host preflight router mode mismatch');
+      brokerBind(router, this.manifest.astRoot as NodeRef);
+      assertEffectResourceAdapterV4(policy, rule.capability, { ...brokerAdapterIdentity(router, rule.capability),
+        artifactCapability: brokerWasmAdapterCapability(router, rule.capability) });
+      brokerAttestContext(router, { executionId: operationId, manifestDigest, mode: 'live',
+        policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
+        capability: rule.capability, grantRef });
+    }
+  }
   /** Stable identity for a durable supervisor sharing this host's state. */
   fallbackIdentity(): Readonly<{ configuration: Digest; manifest: Digest; storage: string }> {
     this.assertOpen(); return Object.freeze({ configuration: this.configuration, manifest: executionManifestDigest(this.manifest), storage: realpathSync(this.options.directory) });
@@ -413,10 +461,10 @@ export class ProcessHost {
       return this.execute(journal, call, 'live', tokens);
     }, this.options.lockWaitMs ?? 5000);
   }
-  async recoverOperation(operationId: string, options: { strategy: 'isolated-replay' | 'abort-before-effects' } = { strategy: 'isolated-replay' }): Promise<ProcessHostCallResult> {
+  async recoverOperation(operationId: string, options: { strategy: 'isolated-replay' | 'abort-before-effects' | 'abort-readonly-wasm' } = { strategy: 'isolated-replay' }): Promise<ProcessHostCallResult> {
     identifier(operationId);
     options = Object.freeze({ strategy: options.strategy });
-    if (!['isolated-replay', 'abort-before-effects'].includes(options.strategy)) throw new Error('unknown recovery strategy');
+    if (!['isolated-replay', 'abort-before-effects', 'abort-readonly-wasm'].includes(options.strategy)) throw new Error('unknown recovery strategy');
     if (this.options.authorizeRecovery?.(operationId, options.strategy) !== true) throw new Error('recovery_authorization_denied');
     return this.lock.runAsync(async () => {
       this.assertOpen(); const journal = this.read(), call = journal.calls.find(call => call.operationId === operationId);
@@ -433,7 +481,26 @@ export class ProcessHost {
         this.requireRecoveryAuthorization(operationId, options.strategy);
         journal.snapshot = copy(call.before); this.appendHead(journal, { kind: 'abort', operationId, subjectDigest: call.recovery.evidenceDigest }); this.persist(journal); return this.result(call);
       }
+      if (options.strategy === 'abort-readonly-wasm') {
+        const policy = this.signedEffectResourcePolicy;
+        if (policy?.format !== 'aether.signed-effect-resource-policy/4'
+          || call.effects.some(effect => !policy.body.rules.some(rule => rule.capability === effect.capability))
+          || runtimeSnapshotDigest(journal.snapshot) !== runtimeSnapshotDigest(call.before))
+          throw new Error('read-only Wasm abort lacks exact safe-state evidence');
+        this.preflightV4Host(journal);
+        const evidenceDigest = domainDigest('aether.process-readonly-wasm-abort/1', {
+          operationId, before: runtimeSnapshotDigest(call.before), effects: call.effects,
+          policy: effectResourcePolicyDigestV4(policy.body), configuration: this.configuration,
+        });
+        this.requireRecoveryAuthorization(operationId, options.strategy);
+        call.state = 'aborted'; call.failure = 'authorized read-only Wasm abort; external guest effects are excluded by signed policy';
+        call.recovery = { strategy: options.strategy, evidenceDigest };
+        journal.snapshot = copy(call.before); this.appendHead(journal, { kind: 'abort', operationId, subjectDigest: evidenceDigest }); this.persist(journal);
+        return this.result(call);
+      }
       if (options.strategy !== 'isolated-replay') throw new Error('unknown recovery strategy');
+      if (this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4'
+        && !this.reconcileV4Call(journal, call)) return this.result(call);
       await this.ensureWorkers(journal);
       const result = await this.execute(journal, call, 'replay');
       if (result.state === 'completed') {
@@ -684,6 +751,72 @@ export class ProcessHost {
     this.phase('boundary', active.call.operationId, active.journal.generation);
     return this.invoke(active, request.symbol, request.args, request.operationId);
   }
+  private v4Router(active: Active, unit: string, request: ProcessEffectRequest, id: Digest): RuntimeEffectRouter {
+    const policy = this.signedEffectResourcePolicy;
+    if (policy?.format !== 'aether.signed-effect-resource-policy/4' || !this.options.effectRouterFactory)
+      throw new TypeError('isolated Wasm router requires signed v4 policy and factory');
+    const rule = policy.body.rules.find(item => item.capability === request.capability);
+    if (!rule) throw new TypeError('isolated Wasm effect lacks a signed rule');
+    const grantRef = domainDigest('aether.process-effect-grant-ref/1', {
+      configuration: this.configuration, operationId: id, capability: request.capability, policyEpoch: policy.body.policyEpoch,
+    });
+    const context: ProcessEffectContext = freeze({ operationId: id, rootOperationId: active.call.operationId, unit,
+      generation: active.journal.generation, manifest: copy(this.manifest), capability: request.capability,
+      mode: active.mode, snapshot: copy(active.snapshot), policyEpoch: policy.body.policyEpoch,
+      deadline: rule.deadline, clockDomain: rule.clockDomain, grantRef });
+    const router = this.options.effectRouterFactory(context);
+    if (brokerMode(router) !== active.mode) throw new TypeError('isolated Wasm router mode mismatch');
+    brokerBind(router, this.manifest.astRoot as NodeRef);
+    assertEffectResourceAdapterV4(policy, request.capability, { ...brokerAdapterIdentity(router, request.capability),
+      artifactCapability: brokerWasmAdapterCapability(router, request.capability) });
+    brokerAttestContext(router, { executionId: id, manifestDigest: executionManifestDigest(this.manifest),
+      mode: active.mode, policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
+      capability: request.capability, grantRef });
+    return router;
+  }
+  private reconcileV4Call(journal: HostJournal, call: CallRecord): boolean {
+    const policy = this.signedEffectResourcePolicy;
+    if (policy?.format !== 'aether.signed-effect-resource-policy/4' || !this.options.effectRouterFactory)
+      throw new TypeError('isolated Wasm reconciliation requires signed v4 policy and factory');
+    for (const effect of call.effects) {
+      if (effect.state !== 'dispatching' && effect.state !== 'indeterminate') continue;
+      try {
+        this.requireRecoveryAuthorization(call.operationId, 'isolated-replay');
+        const rule = policy.body.rules.find(item => item.capability === effect.capability);
+        const retained = journal.snapshots.find(item => item.digest === effect.snapshotDigest)?.snapshot;
+        if (!rule || !retained || effect.args.length !== 1 || effect.args[0].tag !== 'int')
+          throw new TypeError('unavailable exact Wasm effect history');
+        const grantRef = domainDigest('aether.process-effect-grant-ref/1', {
+          configuration: this.configuration, operationId: effect.id, capability: effect.capability, policyEpoch: policy.body.policyEpoch,
+        });
+        const router = this.options.effectRouterFactory(freeze({ operationId: effect.id, rootOperationId: call.operationId,
+          unit: effect.unit, generation: call.generation, manifest: copy(this.manifest), capability: effect.capability,
+          mode: 'live' as const, snapshot: copy(retained), policyEpoch: policy.body.policyEpoch,
+          deadline: rule.deadline, clockDomain: rule.clockDomain, grantRef }));
+        if (brokerMode(router) !== 'live') throw new TypeError('Wasm recovery broker mode mismatch');
+        brokerBind(router, this.manifest.astRoot as NodeRef);
+        assertEffectResourceAdapterV4(policy, effect.capability, { ...brokerAdapterIdentity(router, effect.capability),
+          artifactCapability: brokerWasmAdapterCapability(router, effect.capability) });
+        brokerAttestContext(router, { executionId: effect.id, manifestDigest: executionManifestDigest(this.manifest),
+          mode: 'live', policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
+          capability: effect.capability, grantRef });
+        const payload: TaggedValueV1 = { tag: 'sequence', items: [{ tag: 'string', value: effect.capability }, ...copy(effect.args)] };
+        const request: EffectRequestV1 = { format: 'aether.effect/1', executionId: effect.id, effectId: 'operation-0',
+          branchId: null, executionManifest: executionManifestDigest(this.manifest), capabilityGrantRef: grantRef,
+          policyEpoch: policy.body.policyEpoch, payloadDigest: effectPayloadDigest(payload), payload,
+          budgetReservationId: null, deadline: rule.deadline };
+        const outcome = brokerReconcileRecorded(router, effect.capability, request);
+        if (outcome.state === 'indeterminate') return false;
+        this.requireRecoveryAuthorization(call.operationId, 'isolated-replay');
+        effect.state = outcome.state; effect.value = outcome.state === 'committed' ? copy(outcome.value) : null;
+        effect.code = outcome.state === 'committed' ? null : outcome.code;
+        effect.outcomeDigest = effectOutcomeDigest(effect); this.persist(journal);
+      } catch (error) {
+        call.failure = `isolated Wasm reconciliation pending: ${String(error)}`; this.persist(journal); return false;
+      }
+    }
+    return true;
+  }
   private async onEffect(unit: string, request: ProcessEffectRequest): Promise<{ value: Value; snapshot: RuntimeSnapshotV1 }> {
     const active = this.requireActive(), frame = active.frames.at(-1)!;
     if (frame.unit !== unit || request.operationId !== frame.operationId || request.effectIndex !== frame.nextBoundary++ || !active.authority.has(request.capability) || !this.locallyReachable(frame.symbol, request.from, unit, JSON.parse(active.journal.plan) as TopologyPlan) || !this.declarations.get(request.from)?.capabilities.includes(request.capability)) throw new Error('unauthorized process effect boundary');
@@ -691,6 +824,11 @@ export class ProcessHost {
     if (!declared.capabilities.includes(request.capability)) throw new Error('effect is outside the authenticated unit authority');
     this.checkRevocation(request.capability, unit, active.journal.generation, active.mode);
     if (active.mode === 'live') this.authorize(active.call.symbol, active.call.unit, active.journal.generation, active.tokens);
+    if (this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4') {
+      const value = request.args[0];
+      if (request.args.length !== 1 || typeof value !== 'bigint' || value < -2147483648n || value > 2147483647n)
+        throw new EffectInvocationError({ state: 'rejected', code: 'isolated_wasm_i32_argument_required' });
+    }
     this.adopt(active, request.snapshot);
     const id = processBoundaryId(request.operationId, 'effect', request.effectIndex);
     const taggedArgs = request.args.map(value => encodeProcessValue(value, this.scope(active.journal, unit), request.snapshot));
@@ -701,19 +839,29 @@ export class ProcessHost {
     let effect = active.call.effects.find(effect => effect.id === id);
     if (effect && effect.requestDigest !== requestDigest) throw new EffectInvocationError({ state: 'indeterminate', recoveryId: 'process_replay_mismatch' });
     if (active.mode === 'replay' && !effect) throw new EffectInvocationError({ state: 'indeterminate', recoveryId: 'process_missing_effect_history' });
+    if (effect?.state === 'committed') return { value: decodeProcessValue(effect.value!, this.scope(active.journal, unit), active.snapshot), snapshot: active.snapshot };
+    if (effect?.state === 'rejected' || effect?.state === 'aborted') throw new EffectInvocationError({ state: effect.state, code: effect.code! });
+    const v4 = this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4';
+    let preparedRouter: RuntimeEffectRouter | null = null;
+    if (v4 && active.mode === 'live' && !effect) {
+      try { preparedRouter = this.v4Router(active, unit, request, id); }
+      catch { throw new EffectInvocationError({ state: 'rejected', code: 'isolated_wasm_router_preflight' }); }
+    }
     if (!effect) { effect = { id, capability: request.capability, requestDigest, snapshotDigest, unit, from: request.from, parentOperationId: request.operationId, index: request.effectIndex, args: copy(taggedArgs), outcomeDigest: null, state: 'requested', value: null, code: null }; active.call.effects.push(effect); this.persist(active.journal); }
-    if (effect.state === 'committed') return { value: decodeProcessValue(effect.value!, this.scope(active.journal, unit), active.snapshot), snapshot: active.snapshot };
-    if (effect.state === 'rejected' || effect.state === 'aborted') throw new EffectInvocationError({ state: effect.state, code: effect.code! });
     try {
       if (active.mode === 'live') { this.phase('effect-requested', active.call.operationId, active.journal.generation); effect.state = 'dispatching'; this.persist(active.journal); }
-      if (!this.options.effectRouterFactory) throw new Error('effect router factory missing');
-      const router = this.options.effectRouterFactory(freeze({ operationId: id, rootOperationId: active.call.operationId, unit, generation: active.journal.generation, manifest: copy(this.manifest), capability: request.capability, mode: active.mode, snapshot: copy(active.snapshot) }));
+      if (!v4 && !this.options.effectRouterFactory) throw new Error('effect router factory missing');
+      const router = v4 ? preparedRouter ?? this.v4Router(active, unit, request, id)
+        : this.options.effectRouterFactory!(freeze({ operationId: id, rootOperationId: active.call.operationId, unit, generation: active.journal.generation, manifest: copy(this.manifest), capability: request.capability, mode: active.mode, snapshot: copy(active.snapshot) }));
       const brokerBound = this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2'
-        || this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/3';
-      if ((brokerBound ? brokerMode(router) : router.mode) !== active.mode) throw new Error('effect router mode does not match execution/recovery mode');
-      if (brokerBound) brokerBind(router, this.manifest.astRoot as NodeRef);
-      else router.bind(this.manifest.astRoot as NodeRef);
-      if (this.signedEffectResourcePolicy) {
+        || this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/3'
+        || this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4';
+      if (!v4) {
+        if ((brokerBound ? brokerMode(router) : router.mode) !== active.mode) throw new Error('effect router mode does not match execution/recovery mode');
+        if (brokerBound) brokerBind(router, this.manifest.astRoot as NodeRef);
+        else router.bind(this.manifest.astRoot as NodeRef);
+      }
+      if (this.signedEffectResourcePolicy && !v4) {
         if (this.signedEffectResourcePolicy.format === 'aether.signed-effect-resource-policy/3')
           assertEffectResourceAdapterV3(this.signedEffectResourcePolicy, request.capability, brokerAdapterIdentity(router, request.capability));
         else if (this.signedEffectResourcePolicy.format === 'aether.signed-effect-resource-policy/2')
@@ -731,7 +879,14 @@ export class ProcessHost {
         if (!equal(currentPath, resourcePath)) throw new Error('effect resource changed before sink dispatch');
         this.authorizeScopedEffect(active, request.capability, currentPath);
       }
-      const value = brokerBound ? brokerInvoke(router, request.capability, request.args) : router.invoke(request.capability, request.args);
+      let value: Value;
+      try { value = brokerBound ? brokerInvoke(router, request.capability, request.args) : router.invoke(request.capability, request.args); }
+      catch (error) {
+        if (!v4 || active.mode !== 'live' || !(error instanceof EffectInvocationError) || error.outcome.state !== 'indeterminate') throw error;
+        // The V4 guest is import-free and read-only. Its broker can resolve a
+        // trapped/timed-out pure computation to terminal noncommit immediately.
+        value = brokerReconcileLast(router, request.capability, request.args);
+      }
       const tagged = encodeProcessValue(value, this.scope(active.journal, unit), active.snapshot);
       effect.state = 'committed'; effect.value = tagged; effect.code = null; effect.outcomeDigest = effectOutcomeDigest(effect); this.persist(active.journal);
       this.phase('effect-recorded', active.call.operationId, active.journal.generation);
@@ -774,7 +929,7 @@ export class ProcessHost {
     if (this.active !== active || active.cancelled || this.closed) throw new Error('process operation is no longer authoritative');
     if (active.mode === 'replay') this.requireRecoveryAuthorization(active.call.operationId, 'isolated-replay');
   }
-  private requireRecoveryAuthorization(operationId: string, strategy: 'isolated-replay' | 'abort-before-effects'): void { if (this.options.authorizeRecovery?.(operationId, strategy) !== true) throw new Error('recovery_authorization_denied'); }
+  private requireRecoveryAuthorization(operationId: string, strategy: 'isolated-replay' | 'abort-before-effects' | 'abort-readonly-wasm'): void { if (this.options.authorizeRecovery?.(operationId, strategy) !== true) throw new Error('recovery_authorization_denied'); }
   private phase(phase: ProcessHostPhase, operationId: string, generation: string): void { this.options.onPhase?.(phase, Object.freeze({ operationId, generation })); }
   private tokenScope(unit: string, generation: string, symbol: SymbolId): string { return domainDigest('aether.process-grant-scope/1', { configuration: this.configuration, generation, unit, symbol }); }
   private scopedGrantPath(unit: string, generation: string): readonly string[] {
@@ -784,7 +939,11 @@ export class ProcessHost {
     const context = freeze({ capability: request.capability, from: request.from, unit, generation: active.journal.generation, args: copy(args) });
     let suffix: readonly string[];
     if (this.signedEffectResourcePolicy) {
-      if (this.signedEffectResourcePolicy.format === 'aether.signed-effect-resource-policy/3') {
+      if (this.signedEffectResourcePolicy.format === 'aether.signed-effect-resource-policy/4') {
+        assertAnchoredEffectPolicy(this.options.effectSignerAnchor!, this.signedEffectResourcePolicy,
+          this.manifest, this.options.scopedGrants!.repositoryId, 'anchored-v4');
+        suffix = effectResourcePathV4(this.signedEffectResourcePolicy, request.capability, args);
+      } else if (this.signedEffectResourcePolicy.format === 'aether.signed-effect-resource-policy/3') {
         if (this.options.effectSignerAnchor)
           assertAnchoredEffectPolicy(this.options.effectSignerAnchor, this.signedEffectResourcePolicy,
             this.manifest, this.options.scopedGrants!.repositoryId);
@@ -984,12 +1143,24 @@ export class ProcessHost {
       }
       if (call.recovery !== null) {
         exactObject(call.recovery, ['strategy', 'evidenceDigest']);
-        if (!['isolated-replay', 'abort-before-effects'].includes(call.recovery.strategy)) throw new Error('invalid recovery strategy');
+        if (!['isolated-replay', 'abort-before-effects', 'abort-readonly-wasm'].includes(call.recovery.strategy)) throw new Error('invalid recovery strategy');
         const evidence = call.recovery.strategy === 'isolated-replay' ? { operationId: call.operationId, before: runtimeSnapshotDigest(call.before), after: runtimeSnapshotDigest(call.latest), execution: call.execution, effects: call.effects } : { operationId: call.operationId, before: runtimeSnapshotDigest(call.before), effects: call.effects };
-        if (domainDigest('aether.process-recovery/1', evidence) !== call.recovery.evidenceDigest) throw new Error('corrupt recovery evidence');
+        const expectedRecovery = call.recovery.strategy === 'abort-readonly-wasm'
+          ? this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4'
+            ? domainDigest('aether.process-readonly-wasm-abort/1', { operationId: call.operationId,
+              before: runtimeSnapshotDigest(call.before), effects: call.effects,
+              policy: effectResourcePolicyDigestV4(this.signedEffectResourcePolicy.body), configuration: this.configuration })
+            : null
+          : domainDigest('aether.process-recovery/1', evidence);
+        if (expectedRecovery !== call.recovery.evidenceDigest) throw new Error('corrupt recovery evidence');
         if (call.recovery.strategy === 'abort-before-effects' && (call.state !== 'aborted' || call.effects.some(effect => !['requested', 'rejected', 'aborted'].includes(effect.state)))) throw new Error('abort is not supported by noncommit evidence');
+        if (call.recovery.strategy === 'abort-readonly-wasm' && (call.state !== 'aborted'
+          || this.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/4'
+          || call.effects.some(effect => !this.signedEffectResourcePolicy!.body.rules.some(rule => rule.capability === effect.capability))))
+          throw new Error('read-only Wasm abort is outside signed policy');
       }
-      if (call.state === 'aborted' && call.recovery?.strategy !== 'abort-before-effects') throw new Error('aborted call lacks authorized noncommit evidence');
+      if (call.state === 'aborted' && !['abort-before-effects', 'abort-readonly-wasm'].includes(call.recovery?.strategy ?? ''))
+        throw new Error('aborted call lacks authorized noncommit evidence');
     }
     for (const allocation of journal.allocations) {
       exactObject(allocation, ['operationId', 'requestDigest', 'reference', 'ty', 'fields', 'requestedUnit', 'unit', 'beforeSnapshotDigest', 'afterSnapshotDigest', 'receiptDigest']);

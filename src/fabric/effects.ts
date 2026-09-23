@@ -327,6 +327,7 @@ export class DurableEffectBroker {
     this.cursor = value.prefix.length; this.buffered.splice(0, this.buffered.length, ...restored); for (const [key, digest] of additions) this.bufferedHistory.set(key, digest);
   }
   get recordedEventCount(): number { return this.trace.length; }
+  get clockDomain(): string { return this.options.clockDomain; }
   get replayRemaining(): number { return this.trace.length - this.cursor; }
   assertReplayComplete(): void { if (this.replayRemaining !== 0) throw new Error('replay_mismatch: unconsumed events'); }
   intents(): readonly EffectRequestV1[] { return immutable(copy(this.buffered, this.limits)); }

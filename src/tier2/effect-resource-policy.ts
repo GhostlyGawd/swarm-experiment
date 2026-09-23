@@ -187,3 +187,67 @@ export function assertEffectResourceAdapterV3(policy: SignedEffectResourcePolicy
   const rule = policy.body.rules.find(item => item.capability === name);
   if (!rule || rule.adapterId !== actual.id || rule.adapterDigest !== actual.digest || rule.adapterArtifactDigest !== actual.artifactDigest) throw new Error('effect adapter artifact is outside signed resource policy v3');
 }
+
+/** V4 requires a separately executed, read-only Wasm i32 artifact for every
+ * listed effect. The signed artifact digest includes its byte hash and limits. */
+export interface EffectResourceRuleV4 extends EffectResourceRuleV2 { readonly deadline: string; readonly clockDomain: string }
+export interface EffectResourcePolicyBodyV4 {
+  readonly format: 'aether.effect-resource-policy/4'; readonly repositoryId: string;
+  readonly astRoot: Digest; readonly policyEpoch: string; readonly rules: readonly EffectResourceRuleV4[];
+}
+export interface SignedEffectResourcePolicyV4 { readonly format: 'aether.signed-effect-resource-policy/4'; readonly body: EffectResourcePolicyBodyV4; readonly signer: string; readonly signature: string }
+const WASM_READONLY_SEMANTICS = Object.freeze({ readOnly: true, atomicIdempotency: true, transactional: false, reconciliation: true });
+export function validateEffectResourcePolicyBodyV4(value: unknown): asserts value is EffectResourcePolicyBodyV4 {
+  encodeCanonical(value);
+  const body = exactObject(value, ['format', 'repositoryId', 'astRoot', 'policyEpoch', 'rules']);
+  if (body.format !== 'aether.effect-resource-policy/4' || !isNodeRef(body.astRoot)) throw new TypeError('invalid effect resource policy v4 subject');
+  identifier(body.repositoryId); decimal(body.policyEpoch);
+  if (!Array.isArray(body.rules) || body.rules.length < 1 || body.rules.length > 128) throw new TypeError('effect resource policy v4 requires bounded rules');
+  let previous = '';
+  for (const item of body.rules) {
+    const rule = exactObject(item, ['capability', 'prefix', 'argument', 'adapterId', 'adapterDigest', 'adapterArtifactDigest', 'deadline', 'clockDomain']);
+    capability(rule.capability as string); path(rule.prefix); identifier(rule.adapterId);
+    validateDigest(rule.adapterDigest, 'aether.effect-adapter/1'); validateDigest(rule.adapterArtifactDigest, 'aether.effect-adapter-artifact/3');
+    decimal(rule.deadline); identifier(rule.clockDomain);
+    const expected = domainDigest('aether.effect-adapter/1', { id: rule.adapterId, semantics: WASM_READONLY_SEMANTICS });
+    if (rule.adapterDigest !== expected) throw new TypeError('v4 policy requires isolated read-only Wasm adapter semantics');
+    if ((rule.capability as string) <= previous || rule.argument !== null) throw new TypeError('v4 i32 adapter requires a fixed resource path');
+    previous = rule.capability as string;
+  }
+}
+export function effectResourcePolicyDigestV4(body: EffectResourcePolicyBodyV4): Digest {
+  validateEffectResourcePolicyBodyV4(body); return domainDigest('aether.effect-resource-policy/4', body);
+}
+function signingBytesV4(body: EffectResourcePolicyBodyV4, signer: string): Uint8Array {
+  return encodeCanonical({ domain: 'aether.effect-resource-policy-signature/4', body, signer });
+}
+export function signEffectResourcePolicyV4(body: EffectResourcePolicyBodyV4, signer: string, key: KeyObject | string): SignedEffectResourcePolicyV4 {
+  validateEffectResourcePolicyBodyV4(body); identifier(signer);
+  const privateKey = typeof key === 'string' ? createPrivateKey(key) : key;
+  if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'ed25519') throw new TypeError('Ed25519 policy signing key required');
+  return { format: 'aether.signed-effect-resource-policy/4', body, signer, signature: sign(null, signingBytesV4(body, signer), privateKey).toString('base64') };
+}
+export function assertSignedEffectResourcePolicyV4(value: unknown, manifest: ExecutionManifestV1, repositoryId: string, currentEpoch: string, key: KeyObject | string): asserts value is SignedEffectResourcePolicyV4 {
+  encodeCanonical(value); const policy = exactObject(value, ['format', 'body', 'signer', 'signature']);
+  if (policy.format !== 'aether.signed-effect-resource-policy/4') throw new TypeError('unsupported signed effect resource policy v4');
+  validateEffectResourcePolicyBodyV4(policy.body); identifier(policy.signer); identifier(repositoryId); decimal(currentEpoch);
+  const body = policy.body as EffectResourcePolicyBodyV4;
+  if (body.repositoryId !== repositoryId || body.astRoot !== manifest.astRoot || body.policyEpoch !== currentEpoch || effectResourcePolicyDigestV4(body) !== manifest.capabilityPolicyDigest) throw new Error('stale or foreign effect resource policy v4');
+  if (typeof policy.signature !== 'string' || !/^[A-Za-z0-9+/]{86}==$/.test(policy.signature)) throw new TypeError('invalid effect policy v4 signature');
+  const signature = Buffer.from(policy.signature, 'base64'), publicKey = typeof key === 'string' ? createPublicKey(key) : key.type === 'private' ? createPublicKey(key) : key;
+  if (publicKey.asymmetricKeyType !== 'ed25519' || signature.toString('base64') !== policy.signature || !verify(null, signingBytesV4(body, policy.signer as string), publicKey, signature)) throw new TypeError('untrusted effect resource policy v4 signer');
+}
+export function effectResourcePathV4(policy: SignedEffectResourcePolicyV4, name: CapabilityName, args: readonly TaggedValueV1[]): readonly string[] {
+  validateEffectResourcePolicyBodyV4(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule) throw new Error('effect capability has no signed v4 resource rule');
+  if (rule.argument !== null) throw new TypeError('v4 i32 adapter requires a fixed resource path');
+  void args;
+  return [...rule.prefix];
+}
+export function assertEffectResourceAdapterV4(policy: SignedEffectResourcePolicyV4, name: CapabilityName, actual: Readonly<{ id: string; digest: Digest; artifactDigest: Digest | null; artifactCapability: CapabilityName | null }>): void {
+  validateEffectResourcePolicyBodyV4(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule || rule.adapterId !== actual.id || rule.adapterDigest !== actual.digest || rule.adapterArtifactDigest !== actual.artifactDigest
+    || actual.artifactCapability !== name) throw new Error('isolated Wasm adapter artifact is outside signed resource policy v4');
+}

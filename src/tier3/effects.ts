@@ -1,8 +1,8 @@
 import type { CapabilityName, NodeRef } from '../tier1/ids.ts';
 import { decodeExecutionManifest, encodeExecutionManifest, executionManifestDigest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import { validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
-import { DurableEffectBroker, effectPayloadDigest, effectAdapterDigest, type EffectAdapter, type EffectOutcome, type ExecutionMode } from '../fabric/effects.ts';
-import { admittedAdapterArtifactDigest } from '../tier2/adapter-artifact.ts';
+import { DurableEffectBroker, effectPayloadDigest, effectAdapterDigest, type EffectAdapter, type EffectOutcome, type EffectRequestV1, type ExecutionMode } from '../fabric/effects.ts';
+import { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from '../tier2/adapter-artifact.ts';
 import { isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
 const brokerRouters = new WeakSet<object>();
 
@@ -34,10 +34,22 @@ export interface RuntimeEffectRouterOptions {
   readonly deadline: string;
   readonly adapters: ReadonlyMap<CapabilityName, EffectAdapter>;
   readonly grant: (capability: CapabilityName) => string;
+  /** V4 signed-host path: immutable host-derived reference, no callback at replay. */
+  readonly grantRef?: string;
   readonly reservation?: (capability: CapabilityName, effectId: string) => string | null;
   readonly references?: { encode(ref: Ref): LogicalRefV1; decode(ref: LogicalRefV1): Ref };
   /** Explicit host factory, because sandbox state/recorded inputs are host resources. */
   readonly isolatedFork?: () => RuntimeEffectRouter;
+}
+export interface BrokerAttestedContext {
+  readonly executionId: string;
+  readonly manifestDigest: string;
+  readonly mode: ExecutionMode;
+  readonly policyEpoch: string;
+  readonly deadline: string;
+  readonly clockDomain: string;
+  readonly capability: CapabilityName;
+  readonly grantRef: string;
 }
 
 /** One logical execution; replay/retry reconstructs the router with the same context. */
@@ -47,6 +59,7 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   readonly #manifestDigest: string;
   #sequence = 0n;
   #bound = false;
+  #attested: Readonly<{ capability: CapabilityName; grantRef: string }> | null = null;
   get mode(): ExecutionMode { return this.#options.broker.executionMode; }
 
   constructor(options: RuntimeEffectRouterOptions) {
@@ -65,6 +78,22 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     if (!adapter) throw new Error(`no broker adapter for ${capability}`);
     return { id: adapter.id, digest: effectAdapterDigest(adapter), artifactDigest: admittedAdapterArtifactDigest(adapter) };
   }
+  wasmAdapterCapability(capability: CapabilityName): CapabilityName | null {
+    const adapter = this.#options.adapters.get(capability);
+    return adapter ? admittedWasmAdapterCapability(adapter) : null;
+  }
+  /** V4 signed hosts pin the exact factory context before broker dispatch.
+   * The resulting grant reference is reused, preventing a callback swap. */
+  attestContext(expected: BrokerAttestedContext): void {
+    if (!this.#bound || this.#attested || this.#sequence !== 0n || this.#options.executionId !== expected.executionId
+      || this.#manifestDigest !== expected.manifestDigest || this.#options.broker.executionMode !== expected.mode
+      || this.#options.policyEpoch !== expected.policyEpoch || this.#options.deadline !== expected.deadline
+      || this.#options.broker.clockDomain !== expected.clockDomain
+      || (this.#options.branchId ?? null) !== null || this.#options.reservation !== undefined
+      || this.#options.references !== undefined) throw new TypeError('broker router context differs from signed host effect');
+    if (this.#options.grantRef !== expected.grantRef) throw new TypeError('broker router grant reference differs from signed host effect');
+    this.#attested = Object.freeze({ capability: expected.capability, grantRef: expected.grantRef });
+  }
   fork(): RuntimeEffectRouter {
     if (!this.#options.isolatedFork) throw new Error('broker-backed fork requires an isolated effect router');
     const child = this.#options.isolatedFork();
@@ -74,23 +103,45 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   }
   invoke(capability: CapabilityName, args: readonly Value[]): Value {
     if (!this.#bound) throw new Error('effect router is not bound to loaded code');
+    if (this.#attested && this.#attested.capability !== capability) throw new TypeError('attested effect capability mismatch');
     const adapter = this.#options.adapters.get(capability);
     if (!adapter) throw new Error(`no broker adapter for ${capability}`);
+    const outcome = this.#options.broker.dispatch(this.#request(capability, args, `operation-${this.#sequence++}`), adapter);
+    if (outcome.state !== 'committed') throw new EffectInvocationError(outcome);
+    return this.#decode(outcome.value);
+  }
+  reconcileLast(capability: CapabilityName, args: readonly Value[]): Value {
+    if (!this.#bound || !this.#attested || this.#attested.capability !== capability || this.#sequence < 1n
+      || this.#options.broker.executionMode !== 'live') throw new TypeError('no attested live Wasm effect to reconcile');
+    const adapter = this.#options.adapters.get(capability);
+    if (!adapter || !adapter.semantics.readOnly || !adapter.semantics.reconciliation) throw new TypeError('Wasm reconciliation requires a read-only adapter');
+    const outcome = this.#options.broker.reconcile(this.#request(capability, args, `operation-${this.#sequence - 1n}`), adapter);
+    if (outcome.state !== 'committed') throw new EffectInvocationError(outcome);
+    return this.#decode(outcome.value);
+  }
+  reconcileRecorded(capability: CapabilityName, request: EffectRequestV1): EffectOutcome {
+    if (!this.#bound || !this.#attested || this.#attested.capability !== capability || this.#options.broker.executionMode !== 'live'
+      || request.executionId !== this.#options.executionId || request.executionManifest !== this.#manifestDigest
+      || request.policyEpoch !== this.#options.policyEpoch || request.deadline !== this.#options.deadline
+      || request.capabilityGrantRef !== this.#attested.grantRef || request.branchId !== null
+      || request.budgetReservationId !== null) throw new TypeError('recorded Wasm effect differs from attested broker context');
+    const adapter = this.#options.adapters.get(capability);
+    if (!adapter || !adapter.semantics.readOnly || !adapter.semantics.reconciliation) throw new TypeError('recorded Wasm effect lacks read-only reconciliation');
+    return this.#options.broker.reconcile(request, adapter);
+  }
+  #request(capability: CapabilityName, args: readonly Value[], effectId: string) {
     const payload: TaggedValueV1 = { tag: 'sequence', items: [
       { tag: 'string', value: capability }, ...args.map(value => this.#encode(value)),
     ] };
     validateTaggedValue(payload);
-    const effectId = `operation-${this.#sequence++}`;
-    const outcome = this.#options.broker.dispatch({
+    return {
       format: 'aether.effect/1', executionId: this.#options.executionId, effectId,
       branchId: this.#options.branchId ?? null, executionManifest: this.#manifestDigest,
-      capabilityGrantRef: this.#options.grant(capability), policyEpoch: this.#options.policyEpoch,
+      capabilityGrantRef: this.#attested?.grantRef ?? this.#options.grant(capability), policyEpoch: this.#options.policyEpoch,
       payloadDigest: effectPayloadDigest(payload), payload,
       budgetReservationId: this.#options.reservation?.(capability, effectId) ?? null,
       deadline: this.#options.deadline,
-    }, adapter);
-    if (outcome.state !== 'committed') throw new EffectInvocationError(outcome);
-    return this.#decode(outcome.value);
+    } as const;
   }
   #encode(value: Value, depth = 0): TaggedValueV1 {
     if (depth > 64) throw new RangeError('effect argument nesting limit');
@@ -128,6 +179,10 @@ export function brokerAdapterIdentity(router: RuntimeEffectRouter, capability: C
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
   return BrokerEffectRouter.prototype.adapterIdentity.call(router, capability);
 }
+export function brokerWasmAdapterCapability(router: RuntimeEffectRouter, capability: CapabilityName): CapabilityName | null {
+  if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
+  return BrokerEffectRouter.prototype.wasmAdapterCapability.call(router, capability);
+}
 
 /** Signed-policy hosts call the base router boundary directly. Subclasses or
  * own properties cannot replace bind, mode or dispatch after identity checking;
@@ -143,4 +198,16 @@ export function brokerBind(router: RuntimeEffectRouter, root: NodeRef): void {
 export function brokerInvoke(router: RuntimeEffectRouter, capability: CapabilityName, args: readonly Value[]): Value {
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
   return BrokerEffectRouter.prototype.invoke.call(router, capability, args);
+}
+export function brokerAttestContext(router: RuntimeEffectRouter, expected: BrokerAttestedContext): void {
+  if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
+  BrokerEffectRouter.prototype.attestContext.call(router, expected);
+}
+export function brokerReconcileLast(router: RuntimeEffectRouter, capability: CapabilityName, args: readonly Value[]): Value {
+  if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
+  return BrokerEffectRouter.prototype.reconcileLast.call(router, capability, args);
+}
+export function brokerReconcileRecorded(router: RuntimeEffectRouter, capability: CapabilityName, request: EffectRequestV1): EffectOutcome {
+  if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
+  return BrokerEffectRouter.prototype.reconcileRecorded.call(router, capability, request);
 }
