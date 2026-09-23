@@ -1,0 +1,1886 @@
+{
+  "format": "aether.packed-native-string-differential/2",
+  "sourceCommit": "9fbc4a50b2015dfbcaaf33f3a582648d12dab8b6",
+  "sources": [
+    {
+      "path": "roadmap/v4/research/packed-native-bridge/native.c",
+      "sha256": "sha256:f8cb4b096b9f39a8eb19f6f9f7a4765b54e22d17634ae5c50ff8c2373e85d785"
+    },
+    {
+      "path": "roadmap/v4/research/packed-native-bridge/bridge.ts",
+      "sha256": "sha256:b4648f7da8d478201e2c2a707122feedf9063662caee1e8143efbb153597f516"
+    },
+    {
+      "path": "roadmap/v4/research/packed-native-bridge/bridge-strings.test.ts",
+      "sha256": "sha256:21f1b7b5f0e4ce32b71f3860d05688715890fec06dfa72d5b48063f32ec66362"
+    },
+    {
+      "path": "roadmap/v4/research/packed-heap/abi.c",
+      "sha256": "sha256:787f64123a07d085aed3f690ab1edbc48aef7886fadd29432b68bde460dcdf68"
+    },
+    {
+      "path": "roadmap/v4/research/packed-heap/abi.h",
+      "sha256": "sha256:08e8b690e2ea6a4e6acbf8f58b2cf0a720d61804a154aaedbc2e51f30cce84fe"
+    },
+    {
+      "path": "src/tier3/packed-heap.ts",
+      "sha256": "sha256:bf0ae1bf0f30c3e22de4c5e0d324d9e63655238be17291d315f750643b7d9d1e"
+    },
+    {
+      "path": "src/tier3/resumable-state.ts",
+      "sha256": "sha256:0a98cdbe98320dadb4a4288dccd216394e29e56ed2b564cf210e1d7cc049a936"
+    }
+  ],
+  "executableSha256": "sha256:030f9f323ce54e8ab667525bb7d25166d962933faa37a742c1e1d4bde3543dd6",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "osRelease": "25.6.0",
+    "cpu": "Apple M4 Pro",
+    "node": "v26.7.0"
+  },
+  "registration": {
+    "seed": "0x6c327a91",
+    "generator": "xorshift32",
+    "records": 16,
+    "operations": 256,
+    "samples": 30
+  },
+  "inputSnapshotDigest": "aether.resumable-state/1:b3:2a010187744ad0ea7ea719e2d6f8c08188c07e74c6137932b3a25c9e5b99c816",
+  "inputImageDigest": "aether.packed-heap-image/2:b3:85f0f310fcb844acfa89890ec111d0663d61074ea8febf33acb69531617c489b",
+  "layoutDigest": "aether.packed-layout/2:b3:10a3c9c7f8e808167ea509a85dccdc8d08c2bb12d5b1956686c3fe93fee5f370",
+  "candidateImageDigest": "aether.packed-heap-image/2:b3:85f0f310fcb844acfa89890ec111d0663d61074ea8febf33acb69531617c489b",
+  "operations": [
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "8",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "4",
+      "field": "text",
+      "otherId": "4",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "7",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "8",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "10",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "9",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "10",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "4",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "11",
+      "field": "text",
+      "otherId": "8",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "5",
+      "field": "text",
+      "otherId": "8",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "5",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "15",
+      "field": "text",
+      "otherId": "3",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "10",
+      "field": "text",
+      "otherId": "6",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "10",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "9",
+      "field": "text",
+      "otherId": "16",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "6",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "1",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "12",
+      "field": "text",
+      "otherId": "5",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "11",
+      "field": "text",
+      "otherId": "7",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "13",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "7",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "11",
+      "field": "text",
+      "otherId": "15",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "8",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "1",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "6",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "10",
+      "field": "text",
+      "otherId": "6",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "2",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "15",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "5",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "2",
+      "field": "text",
+      "otherId": "12",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "2",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "16",
+      "field": "text",
+      "otherId": "11",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "14",
+      "field": "text",
+      "otherId": "15",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "1",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "15",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "4",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "8",
+      "field": "text",
+      "otherId": "5",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "14",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "15",
+      "field": "text",
+      "otherId": "15",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "2",
+      "field": "text",
+      "otherId": "4",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "10",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "8",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "2",
+      "field": "text",
+      "otherId": "4",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "5",
+      "field": "text",
+      "otherId": "11",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "10",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "9",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "13",
+      "field": "text",
+      "otherId": "6",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "2",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "7",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "4",
+      "field": "text",
+      "otherId": "3",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "4",
+      "field": "text",
+      "otherId": "14",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "11",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "4",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "10",
+      "field": "text",
+      "otherId": "9",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "7",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "5",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "6",
+      "field": "text",
+      "otherId": "9",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "5",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "6",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "13",
+      "field": "text",
+      "otherId": "12",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "15",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "11",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "1",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "2",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "3",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "9",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "9",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "14",
+      "field": "text",
+      "otherId": "15",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "2",
+      "field": "text",
+      "otherId": "10",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "6",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "14",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "13",
+      "field": "text",
+      "otherId": "4",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "13",
+      "field": "text",
+      "otherId": "3",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "16",
+      "field": "text",
+      "otherId": "16",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "12",
+      "field": "text",
+      "otherId": "8",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "6",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "7",
+      "field": "text",
+      "otherId": "5",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "1",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "2",
+      "field": "text",
+      "otherId": "16",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "12",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "9",
+      "field": "text",
+      "otherId": "16",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "8",
+      "field": "text",
+      "otherId": "7",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "9",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "8",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "2",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "12",
+      "field": "text",
+      "otherId": "8",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "13",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "2",
+      "field": "text",
+      "otherId": "3",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "14",
+      "field": "text",
+      "otherId": "9",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "11",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "2",
+      "field": "text",
+      "otherId": "13",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "6",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "10",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "15",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "4",
+      "field": "text",
+      "otherId": "14",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "14",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "15",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "5",
+      "field": "text",
+      "otherId": "13",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "5",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "14",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "14",
+      "field": "text",
+      "otherId": "11",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "7",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "13",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "7",
+      "field": "text",
+      "otherId": "8",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "11",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "4",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "13",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "12",
+      "field": "text",
+      "otherId": "7",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "7",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "15",
+      "field": "text",
+      "otherId": "12",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "13",
+      "field": "text",
+      "otherId": "16",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "2",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "4",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "4",
+      "field": "text",
+      "otherId": "12",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "10",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "7",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "2",
+      "field": "text",
+      "otherId": "9",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "15",
+      "field": "text",
+      "otherId": "12",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "6",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "13",
+      "field": "text",
+      "otherId": "9",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "16",
+      "field": "text",
+      "otherId": "3",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "10",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "12",
+      "field": "text",
+      "otherId": "3",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "5",
+      "field": "text",
+      "otherId": "2",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "8",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "13",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "2",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "14",
+      "field": "text",
+      "otherId": "10",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "11",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "9",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "16",
+      "field": "text",
+      "otherId": "14",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "9",
+      "field": "text",
+      "otherId": "8",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "15",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "5",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "14",
+      "field": "text",
+      "otherId": "8",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "11",
+      "field": "text",
+      "otherId": "4",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "14",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "8",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "16",
+      "field": "text",
+      "otherId": "4",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "13",
+      "field": "text",
+      "otherId": "7",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "8",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "11",
+      "field": "text",
+      "otherId": "9",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "8",
+      "field": "text",
+      "otherId": "4",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "9",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "7",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "8",
+      "field": "text",
+      "otherId": "4",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "13",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "16",
+      "field": "text",
+      "otherId": "9",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "15",
+      "field": "text",
+      "otherId": "5",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "13",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "1",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "8",
+      "field": "text",
+      "otherId": "6",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "10",
+      "field": "text",
+      "otherId": "3",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "4",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "13",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "16",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "5",
+      "field": "text",
+      "otherId": "12",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "6",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "15",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "13",
+      "field": "text",
+      "otherId": "10",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "11",
+      "field": "text",
+      "otherId": "16",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "4",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "7",
+      "field": "text",
+      "otherId": "15",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "7",
+      "field": "text",
+      "otherId": "15",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "2",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "16",
+      "field": "text",
+      "otherId": "6",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "4",
+      "field": "text",
+      "otherId": "5",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "4",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "2",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "15",
+      "field": "text",
+      "otherId": "7",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "2",
+      "field": "text",
+      "otherId": "8",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "2",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "6",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "9",
+      "field": "text",
+      "otherId": "3",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "13",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "10",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "14",
+      "field": "text",
+      "otherId": "5",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "4",
+      "field": "text",
+      "otherId": "12",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "16",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "2",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "9",
+      "field": "text",
+      "otherId": "6",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "14",
+      "field": "text",
+      "otherId": "13",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "5",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "1",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "13",
+      "field": "text",
+      "otherId": "13",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "5",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "9",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "10",
+      "field": "text",
+      "otherId": "15",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "9",
+      "field": "text",
+      "otherId": "5",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "9",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "3",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "10",
+      "field": "text",
+      "otherId": "3",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "8",
+      "field": "text",
+      "otherId": "2",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "15",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "11",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "6",
+      "field": "text",
+      "otherId": "12",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "10",
+      "field": "text",
+      "otherId": "15",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "9",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "7",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "5",
+      "field": "text",
+      "otherId": "16",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "2",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "11",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "1",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "8",
+      "field": "text",
+      "otherId": "14",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "7",
+      "field": "text",
+      "otherId": "9",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "14",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "10",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "1",
+      "field": "text",
+      "otherId": "2",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "13",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "4",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "4",
+      "field": "text",
+      "otherId": "1",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "3",
+      "field": "text",
+      "otherId": "13",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "12",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "10",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "9",
+      "field": "text",
+      "otherId": "7",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "5",
+      "field": "text",
+      "otherId": "6",
+      "otherField": "copy"
+    },
+    {
+      "kind": "readString",
+      "id": "7",
+      "field": "text"
+    },
+    {
+      "kind": "readString",
+      "id": "6",
+      "field": "copy"
+    },
+    {
+      "kind": "equalString",
+      "id": "11",
+      "field": "text",
+      "otherId": "2",
+      "otherField": "text"
+    },
+    {
+      "kind": "equalString",
+      "id": "7",
+      "field": "text",
+      "otherId": "16",
+      "otherField": "copy"
+    }
+  ],
+  "observations": [
+    "T 0 efbbbf6c656164",
+    "T 0 f09f9982",
+    "E 0 0",
+    "E 0 0",
+    "T 0 -",
+    "T 0 61",
+    "E 0 1",
+    "E 0 0",
+    "T 0 c3a9",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 f09f9982",
+    "E 0 0",
+    "E 0 0",
+    "T 0 c3a9",
+    "T 0 efbbbf6c656164",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 -",
+    "E 0 0",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 c3a9",
+    "E 0 1",
+    "E 0 0",
+    "T 0 e6bca2e5ad97",
+    "T 0 -",
+    "E 0 0",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 e6bca2e5ad97",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 f09f9982",
+    "E 0 1",
+    "E 0 0",
+    "T 0 c3a9",
+    "T 0 e6bca2e5ad97",
+    "E 0 0",
+    "E 0 0",
+    "T 0 e6bca2e5ad97",
+    "T 0 efbbbf6c656164",
+    "E 0 1",
+    "E 0 0",
+    "T 0 c3a9",
+    "T 0 61",
+    "E 0 0",
+    "E 0 0",
+    "T 0 c3a9",
+    "T 0 f09f9982",
+    "E 0 1",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 61",
+    "E 0 0",
+    "E 0 1",
+    "T 0 -",
+    "T 0 efbbbf6c656164",
+    "E 0 0",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 efbbbf6c656164",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 -",
+    "E 0 0",
+    "E 0 0",
+    "T 0 c3a9",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 -",
+    "T 0 efbbbf6c656164",
+    "E 0 0",
+    "E 0 1",
+    "T 0 efbbbf6c656164",
+    "T 0 61",
+    "E 0 1",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 efbbbf6c656164",
+    "E 0 0",
+    "E 0 0",
+    "T 0 c3a9",
+    "T 0 f09f9982",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 61",
+    "E 0 0",
+    "E 0 0",
+    "T 0 c3a9",
+    "T 0 61",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 65cc81",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 f09f9982",
+    "E 0 1",
+    "E 0 0",
+    "T 0 -",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 -",
+    "T 0 e6bca2e5ad97",
+    "E 0 1",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 efbbbf6c656164",
+    "E 0 0",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 efbbbf6c656164",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 c3a9",
+    "E 0 1",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 -",
+    "T 0 61",
+    "E 0 0",
+    "E 0 0",
+    "T 0 -",
+    "T 0 61",
+    "E 0 0",
+    "E 0 0",
+    "T 0 e6bca2e5ad97",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 1",
+    "T 0 65cc81",
+    "T 0 65cc81",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 e6bca2e5ad97",
+    "E 0 0",
+    "E 0 0",
+    "T 0 -",
+    "T 0 61",
+    "E 0 0",
+    "E 0 0",
+    "T 0 65cc81",
+    "T 0 f09f9982",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 61",
+    "E 0 0",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 -",
+    "E 0 0",
+    "E 0 0",
+    "T 0 65cc81",
+    "T 0 65cc81",
+    "E 0 0",
+    "E 0 0",
+    "T 0 -",
+    "T 0 e6bca2e5ad97",
+    "E 0 0",
+    "E 0 1",
+    "T 0 e6bca2e5ad97",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 f09f9982",
+    "E 0 0",
+    "E 0 0",
+    "T 0 65cc81",
+    "T 0 f09f9982",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 f09f9982",
+    "E 0 0",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 f09f9982",
+    "E 0 0",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 -",
+    "E 0 0",
+    "E 0 0",
+    "T 0 f09f9982",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 c3a9",
+    "T 0 f09f9982",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 61",
+    "E 0 0",
+    "E 0 0",
+    "T 0 c3a9",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 -",
+    "E 0 0",
+    "E 0 0",
+    "T 0 -",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 65cc81",
+    "T 0 61",
+    "E 0 0",
+    "E 0 0",
+    "T 0 efbbbf6c656164",
+    "T 0 c3a9",
+    "E 0 0",
+    "E 0 0",
+    "T 0 -",
+    "T 0 efbbbf6c656164",
+    "E 0 0",
+    "E 0 0"
+  ],
+  "samplesNs": [
+    80810125,
+    59610458,
+    64381958,
+    60170250,
+    59415542,
+    58339458,
+    56437542,
+    57157375,
+    58318709,
+    56509125,
+    59141417,
+    58035458,
+    56137917,
+    57263292,
+    58434750,
+    57698458,
+    57949042,
+    58050083,
+    57406167,
+    56759500,
+    61036292,
+    61021583,
+    59278417,
+    58260041,
+    59107250,
+    58083875,
+    61626917,
+    59056625,
+    61885167,
+    63628209
+  ],
+  "latencyNs": {
+    "median": 58387104,
+    "maximum": 80810125
+  }
+}
