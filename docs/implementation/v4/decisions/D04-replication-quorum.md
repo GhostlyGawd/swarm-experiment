@@ -83,6 +83,14 @@ The model campaign reports **5,040 permutations of seven tree operations**, chec
 
 This is finite, manually bounded evidence. It does not exhaust all multi-view message schedules, Byzantine strategies, memberships, tree shapes or keys. Votes are symbolic authenticated tokens; no threshold cryptography is executed. Event delivery is explicit; no network latency, scheduler fairness or persistence timing is measured. The model therefore establishes neither full protocol correctness nor a 1,000-agent/50 ms claim. Actual scale qualification remains V4-Q01. The root task's evidence manifest must bind these commands to the exact committed artifact version before closing R01.
 
+## T2-06 cryptography follow-up — 2026-09-23
+
+`src/fabric/quorum-crypto.ts` now verifies distinct Ed25519 signatures, roster/family/role bounds and exact promotion-subject commit certificates. This is a bounded multisignature foundation. It does not replace Basic HotStuff's durable vote/lock/view state or the required threshold-group key and signing protocol.
+
+The [FROST specification, RFC 9591](https://www.rfc-editor.org/rfc/rfc9591.html) defines two-round threshold Schnorr signing and Ed25519-compatible signatures, but leaves distributed key generation outside its scope. The [Zcash Foundation FROST implementation](https://github.com/ZcashFoundation/frost) provides an Ed25519 ciphersuite and a [distributed key generation tutorial](https://github.com/ZcashFoundation/frost/blob/main/book/src/tutorial/dkg.md). A pinned, reviewed implementation of that protocol is a concrete candidate for T2-06; no crate or group key has been installed or enrolled by this decision note.
+
+A group signature alone does not identify which model families actually participated. Production authorization must retain an authenticated signer/commitment transcript bound to the roster and exact vote subject, then enforce family and role eligibility in addition to verifying the group signature. Real validator independence and model-family labels require trusted enrollment evidence outside the cryptographic vote. Epoch handoff must bind the next group key to the old terminal checkpoint and a new-epoch readiness quorum; a timeout never substitutes for that certificate.
+
 ## Decision change history
 
 - **0.1.0:** selected RGA placement anchors for sibling ordering. This was recorded before the source mechanism mismatch was found.
