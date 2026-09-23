@@ -1,0 +1,35 @@
+[
+  {
+    "target": "typescript",
+    "source": "7bf752c1b4d66d310f55ae60d8b1a38cca065b319385bf115bf42596c6155e20",
+    "runtime": "693f890cd9d2dc5cf98ae526e05e8afb785303e7478fb847fdba03c04f6dcd39",
+    "dependencies": [
+      [
+        "aether_0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed.ts",
+        "edeb4d2e2fde72c14a34ea2897c717212cb8c1719c7c0e50d9ff6145ec58883d"
+      ]
+    ]
+  },
+  {
+    "target": "python",
+    "source": "184880dec4db1108a4f72215576dd026eabeea5b1e09579c7d93a9c715b76d84",
+    "runtime": "cdb83a46a41db4f0f6d2ccad0fd6e3a878ae3c6bb2fd1a7305842b2d4c6cc5db",
+    "dependencies": [
+      [
+        "aether_0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed.py",
+        "a3d2638adcdb8087c579bf4cf3515ca14b6d36af95f585e4d1763d02a6a87c1d"
+      ]
+    ]
+  },
+  {
+    "target": "rust",
+    "source": "0867e8b9031c8ecb2c6bb56fa7dd869713e7ec5952a2eff52cba5c01e9f9cb52",
+    "runtime": "6c3fdfda58265ef0981c7a1d6c635e5175d89081bf5268abf0ab2d405ad80029",
+    "dependencies": [
+      [
+        "aether_0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed.rs",
+        "d5ba036ffaad594dce7f1df2014046f3024bd1586aa5108783d12c46e21f73fb"
+      ]
+    ]
+  }
+]

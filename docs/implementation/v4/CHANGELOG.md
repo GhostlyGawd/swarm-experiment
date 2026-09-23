@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Executable projection V9 null-body support — 2026-09-23
+
+- Added `aether.executable-projection/9` for unsynthesized function declarations. TS/Python/Rust source and runtime explicitly trap on a call, while round-tripping `body: null`, exact contract and imported dependency identity. V8 source/runtime/dependency bytes matched the pre-V9 commit in all three targets.
+- A clean-source `80a37c9` corpus retained actual cl100k/o200k counts over full JSON role/content source/runtime messages, including exact-address dependencies. The report is a cost record, not a 4× release comparison. T1-02 and Q03 remain open; no target changed.
+
 ## AST-derived native fallback campaign — 2026-09-23
 
 - Added a bounded native compiler that derives both tier bodies and contract checks from the exact Aether fallback AST. One C call frame restores aliased record state and allocator before entering Tier 2. A source edit changes the root, generated source, binary and result; 14 native/reference cases match.

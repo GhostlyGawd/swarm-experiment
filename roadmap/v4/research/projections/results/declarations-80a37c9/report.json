@@ -1,0 +1,82 @@
+{
+  "format": "aether.declaration-token-corpus/1",
+  "commit": "80a37c950cc446e9dad5a376db8e03cbb2915768",
+  "recordedAt": "2026-09-23T23:48:01.263Z",
+  "sourceHashes": {
+    "roadmap/v4/research/projections/declarations-measure.ts": "72fbe85a843e6565930ef1e8cc2e48b2ec86c46159a5dd34158dc18262362011",
+    "src/projection/executable.ts": "af73924e835e73fe0f35db4a3ae98ea071719a38342731e776243d0f89375cd7",
+    "src/projection/executable-runtime.ts": "af6b91ae0315d1f1fbdb81f8b8230ae2bbfbed90b07add93e1abb811f63349af",
+    "src/projection/executable-declarations.ts": "0f546d9a1c24df6df7751d27b19d6ca52933d85c74a3f76b5388f57348a7a1ac",
+    "src/projection/executable-link.ts": "ec83f9063b0fb534cea41bd52482541bdbbb7dbb378222208de61819ccab25d3",
+    "src/util/tokens.ts": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9",
+    "src/tier1/ast.ts": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb",
+    "package-lock.json": "5c681465706b3f7b5316290d26e3e2612d733b43260994cb3339e7b422a174dc"
+  },
+  "tokenizer": {
+    "package": "js-tiktoken",
+    "lockfileSha256": "5c681465706b3f7b5316290d26e3e2612d733b43260994cb3339e7b422a174dc",
+    "encodings": [
+      "cl100k_base",
+      "o200k_base"
+    ]
+  },
+  "framing": "sum of actual BPE counts over each complete JSON role/content message; local measurement, not API billing",
+  "messagesSha256": "4eeaaf649026716c80e81dc008b9e27fbbdd4a45981b5e78fa61c49c567d23a4",
+  "rows": [
+    {
+      "case": "local-null-body",
+      "target": "typescript",
+      "root": "ast:b3:07ca1c65f6e5dfe96e4af2ade1df62c63931df14366f40dbec84b68b4b25d764",
+      "messageCount": 2,
+      "bytes": 93733,
+      "cl100kTokens": 44043,
+      "o200kTokens": 43210
+    },
+    {
+      "case": "local-null-body",
+      "target": "python",
+      "root": "ast:b3:07ca1c65f6e5dfe96e4af2ade1df62c63931df14366f40dbec84b68b4b25d764",
+      "messageCount": 2,
+      "bytes": 92206,
+      "cl100kTokens": 43424,
+      "o200kTokens": 42701
+    },
+    {
+      "case": "local-null-body",
+      "target": "rust",
+      "root": "ast:b3:07ca1c65f6e5dfe96e4af2ade1df62c63931df14366f40dbec84b68b4b25d764",
+      "messageCount": 2,
+      "bytes": 90220,
+      "cl100kTokens": 38461,
+      "o200kTokens": 37693
+    },
+    {
+      "case": "exact-import-null-body",
+      "target": "typescript",
+      "root": "ast:b3:ecc9fc6de8cbc9058aebc5f6273f182fe6131dd9f30f95ee995f25eac0ed5b1b",
+      "messageCount": 3,
+      "bytes": 96078,
+      "cl100kTokens": 44980,
+      "o200kTokens": 44147
+    },
+    {
+      "case": "exact-import-null-body",
+      "target": "python",
+      "root": "ast:b3:ecc9fc6de8cbc9058aebc5f6273f182fe6131dd9f30f95ee995f25eac0ed5b1b",
+      "messageCount": 3,
+      "bytes": 93802,
+      "cl100kTokens": 44121,
+      "o200kTokens": 43396
+    },
+    {
+      "case": "exact-import-null-body",
+      "target": "rust",
+      "root": "ast:b3:ecc9fc6de8cbc9058aebc5f6273f182fe6131dd9f30f95ee995f25eac0ed5b1b",
+      "messageCount": 3,
+      "bytes": 91892,
+      "cl100kTokens": 39206,
+      "o200kTokens": 38435
+    }
+  ],
+  "release4xVerdict": "not_qualified_by_this_corpus"
+}
