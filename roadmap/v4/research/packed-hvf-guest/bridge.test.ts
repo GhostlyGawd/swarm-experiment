@@ -199,7 +199,10 @@ test('actual EL1 guest reads and mutates authenticated packed checkpoint with di
       assert.equal(rawGuest(stringFrame()).readUInt32LE(44), 0x454e4f44);
       const invalidUtf8 = stringFrame(); invalidUtf8[138] = 0xc0; invalidUtf8[139] = 0x80;
       assert.throws(() => rawGuest(invalidUtf8), /guest exit\/status/);
-      const surrogateUtf8 = stringFrame(); surrogateUtf8[138] = 0xed; surrogateUtf8[139] = 0xa0;
+      const surrogateUtf8 = Buffer.concat([stringFrame(), Buffer.from([0x80])]);
+      surrogateUtf8.writeUInt32LE(141, 8); surrogateUtf8.writeUInt32LE(3, 60);
+      surrogateUtf8.writeUInt32LE(3, 134);
+      surrogateUtf8[138] = 0xed; surrogateUtf8[139] = 0xa0;
       assert.throws(() => rawGuest(surrogateUtf8), /guest exit\/status/);
       const truncatedUtf8 = stringFrame(); truncatedUtf8[138] = 0xe2; truncatedUtf8[139] = 0x82;
       assert.throws(() => rawGuest(truncatedUtf8), /guest exit\/status/);

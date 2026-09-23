@@ -65,3 +65,23 @@ node --experimental-strip-types roadmap/v4/research/packed-hvf-guest/campaign/st
 
 The string result is a bounded research result; historical fields, closures,
 tasks, effect routing and full runtime admission remain outside this guest.
+
+`results/string-local-01.json` pins source commit
+`58360806d5a90f363aca8453b562faa81d1c8e1a`. The independent verifier
+rebuilds the signed controller and EL1 image, checks all pinned source bytes,
+recalculates every raw sample, and repeats the semantic campaign.
+
+| `/2` string measure | Result |
+| --- | ---: |
+| Guest samples | 1,000 |
+| String reads / equality checks per guest | 58 / 70 |
+| Fresh guest to validated response median | 41,667 ns |
+| Fresh guest to validated response p95 | 88,500 ns |
+| Fresh guest to validated response maximum | **1,363,958 ns** |
+| Samples above 1 ms | **1** |
+| Guest mapped and observed resident backing | 65,536 B |
+
+The unchanged 1 ms **maximum** gate fails for this bounded string workload.
+Sample 48 spent about 1,245,708 ns between RW mapping and completed vCPU
+configuration. The raw ticks do not identify the cause. This measurement also
+does not account for all hypervisor memory or the complete runtime.

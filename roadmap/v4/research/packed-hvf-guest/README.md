@@ -26,6 +26,8 @@ The first retained M4 Pro campaign pins source commit `1181a08be6b36a403c406b5df
 
 The [persistent-controller authenticated checkpoint campaign](campaign/README.md) retains 1,000 fresh guest samples on the approved already-running controller boundary. Its measured maximum is **181,125 ns** for a 16-record, 128-operation bounded checkpoint, with 65,536 mapped and observed backing bytes. The [map-coalescing comparison](../hvf-map-coalescing/README.md) shows the reason for combining the RW mappings. Both remain research evidence; the complete v4 runtime boot and resident-memory release gates are open.
 
+The separate [packed `/2` string campaign](campaign/README.md#packed-2-string-extension) retains 1,000 source-pinned fresh guest samples with 128 string read/equality operations. Its **1,363,958 ns maximum misses** the unchanged 1 ms gate, despite a 41,667 ns median. The failed maximum remains visible in the retained raw samples. The mapped and observed guest backing was 65,536 B per sample; this is not total hypervisor residency.
+
 ## Open work
 
 1. Integrate this guest with production native lowering, manifest admission, checkpoint handoff, and authorized correction events. The current driver accepts only a host-derived research frame, and its direct raw CLI does not authenticate checkpoint history.
