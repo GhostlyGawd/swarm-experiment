@@ -1,0 +1,23 @@
+{
+  "format": "aether.packed-heap-native-check/1",
+  "checks": 26,
+  "status": "pass",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M4 Pro",
+    "node": "v26.7.0",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)"
+  },
+  "sourceSha256": {
+    "abi": "787f64123a07d085aed3f690ab1edbc48aef7886fadd29432b68bde460dcdf68",
+    "header": "08e8b690e2ea6a4e6acbf8f58b2cf0a720d61804a154aaedbc2e51f30cce84fe",
+    "packedHeap": "614e23bf81bcddc92204f4006223c9abd09afe285f1ffa0809bd2439d57dfc4b",
+    "verifier": "7c29aff06f0809ccd074331c49bb6bbc2353ba6798e395f140b6cb36144d0451"
+  },
+  "fixture": {
+    "records": 3,
+    "initialPayloadHex": "e82f0006e000",
+    "mutatedPayloadHex": "e72f0006e000"
+  }
+}

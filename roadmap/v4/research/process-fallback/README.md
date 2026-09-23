@@ -1,0 +1,9 @@
+# Effect-aware process fallback candidate (V4-T3-07)
+
+`ProcessFallbackSupervisor` is an opt-in, process-level candidate over one `ProcessHost` state domain. It accepts two executable Aether functions only when their parameter symbols and types, return types, purity, capabilities, surfaces and explicit contract are identical. Both tiers use the real worker/effect broker. A signed, bounded journal binds exact operation IDs, arguments, host identity, manifest and signer. The repair outbox uses stable IDs and at-least-once delivery.
+
+Tier 2 starts only after a Tier 1 failure with durable evidence that no external effect could have committed and the original snapshot/generation still owns the host. ProcessHost checks that base under its journal lock when starting each tier. A requested/rejected/aborted effect can be safely aborted; dispatching, committed or indeterminate effects block automatic fallback. Exact host replay can reconcile a committed effect, after which the supervisor may return the Tier 1 result. Fresh scoped grants are required for each tier and cached successful receipts. A blocked result does not claim a terminal production outcome.
+
+Focused tests cover pre-effect faults, committed-effect faults, both-tier failure, changed heap, grant denial, signed-journal tamper, outbox retry and three real SIGKILL windows. They assert no duplicate sink call. The candidate returns `productionAuthorized: false`.
+
+This does not supply an independently proved portable Tier 2, complete effect reconciliation policy, native in-frame lowering, or the required ≤50 ns maximum. The measured bounded native switch remains an 83.333 ns miss. V4-T3-07 and its release gates remain open.

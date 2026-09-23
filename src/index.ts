@@ -105,7 +105,8 @@ export { buildLedgerExample, ledgerCapabilities, ledgerTelemetry, ACCOUNT, CENTS
 // Versioned execution envelopes; kept namespaced to preserve the v1 API.
 export * as fabric from './fabric/index.ts';
 export { BrokerEffectRouter, EffectInvocationError, type RuntimeEffectRouter, type RuntimeEffectRouterOptions } from './tier3/effects.ts';
-export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessEffectContext, type ProcessCheckpointAccess, type ProcessInvocationGrant } from './tier4/process-host.ts';
+export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessOperationEffectDisposition, type ProcessEffectContext, type ProcessCheckpointAccess, type ProcessInvocationGrant } from './tier4/process-host.ts';
+export { ProcessFallbackSupervisor, type ProcessFallbackOptions, type ProcessFallbackRepairEvent, type ProcessFallbackResult } from './tier4/process-fallback.ts';
 export { ProcessResumableSession, type ProcessResumableOptions, type ProcessResumableEffectsContext } from './tier4/process-resumable.ts';
 export { seedProcessCheckpoint, seededProcessReference, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointSeed, type ProcessCheckpointAuthorization, type ProcessCheckpointAction, type ProcessCheckpointControlRequest, type ProcessCheckpointControl } from './tier4/process-checkpoint-contract.ts';
 export { ProcessDeployment, processArtifactContext, processArtifactDigest, processMigrationPlan, processEffectPlan, processAnchoredEffectPlan, processImportFreeEffectPlan, type ProcessArtifactInput, type ProcessDeploymentOptions, type CapabilityDeploymentProfile } from './tier4/process-deployment.ts';

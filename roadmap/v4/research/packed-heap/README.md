@@ -20,6 +20,8 @@ The candidate `abi.h`/`abi.c` implements checked C bit reads/writes, relative or
 
 Campaign 01 was measured before the additional canonical-input hardening described above; its exact `packedHeapSha256` is retained. It is historical bounded evidence until a clean-source repeat measures the hardened implementation.
 
+The clean detached-worktree repeat at commit `8d285d7` is retained in `results/local-02/`. Its registration pins the clean commit, five source hashes and unchanged workload. An independent audit checked those hashes, all four raw-sample medians, equality of the baseline and packed checksums, and the 26 native checks. The repeat measured complete-image ratios of 0.6796/0.6849 for 1,024 local/random records and 0.6795/0.6850 for 4,096 local/random records. The corresponding packed JavaScript read slowdowns were 83.3×, 68.1×, 93.7× and 61.1×. The slow reads and limited value domain remain release blockers.
+
 | Records | Links | Logical record bytes | Packed payload bytes | Complete image bytes | Image / logical | Baseline read median | JS packed read median |
 | ---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1,024 | local | 362,730 | 1,664 | 246,527 | 0.680 | 0.860 ms | 89.285 ms |

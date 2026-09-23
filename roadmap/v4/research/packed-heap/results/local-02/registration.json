@@ -1,0 +1,21 @@
+{
+  "format": "aether.packed-heap-repeat-registration/1",
+  "gitHead": "8d285d719ee4c1788abf740487346731f323997b",
+  "gitStatus": "",
+  "sourceHashes": {
+    "src/tier3/packed-heap.ts": "614e23bf81bcddc92204f4006223c9abd09afe285f1ffa0809bd2439d57dfc4b",
+    "roadmap/v4/research/packed-heap/run.ts": "958f1d68042dbef5f75be484de7f41b8c23d736fd362a00db4d7474acc491e19",
+    "roadmap/v4/research/packed-heap/PREREGISTRATION.md": "f74ebd7a8d22c35adef11a12c3a4021a08e4268f7c0f4bf0401ba1e47c2ed692",
+    "src/tier3/resumable-state.ts": "dfc91e01a8f2f7a28a82111e66c4735292ba72fb84ca202a757c91ecb17cf35c",
+    "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d"
+  },
+  "machine": {
+    "system": "Darwin",
+    "node": "Rhens-MacBook-Pro.local",
+    "release": "25.6.0",
+    "version": "Darwin Kernel Version 25.6.0: Tue Aug 18 17:48:46 PDT 2026; root:xnu-12377.161.15.700.19~2/RELEASE_ARM64_T6041",
+    "machine": "arm64",
+    "processor": "arm"
+  },
+  "profile": "unchanged PREREGISTRATION.md local four-case campaign"
+}

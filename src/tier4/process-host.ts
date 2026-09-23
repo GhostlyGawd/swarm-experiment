@@ -1,5 +1,5 @@
 import { randomUUID, type KeyObject } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, statSync, openSync, fsyncSync, closeSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, openSync, fsyncSync, closeSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { walk, type Term, type Ty } from '../tier1/ast.ts';
 import { decode as decodeIR, encode as encodeIR } from '../tier1/agent-ir.ts';
@@ -91,6 +91,16 @@ interface HostJournal {
 export type ProcessHostCallResult =
   | { state: 'completed'; operationId: string; generation: string; unit: string; execution: WireExecution }
   | { state: 'indeterminate' | 'aborted'; operationId: string; generation: string; unit: string; reason: string };
+/** This summary is reconstructed from the validated durable host journal. A
+ * dispatching/indeterminate effect is treated as a possible external commit. */
+export interface ProcessOperationEffectDisposition {
+  readonly operationId: string;
+  readonly state: CallRecord['state'];
+  readonly effects: readonly Readonly<{ id: string; state: EffectRecord['state']; requestDigest: Digest; outcomeDigest: Digest | null }>[];
+  readonly safeToAbortBeforeEffects: boolean;
+  readonly possibleExternalCommit: boolean;
+  readonly evidenceDigest: Digest;
+}
 export interface ProcessEffectContext {
   /** Stable boundary ID. Pass this as BrokerEffectRouter.executionId. */
   readonly operationId: string;
@@ -303,6 +313,10 @@ export class ProcessHost {
     } catch (error) { await host.close(); throw error; }
   }
   get generation(): string { return this.read().generation; }
+  /** Stable identity for a durable supervisor sharing this host's state. */
+  fallbackIdentity(): Readonly<{ configuration: Digest; manifest: Digest; storage: string }> {
+    this.assertOpen(); return Object.freeze({ configuration: this.configuration, manifest: executionManifestDigest(this.manifest), storage: realpathSync(this.options.directory) });
+  }
   get plan(): TopologyPlan { return JSON.parse(this.read().plan) as TopologyPlan; }
   get workerPids(): Readonly<Record<string, number>> { return Object.freeze(Object.fromEntries([...this.channels].map(([unit, channel]) => [unit, channel.pid]))); }
   unitFor(symbol: SymbolId): string | null { return this.unitIn(this.plan, symbol); }
@@ -336,6 +350,16 @@ export class ProcessHost {
     this.assertOpen(); identifier(operationId); const call = this.read().calls.find(call => call.operationId === operationId);
     return call ? this.result(call) : null;
   }
+  operationEffectDisposition(operationId: string): ProcessOperationEffectDisposition | null {
+    this.assertOpen(); identifier(operationId);
+    const call = this.read().calls.find(item => item.operationId === operationId);
+    if (!call) return null;
+    const effects = Object.freeze(call.effects.map(effect => Object.freeze({ id: effect.id, state: effect.state, requestDigest: effect.requestDigest, outcomeDigest: effect.outcomeDigest })));
+    const safeToAbortBeforeEffects = effects.every(effect => ['requested', 'rejected', 'aborted'].includes(effect.state));
+    const body = { operationId, state: call.state, effects };
+    return Object.freeze({ ...body, safeToAbortBeforeEffects, possibleExternalCommit: !safeToAbortBeforeEffects,
+      evidenceDigest: domainDigest('aether.process-effect-disposition/1', body) });
+  }
   async allocateRecord(ty: Ty, fields: Readonly<Record<string, TaggedValueV1>>, options: { operationId: string; unit?: string }): Promise<LogicalRefV1> {
     identifier(options.operationId);
     ty = freeze(copy(ty)); fields = freeze(copy(fields)); options = Object.freeze({ operationId: options.operationId, ...(options.unit === undefined ? {} : { unit: options.unit }) });
@@ -361,9 +385,13 @@ export class ProcessHost {
       return copy(reference);
     }, this.options.lockWaitMs ?? 5000);
   }
-  async call(symbol: SymbolId, args: readonly TaggedValueV1[], options: { operationId: string; tokens: readonly ProcessInvocationGrant[] }): Promise<ProcessHostCallResult> {
+  async call(symbol: SymbolId, args: readonly TaggedValueV1[], options: { operationId: string; tokens: readonly ProcessInvocationGrant[]; expectedSnapshot?: Digest; expectedGeneration?: string }): Promise<ProcessHostCallResult> {
     identifier(options.operationId); args.forEach(value => validateTaggedValue(value));
-    args = freeze(copy([...args])); options = Object.freeze({ operationId: options.operationId, tokens: freeze(copy([...options.tokens])) });
+    if (options.expectedSnapshot !== undefined) validateDigest(options.expectedSnapshot);
+    if (options.expectedGeneration !== undefined) decimal(options.expectedGeneration);
+    args = freeze(copy([...args])); options = Object.freeze({ operationId: options.operationId, tokens: freeze(copy([...options.tokens])),
+      ...(options.expectedSnapshot === undefined ? {} : { expectedSnapshot: options.expectedSnapshot }),
+      ...(options.expectedGeneration === undefined ? {} : { expectedGeneration: options.expectedGeneration }) });
     return this.lock.runAsync(async () => {
       this.assertOpen(); const journal = this.read(), plan = JSON.parse(journal.plan) as TopologyPlan, unit = this.unitIn(plan, symbol);
       if (!unit) throw new Error('unplaced function');
@@ -373,6 +401,9 @@ export class ProcessHost {
       const old = journal.calls.find(call => call.operationId === options.operationId);
       if (old) { if (old.requestDigest !== requestDigest) throw new Error('call_identity_conflict'); return this.result(old); }
       this.assertReady(journal);
+      if ((options.expectedGeneration !== undefined && journal.generation !== options.expectedGeneration)
+        || (options.expectedSnapshot !== undefined && runtimeSnapshotDigest(journal.snapshot) !== options.expectedSnapshot))
+        throw new Error('stale_process_fallback_base');
       if (journal.allocations.some(allocation => allocation.operationId === options.operationId)) throw new Error('operation ID already names an allocation');
       const scope = this.scope(journal, unit); args.forEach(value => decodeProcessValue(value, scope, journal.snapshot));
       validateProcessArguments(this.declarations.get(symbol)!, args, journal.snapshot);
