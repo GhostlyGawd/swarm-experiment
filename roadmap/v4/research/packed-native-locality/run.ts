@@ -15,6 +15,19 @@ const output = resolve(process.argv[2] ?? join(here, 'results/local-01'));
 const sha = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex');
 const distNames = ['local', 'cluster', 'wide'] as const;
 const counts = [4096, 16384] as const;
+const sourceFiles = [
+  'roadmap/v4/research/packed-native-locality/PREREGISTRATION.md',
+  'roadmap/v4/research/packed-native-locality/run.ts',
+  'roadmap/v4/research/packed-native-locality/native.c',
+  'roadmap/v4/research/packed-native-locality/verify.ts',
+  'roadmap/v4/research/packed-heap/abi.c',
+  'roadmap/v4/research/packed-heap/abi.h',
+  'src/tier3/packed-heap.ts',
+  'src/tier3/resumable-state.ts',
+  'src/fabric/encoding.ts',
+  'src/fabric/identity.ts',
+  'src/tier1/ids.ts',
+];
 const name = typeName('type:bench:native_locality');
 const ty = { t: 'Record' as const, name, fields: [['number', { t: 'Int' as const }], ['alive', { t: 'Bool' as const }], ['link', { t: 'Unit' as const }]] as const };
 const write64 = (view: DataView, offset: number, value: bigint) => view.setBigUint64(offset, value, true);
@@ -79,6 +92,7 @@ function summarize(native: any) {
 mkdirSync(output, { recursive: true });
 const temporary = mkdtempSync(join(tmpdir(), 'aether-native-locality-'));
 try {
+  const before = Object.fromEntries(sourceFiles.map(path => [path, sha(join(repository, path))]));
   const executable = join(temporary, 'native');
   const compilerArgs = ['-O3', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I', join(repository, 'roadmap/v4/research/packed-heap'),
     join(repository, 'roadmap/v4/research/packed-heap/abi.c'), join(here, 'native.c'), '-o', executable];
@@ -98,22 +112,11 @@ try {
       logicalCanonicalBytes: generated.logicalCanonicalBytes, packedImageCanonicalBytes: generated.packedImageCanonicalBytes,
       layoutDigest: generated.layoutDigest, imageDigest: generated.imageDigest });
   }
-  const sourceFiles = [
-    'roadmap/v4/research/packed-native-locality/PREREGISTRATION.md',
-    'roadmap/v4/research/packed-native-locality/run.ts',
-    'roadmap/v4/research/packed-native-locality/native.c',
-    'roadmap/v4/research/packed-native-locality/verify.ts',
-    'roadmap/v4/research/packed-heap/abi.c',
-    'roadmap/v4/research/packed-heap/abi.h',
-    'src/tier3/packed-heap.ts',
-    'src/tier3/resumable-state.ts',
-    'src/fabric/encoding.ts',
-    'src/fabric/identity.ts',
-    'src/tier1/ids.ts',
-  ];
+  const after = Object.fromEntries(sourceFiles.map(path => [path, sha(join(repository, path))]));
+  if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error('source changed during campaign');
   const report = { format: 'aether.packed-native-locality/1', preregistration: 'roadmap/v4/research/packed-native-locality/PREREGISTRATION.md',
     timestamp: new Date().toISOString(), source: { gitHead: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', cwd: repository }).trim(),
-      sha256: Object.fromEntries(sourceFiles.map(path => [path, sha(join(repository, path))])) },
+      sha256: after, nativeBinarySha256: sha(executable) },
     host: { platform: platform(), arch: arch(), release: release(), cpu: cpus()[0]?.model ?? 'unknown',
       node: process.version, compiler: execFileSync('clang', ['--version'], { encoding: 'utf8' }).split('\n')[0],
       compileArgs: compilerArgs.map(arg => arg === executable ? '<temporary-executable>' : arg.replace(repository, '.')) },

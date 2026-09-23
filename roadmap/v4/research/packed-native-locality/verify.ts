@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { encodeCanonical } from '../../../../src/fabric/encoding.ts';
@@ -50,10 +52,27 @@ const sourceFiles = [
   'src/tier1/ids.ts',
 ];
 assert(JSON.stringify(Object.keys(report.source.sha256).sort()) === JSON.stringify(sourceFiles.sort()), 'source manifest completeness');
+assert(typeof report.source.gitHead === 'string' && /^[a-f0-9]{40}$/.test(report.source.gitHead), 'pinned commit syntax');
 for (const [path, digest] of Object.entries(report.source.sha256)) {
   assert(typeof digest === 'string' && /^[a-f0-9]{64}$/.test(digest), `source hash syntax: ${path}`);
   assert(sha(readFileSync(join(repository, path))) === digest, `source hash mismatch: ${path}`);
+  const pinned = execFileSync('git', ['show', `${report.source.gitHead}:${path}`], { cwd: repository, maxBuffer: 64 * 1024 * 1024 });
+  assert(sha(pinned) === digest, `pinned commit source mismatch: ${path}`);
 }
+assert(typeof report.source.nativeBinarySha256 === 'string' && /^[a-f0-9]{64}$/.test(report.source.nativeBinarySha256), 'native binary digest syntax');
+assert(report.host.compiler === execFileSync('clang', ['--version'], { encoding: 'utf8' }).split('\n')[0], 'compiler identity mismatch');
+const expectedCompilerArgs = ['-O3', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I', './roadmap/v4/research/packed-heap',
+  './roadmap/v4/research/packed-heap/abi.c', './roadmap/v4/research/packed-native-locality/native.c', '-o', '<temporary-executable>'];
+assert(JSON.stringify(report.host.compileArgs) === JSON.stringify(expectedCompilerArgs), 'compiler command mismatch');
+const temporary = mkdtempSync(join(tmpdir(), 'aether-native-locality-verify-'));
+try {
+  const executable = join(temporary, 'native');
+  const compile = spawnSync('clang', ['-O3', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I',
+    join(repository, 'roadmap/v4/research/packed-heap'), join(repository, 'roadmap/v4/research/packed-heap/abi.c'),
+    join(here, 'native.c'), '-o', executable], { encoding: 'utf8' });
+  assert(compile.status === 0, `native recompilation failed: ${compile.stderr}`);
+  assert(sha(readFileSync(executable)) === report.source.nativeBinarySha256, 'native binary digest mismatch');
+} finally { rmSync(temporary, { recursive: true, force: true }); }
 for (const count of [4096, 16384]) for (let distribution = 0; distribution < 3; distribution++) {
   const label = distributions[distribution], item = report.cases.find((value: any) => value.count === count && value.distribution === label);
   assert(item, `missing ${count}/${label}`);
