@@ -1,0 +1,379 @@
+{
+  "format": "aether.packed-heap-local-campaign/1",
+  "preregistration": "roadmap/v4/research/packed-heap/PREREGISTRATION.md",
+  "timestamp": "2026-09-23T16:14:44.411Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "release": "25.6.0",
+    "cpu": "Apple M4 Pro",
+    "node": "v26.7.0"
+  },
+  "source": {
+    "gitHead": "12971a6e6b300af86a5c8d831ff7b375f077a68f",
+    "packedHeapSha256": "bd2338225aba0c32479259726da4bb8556b8682a876ed127e619b3d576fa2dcc",
+    "runnerSha256": "958f1d68042dbef5f75be484de7f41b8c23d736fd362a00db4d7474acc491e19"
+  },
+  "trials": [
+    {
+      "count": 1024,
+      "distribution": "local",
+      "layout": {
+        "typeName": "type:bench:packed_node",
+        "fields": [
+          {
+            "name": "number",
+            "kind": "int",
+            "min": "0",
+            "max": "1000",
+            "overflow": "trap"
+          },
+          {
+            "name": "alive",
+            "kind": "bool"
+          },
+          {
+            "name": "link",
+            "kind": "ref",
+            "maxRelative": 1
+          }
+        ]
+      },
+      "baselineCanonicalRecordBytes": 362730,
+      "packedPayloadBytes": 1664,
+      "packedImageCanonicalBytes": 246527,
+      "baselineSamples": [
+        {
+          "ms": 1.278625,
+          "checksum": 37522337
+        },
+        {
+          "ms": 0.85975,
+          "checksum": 37522337
+        },
+        {
+          "ms": 0.938875,
+          "checksum": 37522337
+        },
+        {
+          "ms": 0.855917,
+          "checksum": 37522337
+        },
+        {
+          "ms": 0.855209,
+          "checksum": 37522337
+        },
+        {
+          "ms": 0.854209,
+          "checksum": 37522337
+        },
+        {
+          "ms": 0.866417,
+          "checksum": 37522337
+        }
+      ],
+      "packedSamples": [
+        {
+          "ms": 89.545916,
+          "checksum": 37522337
+        },
+        {
+          "ms": 88.845042,
+          "checksum": 37522337
+        },
+        {
+          "ms": 89.69675,
+          "checksum": 37522337
+        },
+        {
+          "ms": 90.700917,
+          "checksum": 37522337
+        },
+        {
+          "ms": 89.285458,
+          "checksum": 37522337
+        },
+        {
+          "ms": 88.341625,
+          "checksum": 37522337
+        },
+        {
+          "ms": 88.922417,
+          "checksum": 37522337
+        }
+      ],
+      "baselineMedianMs": 0.85975,
+      "packedMedianMs": 89.285458
+    },
+    {
+      "count": 1024,
+      "distribution": "random",
+      "layout": {
+        "typeName": "type:bench:packed_node",
+        "fields": [
+          {
+            "name": "number",
+            "kind": "int",
+            "min": "0",
+            "max": "1000",
+            "overflow": "trap"
+          },
+          {
+            "name": "alive",
+            "kind": "bool"
+          },
+          {
+            "name": "link",
+            "kind": "ref",
+            "maxRelative": 1023
+          }
+        ]
+      },
+      "baselineCanonicalRecordBytes": 362720,
+      "packedPayloadBytes": 2816,
+      "packedImageCanonicalBytes": 248415,
+      "baselineSamples": [
+        {
+          "ms": 1.609459,
+          "checksum": 45101688
+        },
+        {
+          "ms": 1.593625,
+          "checksum": 45101688
+        },
+        {
+          "ms": 1.556042,
+          "checksum": 45101688
+        },
+        {
+          "ms": 1.555542,
+          "checksum": 45101688
+        },
+        {
+          "ms": 1.554583,
+          "checksum": 45101688
+        },
+        {
+          "ms": 1.5475,
+          "checksum": 45101688
+        },
+        {
+          "ms": 1.56025,
+          "checksum": 45101688
+        }
+      ],
+      "packedSamples": [
+        {
+          "ms": 103.730041,
+          "checksum": 45101688
+        },
+        {
+          "ms": 103.613417,
+          "checksum": 45101688
+        },
+        {
+          "ms": 103.288291,
+          "checksum": 45101688
+        },
+        {
+          "ms": 107.200417,
+          "checksum": 45101688
+        },
+        {
+          "ms": 105.176958,
+          "checksum": 45101688
+        },
+        {
+          "ms": 110.6415,
+          "checksum": 45101688
+        },
+        {
+          "ms": 104.779084,
+          "checksum": 45101688
+        }
+      ],
+      "baselineMedianMs": 1.556042,
+      "packedMedianMs": 104.779084
+    },
+    {
+      "count": 4096,
+      "distribution": "local",
+      "layout": {
+        "typeName": "type:bench:packed_node",
+        "fields": [
+          {
+            "name": "number",
+            "kind": "int",
+            "min": "0",
+            "max": "1000",
+            "overflow": "trap"
+          },
+          {
+            "name": "alive",
+            "kind": "bool"
+          },
+          {
+            "name": "link",
+            "kind": "ref",
+            "maxRelative": 1
+          }
+        ]
+      },
+      "baselineCanonicalRecordBytes": 1457564,
+      "packedPayloadBytes": 6656,
+      "packedImageCanonicalBytes": 990463,
+      "baselineSamples": [
+        {
+          "ms": 1.149958,
+          "checksum": 54405761
+        },
+        {
+          "ms": 0.984209,
+          "checksum": 54405761
+        },
+        {
+          "ms": 0.9875,
+          "checksum": 54405761
+        },
+        {
+          "ms": 1.076708,
+          "checksum": 54405761
+        },
+        {
+          "ms": 0.975583,
+          "checksum": 54405761
+        },
+        {
+          "ms": 0.994959,
+          "checksum": 54405761
+        },
+        {
+          "ms": 0.998875,
+          "checksum": 54405761
+        }
+      ],
+      "packedSamples": [
+        {
+          "ms": 91.805042,
+          "checksum": 54405761
+        },
+        {
+          "ms": 91.958375,
+          "checksum": 54405761
+        },
+        {
+          "ms": 91.740625,
+          "checksum": 54405761
+        },
+        {
+          "ms": 93.137792,
+          "checksum": 54405761
+        },
+        {
+          "ms": 92.787,
+          "checksum": 54405761
+        },
+        {
+          "ms": 92.0755,
+          "checksum": 54405761
+        },
+        {
+          "ms": 92.516667,
+          "checksum": 54405761
+        }
+      ],
+      "baselineMedianMs": 0.994959,
+      "packedMedianMs": 92.0755
+    },
+    {
+      "count": 4096,
+      "distribution": "random",
+      "layout": {
+        "typeName": "type:bench:packed_node",
+        "fields": [
+          {
+            "name": "number",
+            "kind": "int",
+            "min": "0",
+            "max": "1000",
+            "overflow": "trap"
+          },
+          {
+            "name": "alive",
+            "kind": "bool"
+          },
+          {
+            "name": "link",
+            "kind": "ref",
+            "maxRelative": 4095
+          }
+        ]
+      },
+      "baselineCanonicalRecordBytes": 1457532,
+      "packedPayloadBytes": 12288,
+      "packedImageCanonicalBytes": 998365,
+      "baselineSamples": [
+        {
+          "ms": 1.810791,
+          "checksum": 54903187
+        },
+        {
+          "ms": 1.772667,
+          "checksum": 54903187
+        },
+        {
+          "ms": 1.738417,
+          "checksum": 54903187
+        },
+        {
+          "ms": 1.752208,
+          "checksum": 54903187
+        },
+        {
+          "ms": 1.777417,
+          "checksum": 54903187
+        },
+        {
+          "ms": 1.788708,
+          "checksum": 54903187
+        },
+        {
+          "ms": 1.733209,
+          "checksum": 54903187
+        }
+      ],
+      "packedSamples": [
+        {
+          "ms": 107.7965,
+          "checksum": 54903187
+        },
+        {
+          "ms": 107.408583,
+          "checksum": 54903187
+        },
+        {
+          "ms": 106.871541,
+          "checksum": 54903187
+        },
+        {
+          "ms": 106.6395,
+          "checksum": 54903187
+        },
+        {
+          "ms": 109.477208,
+          "checksum": 54903187
+        },
+        {
+          "ms": 108.620625,
+          "checksum": 54903187
+        },
+        {
+          "ms": 107.999125,
+          "checksum": 54903187
+        }
+      ],
+      "baselineMedianMs": 1.772667,
+      "packedMedianMs": 107.7965
+    }
+  ]
+}
