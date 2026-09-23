@@ -1,0 +1,17 @@
+✔ unaudited research checker independently verifies all 40 Rust-generated group and authenticated share transcripts (1472.959333ms)
+✔ group-signature-only and claimed family labels cannot replace enrolled participation attestations (41.634375ms)
+✔ exact proposal, epoch, policy, phase, view, parent, expiry and enrollment bindings cannot be replayed (4.542625ms)
+✔ authenticated cancelling false shares reject even when their sum and OpenSSL group signature remain valid (27.728084ms)
+✔ duplicate, stale, malformed scalar and non-prime-subgroup public contributions are rejected (117.868042ms)
+✔ enrollment cannot substitute mixed verifying shares or one-family/one-role membership (15.315708ms)
+✔ research replay ledger rejects duplicates atomically and cannot imply durable replay protection (152.685ms)
+✔ pinned FROST 3.0.0 independently cross-checks valid, cancelling, changed and malformed public shares (5354.037875ms)
+ℹ 200 public transcripts cross-checked against pinned frost_core::verify_signature_share; 40 valid and 160 malformed/altered cases.
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7344.013542
