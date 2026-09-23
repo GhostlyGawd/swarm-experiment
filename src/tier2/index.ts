@@ -6,6 +6,7 @@ export { ResourceBudgetBridge, decodeBudgetSettlementWitness, type ResourceBudge
 export { adapterArtifactDigest, adapterArtifactForSource, admitAdapterSource, admittedAdapterArtifactDigest, type AdapterArtifactV1 } from './adapter-artifact.ts';
 export { validateEffectResourcePolicyBody, effectResourcePolicyDigest, signEffectResourcePolicy, assertSignedEffectResourcePolicy, effectResourcePath, assertEffectResourceAdapter, type EffectResourceRuleV1, type EffectResourcePolicyBodyV1, type SignedEffectResourcePolicyV1 } from './effect-resource-policy.ts';
 export { validateEffectResourcePolicyBodyV2, effectResourcePolicyDigestV2, signEffectResourcePolicyV2, assertSignedEffectResourcePolicyV2, effectResourcePathV2, assertEffectResourceAdapterV2, type EffectResourceRuleV2, type EffectResourcePolicyBodyV2, type SignedEffectResourcePolicyV2 } from './effect-resource-policy.ts';
+export { createEffectSignerAnchor, type EffectSignerAnchor } from './effect-signer-anchor.ts';
 export { ProofCache, type ProofCacheStats } from './proof-cache.ts';
 export { verifyIncremental, type IncrementalVerificationResult } from './incremental.ts';
 export { TypeChecker, typecheck, tyEqual, tyToString, underlying, type CheckResult, type Diagnostic } from './typecheck.ts';

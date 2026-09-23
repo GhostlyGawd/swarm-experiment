@@ -10,6 +10,7 @@ import { CapabilitySealer, CapabilityRegistry, RevocationList } from '../../src/
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
 import { effectResourcePolicyDigest, effectResourcePolicyDigestV2, signEffectResourcePolicy, signEffectResourcePolicyV2, type EffectResourcePolicyBodyV1, type EffectResourcePolicyBodyV2 } from '../../src/tier2/effect-resource-policy.ts';
+import { createEffectSignerAnchor } from '../../src/tier2/effect-signer-anchor.ts';
 import { adapterArtifactForSource, admitAdapterSource, admittedAdapterArtifactDigest } from '../../src/tier2/adapter-artifact.ts';
 import { createEvidenceManifest } from '../../src/fabric/evidence.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
@@ -207,7 +208,9 @@ test('signed resource policy binds a real process effect to its manifest and cur
     const signedOptions: ProcessHostOptions = { ...f.options, manifest: signedManifest,
       effectRouterFactory: factory(f.directory, signedManifest, CAP_LEDGER_APPEND, sink),
       scopedGrants: grants, signedEffectResourcePolicy, effectResourceSignerKey: publicKey, currentEffectPolicyEpoch: () => effectPolicyEpoch,
+      legacyEffectSignerTrust: 'factory-v1',
       onPhase: phase => { if (phase === 'effect-requested' && rotateAtEffect) { rotateAtEffect = false; effectPolicyEpoch = '1'; } } };
+    await assert.rejects(ProcessHost.open({ ...signedOptions, legacyEffectSignerTrust: undefined }), /explicit legacy signer trust profile/);
     await assert.rejects(ProcessHost.open({ ...signedOptions, effectResourceSignerKey: generateKeyPairSync('ed25519').publicKey }), /untrusted/);
     await assert.rejects(ProcessHost.open({ ...signedOptions, manifest: f.options.manifest }), /stale or foreign/);
     host = await ProcessHost.open(signedOptions);
@@ -240,6 +243,7 @@ test('signed process policy refuses a changed adapter before dispatch', async ()
     const keys = generateKeyPairSync('ed25519');
     host = await ProcessHost.open({ ...f.options, manifest: manifestValue, scopedGrants: grants,
       signedEffectResourcePolicy: signEffectResourcePolicy(body, 'adapter-policy', keys.privateKey), effectResourceSignerKey: keys.publicKey,
+      legacyEffectSignerTrust: 'factory-v1',
       currentEffectPolicyEpoch: () => epochs.policyEpoch, effectRouterFactory: factory(f.directory, manifestValue, CAP_LEDGER_APPEND, changed) });
     const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
     const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
@@ -266,10 +270,13 @@ test('v2 process policy requires the exact loader-admitted adapter bytes before 
         adapterDigest: effectAdapterDigest(adapter), adapterArtifactDigest: artifactDigest }] };
     const manifestValue = { ...f.options.manifest, capabilityPolicyDigest: effectResourcePolicyDigestV2(body) }, keys = generateKeyPairSync('ed25519');
     let active: EffectAdapter = adapter;
-    host = await ProcessHost.open({ ...f.options, manifest: manifestValue, scopedGrants: grants,
+    const legacySignedOptions: ProcessHostOptions = { ...f.options, manifest: manifestValue, scopedGrants: grants,
       signedEffectResourcePolicy: signEffectResourcePolicyV2(body, 'artifact-policy', keys.privateKey), effectResourceSignerKey: keys.publicKey,
+      legacyEffectSignerTrust: 'factory-v1',
       currentEffectPolicyEpoch: () => epochs.policyEpoch,
-      effectRouterFactory: context => factory(f.directory, manifestValue, CAP_LEDGER_APPEND, active)(context) });
+      effectRouterFactory: context => factory(f.directory, manifestValue, CAP_LEDGER_APPEND, active)(context) };
+    await assert.rejects(ProcessHost.open({ ...legacySignedOptions, legacyEffectSignerTrust: undefined }), /explicit legacy signer trust profile/);
+    host = await ProcessHost.open(legacySignedOptions);
     const alice = await host.allocateRecord(ACCOUNT, { id: text('alice'), balance: integer(100) }, { operationId: 'alice' });
     const bob = await host.allocateRecord(ACCOUNT, { id: text('bob'), balance: integer(0) }, { operationId: 'bob' });
     const args = [reference(alice), reference(bob), integer(10)], scope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
@@ -281,6 +288,39 @@ test('v2 process policy requires the exact loader-admitted adapter bytes before 
     assert.equal(globals.__aetherV2SinkCalls, 1);
     assert.deepEqual(balances(await host.snapshot()), ['90', '10']);
   } finally { await host?.close(); f.cleanup(); delete globals.__aetherV2SinkCalls; }
+});
+
+test('anchored ProcessHost pins signer key in durable configuration across reopen', async () => {
+  const f = fixture(), { epochs, grants } = scopedAuthority(f.directory); let host: ProcessHost | undefined;
+  try {
+    const body: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: grants.repositoryId,
+      astRoot: f.options.manifest.astRoot, policyEpoch: epochs.policyEpoch,
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: 'pinned-sink',
+        adapterDigest: domainDigest('aether.effect-adapter/1', 'pinned-sink'),
+        adapterArtifactDigest: domainDigest('aether.effect-adapter-artifact/1', 'pinned-sink-bytes') }] };
+    const manifestValue = { ...f.options.manifest, capabilityPolicyDigest: effectResourcePolicyDigestV2(body) };
+    const trusted = generateKeyPairSync('ed25519'), replacement = generateKeyPairSync('ed25519');
+    const anchor = createEffectSignerAnchor({ repositoryId: grants.repositoryId, signer: 'pinned-policy',
+      epochAuthorityId: 'process-host-grant-epochs', publicKey: trusted.publicKey,
+      currentEpoch: () => epochs.policyEpoch });
+    const old = signEffectResourcePolicyV2(body, anchor.signer, trusted.privateKey);
+    const forged = signEffectResourcePolicyV2(body, anchor.signer, replacement.privateKey);
+    const options: ProcessHostOptions = { ...f.options, manifest: manifestValue, scopedGrants: grants,
+      signedEffectResourcePolicy: old, effectSignerAnchor: anchor };
+    host = await ProcessHost.open(options); const before = await host.snapshot();
+    await host.close(); host = undefined;
+    await assert.rejects(ProcessHost.open({ ...options, signedEffectResourcePolicy: forged }), /untrusted effect resource policy v2 signer/);
+    await assert.rejects(ProcessHost.open({ ...options, effectResourceSignerKey: replacement.publicKey }), /independent signer authority/);
+    const newAnchor = createEffectSignerAnchor({ repositoryId: grants.repositoryId, signer: 'pinned-policy',
+      epochAuthorityId: 'process-host-grant-epochs', publicKey: replacement.publicKey,
+      currentEpoch: () => epochs.policyEpoch });
+    await assert.rejects(ProcessHost.open({ ...options, signedEffectResourcePolicy: forged, effectSignerAnchor: newAnchor }), /configuration mismatch/);
+    const replacedEpochSource = createEffectSignerAnchor({ repositoryId: grants.repositoryId, signer: 'pinned-policy',
+      epochAuthorityId: 'different-epoch-authority', publicKey: trusted.publicKey, currentEpoch: () => epochs.policyEpoch });
+    await assert.rejects(ProcessHost.open({ ...options, effectSignerAnchor: replacedEpochSource }), /configuration mismatch/);
+    host = await ProcessHost.open(options);
+    assert.deepEqual(await host.snapshot(), before);
+  } finally { await host?.close(); f.cleanup(); }
 });
 
 test('strict scoped grants remain bound through an actual cross-process nested call', async () => {

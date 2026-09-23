@@ -17,6 +17,7 @@ import { CapabilitySealer, RevocationList } from '../../src/tier2/ocap.ts';
 import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { DurableGrantEpochs } from '../../src/tier2/grant-epochs.ts';
 import { effectResourcePolicyDigest, effectResourcePolicyDigestV2, signEffectResourcePolicy, signEffectResourcePolicyV2, type EffectResourcePolicyBodyV1, type EffectResourcePolicyBodyV2 } from '../../src/tier2/effect-resource-policy.ts';
+import { createEffectSignerAnchor } from '../../src/tier2/effect-signer-anchor.ts';
 import { adapterArtifactDigest, adapterArtifactForSource, admitAdapterSource } from '../../src/tier2/adapter-artifact.ts';
 import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
 import { DurableEffectBroker, type EffectAdapter } from '../../src/fabric/effects.ts';
@@ -25,7 +26,7 @@ import { DEFAULT_EVIDENCE_POLICY, DEFAULT_EVIDENCE_POLICY_V2, mintLocalEvidence,
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
 import type { TaggedValueV1, LogicalRefV1 } from '../../src/fabric/encoding.ts';
 import { PromotionCoordinator, approvePromotion, evidenceBundleDigest, migrationPlanDigest, effectPlanDigest, type PromotionInput, type PromotionCoordinatorOptions } from '../../src/fabric/promotion.ts';
-import { ProcessDeployment, processMigrationPlan, processEffectPlan, type ProcessArtifactV1, type ProcessDeploymentOptions } from '../../src/tier4/process-deployment.ts';
+import { ProcessDeployment, processMigrationPlan, processEffectPlan, processAnchoredEffectPlan, type ProcessArtifactV1, type ProcessDeploymentOptions } from '../../src/tier4/process-deployment.ts';
 import { ProcessHost, PROCESS_INVOKE } from '../../src/tier4/process-host.ts';
 import type { TopologyPlan } from '../../src/tier4/topology.ts';
 
@@ -175,7 +176,7 @@ test('process deployment factory serves a signed effect resource policy bound to
       effectResourceSignerKey: keys.publicKey, currentEffectPolicyEpoch: () => epochs.policyEpoch };
   }]]);
   try {
-    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, factories }), /artifact deployment profile requires signed code-provenance policy v2/);
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-artifact-v4', factories }), /artifact deployment profile requires signed code-provenance policy v2/);
     assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false);
     deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-signed-v3', factories });
     assert.equal(deployment.status().capabilityProfile, 'scoped-signed-v3');
@@ -212,10 +213,10 @@ test('fresh production deployment serves exact loader-admitted adapter bytes und
   try {
     globals.__deploymentArtifactCalls = 0;
     const oldContext: EvidenceContext = { ...f.original, policy: { ...DEFAULT_EVIDENCE_POLICY, requireFormal: false } };
-    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, factories,
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-artifact-v4', factories,
       genesis: { context: oldContext, evidence: mintLocalEvidence(oldContext), plan: f.plan(), factoryId: 'ledger-services/1' } }), /process-isolated evidence policy v2/);
     assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false);
-    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, factories });
+    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-artifact-v4', factories });
     assert.equal(deployment.status().capabilityProfile, 'scoped-artifact-v4');
     const { alice, bob } = await accounts(deployment), scope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
     const result = await deployment.call(f.ex.symbols.transfer, [reference(alice), reference(bob), integer(10)],
@@ -226,6 +227,97 @@ test('fresh production deployment serves exact loader-admitted adapter bytes und
     downgradeCandidate = true;
     assert.throws(() => deployment!.registerArtifact({ context: candidate, evidence, plan: f.plan(), factoryId: 'ledger-services/1' }), /signed deployment profile requires complete manifest-bound effect policy/);
     assert.equal(existsSync(candidatePath), false, 'untrusted effect factory cannot persist a candidate artifact');
+    downgradeCandidate = false;
+    await deployment.close(); deployment = undefined;
+    deployment = await ProcessDeployment.open({ ...f.options, capabilityProfile: 'scoped-artifact-v4', factories, genesis: undefined });
+    assert.equal(deployment.status().capabilityProfile, 'scoped-artifact-v4');
+    assert.deepEqual(await balances(deployment), ['90', '10'], 'explicit compatibility profile retains old host state');
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); delete globals.__deploymentArtifactCalls; }
+});
+
+async function anchoredDeploymentFixture() {
+  const f = fixture('artifact-v2');
+  const epochs = new DurableGrantEpochs({ directory: join(f.directory, 'anchored-grant-epochs'), repositoryId: 'deployment-test' });
+  const scopedGrants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(58), repositoryId: 'deployment-test', clock: () => 100,
+    policyEpoch: () => epochs.policyEpoch, revocationEpoch: () => epochs.epoch,
+    isRevoked: (cap, path) => epochs.isRevoked(cap, path), authorizeIssue: () => true, authorizeDelegate: () => true });
+  const trusted = generateKeyPairSync('ed25519'), replacement = generateKeyPairSync('ed25519');
+  const anchor = createEffectSignerAnchor({ repositoryId: scopedGrants.repositoryId, signer: 'production-policy',
+    epochAuthorityId: 'anchored-grant-epochs', publicKey: trusted.publicKey,
+    currentEpoch: () => epochs.policyEpoch });
+  const adapter = await admitAdapterSource(ARTIFACT_SINK_SOURCE, ARTIFACT_SINK_DESCRIPTOR);
+  let useReplacement = false, changeEpochAtEffect = false, changeKeyAtActivation = false;
+  const factories = new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => {
+    const body: EffectResourcePolicyBodyV2 = { format: 'aether.effect-resource-policy/2', repositoryId: scopedGrants.repositoryId,
+      astRoot: artifact.manifest.astRoot, policyEpoch: epochs.policyEpoch,
+      rules: [{ capability: CAP_LEDGER_APPEND, prefix: ['ledger'], argument: 0, adapterId: ARTIFACT_SINK_DESCRIPTOR.id,
+        adapterDigest: ARTIFACT_SINK_ADAPTER_DIGEST, adapterArtifactDigest: ARTIFACT_SINK_DIGEST }] };
+    return { ...hostFactory(f.directory, artifact, adapter), scopedGrants,
+      signedEffectResourcePolicy: signEffectResourcePolicyV2(body, anchor.signer, useReplacement ? replacement.privateKey : trusted.privateKey),
+      onPhase: (phase: string) => { if (phase === 'effect-requested' && changeEpochAtEffect) epochs.advancePolicy(epochs.policyEpoch); } };
+  }]]);
+  const options: ProcessDeploymentOptions = { ...f.options, capabilityProfile: undefined, effectSignerAnchor: anchor, factories,
+    phase: phase => { if (phase === 'before-activation' && changeKeyAtActivation) useReplacement = true; } };
+  return { ...f, anchor, epochs, options, setReplacement: (value: boolean) => { useReplacement = value; },
+    setEpochAtEffect: (value: boolean) => { changeEpochAtEffect = value; },
+    setKeyAtActivation: (value: boolean) => { changeKeyAtActivation = value; } };
+}
+
+test('default effectful deployment pins independent signer across real sink, candidate and restart', async () => {
+  const f = await anchoredDeploymentFixture(); let deployment: ProcessDeployment | undefined;
+  const globals = globalThis as Record<string, unknown>;
+  try {
+    globals.__deploymentArtifactCalls = 0;
+    await assert.rejects(ProcessDeployment.open({ ...f.options, effectSignerAnchor: undefined }), /independently provisioned effect signer anchor/);
+    assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false);
+    deployment = await ProcessDeployment.open(f.options);
+    assert.equal(deployment.status().capabilityProfile, 'scoped-anchored-v4');
+    const stateFile = join(f.options.directory, 'deployment.json'), state = readFileSync(stateFile, 'utf8');
+    const { alice, bob } = await accounts(deployment);
+    const scope = new Map([[CAP_LEDGER_APPEND, ['ledger', 'alice']]]);
+    const args = [reference(alice), reference(bob), integer(10)];
+    assert.equal((await deployment.call(f.ex.symbols.transfer, args,
+      { operationId: 'anchored-valid', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) })).state, 'completed');
+    assert.equal(globals.__deploymentArtifactCalls, 1);
+    f.setReplacement(true);
+    const candidate = f.context('v2'), evidence = mintLocalEvidence(candidate);
+    const candidatePath = join(f.options.directory, 'artifacts', `${executionManifestDigest(evidence.manifest).split(':').at(-1)}.json`);
+    assert.throws(() => deployment!.registerArtifact({ context: candidate, evidence, plan: f.plan(true), factoryId: 'ledger-services/1' }), /untrusted effect resource policy v2 signer/);
+    assert.equal(existsSync(candidatePath), false);
+    await deployment.close(); deployment = undefined;
+    const beforeReopen = readFileSync(stateFile, 'utf8');
+    await assert.rejects(ProcessDeployment.open({ ...f.options, genesis: undefined }), /untrusted effect resource policy v2 signer/);
+    assert.equal(readFileSync(stateFile, 'utf8'), beforeReopen, 'rejected key substitution must not rewrite durable deployment state');
+    f.setReplacement(false);
+    deployment = await ProcessDeployment.open({ ...f.options, genesis: undefined });
+    assert.deepEqual(await balances(deployment), ['90', '10']);
+    assert.notEqual(readFileSync(stateFile, 'utf8'), state, 'valid call persisted without changing the pinned profile');
+    f.setEpochAtEffect(true);
+    await assert.rejects(deployment.call(f.ex.symbols.transfer, args,
+      { operationId: 'anchored-epoch-race', tokens: deployment.issueScopedTokens(f.ex.symbols.transfer, 60000, scope) }), /authority_denied|stale or foreign/);
+    assert.equal(globals.__deploymentArtifactCalls, 1);
+    assert.deepEqual(await balances(deployment), ['90', '10']);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); delete globals.__deploymentArtifactCalls; }
+});
+
+test('anchored promotion binds signer identity and refuses key substitution before activation', async () => {
+  const f = await anchoredDeploymentFixture(); let deployment: ProcessDeployment | undefined;
+  const globals = globalThis as Record<string, unknown>;
+  try {
+    globals.__deploymentArtifactCalls = 0;
+    deployment = await ProcessDeployment.open(f.options);
+    await accounts(deployment);
+    const draft = await f.proposal(deployment), effectPlan = processAnchoredEffectPlan('ledger-services/1', draft.evidence.manifest.capabilityPolicyDigest, f.anchor.digest);
+    const proposal = { ...draft.proposal, effectPlanDigest: effectPlanDigest(effectPlan) };
+    const approved = { ...draft, effectPlan, proposal, approval: approvePromotion(proposal, 'governor', f.keys.privateKey) };
+    f.setKeyAtActivation(true);
+    await assert.rejects(deployment.promote(approved), /untrusted effect resource policy v2 signer/);
+    assert.equal(globals.__deploymentArtifactCalls, 0);
+    f.setReplacement(false); f.setKeyAtActivation(false);
+    await deployment.recover();
+    assert.equal(deployment.status().servingReady, true);
+    assert.equal(deployment.servingManifest(), proposal.candidateManifest);
+    assert.deepEqual(await balances(deployment), ['100', '0']);
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); delete globals.__deploymentArtifactCalls; }
 });
 
@@ -595,26 +687,30 @@ test('deployment legacy profile adoption is explicit and preserves durable recei
   } finally {await deployment?.close();rmSync(f.directory,{recursive:true,force:true});}
 });
 
-test('fresh production deployment defaults to signed scoped authority and refuses a legacy factory', async () => {
+test('fresh production deployment requires an independent signer anchor and preserves explicit legacy histories', async () => {
   const f = fixture(); let deployment: ProcessDeployment | undefined;
   try {
-    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined }), /trusted deployment factory does not match durable capability profile/);
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined }), /independently provisioned effect signer anchor/);
     assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false, 'authority mismatch cannot publish a durable genesis');
     deployment = await ProcessDeployment.open(f.options);
     const state = JSON.parse(readFileSync(join(f.options.directory, 'deployment.json'), 'utf8'));
     assert.equal(state.format, 'aether.process-deployment/3');
     assert.equal(state.capabilityProfile, 'legacy-sealed-v1');
     await deployment.close(); deployment = undefined;
-    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined }), /readiness\/profile/);
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined }), /independently provisioned effect signer anchor/);
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });
 
 test('fresh signed deployment refuses unsigned effect services before durable genesis', async () => {
   const f = fixture(true);
+  const signer = generateKeyPairSync('ed25519');
+  const effectSignerAnchor = createEffectSignerAnchor({ repositoryId: 'deployment-test', signer: 'unsigned-rejection',
+    epochAuthorityId: 'unsigned-test-epochs',
+    publicKey: signer.publicKey, currentEpoch: () => '0' });
   const scopedGrants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(53), repositoryId: 'deployment-test', clock: () => 100,
     policyEpoch: () => '0', revocationEpoch: () => '0', isRevoked: () => false, authorizeIssue: () => true, authorizeDelegate: () => true });
   try {
-    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined,
+    await assert.rejects(ProcessDeployment.open({ ...f.options, capabilityProfile: undefined, effectSignerAnchor,
       factories: new Map([['ledger-services/1', (artifact: ProcessArtifactV1) => ({ ...hostFactory(f.directory, artifact), scopedGrants })]]) }), /signed deployment profile requires complete manifest-bound effect policy/);
     assert.equal(existsSync(join(f.options.directory, 'deployment.json')), false);
   } finally { rmSync(f.directory, { recursive: true, force: true }); }

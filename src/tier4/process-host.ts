@@ -9,6 +9,7 @@ import { capability, type CapabilityName, type NodeRef, type SymbolId } from '..
 import { CapabilityRegistry, CapabilitySealer, RevocationList, type CapabilityToken } from '../tier2/ocap.ts';
 import { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2 } from '../tier2/scoped-grants.ts';
 import { assertSignedEffectResourcePolicy, assertSignedEffectResourcePolicyV2, assertEffectResourceAdapter, assertEffectResourceAdapterV2, effectResourcePath as signedEffectResourcePath, effectResourcePathV2, effectResourcePolicyDigest, effectResourcePolicyDigestV2, type SignedEffectResourcePolicyV1, type SignedEffectResourcePolicyV2 } from '../tier2/effect-resource-policy.ts';
+import { assertEffectSignerAnchor, assertAnchoredEffectPolicy, type EffectSignerAnchor } from '../tier2/effect-signer-anchor.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { ProductionRuntime } from '../tier3/compile.ts';
 import type { EffectEventV1 } from '../fabric/effects.ts';
@@ -117,8 +118,13 @@ export interface ProcessHostOptions {
   readonly effectResourcePolicyDigest?: Digest;
   /** Content-bound policy for deterministic target extraction in strict mode. */
   readonly signedEffectResourcePolicy?: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2;
+  /** Independent production trust source; not supplied by a reloadable services factory. */
+  readonly effectSignerAnchor?: EffectSignerAnchor;
+  /** Compatibility-only signer authority for explicitly selected old profiles. */
   readonly effectResourceSignerKey?: KeyObject | string;
   readonly currentEffectPolicyEpoch?: () => string;
+  /** Explicitly reopen historical signed policies whose signer key came from the caller. */
+  readonly legacyEffectSignerTrust?: 'factory-v1';
   readonly revocations?: RevocationList;
   readonly effectRouterFactory?: (context: ProcessEffectContext) => RuntimeEffectRouter;
   /** Privileged adoption/resumption of exact checkpoint state. No implicit authority from checkpoint bytes. */
@@ -203,15 +209,37 @@ export class ProcessHost {
     if (options.effectResourcePath && !options.scopedGrants || !!options.effectResourcePath !== !!options.effectResourcePolicyDigest) throw new TypeError('strict effect resource policy requires an exact policy digest');
     if (options.effectResourcePolicyDigest) validateDigest(options.effectResourcePolicyDigest, 'aether.effect-resource-policy/1');
     const signed = options.signedEffectResourcePolicy !== undefined;
+    const anchored = options.effectSignerAnchor !== undefined;
+    if (options.legacyEffectSignerTrust !== undefined && options.legacyEffectSignerTrust !== 'factory-v1')
+      throw new TypeError('invalid legacy effect signer trust profile');
+    if (anchored && options.legacyEffectSignerTrust !== undefined)
+      throw new TypeError('anchored ProcessHost cannot use legacy signer trust');
+    if (signed && !anchored && options.legacyEffectSignerTrust !== 'factory-v1')
+      throw new TypeError('unanchored signed effect policy requires explicit legacy signer trust profile');
+    if (!signed && options.legacyEffectSignerTrust !== undefined)
+      throw new TypeError('legacy signer trust profile requires a signed effect policy');
+    if (anchored) {
+      assertEffectSignerAnchor(options.effectSignerAnchor);
+      if (!options.scopedGrants || options.scopedGrants.repositoryId !== options.effectSignerAnchor!.repositoryId
+        || options.effectResourceSignerKey !== undefined || options.currentEffectPolicyEpoch !== undefined
+        || options.effectResourcePath !== undefined || options.effectResourcePolicyDigest !== undefined
+        || signed && options.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/2')
+        throw new TypeError('anchored ProcessHost requires independent signer authority and signed policy v2');
+    }
     if (signed && (!options.scopedGrants || options.effectResourcePath || options.effectResourcePolicyDigest)
-      || signed !== (options.effectResourceSignerKey !== undefined)
-      || signed !== (options.currentEffectPolicyEpoch !== undefined)) throw new TypeError('signed effect resource policy requires strict grants, signer key, and epoch source');
+      || !anchored && (signed !== (options.effectResourceSignerKey !== undefined)
+        || signed !== (options.currentEffectPolicyEpoch !== undefined))) throw new TypeError('signed effect resource policy requires strict grants, signer key, and epoch source');
     this.options = { ...options, plan: JSON.parse(planBytes(options.plan)) as TopologyPlan, initialSnapshot: options.initialSnapshot ? copy(options.initialSnapshot) : undefined };
     this.module = decodeIR(encodeIR(options.module).text);
     this.manifest = decodeExecutionManifest(encodeExecutionManifest(options.manifest));
     if (new GraphStore().intern(this.module) !== this.manifest.astRoot) throw new TypeError('ProcessHost module/manifest mismatch');
+    if (anchored && [...walk(this.module)].some(node => node.kind === 'Invoke') && !signed)
+      throw new TypeError('anchored effectful ProcessHost requires signed policy v2');
     if (signed) {
-      if (options.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2')
+      if (anchored)
+        assertAnchoredEffectPolicy(options.effectSignerAnchor!, options.signedEffectResourcePolicy as SignedEffectResourcePolicyV2,
+          this.manifest, options.scopedGrants!.repositoryId);
+      else if (options.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2')
         assertSignedEffectResourcePolicyV2(options.signedEffectResourcePolicy, this.manifest, options.scopedGrants!.repositoryId,
           options.currentEffectPolicyEpoch!(), options.effectResourceSignerKey!);
       else assertSignedEffectResourcePolicy(options.signedEffectResourcePolicy, this.manifest, options.scopedGrants!.repositoryId,
@@ -226,10 +254,11 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest('aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+    this.configuration = domainDigest(anchored ? 'aether.process-host-config/2' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
       ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2' ? effectResourcePolicyDigestV2(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy ? effectResourcePolicyDigest(this.signedEffectResourcePolicy.body) : options.effectResourcePolicyDigest ?? null,
-        effectResourcePolicySigner: this.signedEffectResourcePolicy?.signer ?? null } : {}) });
+        effectResourcePolicySigner: this.signedEffectResourcePolicy?.signer ?? null } : {}),
+      ...(anchored ? { effectSignerAnchor: options.effectSignerAnchor!.digest } : {}) });
     ensureDurableDirectory(options.directory);
     this.file = join(options.directory, 'host.json');
     this.lock = new JournalLock({ directory: join(options.directory, 'host-lock'), domain: 'aether.process-host-lock', busyError: 'process_host_busy: another state transition is active' });
@@ -709,7 +738,10 @@ export class ProcessHost {
     let suffix: readonly string[];
     if (this.signedEffectResourcePolicy) {
       if (this.signedEffectResourcePolicy.format === 'aether.signed-effect-resource-policy/2') {
-        assertSignedEffectResourcePolicyV2(this.signedEffectResourcePolicy, this.manifest, this.options.scopedGrants!.repositoryId,
+        if (this.options.effectSignerAnchor)
+          assertAnchoredEffectPolicy(this.options.effectSignerAnchor, this.signedEffectResourcePolicy,
+            this.manifest, this.options.scopedGrants!.repositoryId);
+        else assertSignedEffectResourcePolicyV2(this.signedEffectResourcePolicy, this.manifest, this.options.scopedGrants!.repositoryId,
           this.options.currentEffectPolicyEpoch!(), this.options.effectResourceSignerKey!);
         suffix = effectResourcePathV2(this.signedEffectResourcePolicy, request.capability, args);
       } else {
