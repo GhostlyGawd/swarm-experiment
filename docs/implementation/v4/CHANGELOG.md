@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Proved process fallback V2 — 2026-09-23
+
+- Added opt-in process fallback profile `/2` and journal `/2`. An effectful Tier 1 may fall back to an independently proved pure scalar Tier 2 with the same exact contract and a proof digest in the durable profile. V1 histories remain explicit.
+- Opt-in authorized `reconcileBroker: true` recovery reads the original exact request, checks host arguments/context, releases only a confirmed dead writer ticket, and reconciles before worker replay. V1 historical manual reconciliation is unchanged. The V2 supervisor keeps unknown effects blocked, replays committed effects without redispatch, and starts Tier 2 only after a trusted adapter reports definitive noncommit.
+- Real-process SIGKILL tests cover committed, definitive-noncommit and unknown sink outcomes, proof mismatch and revoked Tier 2 authority. The local adapter is trusted; remote sink attestation, general proofs, native in-frame lowering and the 50 ns release limit remain open. T3-07 is still in progress.
+
 ## Opt-in operator witness catalog profile — 2026-09-23
 
 - Added `scoped-anchored-wasm-v8` and `isolated-wasm-v6-witnessed`. Operator-supplied catalog identity is bound into deployment `/8`, prepared `/6`, host configuration `/6` and effect plan `/6`; the exact per-operation witness is checked before broker use. V7 histories retain their original formats and clock-only authority.

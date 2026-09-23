@@ -13,6 +13,7 @@ import { decimal, decodeCanonical, encodeCanonical, exactObject, identifier, val
 import { decodeExecutionManifest, encodeExecutionManifest, domainDigest, executionManifestDigest, validateDigest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
 import { runtimeSnapshotDigest } from '../fabric/snapshot.ts';
+import { checkConservativeFallbackProof, type ConservativeFallbackProofInput } from '../tier3/fallback-proof.ts';
 import { ProcessHost, type ProcessHostCallResult, type ProcessInvocationGrant, type ProcessOperationEffectDisposition } from './process-host.ts';
 
 export interface ProcessFallbackOptions {
@@ -26,6 +27,8 @@ export interface ProcessFallbackOptions {
   readonly key: KeyObject | string;
   /** Supply fresh grants on every tier attempt and cached successful response. */
   readonly tokensFor: (tier: 1 | 2, symbol: SymbolId) => readonly ProcessInvocationGrant[];
+  /** Opt-in V2: exact portable proof of a pure conservative Tier 2. */
+  readonly conservativeProof?: ConservativeFallbackProofInput;
   readonly fault?: (phase: 'intent' | 'tier1-failed' | 'tier2-failed' | 'before-final' | 'final' | 'repair-delivered') => void;
 }
 export interface ProcessFallbackRepairEvent {
@@ -48,7 +51,7 @@ interface Call {
   beforeSnapshot: Digest; generation: string; result: ProcessFallbackResult | null;
 }
 interface Journal {
-  format: 'aether.process-fallback-journal/1'; profile: Digest;
+  format: 'aether.process-fallback-journal/1' | 'aether.process-fallback-journal/2'; profile: Digest;
   calls: Call[]; repairs: { event: ProcessFallbackRepairEvent; acknowledged: boolean }[];
 }
 const LIMITS = { maxFrameBytes: 8 * 1024 * 1024, maxDecompressedBytes: 8 * 1024 * 1024, maxObjects: 100_000 };
@@ -65,6 +68,7 @@ function declaration(module: Term, symbol: SymbolId): Extract<Term, { kind: 'Fun
 
 export class ProcessFallbackSupervisor {
   readonly profileDigest: Digest;
+  readonly conservativeProofDigest: Digest | null;
   private readonly directory: string;
   private readonly file: string;
   private readonly key: KeyObject;
@@ -81,22 +85,28 @@ export class ProcessFallbackSupervisor {
     const identity = options.host.fallbackIdentity();
     if (identity.manifest !== executionManifestDigest(manifest)) throw new TypeError('fallback host/manifest mismatch');
     const one = declaration(module, options.tier1), two = declaration(module, options.tier2), store = new GraphStore();
+    const proved = options.conservativeProof !== undefined;
     if (one.symbol === two.symbol || !one.body || !two.body || !one.contract || !two.contract
       || store.intern(one.contract) !== store.intern(two.contract)
       || one.params.length !== two.params.length || one.params.some((param, index) => param.symbol !== two.params[index].symbol || !tyEqual(param.ty, two.params[index].ty))
-      || !tyEqual(one.returns, two.returns) || one.purity !== two.purity || !same(one.capabilities, two.capabilities)
+      || !tyEqual(one.returns, two.returns)
+      || (proved ? two.purity !== 'pure' || two.capabilities.length !== 0
+        : one.purity !== two.purity || !same(one.capabilities, two.capabilities))
       || !same(one.typeParams, two.typeParams) || !same(one.surfaces, two.surfaces))
       throw new TypeError('fallback tiers require identical signature, capabilities and explicit contract/frame');
+    this.conservativeProofDigest = proved
+      ? checkConservativeFallbackProof(module, manifest, two.symbol, options.conservativeProof!) : null;
     if (typeof options.tokensFor !== 'function') throw new TypeError('fallback requires a current grant source');
     ensure(resolve(options.directory)); this.directory = realpathSync(resolve(options.directory)); this.file = join(this.directory, 'fallback.json');
     this.key = key; this.options = Object.freeze({ ...options }); this.symbols = Object.freeze([one.symbol, two.symbol]);
-    this.profileDigest = domainDigest('aether.process-fallback-profile/1', { host: identity.configuration, hostStorage: identity.storage, manifest: identity.manifest,
-      tier1: one.symbol, tier2: two.symbol, directory: this.directory, signer: createPublicKey(key).export({ type: 'spki', format: 'der' }).toString('base64') });
+    this.profileDigest = domainDigest(proved ? 'aether.process-fallback-profile/2' : 'aether.process-fallback-profile/1', { host: identity.configuration, hostStorage: identity.storage, manifest: identity.manifest,
+      tier1: one.symbol, tier2: two.symbol, directory: this.directory, signer: createPublicKey(key).export({ type: 'spki', format: 'der' }).toString('base64'),
+      ...(proved ? { conservativeProof: this.conservativeProofDigest } : {}) });
     this.lock = new JournalLock({ directory: join(this.directory, 'tickets'), domain: 'aether.process-fallback-lock' });
     this.delivery = new JournalLock({ directory: join(this.directory, 'delivery-tickets'), domain: 'aether.process-fallback-delivery-lock' });
     this.lock.run(() => {
       const seal = join(this.directory, 'initialized.json');
-      if (!existsSync(this.file)) { if (existsSync(seal)) throw new Error('missing established fallback journal'); this.write({ format: 'aether.process-fallback-journal/1', profile: this.profileDigest, calls: [], repairs: [] }, true); }
+      if (!existsSync(this.file)) { if (existsSync(seal)) throw new Error('missing established fallback journal'); this.write({ format: proved ? 'aether.process-fallback-journal/2' : 'aether.process-fallback-journal/1', profile: this.profileDigest, calls: [], repairs: [] }, true); }
       this.read();
       if (!existsSync(seal)) this.publish(seal, encodeCanonical({ profile: this.profileDigest }, LIMITS), true);
       else if (!same(decodeCanonical(readFileSync(seal), LIMITS), { profile: this.profileDigest })) throw new Error('fallback seal mismatch');
@@ -119,7 +129,7 @@ export class ProcessFallbackSupervisor {
     const signature = Buffer.from(envelope.signature, 'base64'), body = envelope.body as Journal;
     if (signature.toString('base64') !== envelope.signature || !verify(null, encodeCanonical(body, LIMITS), createPublicKey(this.key), signature)) throw new Error('forged fallback journal');
     exactObject(body, ['format', 'profile', 'calls', 'repairs']);
-    if (body.format !== 'aether.process-fallback-journal/1' || body.profile !== this.profileDigest || !Array.isArray(body.calls) || !Array.isArray(body.repairs) || body.calls.length > 1000 || body.repairs.length > 2000) throw new Error('fallback journal/profile bound');
+    if (body.format !== (this.conservativeProofDigest ? 'aether.process-fallback-journal/2' : 'aether.process-fallback-journal/1') || body.profile !== this.profileDigest || !Array.isArray(body.calls) || !Array.isArray(body.repairs) || body.calls.length > 1000 || body.repairs.length > 2000) throw new Error('fallback journal/profile bound');
     const ids = new Set<string>(), repairs = new Set<string>();
     for (const call of body.calls) {
       exactObject(call, ['operationId', 'requestDigest', 'args', 'beforeSnapshot', 'generation', 'result']);
@@ -192,6 +202,15 @@ export class ProcessFallbackSupervisor {
   private async stage(call: Call, tier: 1 | 2): Promise<{ result: ProcessHostCallResult; disposition: ProcessOperationEffectDisposition } | ProcessFallbackResult> {
     const host = this.options.host, id = this.hostOperationId(call.operationId, tier), symbol = this.symbols[tier - 1];
     let result = host.operationResult(id), disposition = host.operationEffectDisposition(id);
+    const reconcilePossible = async (): Promise<boolean> => {
+      if (!this.conservativeProofDigest || result?.state !== 'indeterminate' || !disposition?.possibleExternalCommit) return true;
+      try {
+        result = await host.recoverOperation(id, { strategy: 'isolated-replay', reconcileBroker: true });
+        disposition = host.operationEffectDisposition(id);
+        return disposition !== null;
+      } catch { return false; }
+    };
+    if (!await reconcilePossible()) return this.blocked(call, tier, 'effect_reconciliation_required');
     // A revoked grant cannot turn a possibly committed external action into a
     // harmless Tier 3 abort. Inspect the durable effect decision first.
     if (result && disposition?.possibleExternalCommit && (result.state !== 'completed' || !result.execution.ok))
@@ -219,6 +238,8 @@ export class ProcessFallbackSupervisor {
       }
     }
     disposition = host.operationEffectDisposition(id);
+    if (!disposition) return this.blocked(call, tier, 'host_unavailable');
+    if (!await reconcilePossible()) return this.blocked(call, tier, 'effect_reconciliation_required');
     if (!disposition) return this.blocked(call, tier, 'host_unavailable');
     if (result.state === 'indeterminate') {
       if (!disposition.safeToAbortBeforeEffects) return this.blocked(call, tier, 'effect_reconciliation_required');

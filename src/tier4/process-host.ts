@@ -15,7 +15,7 @@ import { assertEffectJournalWitnessCatalog, selectEffectJournalWitness, type Eff
 import { underlying } from '../tier2/typecheck.ts';
 import { ProductionRuntime } from '../tier3/compile.ts';
 import { effectPayloadDigest, type EffectEventV1, type EffectRequestV1 } from '../fabric/effects.ts';
-import { EffectInvocationError, brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerInvoke, brokerPinTrustedClock, brokerPinWitness, brokerReconcileLast, brokerReconcileRecorded, brokerInspectRecorded, brokerMode, type RuntimeEffectRouter } from '../tier3/effects.ts';
+import { EffectInvocationError, brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerInvoke, brokerPinTrustedClock, brokerPinWitness, brokerReconcileLast, brokerReconcileRecorded, brokerReconcileBoundary, brokerInspectRecorded, brokerMode, type RuntimeEffectRouter } from '../tier3/effects.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
 import type { Value } from '../tier3/values.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
@@ -493,10 +493,12 @@ export class ProcessHost {
       return this.execute(journal, call, 'live', tokens);
     }, this.options.lockWaitMs ?? 5000);
   }
-  async recoverOperation(operationId: string, options: { strategy: 'isolated-replay' | 'abort-before-effects' | 'abort-readonly-wasm' } = { strategy: 'isolated-replay' }): Promise<ProcessHostCallResult> {
+  async recoverOperation(operationId: string, options: { strategy: 'isolated-replay' | 'abort-before-effects' | 'abort-readonly-wasm'; reconcileBroker?: boolean } = { strategy: 'isolated-replay' }): Promise<ProcessHostCallResult> {
     identifier(operationId);
-    options = Object.freeze({ strategy: options.strategy });
+    options = Object.freeze({ strategy: options.strategy, ...(options.reconcileBroker === undefined ? {} : { reconcileBroker: options.reconcileBroker }) });
     if (!['isolated-replay', 'abort-before-effects', 'abort-readonly-wasm'].includes(options.strategy)) throw new Error('unknown recovery strategy');
+    if (options.reconcileBroker !== undefined && (typeof options.reconcileBroker !== 'boolean'
+      || options.reconcileBroker && options.strategy !== 'isolated-replay')) throw new TypeError('broker reconciliation requires isolated replay');
     if (this.options.authorizeRecovery?.(operationId, options.strategy) !== true) throw new Error('recovery_authorization_denied');
     return this.lock.runAsync(async () => {
       this.assertOpen(); const journal = this.read(), call = journal.calls.find(call => call.operationId === operationId);
@@ -532,7 +534,8 @@ export class ProcessHost {
       }
       if (options.strategy !== 'isolated-replay') throw new Error('unknown recovery strategy');
       if (this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4'
-        && !this.reconcileV4Call(journal, call)) return this.result(call, journal);
+        ? !this.reconcileV4Call(journal, call) : options.reconcileBroker === true && !this.reconcileBrokerCall(journal, call))
+        return this.result(call, journal);
       await this.ensureWorkers(journal);
       const result = await this.execute(journal, call, 'replay');
       if (result.state === 'completed') {
@@ -900,6 +903,38 @@ export class ProcessHost {
         effect.outcomeDigest = effectOutcomeDigest(effect); this.persist(journal);
       } catch (error) {
         call.failure = `isolated Wasm reconciliation pending: ${String(error)}`; this.persist(journal); return false;
+      }
+    }
+    return true;
+  }
+  private reconcileBrokerCall(journal: HostJournal, call: CallRecord): boolean {
+    for (const effect of call.effects) {
+      if (effect.state !== 'dispatching' && effect.state !== 'indeterminate') continue;
+      try {
+        this.requireRecoveryAuthorization(call.operationId, 'isolated-replay');
+        const retained = journal.snapshots.find(item => item.digest === effect.snapshotDigest)?.snapshot;
+        if (!retained || !this.options.effectRouterFactory) throw new TypeError('unavailable exact broker effect history');
+        const router = this.options.effectRouterFactory(freeze({ operationId: effect.id, rootOperationId: call.operationId,
+          unit: effect.unit, generation: call.generation, manifest: copy(this.manifest), capability: effect.capability,
+          mode: 'live' as const, snapshot: copy(retained) }));
+        if (brokerMode(router) !== 'live') throw new TypeError('broker recovery mode mismatch');
+        brokerBind(router, this.manifest.astRoot as NodeRef);
+        if (this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/3')
+          assertEffectResourceAdapterV3(this.signedEffectResourcePolicy, effect.capability,
+            brokerAdapterIdentity(router, effect.capability));
+        else if (this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2')
+          assertEffectResourceAdapterV2(this.signedEffectResourcePolicy, effect.capability,
+            brokerAdapterIdentity(router, effect.capability));
+        const outcome = brokerReconcileBoundary(router, effect.capability, effect.args, 'operation-0');
+        if (outcome.state === 'indeterminate') return false;
+        this.requireRecoveryAuthorization(call.operationId, 'isolated-replay');
+        if (outcome.state === 'committed')
+          decodeProcessValue(outcome.value, { ...this.scope(journal, effect.unit), ownershipEpoch: call.generation }, retained);
+        effect.state = outcome.state; effect.value = outcome.state === 'committed' ? copy(outcome.value) : null;
+        effect.code = outcome.state === 'committed' ? null : outcome.code;
+        effect.outcomeDigest = effectOutcomeDigest(effect); this.persist(journal);
+      } catch (error) {
+        call.failure = `broker reconciliation pending: ${String(error)}`; this.persist(journal); return false;
       }
     }
     return true;

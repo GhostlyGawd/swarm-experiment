@@ -1,6 +1,6 @@
 import type { CapabilityName, NodeRef } from '../tier1/ids.ts';
 import { decodeExecutionManifest, encodeExecutionManifest, executionManifestDigest, type ExecutionManifestV1 } from '../fabric/identity.ts';
-import { validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
+import { encodeCanonical, validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { DurableEffectBroker, effectPayloadDigest, effectAdapterDigest, type EffectAdapter, type EffectOutcome, type EffectRequestV1, type ExecutionMode } from '../fabric/effects.ts';
 import { assertEffectJournalWitness, type EffectJournalWitness } from '../fabric/effect-journal-witness.ts';
 import { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from '../tier2/adapter-artifact.ts';
@@ -167,6 +167,33 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
       ? DurableEffectBroker.prototype.inspectRecorded.call(this.#options.broker, request, adapter)
       : this.#options.broker.inspectRecorded(request, adapter);
   }
+  /** Historical general-broker reconciliation. The host supplies the exact
+   * tagged arguments retained at the effect boundary; no live grant callback
+   * is evaluated to reconstruct the old request. */
+  reconcileBoundary(capability: CapabilityName, args: readonly TaggedValueV1[], effectId: string): EffectOutcome {
+    if (!this.#bound || this.#options.broker.executionMode !== 'live')
+      throw new TypeError('recorded boundary requires a bound live broker');
+    const adapter = this.#options.adapters.get(capability);
+    if (!adapter) throw new TypeError('recorded boundary lacks its adapter');
+    // This method is reached only from an explicitly authorized host recovery.
+    // A dead writer's immutable ticket must be released before reading its
+    // durable dispatch marker; a live or unverifiable owner still fails closed.
+    DurableEffectBroker.prototype.recoverDeadWriter.call(this.#options.broker);
+    const request = this.#trustedWitness
+      ? DurableEffectBroker.prototype.recordedRequest.call(this.#options.broker, this.#options.executionId, effectId)
+      : this.#options.broker.recordedRequest(this.#options.executionId, effectId);
+    if (!request) throw new Error('recorded effect is absent from the broker');
+    const payload: TaggedValueV1 = { tag: 'sequence', items: [{ tag: 'string', value: capability }, ...args] };
+    if (request.executionId !== this.#options.executionId || request.effectId !== effectId
+      || request.executionManifest !== this.#manifestDigest || request.policyEpoch !== this.#options.policyEpoch
+      || request.deadline !== this.#options.deadline || request.branchId !== (this.#options.branchId ?? null)
+      || request.budgetReservationId !== null || request.payloadDigest !== effectPayloadDigest(payload)
+      || !Buffer.from(encodeCanonical(request.payload)).equals(Buffer.from(encodeCanonical(payload))))
+      throw new TypeError('recorded effect differs from exact host boundary');
+    return this.#trustedWitness
+      ? DurableEffectBroker.prototype.reconcile.call(this.#options.broker, request, adapter)
+      : this.#options.broker.reconcile(request, adapter);
+  }
   #assertRecorded(capability: CapabilityName, request: EffectRequestV1): void {
     if (!this.#bound || !this.#attested || this.#attested.capability !== capability || this.#options.broker.executionMode !== 'live'
       || request.executionId !== this.#options.executionId || request.executionManifest !== this.#manifestDigest
@@ -269,4 +296,9 @@ export function brokerReconcileRecorded(router: RuntimeEffectRouter, capability:
 export function brokerInspectRecorded(router: RuntimeEffectRouter, capability: CapabilityName, request: EffectRequestV1): EffectOutcome | null {
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
   return BrokerEffectRouter.prototype.inspectRecorded.call(router, capability, request);
+}
+export function brokerReconcileBoundary(router: RuntimeEffectRouter, capability: CapabilityName,
+  args: readonly TaggedValueV1[], effectId: string): EffectOutcome {
+  if (!brokerRouters.has(router)) throw new TypeError('recovery requires a broker-backed router');
+  return BrokerEffectRouter.prototype.reconcileBoundary.call(router, capability, args, effectId);
 }

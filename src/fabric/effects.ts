@@ -386,6 +386,17 @@ export class DurableEffectBroker {
       return event.outcome === null ? null : immutable(copy(event.outcome, this.limits));
     });
   }
+  /** Recover the original immutable request by the broker's stable logical
+   * operation identity. A caller must compare all expected payload/context
+   * fields before using it for reconciliation. */
+  recordedRequest(executionId: string, effectId: string): EffectRequestV1 | null {
+    if (this.mode !== 'live') throw new Error('isolated_record_inspection_forbidden');
+    identifier(executionId); identifier(effectId);
+    return this.locked(() => {
+      const event = this.read().records.find(record => record.request.executionId === executionId && record.request.effectId === effectId);
+      return event ? immutable(copy(event.request, this.limits)) : null;
+    });
+  }
   /** Restore only an isolated immutable trace cursor. No live adapter, grant,
    * reservation or reconciliation callback is evaluated. Validate the complete
    * ordered prefix before publishing the new cursor, including backwards moves. */

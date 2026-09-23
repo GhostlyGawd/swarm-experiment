@@ -4,9 +4,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { GraphStore } from '../../src/tier1/store.ts';
+import type { NodeRef } from '../../src/tier1/ids.ts';
 import { Runtime } from '../../src/tier3/runtime.ts';
 import { ProductionRuntime } from '../../src/tier3/compile.ts';
-import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
+import { BrokerEffectRouter, brokerReconcileBoundary } from '../../src/tier3/effects.ts';
 import { TopologyHost } from '../../src/tier4/host.ts';
 import { slice } from '../../src/tier4/topology.ts';
 import { buildLedgerExample, ACCOUNT, CAP_LEDGER_APPEND } from '../../src/examples/ledger.ts';
@@ -115,4 +116,26 @@ test('F04 integration: code identity and isolated fork authority are enforced be
   const outcome = fork.call(ex.symbols.transfer, [a, b, 10n]);
   assert.equal(outcome.ok, false); // buffered intent is explicitly pending, not fabricated success
   assert.equal(isolated.intents().length, 1); assert.equal(calls, 0);
+});
+
+test('authorized broker recovery rejects altered host arguments before querying sink status', () => {
+  const opts = { ...settings(), beforePersist: (event: { state: string }) => {
+    if (event.state === 'committed') throw new Error('receipt write failed');
+  } };
+  let executions = 0, reconciliations = 0;
+  const adapter: EffectAdapter = { id: 'ledger/1', semantics,
+    execute: () => { executions++; return { tag: 'null' }; },
+    reconcile: () => { reconciliations++; return { state: 'committed', value: { tag: 'null' } }; } };
+  const live = router(new DurableEffectBroker(opts), adapter); live.bind(manifest.astRoot as NodeRef);
+  assert.throws(() => live.invoke(CAP_LEDGER_APPEND, ['a', 'b', 10n]), /effect_indeterminate/);
+  const recovery = router(new DurableEffectBroker({ ...opts, beforePersist: undefined,
+    authorizeReconciliation: () => true }), adapter);
+  recovery.bind(manifest.astRoot as NodeRef);
+  const correct = [{ tag: 'string' as const, value: 'a' }, { tag: 'string' as const, value: 'b' },
+    { tag: 'int' as const, value: '10' }];
+  assert.throws(() => brokerReconcileBoundary(recovery, CAP_LEDGER_APPEND,
+    [...correct.slice(0, 2), { tag: 'int', value: '11' }], 'operation-0'), /exact host boundary/);
+  assert.equal(reconciliations, 0);
+  assert.equal(brokerReconcileBoundary(recovery, CAP_LEDGER_APPEND, correct, 'operation-0').state, 'committed');
+  assert.equal(executions, 1); assert.equal(reconciliations, 1);
 });
