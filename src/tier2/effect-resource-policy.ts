@@ -8,6 +8,8 @@ import { encodeCanonical, exactObject, identifier, decimal, validateTaggedValue,
 import { domainDigest, validateDigest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import { validateSinkAdapterArtifactDigest } from '../fabric/sink-receipt.ts';
 import { capability, isNodeRef, type CapabilityName } from '../tier1/ids.ts';
+import { walk, type Term } from '../tier1/ast.ts';
+import { GraphStore } from '../tier1/store.ts';
 
 export interface EffectResourceRuleV1 { readonly capability: CapabilityName; readonly prefix: readonly string[]; readonly argument: number | null; readonly adapterId: string; readonly adapterDigest: Digest }
 export interface EffectResourcePolicyBodyV1 {
@@ -476,4 +478,135 @@ export function assertEffectResourceSinkContextV6(policy: SignedEffectResourcePo
     || rule.sinkStateWitnessDigest !== actual.sinkStateWitnessDigest
     || rule.adapterArtifactDigest !== actual.approvedAdapterArtifactDigest)
     throw new Error('attested sink context is outside signed resource policy v6');
+}
+
+/** V7 signs the complete production adapter table alongside the V6 sink
+ * rules. An empty table/policy is admissible only for an independently checked
+ * module containing no Invoke node, including unreachable declarations. */
+export interface EffectResourceRuleV7 extends EffectResourceRuleV6 {}
+export interface EffectResourcePolicyBodyV7 {
+  readonly format: 'aether.effect-resource-policy/7'; readonly repositoryId: string;
+  readonly astRoot: Digest; readonly policyEpoch: string;
+  readonly adapterTableDigest: Digest; readonly rules: readonly EffectResourceRuleV7[];
+}
+export interface SignedEffectResourcePolicyV7 {
+  readonly format: 'aether.signed-effect-resource-policy/7'; readonly body: EffectResourcePolicyBodyV7;
+  readonly signer: string; readonly signature: string;
+}
+function assertEmptyEffectModuleV7(module: Term | undefined, root: Digest): void {
+  if (!module || module.kind !== 'Module')
+    throw new TypeError('empty v7 effect policy requires an independently checked AST module');
+  // Clone before inspecting both the root and the whole tree so a caller cannot
+  // mutate one traversal independently of the other.
+  const checked = structuredClone(module);
+  if (new GraphStore().intern(checked) !== root)
+    throw new TypeError('empty v7 effect policy AST root mismatch');
+  let count = 0;
+  for (const node of walk(checked)) {
+    if (++count > 100_000) throw new RangeError('empty v7 effect policy AST bound');
+    if (node.kind === 'Invoke') throw new TypeError('empty v7 effect policy cannot admit Invoke');
+  }
+}
+export function validateEffectResourcePolicyBodyV7(value: unknown, module?: Term): asserts value is EffectResourcePolicyBodyV7 {
+  encodeCanonical(value);
+  const body = exactObject(value, ['format', 'repositoryId', 'astRoot', 'policyEpoch', 'adapterTableDigest', 'rules']);
+  if (body.format !== 'aether.effect-resource-policy/7' || !isNodeRef(body.astRoot))
+    throw new TypeError('invalid effect resource policy v7 subject');
+  identifier(body.repositoryId); decimal(body.policyEpoch);
+  validateDigest(body.adapterTableDigest, 'aether.declarative-adapter-table/2');
+  if (!Array.isArray(body.rules) || body.rules.length > 128)
+    throw new TypeError('effect resource policy v7 requires bounded rules');
+  if (body.rules.length === 0) assertEmptyEffectModuleV7(module, body.astRoot as Digest);
+  let previous = '';
+  for (const item of body.rules) {
+    const rule = exactObject(item, ['capability', 'prefix', 'argument', 'adapterId', 'adapterDigest',
+      'adapterArtifactDigest', 'deadline', 'clockDomain', 'deploymentId', 'sinkAnchorDigest',
+      'sinkStateWitnessDigest']);
+    capability(rule.capability as string); path(rule.prefix); identifier(rule.adapterId);
+    validateDigest(rule.adapterDigest, 'aether.effect-adapter/1');
+    validateSinkAdapterArtifactDigest(rule.adapterArtifactDigest);
+    decimal(rule.deadline); identifier(rule.clockDomain); identifier(rule.deploymentId);
+    validateDigest(rule.sinkAnchorDigest, 'aether.sink-anchor/1');
+    validateDigest(rule.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
+    const expected = domainDigest('aether.effect-adapter/1', { id: rule.adapterId,
+      semantics: SINK_WRITE_SEMANTICS });
+    if (rule.adapterDigest !== expected) throw new TypeError('v7 policy requires exact idempotent sink write semantics');
+    if ((rule.capability as string) <= previous || rule.argument !== null
+      && (!Number.isSafeInteger(rule.argument) || (rule.argument as number) < 0 || (rule.argument as number) > 31))
+      throw new TypeError('v7 sink adapter requires sorted rules and bounded argument index');
+    previous = rule.capability as string;
+  }
+}
+export function effectResourcePolicyDigestV7(body: EffectResourcePolicyBodyV7, module?: Term): Digest {
+  validateEffectResourcePolicyBodyV7(body, module);
+  return domainDigest('aether.effect-resource-policy/7', body);
+}
+function signingBytesV7(body: EffectResourcePolicyBodyV7, signer: string): Uint8Array {
+  return encodeCanonical({ domain: 'aether.effect-resource-policy-signature/7', body, signer });
+}
+export function signEffectResourcePolicyV7(body: EffectResourcePolicyBodyV7, signer: string,
+  key: KeyObject | string, module?: Term): SignedEffectResourcePolicyV7 {
+  validateEffectResourcePolicyBodyV7(body, module); identifier(signer);
+  const privateKey = typeof key === 'string' ? createPrivateKey(key) : key;
+  if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'ed25519')
+    throw new TypeError('Ed25519 policy signing key required');
+  return { format: 'aether.signed-effect-resource-policy/7', body, signer,
+    signature: sign(null, signingBytesV7(body, signer), privateKey).toString('base64') };
+}
+export function assertSignedEffectResourcePolicyV7(value: unknown, manifest: ExecutionManifestV1,
+  repositoryId: string, currentEpoch: string, key: KeyObject | string, module?: Term): asserts value is SignedEffectResourcePolicyV7 {
+  encodeCanonical(value);
+  const policy = exactObject(value, ['format', 'body', 'signer', 'signature']);
+  if (policy.format !== 'aether.signed-effect-resource-policy/7')
+    throw new TypeError('unsupported signed effect resource policy v7');
+  validateEffectResourcePolicyBodyV7(policy.body, module); identifier(policy.signer);
+  identifier(repositoryId); decimal(currentEpoch);
+  const body = policy.body as EffectResourcePolicyBodyV7;
+  if (body.repositoryId !== repositoryId || body.astRoot !== manifest.astRoot
+    || body.policyEpoch !== currentEpoch || effectResourcePolicyDigestV7(body, module) !== manifest.capabilityPolicyDigest)
+    throw new Error('stale or foreign effect resource policy v7');
+  if (typeof policy.signature !== 'string' || !/^[A-Za-z0-9+/]{86}==$/.test(policy.signature))
+    throw new TypeError('invalid effect policy v7 signature');
+  const signature = Buffer.from(policy.signature, 'base64');
+  const publicKey = typeof key === 'string' ? createPublicKey(key)
+    : key.type === 'private' ? createPublicKey(key) : key;
+  if (publicKey.asymmetricKeyType !== 'ed25519' || signature.toString('base64') !== policy.signature
+    || !verify(null, signingBytesV7(body, policy.signer as string), publicKey, signature))
+    throw new TypeError('untrusted effect resource policy v7 signer');
+}
+export function effectResourcePathV7(policy: SignedEffectResourcePolicyV7, name: CapabilityName,
+  args: readonly TaggedValueV1[]): readonly string[] {
+  validateEffectResourcePolicyBodyV7(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule) throw new Error('effect capability has no signed v7 resource rule');
+  if (rule.argument === null) return [...rule.prefix];
+  if (nodeTypes.isProxy(args) || !Array.isArray(args))
+    throw new TypeError('effect target arguments must be an ordinary tagged array');
+  const selected = Object.getOwnPropertyDescriptor(args, String(rule.argument));
+  if (!selected) throw new TypeError('missing signed effect target argument');
+  if (!('value' in selected)) throw new TypeError('effect target argument accessor forbidden');
+  const value = selected.value as TaggedValueV1;
+  validateTaggedValue(value);
+  if (value.tag !== 'string' || !SEGMENT.test(value.value) || value.value === '.' || value.value === '..')
+    throw new TypeError('effect target is outside signed resource grammar');
+  return [...rule.prefix, value.value];
+}
+export function assertEffectResourceAdapterV7(policy: SignedEffectResourcePolicyV7, name: CapabilityName,
+  actual: Readonly<{ id: string; digest: Digest; artifactDigest: Digest | null }>): void {
+  validateEffectResourcePolicyBodyV7(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule || rule.adapterId !== actual.id || rule.adapterDigest !== actual.digest
+    || rule.adapterArtifactDigest !== actual.artifactDigest)
+    throw new Error('attested sink adapter is outside signed resource policy v7');
+}
+export function assertEffectResourceSinkContextV7(policy: SignedEffectResourcePolicyV7,
+  name: CapabilityName, actual: Readonly<{ deploymentId: string; sinkAnchorDigest: Digest;
+    sinkStateWitnessDigest: Digest; approvedAdapterArtifactDigest: Digest }>): void {
+  validateEffectResourcePolicyBodyV7(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule || rule.deploymentId !== actual.deploymentId
+    || rule.sinkAnchorDigest !== actual.sinkAnchorDigest
+    || rule.sinkStateWitnessDigest !== actual.sinkStateWitnessDigest
+    || rule.adapterArtifactDigest !== actual.approvedAdapterArtifactDigest)
+    throw new Error('attested sink context is outside signed resource policy v7');
 }
