@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Cold-bound Agent-IR V6 and measured worker subject — 2026-09-24
+
+- Added an opt-in Agent-IR V6 wire with full 256-bit root references and a checked one-literal edit. The unchanged ledger warm fixture now passes 4× on both pinned tokenizers, while cold and changed-session ratios miss. The clean [default release inventory](evidence/bench-fa2fc64/REVIEW.md) verifies 5.629× warm compression at `fa2fc64` and retains 15 unmeasured required NFR targets; representative FR-1.2 and Q03 remain open. [Protocol](AGENT-IR-V6.md).
+- Added a host-side Artifact/4 validator that binds signed pure-candidate evidence to an independently rebuilt worker-bundle V2 manifest. Live worker init, ProcessHost and ProcessDeployment still reject Artifact/4, so T1-05 remains open. [Subject and limits](ARTIFACT4-SUBJECT.md).
+- Extended same-UID V11 resource-scoped controller crash and signed-fence tests through predispatch, postcommit, noncommit recovery and cached target revocation. The full effect-path matrix and independent external sink custody remain open. [Bounded evidence](evidence/v11-resource-crash-fence/REVIEW.md).
+
 ## Checked virtual forwarding and semantic retention expansion — 2026-09-24
 
 - Added an exact one-wrapper candidate builder and independently checked descriptor `/1`. Reference execution preserves the archived call frame and finite AST-step observations; compiled execution retains its host guard boundary; the opt-in resumable profile binds the descriptor and archived declaration in its program identity and restores source bytecode. It still executes the wrapper physically. [D16](decisions/D16-checked-virtual-forward-reference.md), [D17](decisions/D17-virtual-forward-resumable.md).
