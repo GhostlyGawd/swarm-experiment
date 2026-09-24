@@ -1,0 +1,29 @@
+✔ Artifact/4 signed target binds independently rebuilt V2 bundle and exact virtual proof (9495.719041ms)
+✔ Artifact/4 rejects omitted input, changed tool, native library, Node and bundle identity (12763.081ms)
+✔ Artifact/4 remeasures actual current input and build-recipe bytes on decode (9885.815542ms)
+✔ Artifact/4 rejects swapped descriptor, evidence and forged direct ancestry (25655.469709ms)
+✔ Artifact/4 bounded launch check starts only its measured worker bundle (11808.223542ms)
+✔ Artifact/4 init/3 executes the signed pure candidate and restores its real-worker snapshot (14114.674083ms)
+✔ Artifact/4 pure worker cannot gain callbacks through later caller option mutation (10532.658417ms)
+✔ Artifact/4 init/3 refuses tampered proof, authority, and packaged bytes before execution (13287.616417ms)
+✔ Artifact/4 packaged child independently rejects altered init/3 proof (8063.7375ms)
+✔ Artifact/4 ProcessHost config/16 dispatches and reopens exact durable pure state (17564.598709ms)
+✔ Artifact/4 ProcessHost reconciles a real controller SIGKILL before commit (22250.61775ms)
+✔ Artifact/4 ProcessHost config/17 witnesses pure calls and recovers controller crashes (59719.726958ms)
+✔ Artifact/4 ProcessHost refuses effect services and stale signed lineage before call intent (16508.969875ms)
+✔ pure Artifact/4 governor contract binds source snapshot, plan, witnesses and exact evidence (18585.067541ms)
+✔ pure Artifact/4 governor deployment promotes a real host and pins same-ID replay (52820.649667ms)
+✔ pure Artifact/4 deployment refuses superseded source spec before any call intent (15551.045875ms)
+✔ pure Artifact/4 deployment reconciles real controller SIGKILL at prepared (35644.232458ms)
+✔ pure Artifact/4 deployment reconciles real controller SIGKILL at before-activation (48908.879667ms)
+✔ versioned pure virtual witness repairs a mirror after CAS/crash and refuses rollback (34.851375ms)
+✔ pure virtual /3 witness pins source plan and operator authority across revisions (9.285167ms)
+✔ pure virtual /2 journal refuses duplicate and forged same-ID receipts (9.711708ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 404946.087958
