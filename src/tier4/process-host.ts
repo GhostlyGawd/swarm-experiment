@@ -42,6 +42,7 @@ import { ResourceBudgetBridge } from '../tier2/resource-budget-bridge.ts';
 import { assertProcessNativeFallbackBinding, createProcessNativeFallbackBinding, NATIVE_FALLBACK_COMPILER_PROFILE_DIGEST, type ProcessNativeFallbackBindingInput, type ProcessNativeFallbackBindingV1 } from './native-fallback-contract.ts';
 import { runProcessNativeFallback, validateProcessNativeFallbackOutcome, type ProcessNativeFallbackOutcomeV1, type ProcessNativeFallbackLowered } from './native-fallback-runner.ts';
 import { RECORD_FALLBACK_PROFILE_DIGEST, validateCheckedRecordFallbackProof, type CheckedRecordFallbackProof } from '../tier2/record-fallback-proof-checker.ts';
+import { ProcessSemanticRetention } from './process-semantic-retention.ts';
 
 export const PROCESS_INVOKE = capability('cap:process:invoke');
 export type ProcessInvocationGrant = CapabilityToken | ScopedGrantV2;
@@ -194,6 +195,8 @@ export interface ProcessHostOptions {
   /** Operator-selected complete request/grant inventory and durable bridge for
    * the opt-in budgeted V12 sink profile. Never supplied by a reloadable factory. */
   readonly budgetedSinkAuthority?: BudgetedSinkAuthority;
+  /** Operator-held exact AST/dependency retention for all resumable checkpoint leases. */
+  readonly semanticCheckpointRetention?: ProcessSemanticRetention;
   /** Explicitly reopen anchored V2 journals under their original host-config/2 identity. */
   readonly legacyAnchoredEffectPolicy?: 'anchored-v2';
   /** New isolated Wasm signed-policy profile with host-config/4 identity. */
@@ -292,6 +295,8 @@ export class ProcessHost {
     const signed = options.signedEffectResourcePolicy !== undefined;
     const anchored = options.effectSignerAnchor !== undefined;
     const budgetedSink = options.anchoredEffectPolicyProfile === 'attested-sink-v10-budget-witness';
+    const retainedCheckpoints = options.semanticCheckpointRetention !== undefined;
+    if (retainedCheckpoints) ProcessSemanticRetention.authorityDigest(options.semanticCheckpointRetention!);
     const resourceScopedSink = budgetedSink
       || options.anchoredEffectPolicyProfile === 'attested-sink-v9-resource-witness';
     const witnessedSink = resourceScopedSink
@@ -466,7 +471,8 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest(nativeProfile ? 'aether.process-host-config/10' : budgetedSink ? 'aether.process-host-config/11' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+    this.configuration = domainDigest(retainedCheckpoints ? 'aether.process-host-config/12' : nativeProfile ? 'aether.process-host-config/10' : budgetedSink ? 'aether.process-host-config/11' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+      ...(retainedCheckpoints ? { semanticCheckpointRetentionAuthority: ProcessSemanticRetention.authorityDigest(options.semanticCheckpointRetention!) } : {}),
       ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/6' ? effectResourcePolicyDigestV6(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/5' ? effectResourcePolicyDigestV5(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4' ? effectResourcePolicyDigestV4(this.signedEffectResourcePolicy.body)
@@ -516,6 +522,7 @@ export class ProcessHost {
           if (host.#hostJournalWitness) host.#journalWitnessBases.set(journal, { revision: '0', journal: null });
           host.retain(journal, snapshot); host.appendHead(journal, { kind: 'initial', operationId: 'initial', subjectDigest: host.configuration }); host.persist(journal);
         }
+        for (const lease of journal.checkpointLeases ?? []) ProcessHost.prototype.assertCheckpointSemanticRetention.call(host, lease.binding);
         for (const call of journal.calls) if (call.state === 'running') { call.state = 'indeterminate'; call.failure = 'coordinator restarted without a durable completed outcome'; }
         for (const migration of journal.migrations) {
           if (migration.state === 'requested' || migration.state === 'prepared') { migration.state = 'aborted'; migration.failure = 'no durable migration commit; original generation remains authoritative'; }
@@ -1059,7 +1066,7 @@ export class ProcessHost {
       if (plan.units.length !== 1) throw new Error('resumable process bridge requires a single execution unit');
       const unit = this.unitIn(plan, options.symbol); if (!unit) throw new Error('unknown checkpoint entry');
       const prior = journal.checkpointLeases?.find(item => item.binding.operationId === options.operationId);
-      if (prior) { if (prior.binding.baseCheckpoint !== checkpointDigest(base) || prior.binding.initialCheckpoint !== checkpointDigest(initial) || prior.binding.symbol !== options.symbol) throw new Error('checkpoint operation identity conflict'); this.checkpointAuthority('begin', prior.binding, tokens); return copy(prior.binding); }
+      if (prior) { if (prior.binding.baseCheckpoint !== checkpointDigest(base) || prior.binding.initialCheckpoint !== checkpointDigest(initial) || prior.binding.symbol !== options.symbol) throw new Error('checkpoint operation identity conflict'); this.checkpointAuthority('begin', prior.binding, tokens); ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, prior.binding); return copy(prior.binding); }
       this.assertReady(journal);
       if (journal.calls.some(item => item.operationId === options.operationId)
         || journal.allocations.some(item => item.operationId === options.operationId)
@@ -1077,6 +1084,13 @@ export class ProcessHost {
       const body: Omit<ProcessCheckpointBinding, 'id'> = { format: 'aether.process-checkpoint-binding/1', operationId: options.operationId, symbol: options.symbol, configuration: this.configuration, generation: journal.generation, unit, processHead: journal.heads.at(-1)!.digest, beforeSnapshot: runtimeSnapshotDigest(journal.snapshot), baseCheckpoint: checkpointDigest(base), initialCheckpoint: checkpointDigest(initial), program: program.digest, executionId: initial.core.executionId };
       const binding = { ...body, id: processCheckpointBindingDigest(body) };
       this.checkpointAuthority('begin', binding, tokens);
+      // This runs under the host journal lock and before any checkpoint intent
+      // is written. A failed or crashed pin cannot leave an unprotected lease.
+      if (this.options.semanticCheckpointRetention) {
+        ProcessSemanticRetention.prototype.prepare.call(this.options.semanticCheckpointRetention, ProcessHost.prototype.fallbackIdentity.call(this), this.module, this.manifest,
+          { operationId: binding.operationId, generation: binding.generation, beforeSnapshot: binding.beforeSnapshot });
+        ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, binding);
+      }
       writeProcessCheckpoint(this.options.directory, base, program); writeProcessCheckpoint(this.options.directory, initial, program);
       if (journal.format === 'aether.process-host/1') journal.format = 'aether.process-host/2'; journal.checkpointLeases ??= []; journal.checkpointReceipts ??= [];
       journal.checkpointLeases.push({ binding, state: 'active', latestCheckpoint: binding.initialCheckpoint, checkpoints: [binding.initialCheckpoint], receipt: null });
@@ -1084,12 +1098,13 @@ export class ProcessHost {
     }, this.options.lockWaitMs ?? 5000);
   }
   async readCheckpoint(bindingId: Digest): Promise<ResumableSnapshot> {
-    return this.lock.runAsync(async () => { const lease = this.read().checkpointLeases?.find(item => item.binding.id === bindingId); if (!lease) throw new Error('unknown checkpoint lease'); return readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, this.checkpointProgram()); }, this.options.lockWaitMs ?? 5000);
+    return this.lock.runAsync(async () => { const lease = this.read().checkpointLeases?.find(item => item.binding.id === bindingId); if (!lease) throw new Error('unknown checkpoint lease'); ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding); return readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, this.checkpointProgram()); }, this.options.lockWaitMs ?? 5000);
   }
   async checkpointReference(bindingId: Digest, reference: LogicalRefV1, tokens: readonly ProcessInvocationGrant[]): Promise<LogicalRefV1> {
     return this.lock.runAsync(async () => {
       this.assertOpen(); const journal = this.read(), lease = journal.checkpointLeases?.find(item => item.binding.id === bindingId);
       if (!lease || lease.state !== 'committed') throw new Error('checkpoint state has not been published');
+      ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding);
       if (journal.generation !== lease.binding.generation) throw new Error('checkpoint reference mapping is stale after ownership movement');
       this.checkpointAuthority('commit', lease.binding, tokens);
       const source = readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, this.checkpointProgram());
@@ -1099,17 +1114,25 @@ export class ProcessHost {
   }
   checkpointReceipt(bindingId: Digest, tokens: readonly ProcessInvocationGrant[]): ProcessCheckpointReceipt | null {
     this.assertOpen(); const journal = this.read(), lease = journal.checkpointLeases?.find(item => item.binding.id === bindingId);
-    if (!lease) throw new Error('unknown checkpoint lease'); this.checkpointAuthority('commit', lease.binding, tokens);
+    if (!lease) throw new Error('unknown checkpoint lease'); ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding); this.checkpointAuthority('commit', lease.binding, tokens);
     return lease.state === 'committed' ? freeze(copy(journal.checkpointReceipts!.find(receipt => receipt.id === lease.receipt)!)) : null;
   }
   checkpointStatus(bindingId: Digest): Readonly<ProcessCheckpointLease> {
     const lease = this.read().checkpointLeases?.find(item => item.binding.id === bindingId); if (!lease) throw new Error('unknown checkpoint lease'); return freeze(copy(lease));
+  }
+  /** Nonvirtual host-owned check; the session cannot omit or substitute the
+   * retention authority fixed by this host configuration. */
+  assertCheckpointSemanticRetention(binding: ProcessCheckpointBinding): void {
+    this.assertOpen();
+    if (this.options.semanticCheckpointRetention) ProcessSemanticRetention.prototype.assert.call(this.options.semanticCheckpointRetention,
+      ProcessHost.prototype.fallbackIdentity.call(this), this.module, this.manifest, binding);
   }
   async retainPackedLayout(bindingId: Digest, layouts: readonly PackedLayout[], tokens: readonly ProcessInvocationGrant[]): Promise<Digest> {
     layouts = freeze(copy(layouts)); tokens = freeze(copy([...tokens]));
     return this.lock.runAsync(async () => {
       this.assertOpen(); const journal = this.read(), lease = journal.checkpointLeases?.find(item => item.binding.id === bindingId);
       if (!lease || lease.state !== 'active') throw new Error('packed layout requires an active checkpoint lease');
+      ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding);
       this.checkpointAuthority('packed', lease.binding, tokens);
       if (journal.generation !== lease.binding.generation || journal.heads.at(-1)!.digest !== lease.binding.processHead) throw new Error('packed layout lease lost production ownership');
       return writeProcessPackedLayout(this.options.directory, layouts);
@@ -1126,7 +1149,7 @@ export class ProcessHost {
       this.assertOpen(); const journal = this.read(), lease = journal.checkpointLeases?.find(item => item.binding.id === bindingId);
       if (!lease) throw new Error('unknown checkpoint lease');
       const assertAuthority = (): void => { this.assertOpen(); this.checkpointAuthority(action, lease.binding, tokens, control); if (lease.state !== 'active') throw new Error(`checkpoint lease is ${lease.state}`); if (journal.generation !== lease.binding.generation || journal.heads.at(-1)!.digest !== lease.binding.processHead || runtimeSnapshotDigest(journal.snapshot) !== lease.binding.beforeSnapshot) throw new Error('checkpoint lease lost its production ownership'); };
-      assertAuthority(); const program = this.checkpointProgram();
+      assertAuthority(); ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding); const program = this.checkpointProgram();
       const before = copy(journal.snapshot), base = readProcessCheckpoint(this.options.directory, lease.binding.baseCheckpoint, program);
       const executionOrigin = lease.latestCheckpoint;
       const controls = journal.checkpointControls?.filter(item => item.binding === bindingId) ?? [], latestControl = controls.at(-1);
@@ -1144,7 +1167,7 @@ export class ProcessHost {
         if (additions.some(event => event.op === 'start' || event.code === 'host' && !(action === 'reconcile' && event.op === 'retry-reconciled-effect'))) throw new Error('leased continuation cannot inject a new invocation or debugger mutation');
         projectProcessCheckpoint(snapshot, before, lease.binding.generation, lease.binding.unit);
         const digest = writeProcessCheckpoint(this.options.directory, snapshot, program); assertAuthority();
-        if (digest !== lease.latestCheckpoint) { lease.latestCheckpoint = digest; lease.checkpoints.push(digest); this.persist(journal); this.phase('checkpoint-saved', lease.binding.operationId, lease.binding.generation); }
+        if (digest !== lease.latestCheckpoint) { ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding); lease.latestCheckpoint = digest; lease.checkpoints.push(digest); this.persist(journal); this.phase('checkpoint-saved', lease.binding.operationId, lease.binding.generation); }
       };
       const access: ProcessCheckpointAccess = {
         replayBarrier, controlReceipt: priorControl ? freeze(copy(priorControl)) : null,
@@ -1171,6 +1194,7 @@ export class ProcessHost {
           this.phase('checkpoint-control-before-commit', control.operationId, lease.binding.generation); assertAuthority();
           if (journal.format !== 'aether.process-host/4' && journal.format !== 'aether.process-host/5')
             journal.format = 'aether.process-host/3';
+          ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding);
           (journal.checkpointControls ??= []).push(result); lease.latestCheckpoint = afterCheckpoint; lease.checkpoints.push(afterCheckpoint); this.persist(journal);
           this.phase('checkpoint-control-committed', control.operationId, lease.binding.generation); return freeze(copy(result));
         },
@@ -1182,10 +1206,10 @@ export class ProcessHost {
           const audit = writeCheckpointEffectAudit(this.options.directory, snapshot, effectAudit); const after = projectProcessCheckpoint(snapshot, before, lease.binding.generation, lease.binding.unit); this.validateSnapshot(after, journal.generation, JSON.parse(journal.plan) as TopologyPlan);
           const body: Omit<ProcessCheckpointReceipt, 'id'> = { format: 'aether.process-checkpoint-receipt/1', binding: lease.binding.id, checkpoint: lease.latestCheckpoint, beforeSnapshot: lease.binding.beforeSnapshot, afterSnapshot: runtimeSnapshotDigest(after), effectAudit: audit, eventHead: snapshot.eventHead, eventCursor: snapshot.eventCursor };
           const receipt = { ...body, id: processCheckpointReceiptDigest(body) };
-          this.phase('checkpoint-before-commit', lease.binding.operationId, lease.binding.generation); assertAuthority(); journal.snapshot = after; this.retain(journal, after); lease.state = 'committed'; lease.receipt = receipt.id; journal.checkpointReceipts!.push(receipt);
+          this.phase('checkpoint-before-commit', lease.binding.operationId, lease.binding.generation); assertAuthority(); ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding); journal.snapshot = after; this.retain(journal, after); lease.state = 'committed'; lease.receipt = receipt.id; journal.checkpointReceipts!.push(receipt);
           this.appendHead(journal, { kind: 'checkpoint', operationId: lease.binding.operationId, subjectDigest: receipt.id }); this.persist(journal); this.phase('checkpoint-committed', lease.binding.operationId, lease.binding.generation); return freeze(copy(receipt));
         },
-        abort: () => { if (action !== 'abort') throw new Error('checkpoint abort requires explicit recovery action'); assertAuthority(); const latest = readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, program); if (latest.core.effectCursor !== '0') throw new Error('cannot abort a checkpoint with terminal external effects'); lease.state = 'aborted'; this.persist(journal); this.phase('checkpoint-aborted', lease.binding.operationId, lease.binding.generation); },
+        abort: () => { if (action !== 'abort') throw new Error('checkpoint abort requires explicit recovery action'); assertAuthority(); const latest = readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, program); if (latest.core.effectCursor !== '0') throw new Error('cannot abort a checkpoint with terminal external effects'); ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding); lease.state = 'aborted'; this.persist(journal); this.phase('checkpoint-aborted', lease.binding.operationId, lease.binding.generation); },
       };
       return operation(access);
     }, this.options.lockWaitMs ?? 5000);

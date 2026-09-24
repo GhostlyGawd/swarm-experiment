@@ -16,7 +16,7 @@ import { ResumableRuntime, type ResumableRuntimeOptions, type ResumableEffects, 
 import { packResumableCheckpoint, type PackedLayout } from '../tier3/packed-heap.ts';
 import { PackedNativeProcessRunner, type PackedNativeRun } from './packed-native-process.ts';
 import { checkpointDigest, machineClone, type ResumableSnapshot, type MachineValue, type MachineCore } from '../tier3/resumable-state.ts';
-import type { ProcessHost, ProcessCheckpointAccess, ProcessInvocationGrant } from './process-host.ts';
+import { ProcessHost, type ProcessCheckpointAccess, type ProcessInvocationGrant } from './process-host.ts';
 import { projectProcessCheckpoint, processReferenceFromCheckpoint, validateCheckpointControlRequest, type ProcessCheckpointBinding, type ProcessCheckpointReceipt, type ProcessCheckpointControlRequest, type ProcessCheckpointControl } from './process-checkpoint-contract.ts';
 
 export interface ProcessResumableEffectsContext {
@@ -88,9 +88,19 @@ export class ProcessResumableSession {
   private constructor(binding: ProcessCheckpointBinding, options: ProcessResumableOptions) { this.binding = machineClone(binding); this.options = options; }
   static async begin(options: ProcessResumableOptions, base: ResumableSnapshot, initial: ResumableSnapshot, request: { operationId: string; symbol: SymbolId; expectedSnapshot: Digest; expectedGeneration: string }): Promise<ProcessResumableSession> {
     preflight(options.module);
-    const binding = await options.host.beginCheckpoint(base, initial, { ...request, tokens: options.tokens() }); return new ProcessResumableSession(binding, options);
+    const binding = await options.host.beginCheckpoint(base, initial, { ...request, tokens: options.tokens() });
+    ProcessHost.prototype.assertCheckpointSemanticRetention.call(options.host, binding);
+    return new ProcessResumableSession(binding, options);
   }
-  static reopen(options: ProcessResumableOptions, bindingId: Digest): ProcessResumableSession { preflight(options.module); return new ProcessResumableSession(options.host.checkpointStatus(bindingId).binding, options); }
+  static reopen(options: ProcessResumableOptions, bindingId: Digest): ProcessResumableSession {
+    preflight(options.module);
+    const binding = options.host.checkpointStatus(bindingId).binding;
+    ProcessHost.prototype.assertCheckpointSemanticRetention.call(options.host, binding);
+    return new ProcessResumableSession(binding, options);
+  }
+  private assertRetention(): void {
+    ProcessHost.prototype.assertCheckpointSemanticRetention.call(this.options.host, this.binding);
+  }
   private resources(access: ProcessCheckpointAccess, snapshot: () => ResumableSnapshot): { effects: ResumableEffects | undefined; adapters: ReadonlyMap<CapabilityName, EffectAdapter> } {
     const original = this.options.effects?.({ binding: access.binding, snapshot: () => projectProcessCheckpoint(snapshot(), access.before, access.binding.generation, access.binding.unit) });
     if (!original) return { effects: undefined, adapters: new Map() };
@@ -118,6 +128,7 @@ export class ProcessResumableSession {
     return events;
   }
   async run(maxInstructions = 100_000): Promise<ResumableRunResult> {
+    this.assertRetention();
     return this.options.host.withCheckpoint(this.binding.id, 'run', this.options.tokens(), async access => {
       let latest = access.checkpoint;
       const resources = this.resources(access, () => latest);
@@ -140,6 +151,7 @@ export class ProcessResumableSession {
     });
   }
   async reconcile(): Promise<void> {
+    this.assertRetention();
     await this.options.host.withCheckpoint(this.binding.id, 'reconcile', [], async access => {
       let latest = access.checkpoint; const resources = this.resources(access, () => latest); if (!resources.effects) throw new Error('no checkpoint effect broker');
       resources.effects.broker.recoverDeadWriter();
@@ -170,6 +182,7 @@ export class ProcessResumableSession {
   }
   async rewind(request: Extract<ProcessCheckpointControlRequest, { kind: 'rewind' }>): Promise<ProcessCheckpointControl> { return this.control(request); }
   private async control(request: ProcessCheckpointControlRequest, packedLayouts?: readonly PackedLayout[]): Promise<ProcessCheckpointControl> {
+    this.assertRetention();
     validateCheckpointControlRequest(request); request = machineClone(request);
     return this.options.host.withCheckpoint(this.binding.id, request.kind === 'rewind' ? 'rewind' : request.kind === 'packed-v1' || request.kind === 'packed-v2' ? 'packed' : 'correct', this.options.tokens(), async access => {
       if (access.controlReceipt) return access.controlReceipt;
@@ -242,6 +255,7 @@ export class ProcessResumableSession {
     }, request);
   }
   async commit(): Promise<ProcessCheckpointReceipt> {
+    this.assertRetention();
     const existing = this.options.host.checkpointReceipt(this.binding.id, this.options.tokens()); if (existing) return existing;
     return this.options.host.withCheckpoint(this.binding.id, 'commit', this.options.tokens(), async access => {
       const checkpoint = access.checkpoint, resources = this.resources(access, () => checkpoint), events = this.events(resources);
@@ -255,6 +269,7 @@ export class ProcessResumableSession {
     });
   }
   async abort(): Promise<void> {
+    this.assertRetention();
     await this.options.host.withCheckpoint(this.binding.id, 'abort', [], async access => {
       const resources = this.resources(access, () => access.checkpoint);
       if (this.events(resources).some(event => event.dispatchStarted || event.outcome?.state === 'committed' || event.outcome?.state === 'indeterminate' || event.prepared !== null)) throw new Error('cannot abort checkpoint with possible external work');
@@ -264,6 +279,7 @@ export class ProcessResumableSession {
   /** A reference is reissued only against the committed lease's unchanged
    * ownership generation. Movement requires explicit fresh host handles. */
   async publishedReference(reference: LogicalRefV1): Promise<LogicalRefV1> {
+    this.assertRetention();
     return this.options.host.checkpointReference(this.binding.id, reference, this.options.tokens());
   }
 }
