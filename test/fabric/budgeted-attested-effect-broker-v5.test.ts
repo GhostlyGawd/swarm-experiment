@@ -114,10 +114,16 @@ function fixture() {
     deploymentId, journalKind: 'bridge', journalId: 'bridge:v5', read: () => bridgeHead,
     advance(expected, journal) { assert.equal(bridgeHead.revision, expected);
       bridgeHead = { revision: String(BigInt(expected) + 1n), journal }; return bridgeHead; } });
-  let broker!: DurableEffectBroker, authorizations = 0, denyOn = -1, failReserved = false;
+  let broker!: DurableEffectBroker, authorizations = 0, denyOn = -1,
+    failReserved = false, failReserveAfterLedger = false;
   const bridge = new ResourceBudgetBridge({ directory: join(directory, 'bridge'), profile: bridgeProfile,
     ledger, key: budgetKeys.privateKey, journalWitness: bridgeWitness, mode: () => broker.executionMode,
-    authorize: () => true, observe: evidence.observe });
+    authorize: () => true, observe: evidence.observe,
+    fault: (phase, operation) => {
+      if (failReserveAfterLedger && phase === 'after-ledger' && operation === 'reserve') {
+        failReserveAfterLedger = false; throw new Error('simulated reserve receipt crash');
+      }
+    } });
   const brokerOptions = { directory: join(directory, 'broker'), clockDomain: 'clock:v5', clock: () => 100n,
     authorize: () => ++authorizations !== denyOn, authorizeReconciliation: () => true,
     beforePersist: (event: { state: string }) => {
@@ -142,6 +148,7 @@ function fixture() {
     setWitnessOutage(value: boolean) { witnessOutage = value; },
     setDenyOn(value: number) { denyOn = value; },
     failNextReserved() { failReserved = true; },
+    failNextReserveReceipt() { failReserveAfterLedger = true; },
     get executes() { return executes; },
     close() { rmSync(directory, { recursive: true, force: true }); } };
 }
@@ -183,6 +190,19 @@ test('V5 recovers a reserve that reached the bridge before broker publication', 
     assert.equal(f.broker.reconcile(f.req, f.adapter).state, 'aborted');
     assert.equal(f.ledger.snapshot('budget-owner').inflight.usdMicros, '0');
     assert.equal(f.ledger.snapshot('budget-owner').spent.usdMicros, '0');
+  } finally { f.close(); }
+});
+
+test('V5 keeps funds encumbered when the bridge loses its reserve receipt', () => {
+  const f = fixture();
+  try {
+    f.failNextReserveReceipt();
+    assert.equal(f.broker.dispatch(f.req, f.adapter).state, 'indeterminate');
+    assert.equal(f.ledger.snapshot('budget-owner').inflight.usdMicros, '10');
+    assert.equal(f.executes, 0);
+    f.setStatus('fence', true);
+    assert.equal(f.broker.reconcile(f.req, f.adapter).state, 'aborted');
+    assert.equal(f.ledger.snapshot('budget-owner').inflight.usdMicros, '0');
   } finally { f.close(); }
 });
 

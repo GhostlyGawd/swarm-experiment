@@ -828,7 +828,7 @@ export class DurableEffectBroker {
       };
       // ID, authorization context and ordered input are durable before any adapter or budget call.
       this.persist(journal, event);
-      let reserved = false;
+      let reserved = false, reserveAttempted = false;
       const abort = (code: string, confirmedBeforeSink = false): EffectOutcome => {
         if (reserved && this.#budgetBridge) return this.budgetedResolve(journal, event, adapter);
         if (event.prepared !== null) adapter.abort?.(request, event.prepared);
@@ -851,6 +851,7 @@ export class DurableEffectBroker {
         if (refusal) return abort(refusal);
         if (request.budgetReservationId !== null) {
           if (!this.options.budgets && !this.#budgetBridge) return abort('budget_adapter_missing');
+          reserveAttempted = true;
           if (!this.budgetReserve(request)) return abort('budget_exhausted');
           reserved = true;
         }
@@ -880,7 +881,7 @@ export class DurableEffectBroker {
         event = this.step(journal, event, 'committed', { outcome,
           ...(this.#attestedSink ? { signedSinkReceipt } : {}) }); return outcome;
       } catch (error) {
-        if (this.#budgetBridge && reserved) return this.budgetedResolve(journal, event, adapter);
+        if (this.#budgetBridge && reserveAttempted) return this.budgetedResolve(journal, event, adapter);
         if (event.dispatchStarted) {
           const outcome = this.uncertain(event);
           try { this.step(journal, event, 'indeterminate', { outcome }); } catch { /* Durable prepared dispatch marker remains the recovery authority. */ }
