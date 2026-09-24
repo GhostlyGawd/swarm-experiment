@@ -86,6 +86,14 @@ export interface ProcessChannelOptions {
   readonly timeoutMs?: number;
   readonly maxFrameBytes?: number;
 }
+/** Pure workers must never retain a caller-owned options object that can
+ * acquire callback handlers after admission. Legacy channels still support
+ * their existing callback options. */
+function pureWorkerOptions(options: ProcessChannelOptions, profile: string): ProcessChannelOptions {
+  if (options.onCall !== undefined || options.onEffect !== undefined)
+    throw new TypeError(`${profile} does not admit remote calls or effects`);
+  return Object.freeze({ timeoutMs: options.timeoutMs, maxFrameBytes: options.maxFrameBytes });
+}
 export class ProcessChannelError extends Error {
   readonly code: 'timeout' | 'eof' | 'protocol' | 'remote' | 'closed';
   readonly outcomeUnknown: boolean;
@@ -179,8 +187,7 @@ export class ProcessChannel {
   }
   static async startVirtual(init: ProcessVirtualChannelInitV2,
     options: ProcessChannelOptions = {}): Promise<ProcessChannel> {
-    if (options.onCall || options.onEffect)
-      throw new TypeError('pure virtual worker does not admit remote calls or effects');
+    const transport = pureWorkerOptions(options, 'pure virtual worker');
     // Snapshot the entire caller-owned init before any semantic read. This
     // rejects accessors/proxies and prevents an option from changing between
     // parent admission, worker spawn and the init/2 payload.
@@ -206,7 +213,7 @@ export class ProcessChannel {
       throw new TypeError('virtual target must be compiled locally');
     const channel = new ProcessChannel({ module, manifest: artifact.candidateEvidence.manifest,
       unit: safe.unit, includeSymbols, capabilities: [], heapId: safe.heapId,
-      ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, options,
+      ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, transport,
     artifact.executableSubject.bundle.path);
     channel.virtualAdmission = { version: 3, artifact, lineage };
     try {
@@ -224,8 +231,7 @@ export class ProcessChannel {
   }
   static async startVirtualV4(init: ProcessVirtualChannelInitV3,
     options: ProcessChannelOptions = {}): Promise<ProcessChannel> {
-    if (options.onCall || options.onEffect)
-      throw new TypeError('pure Artifact/4 worker does not admit remote calls or effects');
+    const transport = pureWorkerOptions(options, 'pure Artifact/4 worker');
     const limits = { maxFrameBytes: 16 * 1024 * 1024,
       maxDecompressedBytes: 16 * 1024 * 1024, maxObjects: 500_000, maxDepth: 128 };
     const safe = decodeCanonical(encodeCanonical(init, limits), limits) as unknown as ProcessVirtualChannelInitV3;
@@ -250,7 +256,7 @@ export class ProcessChannel {
       throw new TypeError('Artifact/4 target must be compiled locally');
     const channel = new ProcessChannel({ module, manifest: artifact.candidateEvidence.manifest,
       unit: safe.unit, includeSymbols, capabilities: [], heapId: safe.heapId,
-      ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, options, path);
+      ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, transport, path);
     channel.virtualAdmission = { version: 4, artifact, lineage };
     try {
       validatePackagedProcessVirtualArtifactV4(artifact, lineage, channel.workerPath);

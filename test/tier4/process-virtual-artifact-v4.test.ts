@@ -28,7 +28,7 @@ import { decodeProcessVirtualArtifactV4, encodeProcessVirtualArtifactV4,
   assertProcessVirtualArtifactV4Launch,
   type ProcessWorkerBundleManifestV2 } from '../../src/tier4/process-virtual-artifact-v4.ts';
 import { verifyWorkerBundle } from '../../scripts/process-worker-bundle.ts';
-import { ProcessChannel } from '../../src/tier4/process-channel.ts';
+import { ProcessChannel, type ProcessChannelOptions } from '../../src/tier4/process-channel.ts';
 import { ProcessHost, type ProcessHostOptions } from '../../src/tier4/process-host.ts';
 import type { TopologyPlan } from '../../src/tier4/topology.ts';
 import { type ProcessVirtualWorkerTrustV1 } from '../../src/tier4/process-virtual-worker-contract.ts';
@@ -287,6 +287,41 @@ test('Artifact/4 init/3 executes the signed pure candidate and restores its real
     assert.notEqual(worker.pid, oldPid);
     assert.deepEqual((await worker.call(f.entry, [3n], await worker.snapshot())).execution,
       first.execution);
+  } finally { await worker?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('Artifact/4 pure worker cannot gain callbacks through later caller option mutation', async () => {
+  const f = fixture(manifest);
+  const options: ProcessChannelOptions = {};
+  let dispatched = 0;
+  let worker: ProcessChannel | undefined;
+  try {
+    worker = await ProcessChannel.startVirtualV4({ artifact: f.artifact!, trust: f.trust,
+      unit: 'pure', heapId: 'artifact4-options-heap', ownershipEpoch: '1' }, options);
+    Object.assign(options, {
+      onCall: () => { dispatched++; throw new Error('late call handler ran'); },
+      onEffect: () => { dispatched++; throw new Error('late effect handler ran'); },
+    });
+    const internal = worker as unknown as { options: ProcessChannelOptions;
+      callback(id: string, method: 'call' | 'effect', value: unknown): Promise<void>;
+      send(value: unknown): void };
+    assert.notEqual(internal.options, options);
+    assert.equal(internal.options.onCall, undefined);
+    assert.equal(internal.options.onEffect, undefined);
+    const snapshot = await worker.snapshot();
+    const replies: unknown[] = [];
+    const originalSend = internal.send;
+    internal.send = value => { replies.push(value); };
+    try {
+      await internal.callback('late-call', 'call', { symbol: f.target, from: f.entry,
+        args: [], snapshot, operationId: 'late-call' });
+      await internal.callback('late-effect', 'effect', { capability: 'cap:probe:effect',
+        from: f.entry, args: [], snapshot, operationId: 'late-effect', effectIndex: 0 });
+    } finally { internal.send = originalSend; }
+    assert.equal(dispatched, 0);
+    assert.deepEqual(replies.map(reply => (reply as { ok: boolean }).ok), [false, false]);
+    assert.deepEqual((await worker.call(f.entry, [3n], snapshot)).execution,
+      { ok: true, value: 4n, steps: 0 });
   } finally { await worker?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });
 
