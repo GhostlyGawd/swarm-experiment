@@ -1,0 +1,36 @@
+✔ descriptor binds only rewritten candidate Call objects and derives exact ordered event script (9.935667ms)
+✔ checker refuses tampered script, site, root and forged digest even when resealed (12.12425ms)
+✔ candidate Call object aliasing cannot turn an unrelated target call into a virtual site (1.344958ms)
+✔ changed candidate, nonempty contracts and nonforwarding wrapper fail closed (2.244459ms)
+✔ dynamic calls, annotation calls and absent rewritten sites are unsupported (1.85425ms)
+✔ R2: the two runtimes agree on every generated case (626.232333ms)
+✔ R2: a proved clause is elided; an unproved one is kept (16.192125ms)
+✔ R2: eliding a proved clause cannot change an observable outcome (1232.729166ms)
+✔ R2: a precondition is elided only when every call site proved it (11.920625ms)
+✔ R2: security is not telemetry — capabilities survive stripping (4.595125ms)
+✔ R2: an ungranted capability fails to compile, not at runtime (0.457834ms)
+✔ R2: the stripped artifact is materially faster than the journaling one (39.859875ms)
+✔ R2: loop invariants and variants carry no runtime cost (8.569959ms)
+✔ R2: the compilation report says exactly what is unchecked and why (8.754875ms)
+✔ R2: with no verification result, nothing is elided (1.286291ms)
+✔ R2: a contract that does fail still faults in production (8.213333ms)
+✔ G4: production telemetry sampling is opt-in and rate bounded (1.247416ms)
+✔ compiled virtual forwarding retains wrapper and target guard denial timing before effects (21.446833ms)
+✔ existing direct target calls do not acquire a virtual wrapper guard (11.503375ms)
+✔ compiled consumer rejects a tampered descriptor and a changed candidate (2.6845ms)
+✔ virtual target must be compiled locally, even when a remote call handler exists (1.783416ms)
+✔ virtual forwarding cannot reuse v4 vetted admission for the candidate alone (0.9745ms)
+✔ virtual forwarding cannot bind an effect router to the candidate root alone (0.997ms)
+✔ checked virtual forwarding preserves exact finite-fuel faults, frames, callbacks and effects (336.297208ms)
+✔ virtual forwarding is bound to the exact candidate and leaves original direct calls alone (2.989333ms)
+✔ loaded virtual forwarding retains checked AST bytes after caller mutation (2.299875ms)
+✔ a target fault retains the archived wrapper frame and fault bindings (51.274417ms)
+✔ virtual forwarding refuses an effect router until its manifest binds the sidecar (0.917125ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2979.586042
