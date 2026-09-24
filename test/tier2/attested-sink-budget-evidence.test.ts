@@ -8,7 +8,8 @@ import { signSinkReceipt, sinkValueDigest, type SinkPublicAnchorV1,
   type SinkReceiptBodyV1 } from '../../src/fabric/sink-receipt.ts';
 import { advanceSinkStateHead, createSinkStateWitness, type SinkStateDecisionRowV1,
   type SinkStateHeadV1, type SinkStateWitnessV1 } from '../../src/fabric/sink-state-witness.ts';
-import { createAttestedSinkBudgetEvidence } from '../../src/tier2/attested-sink-budget-evidence.ts';
+import { attestedSinkBudgetEvidencePolicyDigest,
+  createAttestedSinkBudgetEvidence } from '../../src/tier2/attested-sink-budget-evidence.ts';
 import { type BudgetObservation, type BudgetSettlementWitness } from '../../src/tier2/resource-budget-bridge.ts';
 import { type ResourceAmounts, type ResourceSettlement } from '../../src/tier2/resource-budget.ts';
 
@@ -54,9 +55,10 @@ function fixture(expectedRequests: readonly EffectRequestV1[] = [
       if (head.revision !== expected) throw new Error('stale witness CAS');
       head = { revision: String(BigInt(expected) + 1n), journal }; return head;
     } });
-  const evidence = createAttestedSinkBudgetEvidence({ witness, anchor, repositoryId: anchor.repositoryId,
+  const policyOptions = { witness, anchor, repositoryId: anchor.repositoryId,
     deploymentId: 'deployment:one', approvedAdapterArtifactDigest: artifact,
-    ledgerDigest, owner: 'budget-service', charge, expectedRequests });
+    owner: 'budget-service', charge, expectedRequests };
+  const evidence = createAttestedSinkBudgetEvidence({ ...policyOptions, ledgerDigest });
   const rows: SinkStateDecisionRowV1[] = [];
   const append = (r: EffectRequestV1, disposition: 'committed' | 'not_committed') => {
     rows.push(row(anchor, key.privateKey, r, rows.length + 1, disposition));
@@ -65,7 +67,7 @@ function fixture(expectedRequests: readonly EffectRequestV1[] = [
       adapterArtifactDigest: artifact, decisions: rows })).toString('utf8');
     advanceSinkStateHead(witness, String(rows.length - 1), journal);
   };
-  return { anchor, witness, evidence, append, rows,
+  return { anchor, witness, evidence, policyOptions, append, rows, head: () => head,
     setOutage: (value: boolean) => { outage = value; },
     rollback: () => { head = { revision: '0', journal: null }; } };
 }
@@ -103,6 +105,51 @@ test('one signed commit and one signed fence settle fixed charge and terminal re
   const absent = request('effect:absent');
   assert.deepEqual(f.evidence.observe(absent), { state: 'unknown' });
   assert.equal(f.evidence.verifySettlement(settlement(absent, fence)), false);
+});
+
+test('policy digest is stable on reopen and changes with charge, trust roots and full request inventory', () => {
+  const r = request('effect:one');
+  const f = fixture([r, request('effect:fence')]);
+  const base = attestedSinkBudgetEvidencePolicyDigest(f.policyOptions);
+  assert.equal(f.evidence.policyDigest, base);
+  assert.ok(base.startsWith('aether.attested-sink-budget-evidence-policy/1:b3:'));
+  assert.notEqual(attestedSinkBudgetEvidencePolicyDigest({ ...f.policyOptions,
+    charge: { ...charge, tokens: '3' } }), base);
+  assert.notEqual(attestedSinkBudgetEvidencePolicyDigest({ ...f.policyOptions,
+    deploymentId: 'deployment:other' }), base);
+  assert.notEqual(attestedSinkBudgetEvidencePolicyDigest({ ...f.policyOptions,
+    owner: 'other-budget-owner' }), base);
+  assert.notEqual(attestedSinkBudgetEvidencePolicyDigest({ ...f.policyOptions,
+    expectedRequests: [{ ...r, capabilityGrantRef: 'grant:other' }, request('effect:fence')] }), base);
+  assert.notEqual(attestedSinkBudgetEvidencePolicyDigest({ ...f.policyOptions,
+    expectedRequests: [{ ...r, budgetReservationId: 'budget:other' }, request('effect:fence')] }), base);
+  assert.equal(attestedSinkBudgetEvidencePolicyDigest({ ...f.policyOptions,
+    expectedRequests: [request('effect:fence'), r] }), base);
+  const otherWitness = createSinkStateWitness({ authorityId: 'external:other', anchor: f.anchor,
+    adapterArtifactDigest: artifact, read: f.head,
+    advance: () => { throw new Error('unused'); } });
+  assert.notEqual(attestedSinkBudgetEvidencePolicyDigest({ ...f.policyOptions,
+    witness: otherWitness }), base);
+  const otherKey = generateKeyPairSync('ed25519');
+  const otherAnchor = { ...f.anchor,
+    publicKey: otherKey.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') };
+  const otherAnchorWitness = createSinkStateWitness({ authorityId: 'external:operator',
+    anchor: otherAnchor, adapterArtifactDigest: artifact,
+    read: () => ({ revision: '0', journal: null }),
+    advance: () => { throw new Error('unused'); } });
+  assert.notEqual(attestedSinkBudgetEvidencePolicyDigest({ ...f.policyOptions,
+    anchor: otherAnchor, witness: otherAnchorWitness }), base);
+  f.append(r, 'committed');
+  const reopened = createSinkStateWitness({ authorityId: 'external:operator', anchor: f.anchor,
+    adapterArtifactDigest: artifact, read: f.head,
+    advance: () => { throw new Error('unused'); } });
+  assert.equal(attestedSinkBudgetEvidencePolicyDigest({ ...f.policyOptions,
+    witness: reopened }), base);
+  assert.equal(createAttestedSinkBudgetEvidence({ ...f.policyOptions,
+    witness: reopened, ledgerDigest }).policyDigest, base);
+  f.setOutage(true);
+  assert.equal(attestedSinkBudgetEvidencePolicyDigest({ ...f.policyOptions,
+    witness: reopened }), base);
 });
 
 test('outer settlement binds exact request, result, charge, owner and inner receipt', () => {

@@ -85,16 +85,20 @@ export interface AttestedSinkBudgetEvidenceOptions {
   readonly expectedRequests: readonly EffectRequestV1[];
 }
 export interface AttestedSinkBudgetEvidence {
+  readonly policyDigest: Digest;
   observe(request: EffectRequestV1): BudgetObservation;
   verifySettlement(settlement: ResourceSettlement): boolean;
 }
 
-export function createAttestedSinkBudgetEvidence(options: AttestedSinkBudgetEvidenceOptions): AttestedSinkBudgetEvidence {
+export type AttestedSinkBudgetEvidencePolicyOptions = Omit<AttestedSinkBudgetEvidenceOptions, 'ledgerDigest'>;
+function preparePolicy(options: AttestedSinkBudgetEvidencePolicyOptions): Readonly<{
+  policyDigest: Digest; expected: Map<string, Digest>; effects: Set<string>;
+  anchor: SinkPublicAnchorV1; charge: ResourceAmounts;
+}> {
   assertSinkStateWitness(options.witness);
   validateSinkPublicAnchor(options.anchor);
   identifier(options.repositoryId); identifier(options.deploymentId); identifier(options.owner);
   validateSinkAdapterArtifactDigest(options.approvedAdapterArtifactDigest);
-  validateDigest(options.ledgerDigest, 'aether.resource-budget/1');
   amount(options.charge);
   if (!Array.isArray(options.expectedRequests) || options.expectedRequests.length < 1
     || options.expectedRequests.length > 256)
@@ -102,6 +106,7 @@ export function createAttestedSinkBudgetEvidence(options: AttestedSinkBudgetEvid
   const expected = new Map<string, Digest>();
   const effects = new Set<string>();
   const reservations = new Set<string>();
+  const inventory: { binding: ResourceBinding; budgetReservationId: string; requestDigest: Digest }[] = [];
   for (const request of options.expectedRequests) {
     validateEffectRequest(request, SINK_RECEIPT_LIMITS);
     if (request.budgetReservationId === null) throw new TypeError('expected sink request needs budget reservation ID');
@@ -109,8 +114,11 @@ export function createAttestedSinkBudgetEvidence(options: AttestedSinkBudgetEvid
     const effect = effectKey(request);
     if (expected.has(bound) || effects.has(effect) || reservations.has(request.budgetReservationId))
       throw new TypeError('ambiguous expected sink request binding or reservation');
-    expected.set(bound, effectRequestDigest(request, SINK_RECEIPT_LIMITS));
+    const requestDigest = effectRequestDigest(request, SINK_RECEIPT_LIMITS);
+    expected.set(bound, requestDigest);
     effects.add(effect); reservations.add(request.budgetReservationId);
+    inventory.push({ binding: binding(request), budgetReservationId: request.budgetReservationId,
+      requestDigest });
   }
   const anchor = decodeCanonical(encodeCanonical(options.anchor)) as unknown as SinkPublicAnchorV1;
   const charge = Object.freeze(decodeCanonical(encodeCanonical(options.charge)) as unknown as ResourceAmounts);
@@ -119,6 +127,30 @@ export function createAttestedSinkBudgetEvidence(options: AttestedSinkBudgetEvid
     || options.witness.sinkAnchorDigest !== domainDigest('aether.sink-anchor/1', anchor)
     || options.witness.adapterArtifactDigest !== options.approvedAdapterArtifactDigest)
     throw new TypeError('sink budget evidence identity differs from independently pinned witness');
+  inventory.sort((left, right) => {
+    const a = bindingKey(left.binding), b = bindingKey(right.binding);
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  const policyDigest = domainDigest('aether.attested-sink-budget-evidence-policy/1', {
+    format: 'aether.attested-sink-budget-evidence-policy/1', repositoryId: options.repositoryId,
+    deploymentId: options.deploymentId, sinkAnchorDigest: options.witness.sinkAnchorDigest,
+    sinkStateWitnessDigest: options.witness.digest,
+    approvedAdapterArtifactDigest: options.approvedAdapterArtifactDigest,
+    owner: options.owner, charge, expectedRequests: inventory,
+  });
+  return { policyDigest, expected, effects, anchor, charge };
+}
+
+/** Pure pre-ledger identity: excludes ledgerDigest to avoid a construction
+ * cycle, but includes the canonical inventory of full request digests. It
+ * does not contact the witness service or read its head. */
+export function attestedSinkBudgetEvidencePolicyDigest(options: AttestedSinkBudgetEvidencePolicyOptions): Digest {
+  return preparePolicy(options).policyDigest;
+}
+
+export function createAttestedSinkBudgetEvidence(options: AttestedSinkBudgetEvidenceOptions): AttestedSinkBudgetEvidence {
+  validateDigest(options.ledgerDigest, 'aether.resource-budget/1');
+  const { policyDigest, expected, effects, anchor, charge } = preparePolicy(options);
 
   const currentRows = (): readonly SinkStateDecisionRowV1[] | null => {
     try {
@@ -191,5 +223,5 @@ export function createAttestedSinkBudgetEvidence(options: AttestedSinkBudgetEvid
         disposition: outer.disposition, value: outer.value });
     } catch { return false; }
   };
-  return Object.freeze({ observe, verifySettlement });
+  return Object.freeze({ policyDigest, observe, verifySettlement });
 }
