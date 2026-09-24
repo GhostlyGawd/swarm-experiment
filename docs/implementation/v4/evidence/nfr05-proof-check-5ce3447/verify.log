@@ -1,0 +1,12 @@
+{
+  "verified": true,
+  "sourceMatches": true,
+  "verdict": "fail",
+  "minimumNs": 1738459,
+  "medianNs": 1903583,
+  "p95Ns": 2088542,
+  "maximumNs": 2203166,
+  "overBound": 200,
+  "hardMaximumNs": 50000
+}
+

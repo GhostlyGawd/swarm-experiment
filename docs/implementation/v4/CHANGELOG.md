@@ -1,5 +1,9 @@
 # Implementation specification changelog
 
+## Portable certificate check latency preflight — 2026-09-24
+
+- Added a versioned, raw-sample NFR-05 preflight for a complete seven-obligation portable AST certificate check. The clean `5ce3447` campaign measured 200 checks on Apple M4 Pro: 1,903.583 µs median, 2,203.166 µs maximum, all above the unchanged 50 µs bound. The independent verifier checks source pins, certificate and sample verdict. This bounded fixture does not qualify NFR-05 for release; it stays unmeasured in the default inventory. [Evidence and limits](evidence/nfr05-proof-check-5ce3447/REVIEW.md).
+
 ## Checked closure values in contract projection V15 — 2026-09-24
 
 - Added `aether.executable-projection/15` for capability-free function values passed into contracts and straight-line factories with scalar block-local captures. The projector derives exact owner/lambda-root certificates, the parser recomputes the certificate set, and matched native runtimes refuse unmarked host closures and mutable captures before contract execution. [Bounded profile and trust limits](../../../roadmap/v4/research/projections/CHECKED-CLOSURE-VALUES.md).
