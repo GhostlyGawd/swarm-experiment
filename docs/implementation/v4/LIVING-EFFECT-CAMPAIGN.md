@@ -44,7 +44,28 @@ The interpreter and local synthetic sink are part of the trusted implementation;
 this profile signs their declared semantics but does not bind a measured runtime
 binary or an independently attested external sink. It supports the v1 scenario
 boundary, not arbitrary opaque values or full production module dependencies.
-The process/socket fault campaign remains a separate fixed broker companion;
-the signed candidate path has not yet run its Aether module across a production
-worker, host-level partition or external sink. The complete campaign rate must
+The earlier fixed process/socket companion remains separate. V3 exercises a
+signed candidate in an independent research worker, but has not reached
+production ProcessHost, a host-level partition or an external sink. The complete campaign rate must
 meet the fixed R04 2,000,000/s threshold before T3-03 G2 can close.
+
+## V3 independent-process crash profile
+
+Authorization `/3` keeps the V2 exact module, policy and response bindings but
+uses a separate signature and campaign-manifest domain. Its sole fault mode is
+`sigkill-once-after-dispatch`. The trusted test worker fsyncs its local sink,
+durably records a one-time crash marker, then sends itself `SIGKILL` before the
+broker receipt is committed. A fresh worker calls `recoverEffectCase` to
+release only the dead owner and reconcile the exact generated case from the
+local sink before it retries. V2 fault modes and signatures remain unchanged.
+The V3 executor refuses direct execution unless the host explicitly opts its
+isolated worker in with `AETHER_LIVING_CRASH_WORKER=1`; the signed authorization
+alone cannot make an ordinary controller kill itself.
+
+The V3 crash profile cannot call `runEffectful` or `admitEffectful`: a process
+that dies mid-case has no local complete-run report to mint. The independent
+campaign retains every worker observation, raw sink and broker record, and
+checks all declared cases after recovery. Its result is research evidence with
+`productionAuthorized: false`. The marker and sink share one UID and local
+filesystem, so they do not establish independent external sink custody or a
+production noncommit/commit proof.

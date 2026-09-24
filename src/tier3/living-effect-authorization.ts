@@ -16,9 +16,17 @@ export interface LivingEffectAuthorizationV2 {
   readonly signer: string;
   readonly signature: string;
 }
-type Body = Omit<LivingEffectAuthorizationV2, 'signature'>;
-function signedBytes(body: Body): Uint8Array {
-  return encodeCanonical({ domain: 'aether.living-effect-authorization-signature/2', body });
+/** V3 adds an explicitly signed, one-time independent-process crash injection.
+ * V2 signatures and accepted fault modes retain their original bytes. */
+export interface LivingEffectAuthorizationV3 extends Omit<LivingEffectAuthorizationV2, 'format' | 'faultMode'> {
+  readonly format: 'aether.living-effect-authorization/3';
+  readonly faultMode: 'sigkill-once-after-dispatch';
+}
+export type AnyLivingEffectAuthorization = LivingEffectAuthorizationV2 | LivingEffectAuthorizationV3;
+type BodyV2 = Omit<LivingEffectAuthorizationV2, 'signature'>;
+type BodyV3 = Omit<LivingEffectAuthorizationV3, 'signature'>;
+function signedBytes(body: BodyV2 | BodyV3, version: 2 | 3): Uint8Array {
+  return encodeCanonical({ domain: `aether.living-effect-authorization-signature/${version}`, body });
 }
 function unsupportedResponse(value: TaggedValueV1): boolean {
   if (value.tag === 'ref' || value.tag === 'authority') return true;
@@ -26,18 +34,24 @@ function unsupportedResponse(value: TaggedValueV1): boolean {
   if (value.tag === 'result') return unsupportedResponse(value.value);
   return false;
 }
-export function signLivingEffectAuthorizationV2(body: Body, key: KeyObject | string): LivingEffectAuthorizationV2 {
+export function signLivingEffectAuthorizationV2(body: BodyV2, key: KeyObject | string): LivingEffectAuthorizationV2 {
   const privateKey = typeof key === 'string' ? createPrivateKey(key) : key;
   if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'ed25519') throw new TypeError('Ed25519 campaign key required');
-  return { ...body, signature: sign(null, signedBytes(body), privateKey).toString('base64') };
+  return { ...body, signature: sign(null, signedBytes(body, 2), privateKey).toString('base64') };
 }
-export function assertLivingEffectAuthorizationV2(value: unknown, expected: {
+export function signLivingEffectAuthorizationV3(body: BodyV3, key: KeyObject | string): LivingEffectAuthorizationV3 {
+  const privateKey = typeof key === 'string' ? createPrivateKey(key) : key;
+  if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'ed25519') throw new TypeError('Ed25519 campaign key required');
+  return { ...body, signature: sign(null, signedBytes(body, 3), privateKey).toString('base64') };
+}
+interface ExpectedAuthorization {
   readonly candidateRoot: Digest; readonly campaignDigest: Digest; readonly repositoryId: string;
   readonly policyEpoch: string; readonly signer: string; readonly key: KeyObject | string;
-}): asserts value is LivingEffectAuthorizationV2 {
+}
+function assertVersion(value: unknown, expected: ExpectedAuthorization, version: 2 | 3): void {
   encodeCanonical(value);
   const authorization = exactObject(value, ['format', 'executionManifest', 'signedPolicy', 'campaignDigest', 'responses', 'faultMode', 'signer', 'signature']);
-  if (authorization.format !== 'aether.living-effect-authorization/2') throw new TypeError('unsupported effectful campaign authority');
+  if (authorization.format !== `aether.living-effect-authorization/${version}`) throw new TypeError('unsupported effectful campaign authority');
   validateExecutionManifest(authorization.executionManifest);
   const manifest = authorization.executionManifest as ExecutionManifestV1;
   validateDigest(authorization.campaignDigest, 'aether.living-cooperative-campaign/1');
@@ -57,14 +71,21 @@ export function assertLivingEffectAuthorizationV2(value: unknown, expected: {
     if (unsupportedResponse(response.value as TaggedValueV1))
       throw new TypeError('opaque/authority effect response unsupported by this campaign profile');
   }
-  if (!['none', 'unknown-after-dispatch'].includes(String(authorization.faultMode))) throw new TypeError('unknown campaign effect fault mode');
+  if (!(version === 2 ? ['none', 'unknown-after-dispatch'] : ['sigkill-once-after-dispatch']).includes(String(authorization.faultMode)))
+    throw new TypeError('unknown campaign effect fault mode');
   identifier(authorization.signer);
   if (authorization.signer !== expected.signer || typeof authorization.signature !== 'string'
     || !/^[A-Za-z0-9+/]{86}==$/.test(authorization.signature)) throw new TypeError('untrusted campaign signer');
   const signature = Buffer.from(authorization.signature as string, 'base64');
   const key = typeof expected.key === 'string' ? createPublicKey(expected.key) : expected.key.type === 'private' ? createPublicKey(expected.key) : expected.key;
-  const { signature: _signature, ...body } = authorization as unknown as LivingEffectAuthorizationV2;
+  const { signature: _signature, ...body } = authorization as unknown as AnyLivingEffectAuthorization;
   if (key.asymmetricKeyType !== 'ed25519' || signature.toString('base64') !== authorization.signature
-    || !verify(null, signedBytes(body), key, signature)) throw new TypeError('forged effectful campaign authorization');
+    || !verify(null, signedBytes(body, version), key, signature)) throw new TypeError('forged effectful campaign authorization');
   executionManifestDigest(manifest);
+}
+export function assertLivingEffectAuthorizationV2(value: unknown, expected: ExpectedAuthorization): asserts value is LivingEffectAuthorizationV2 {
+  assertVersion(value, expected, 2);
+}
+export function assertLivingEffectAuthorizationV3(value: unknown, expected: ExpectedAuthorization): asserts value is LivingEffectAuthorizationV3 {
+  assertVersion(value, expected, 3);
 }

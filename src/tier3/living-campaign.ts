@@ -21,7 +21,8 @@ import { Runtime } from './runtime.ts';
 import { BrokerEffectRouter, type RuntimeEffectRouter } from './effects.ts';
 import type { Value, Ref } from './values.ts';
 import { rng } from '../util/rng.ts';
-import { assertLivingEffectAuthorizationV2, type LivingEffectAuthorizationV2 } from './living-effect-authorization.ts';
+import { assertLivingEffectAuthorizationV2, assertLivingEffectAuthorizationV3,
+  type AnyLivingEffectAuthorization } from './living-effect-authorization.ts';
 
 export const LIVING_CAMPAIGN_PROFILE = 'aether.living-cooperative-campaign/1' as const;
 export type CampaignScalar = { readonly tag: 'int'; readonly value: string } | { readonly tag: 'bool'; readonly value: boolean } | { readonly tag: 'string'; readonly value: string } | { readonly tag: 'null' };
@@ -166,11 +167,11 @@ export class LivingCampaign {
   private readonly registry: CapabilityRegistry;
   private readonly directory: string;
   private readonly declarations: Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>;
-  private readonly effectAuthorization: LivingEffectAuthorizationV2 | null;
+  private readonly effectAuthorization: AnyLivingEffectAuthorization | null;
   private readonly effectAuthorizationDigest: Digest | null;
   private readonly acceptedReports = new WeakMap<object, Digest>();
   constructor(options: { manifest: LivingCampaignManifest; module: Term; registry: CapabilityRegistry; directory: string;
-    effectAuthorization?: LivingEffectAuthorizationV2; effectTrust?: { repositoryId: string; policyEpoch: string; signer: string; key: KeyObject | string } }) {
+    effectAuthorization?: AnyLivingEffectAuthorization; effectTrust?: { repositoryId: string; policyEpoch: string; signer: string; key: KeyObject | string } }) {
     this.manifest = clone(options.manifest); this.registry = options.registry; this.directory = resolve(options.directory);
     const store = new GraphStore(), root = store.intern(options.module); this.module = store.hydrate(root);
     if (root !== this.manifest.candidateRoot) throw new TypeError('campaign candidate root mismatch');
@@ -181,16 +182,19 @@ export class LivingCampaign {
     if (options.effectAuthorization || options.effectTrust) {
       if (!options.effectAuthorization || !options.effectTrust) throw new TypeError('effectful campaign requires signed authority and independent trust');
       const campaignDigest = digest(LIVING_CAMPAIGN_PROFILE, this.manifest);
-      assertLivingEffectAuthorizationV2(options.effectAuthorization, { candidateRoot: root, campaignDigest, ...options.effectTrust });
+      if (options.effectAuthorization.format === 'aether.living-effect-authorization/3')
+        assertLivingEffectAuthorizationV3(options.effectAuthorization, { candidateRoot: root, campaignDigest, ...options.effectTrust });
+      else assertLivingEffectAuthorizationV2(options.effectAuthorization, { candidateRoot: root, campaignDigest, ...options.effectTrust });
       const used = new Set<CapabilityName>();
       for (const node of walk(this.module)) if (node.kind === 'Invoke') used.add(node.capability);
       const signed = options.effectAuthorization.signedPolicy.body.rules.map(rule => rule.capability);
       if (used.size !== signed.length || signed.some(capability => !used.has(capability)))
         throw new TypeError('signed effect capability set does not cover exact module');
       this.effectAuthorization = clone(options.effectAuthorization);
-      this.effectAuthorizationDigest = digest('aether.living-effect-authorization/2', this.effectAuthorization);
-      this.manifestId = digest('aether.living-effect-campaign/2', { manifest: this.manifest, authorization: this.effectAuthorization });
-      persist(join(this.directory, 'manifests'), 'aether.living-effect-campaign/2', { manifest: this.manifest, authorization: this.effectAuthorization });
+      const version = this.effectAuthorization.format.endsWith('/3') ? 3 : 2;
+      this.effectAuthorizationDigest = digest(`aether.living-effect-authorization/${version}`, this.effectAuthorization);
+      this.manifestId = digest(`aether.living-effect-campaign/${version}`, { manifest: this.manifest, authorization: this.effectAuthorization });
+      persist(join(this.directory, 'manifests'), `aether.living-effect-campaign/${version}`, { manifest: this.manifest, authorization: this.effectAuthorization });
     } else {
       this.effectAuthorization = null; this.effectAuthorizationDigest = null;
       this.manifestId = digest(LIVING_CAMPAIGN_PROFILE, this.manifest);
@@ -262,9 +266,13 @@ export class LivingCampaign {
         variables: Object.fromEntries(scenario.variables.map(variable => [variable.name, ordinal === 0 ? variable.minimum : ordinal === 1 ? variable.maximum : random.int(variable.minimum, variable.maximum)])) };
     }));
   }
-  private effectCase(input: LivingCase): { router: RuntimeEffectRouter; broker: DurableEffectBroker; sinkDirectory: string } {
+  private effectCase(input: LivingCase): { router: RuntimeEffectRouter; broker: DurableEffectBroker;
+    sinkDirectory: string; adapters: ReadonlyMap<CapabilityName, EffectAdapter> } {
     const authorization = this.effectAuthorization;
     if (!authorization) throw new TypeError('no effectful campaign authorization');
+    if (authorization.format === 'aether.living-effect-authorization/3'
+      && process.env.AETHER_LIVING_CRASH_WORKER !== '1')
+      throw new TypeError('V3 crash fault requires explicit isolated worker opt-in');
     const sinkDirectory = join(this.directory, 'effect-sinks', caseDigest(input).split(':').at(-1)!);
     ensureDirectory(sinkDirectory);
     const manifestDigest = executionManifestDigest(authorization.executionManifest);
@@ -277,10 +285,23 @@ export class LivingCampaign {
       try { effectResourcePath(policy, payload.items[0].value as CapabilityName, payload.items.slice(1)); return true; }
       catch { return false; }
     };
-    const broker = new DurableEffectBroker({ directory: join(this.directory, 'effect-journals', caseDigest(input).split(':').at(-1)!),
+    const caseSuffix = caseDigest(input).split(':').at(-1)!;
+    const crashDirectory = join(this.directory, 'effect-crash-markers');
+    const crashMarker = { authorizationDigest: this.effectAuthorizationDigest,
+      faultMode: 'sigkill-once-after-dispatch' as const };
+    const crashMarkerId = digest('aether.living-effect-crash-marker/2', crashMarker);
+    const crashMarkerPath = join(crashDirectory, `${crashMarkerId.split(':').at(-1)}.json`);
+    const broker = new DurableEffectBroker({ directory: join(this.directory, 'effect-journals', caseSuffix),
       clockDomain: 'living-effect-clock/2', clock: () => 100n, authorize: allowed, authorizeReconciliation: allowed,
-      beforePersist: event => { if (authorization.faultMode === 'unknown-after-dispatch' && event.state === 'committed')
-        throw new Error('campaign receipt persistence fault after sink dispatch'); },
+      beforePersist: event => {
+        if (event.state !== 'committed') return;
+        if (authorization.faultMode === 'unknown-after-dispatch')
+          throw new Error('campaign receipt persistence fault after sink dispatch');
+        if (authorization.faultMode === 'sigkill-once-after-dispatch' && !existsSync(crashMarkerPath)) {
+          persist(crashDirectory, 'aether.living-effect-crash-marker/2', crashMarker);
+          process.kill(process.pid, 'SIGKILL');
+        }
+      },
     });
     const adapters = new Map<CapabilityName, EffectAdapter>();
     for (const [index, response] of authorization.responses.entries()) {
@@ -304,7 +325,28 @@ export class LivingCampaign {
     const router = new BrokerEffectRouter({ broker, manifest: authorization.executionManifest,
       executionId: `living-effect:${caseDigest(input).split(':').at(-1)}`, policyEpoch: policy.body.policyEpoch,
       deadline: '1000', adapters, grant: () => 'grant:living-effect' });
-    return { router, broker, sinkDirectory };
+    return { router, broker, sinkDirectory, adapters };
+  }
+  /** Recover an exact generated case after an independent worker died while
+   * holding its broker ticket. Unknown sink status remains an explicit refusal. */
+  recoverEffectCase(input: LivingCase): { readonly reconciled: number; readonly unknown: number } {
+    if (!this.effectAuthorization) throw new TypeError('signed effectful campaign authority required');
+    if (!this.generate().some(item => caseDigest(item) === caseDigest(input)))
+      throw new TypeError('effect recovery requires an exact generated case');
+    const effect = this.effectCase(input);
+    effect.broker.recoverDeadWriter();
+    let reconciled = 0, unknown = 0;
+    for (const event of effect.broker.events()) {
+      if (event.outcome?.state !== 'indeterminate' && event.outcome !== null) continue;
+      const payload = event.request.payload;
+      if (payload.tag !== 'sequence' || payload.items[0]?.tag !== 'string') throw new TypeError('effect journal payload mismatch');
+      const adapter = effect.adapters.get(payload.items[0].value as CapabilityName);
+      if (!adapter) throw new TypeError('effect journal adapter outside signed policy');
+      const outcome = effect.broker.reconcile(event.request, adapter);
+      if (outcome.state === 'indeterminate') unknown++;
+      else reconciled++;
+    }
+    return { reconciled, unknown };
   }
   execute(input: LivingCase): LivingCaseResult | LivingEffectCaseResultV2 {
     const value = clone(input); exactObject(value, ['format', 'manifestDigest', 'scenario', 'ordinal', 'seed', 'schedule', 'variables']);
@@ -445,6 +487,8 @@ export class LivingCampaign {
   }
   runEffectful(): LivingEffectCampaignReportV2 {
     if (!this.effectAuthorization || !this.effectAuthorizationDigest) throw new TypeError('signed effectful campaign authority required');
+    if (this.effectAuthorization.format === 'aether.living-effect-authorization/3')
+      throw new TypeError('V3 process-crash campaign requires external complete-run audit, not local admission');
     const reportsDirectory = join(this.directory, 'reports');
     if (existsSync(reportsDirectory) && readdirSync(reportsDirectory).some(file => file.endsWith('.json')))
       throw new Error('effectful campaign report already exists; use a new directory for a fresh run');
@@ -489,6 +533,8 @@ export class LivingCampaign {
   admitEffectful(report: LivingEffectCampaignReportV2): { readonly manifestDigest: Digest; readonly reportDigest: Digest;
     readonly effectAuthorizationDigest: Digest; readonly productionAuthorized: false } {
     if (!this.effectAuthorization || !this.effectAuthorizationDigest) throw new TypeError('signed effectful campaign authority required');
+    if (this.effectAuthorization.format === 'aether.living-effect-authorization/3')
+      throw new TypeError('V3 process-crash campaign cannot issue local admission');
     const stamp = this.acceptedReports.get(report);
     if (!stamp || stamp !== digest('aether.living-effect-campaign-report/2', report)
       || report.format !== 'aether.living-effect-campaign-report/2'
@@ -530,7 +576,9 @@ export class LivingCampaign {
     if (effectful ? !this.effectAuthorizationDigest || value.format !== 'aether.living-effect-counterexample/2'
       || value.effectAuthorizationDigest !== this.effectAuthorizationDigest
       || digest('aether.living-effect-counterexample/2', value) !== id
-      || digest('aether.living-effect-campaign/2', { manifest: value.manifest, authorization: this.effectAuthorization }) !== this.manifestId
+      || digest(this.effectAuthorization?.format === 'aether.living-effect-authorization/3'
+        ? 'aether.living-effect-campaign/3' : 'aether.living-effect-campaign/2',
+        { manifest: value.manifest, authorization: this.effectAuthorization }) !== this.manifestId
       : value.format !== 'aether.living-counterexample/1' || digest('aether.living-counterexample/1', value) !== id
       || digest(LIVING_CAMPAIGN_PROFILE, value.manifest) !== this.manifestId)
       throw new TypeError('counterexample manifest/digest mismatch');

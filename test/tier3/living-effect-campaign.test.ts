@@ -88,6 +88,9 @@ test('changed candidate, campaign, signed response, policy, or signer fails befo
   assert.throws(() => new LivingCampaign({ ...options, effectAuthorization: { ...f.authorization, responses: [
     { capability: CAP_LEDGER_APPEND, value: { tag: 'string', value: 'forged' } },
   ] } }), /forged effectful campaign authorization/);
+  assert.throws(() => new LivingCampaign({ ...options, effectAuthorization: {
+    ...f.authorization, faultMode: 'sigkill-once-after-dispatch' as never,
+  } }), /unknown campaign effect fault mode/);
   assert.throws(() => new LivingCampaign({ ...options, effectAuthorization: { ...f.authorization,
     signedPolicy: { ...f.authorization.signedPolicy, signature: 'A'.repeat(86) + '==' } } }), /untrusted effect resource policy signer/);
   assert.throws(() => new LivingCampaign({ ...options, effectTrust: { ...f.trust, key: generateKeyPairSync('ed25519').publicKey } }), /untrusted effect resource policy signer/);

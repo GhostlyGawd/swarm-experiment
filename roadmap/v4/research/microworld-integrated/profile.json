@@ -1,0 +1,11 @@
+{
+  "format": "aether.living-integrated-profile/1",
+  "seed": "20260924-integrated",
+  "declaredGoodCases": 15,
+  "declaredBrokenCases": 15,
+  "sourceScenarios": ["two-writers", "bounded-allocation", "faulted-json-network", "out-of-order-events"],
+  "tcpFaults": ["truncated-frame", "malformed-frame", "duplicate-delivery"],
+  "processFault": "One signed post-sink pre-receipt SIGKILL; explicit dead-owner recovery and reconciliation in a new worker",
+  "minimumBoundaryPermutationsPerSecond": 2000000,
+  "qualification": "Complete good process campaign and broken shrink/replay campaign are timed separately; neither is the four-field JSON kernel"
+}
