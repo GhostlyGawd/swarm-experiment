@@ -11,7 +11,10 @@ import * as net from 'node:net';
 import * as path from 'node:path';
 import { decodeCanonical, encodeCanonical, exactObject, identifier, type EncodingLimits, type TaggedValueV1 } from './encoding.ts';
 import { effectRequestDigest, validateEffectRequest, type EffectRequestV1 } from './effects.ts';
+import { domainDigest } from './identity.ts';
 import { JournalLock } from './journal-lock.ts';
+import { advanceSinkStateHead, assertSinkStateWitness, readSinkStateHead, validateSinkStateJournalV2,
+  type SinkStateJournalV2, type SinkStateWitnessV1 } from './sink-state-witness.ts';
 import { SINK_RECEIPT_LIMITS, signSinkReceipt, validateSinkAdapterArtifactDigest, validateSinkPublicAnchor,
   validateSignedSinkReceipt, verifySinkReceipt, sinkValueDigest,
   type SignedSinkReceiptV1, type SinkPublicAnchorV1, type SinkReceiptBodyV1 } from './sink-receipt.ts';
@@ -43,6 +46,8 @@ export interface AttestedSinkServiceOptions {
   readonly privateKey: KeyObject;
   readonly anchor: SinkPublicAnchorV1;
   readonly adapterArtifactDigest: string;
+  /** Explicit /2 profile with an independently held monotonic decision head. */
+  readonly sinkStateWitness?: SinkStateWitnessV1;
 }
 export interface AttestedSinkService { readonly socketPath: string; close(): Promise<void> }
 export interface AttestedSinkClientOptions {
@@ -113,7 +118,10 @@ function assertPaths(socketPath: string, storageDir: string): void {
     throw new Error('sink storage directory must be private');
 }
 function stateFile(dir: string): string { return path.join(dir, 'sink-state.json'); }
+function witnessedStateFile(dir: string): string { return path.join(dir, 'sink-state-v2.json'); }
 function readState(dir: string, anchor: SinkPublicAnchorV1, adapterArtifactDigest: string): SinkState {
+  if (fs.existsSync(witnessedStateFile(dir)))
+    throw new Error('witnessed sink state cannot run under legacy profile');
   let bytes: Buffer;
   try { bytes = fs.readFileSync(stateFile(dir)); }
   catch (error) {
@@ -141,8 +149,8 @@ function readState(dir: string, anchor: SinkPublicAnchorV1, adapterArtifactDiges
   }
   return state as unknown as SinkState;
 }
-function writeState(dir: string, state: SinkState): void {
-  const dest = stateFile(dir), tmp = path.join(dir, `.sink-${randomBytes(16).toString('hex')}.tmp`);
+function writeStateFile(dir: string, dest: string, state: SinkState | SinkStateJournalV2): void {
+  const tmp = path.join(dir, `.sink-${randomBytes(16).toString('hex')}.tmp`);
   const bytes = canonical(state, STATE_LIMITS);
   let fd: number | undefined;
   try {
@@ -156,10 +164,46 @@ function writeState(dir: string, state: SinkState): void {
     try { fs.unlinkSync(tmp); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   }
 }
+function writeState(dir: string, state: SinkState): void { writeStateFile(dir, stateFile(dir), state); }
+
+function readWitnessedState(dir: string, options: AttestedSinkServiceOptions,
+  witness: SinkStateWitnessV1): SinkStateJournalV2 {
+  // An existing /1 decision inventory needs an explicit, reviewed migration.
+  // Treating it as a fresh /2 genesis would permit duplicate commitments.
+  if (fs.existsSync(stateFile(dir))) throw new Error('legacy sink state requires explicit migration');
+  const head = readSinkStateHead(witness);
+  const genesis: SinkStateJournalV2 = { format: 'aether.attested-sink-state/2',
+    witnessDigest: witness.digest, witnessRevision: '0', anchor: options.anchor,
+    adapterArtifactDigest: options.adapterArtifactDigest, decisions: [] };
+  const authoritative = head.journal === null ? genesis
+    : parse(Buffer.from(head.journal, 'utf8'), STATE_LIMITS) as SinkStateJournalV2;
+  if (head.journal !== null) validateSinkStateJournalV2(authoritative, witness, head.revision);
+  const authoritativeBytes = canonical(authoritative, STATE_LIMITS);
+  let local: Buffer | null = null;
+  let localRevision = -1n;
+  try { local = fs.readFileSync(witnessedStateFile(dir)); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  if (local !== null) {
+    const saved = parse(local, STATE_LIMITS) as SinkStateJournalV2;
+    if (saved.witnessRevision === '0') {
+      if (!local.equals(canonical(genesis, STATE_LIMITS)))
+        throw new Error('sink local genesis differs from operator configuration');
+    } else validateSinkStateJournalV2(saved, witness, saved.witnessRevision);
+    localRevision = BigInt(saved.witnessRevision);
+    if (localRevision > BigInt(head.revision)) throw new Error('sink local state is ahead of witness');
+    if (localRevision === BigInt(head.revision) && !local.equals(authoritativeBytes))
+      throw new Error('sink local state equivocated with witness');
+  }
+  if (localRevision < BigInt(head.revision))
+    writeStateFile(dir, witnessedStateFile(dir), authoritative);
+  return authoritative;
+}
 function decide(dir: string, options: AttestedSinkServiceOptions, op: 'execute' | 'status',
   repositoryId: string, deploymentId: string, request: EffectRequestV1): AttestedSinkDecision {
   if (repositoryId !== options.anchor.repositoryId) throw new Error('DENIED');
-  const state = readState(dir, options.anchor, options.adapterArtifactDigest);
+  const witness = options.sinkStateWitness;
+  const state = witness ? readWitnessedState(dir, options, witness)
+    : readState(dir, options.anchor, options.adapterArtifactDigest);
   const id = decisionKey(repositoryId, request);
   const prior = state.decisions.find(row => decisionKey(row.repositoryId, row.request) === id);
   if (prior) {
@@ -186,8 +230,22 @@ function decide(dir: string, options: AttestedSinkServiceOptions, op: 'execute' 
   };
   const receipt = signSinkReceipt(body, options.privateKey, options.anchor);
   const row: DecisionRow = { repositoryId, deploymentId, request, value, receipt };
-  // A single replacement makes effect, result and signed receipt one decision.
-  writeState(dir, { ...state, decisions: [...state.decisions, row] });
+  if (witness) {
+    const next: SinkStateJournalV2 = { ...state as SinkStateJournalV2,
+      witnessRevision: String(state.decisions.length + 1), decisions: [...state.decisions, row] };
+    const journal = canonical(next, STATE_LIMITS).toString('utf8');
+    try { advanceSinkStateHead(witness, String(state.decisions.length), journal); }
+    catch (error) {
+      // A lost CAS response may still have committed. Only an exact readback
+      // can settle it; otherwise the caller receives an uncertain outcome.
+      const head = readSinkStateHead(witness);
+      if (head.revision !== next.witnessRevision || head.journal !== journal) throw error;
+    }
+    writeStateFile(dir, witnessedStateFile(dir), next);
+  } else {
+    // Legacy /1 profile: the sink file is the only decision authority.
+    writeState(dir, { ...state as SinkState, decisions: [...state.decisions, row] });
+  }
   return committed ? { state: 'committed', value: value!, receipt } : { state: 'not_committed', receipt };
 }
 function response(key: Buffer, nonce: string, decision: AttestedSinkDecision | null, code: string | null): Buffer {
@@ -221,11 +279,20 @@ function processRequest(bytes: Buffer, key: Buffer, options: AttestedSinkService
 export async function startAttestedSinkService(options: AttestedSinkServiceOptions): Promise<AttestedSinkService> {
   const key = keyBytes(options.authKey);
   validateSinkPublicAnchor(options.anchor); validateSinkAdapterArtifactDigest(options.adapterArtifactDigest);
+  if (options.sinkStateWitness) {
+    assertSinkStateWitness(options.sinkStateWitness);
+    const witness = options.sinkStateWitness;
+    if (witness.repositoryId !== options.anchor.repositoryId
+      || witness.sinkAuthorityId !== options.anchor.sinkAuthorityId
+      || witness.sinkId !== options.anchor.sinkId
+      || witness.sinkAnchorDigest !== domainDigest('aether.sink-anchor/1', options.anchor)
+      || witness.adapterArtifactDigest !== options.adapterArtifactDigest)
+      throw new TypeError('sink state witness identity mismatch');
+  }
   if (options.privateKey.type !== 'private' || options.privateKey.asymmetricKeyType !== 'ed25519'
     || createPublicKey(options.privateKey).export({ format: 'der', type: 'spki' }).toString('base64') !== options.anchor.publicKey)
     throw new TypeError('sink private key does not match anchor');
   assertPaths(options.socketPath, options.storageDir);
-  readState(options.storageDir, options.anchor, options.adapterArtifactDigest);
   const lock = new JournalLock({ directory: path.join(options.storageDir, '.service-lock'), domain: FORMAT,
     maxTickets: 10_000, busyError: 'sink storage already served' });
   lock.recoverDeadWriter(false);
@@ -235,6 +302,8 @@ export async function startAttestedSinkService(options: AttestedSinkServiceOptio
   const started = new Promise<AttestedSinkService>((resolve, reject) => { ready = resolve; failed = reject; });
   const serving = lock.runAsync(async () => {
     try {
+      if (options.sinkStateWitness) readWitnessedState(options.storageDir, options, options.sinkStateWitness);
+      else readState(options.storageDir, options.anchor, options.adapterArtifactDigest);
       try {
         const prior = fs.lstatSync(options.socketPath);
         if (!prior.isSocket()) throw new Error('sink socket path occupied');

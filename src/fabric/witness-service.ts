@@ -8,12 +8,13 @@ import * as net from 'node:net';
 import * as path from 'node:path';
 import { decodeCanonical, decimal, encodeCanonical, exactObject, identifier } from './encoding.ts';
 import { domainDigest, validateDigest } from './identity.ts';
-import { validateSinkPublicAnchor } from './sink-receipt.ts';
+import { validateSinkAdapterArtifactDigest, validateSinkPublicAnchor, type SinkPublicAnchorV1 } from './sink-receipt.ts';
 import { createNamespacedEffectJournalWitness, createNamespacedEffectJournalWitnessCatalog,
   type NamespacedEffectJournalWitnessCatalog } from './effect-journal-witness.ts';
 import { createHostJournalWitness, createHostJournalWitnessCatalog,
   type HostJournalWitnessCatalog } from './host-journal-witness.ts';
 import { createDeploymentJournalWitness, type DeploymentJournalWitness } from './deployment-journal-witness.ts';
+import { createSinkStateWitness, validateSinkStateJournalV2, type SinkStateWitnessV1 } from './sink-state-witness.ts';
 import { JournalLock } from './journal-lock.ts';
 
 const FORMAT = 'aether.witness-service/1';
@@ -35,10 +36,13 @@ s.on('end',()=>{if(!s.destroyed)s.destroy()});
 export type WitnessIdentity =
   | Readonly<{ kind: 'effect'; authorityId: string; repositoryId: string; catalogDeploymentId: string; operationId: string; clockDomain: string }>
   | Readonly<{ kind: 'host'; authorityId: string; repositoryId: string; deploymentId: string; hostId: string }>
-  | Readonly<{ kind: 'deployment'; authorityId: string; repositoryId: string; deploymentId: string }>;
-export type WitnessNamespace = WitnessIdentity
+  | Readonly<{ kind: 'deployment'; authorityId: string; repositoryId: string; deploymentId: string }>
+  | Readonly<{ kind: 'sink'; authorityId: string; repositoryId: string; sinkAuthorityId: string; sinkId: string;
+    sinkAnchorDigest: string; adapterArtifactDigest: string }>;
+export type WitnessNamespace = Exclude<WitnessIdentity, { kind: 'sink' }>
   | Readonly<{ kind: 'effect-scope'; authorityId: string; repositoryId: string; catalogDeploymentId: string; clockDomain: string }>
-  | Readonly<{ kind: 'host-scope'; authorityId: string; repositoryId: string; deploymentId: string }>;
+  | Readonly<{ kind: 'host-scope'; authorityId: string; repositoryId: string; deploymentId: string }>
+  | Readonly<{ kind: 'sink-scope'; authorityId: string; anchor: SinkPublicAnchorV1; adapterArtifactDigest: string }>;
 export interface WitnessService { readonly socketPath: string; close(): Promise<void> }
 export interface WitnessServiceOptions {
   readonly socketPath: string;
@@ -80,6 +84,14 @@ function matchMac(key: Buffer, body: unknown, signature: unknown): boolean {
 function identity(value: unknown): WitnessIdentity {
   const record = value as Record<string, unknown>;
   if (!record || typeof record !== 'object') throw new TypeError('missing witness identity');
+  if (record.kind === 'sink') {
+    exactObject(record, ['kind', 'authorityId', 'repositoryId', 'sinkAuthorityId', 'sinkId',
+      'sinkAnchorDigest', 'adapterArtifactDigest']);
+    for (const field of ['authorityId', 'repositoryId', 'sinkAuthorityId', 'sinkId']) identifier(record[field]);
+    validateDigest(record.sinkAnchorDigest, 'aether.sink-anchor/1');
+    validateSinkAdapterArtifactDigest(record.adapterArtifactDigest);
+    return record as unknown as WitnessIdentity;
+  }
   const fields = record.kind === 'effect'
     ? ['kind', 'authorityId', 'repositoryId', 'catalogDeploymentId', 'operationId', 'clockDomain']
     : record.kind === 'host' ? ['kind', 'authorityId', 'repositoryId', 'deploymentId', 'hostId']
@@ -92,6 +104,12 @@ function identity(value: unknown): WitnessIdentity {
 }
 function scope(value: unknown): WitnessNamespace {
   const record = value as Record<string, unknown>;
+  if (record?.kind === 'sink-scope') {
+    exactObject(record, ['kind', 'authorityId', 'anchor', 'adapterArtifactDigest']);
+    identifier(record.authorityId); validateSinkPublicAnchor(record.anchor);
+    validateSinkAdapterArtifactDigest(record.adapterArtifactDigest);
+    return record as unknown as WitnessNamespace;
+  }
   if (record?.kind === 'effect-scope') {
     exactObject(record, ['kind', 'authorityId', 'repositoryId', 'catalogDeploymentId', 'clockDomain']);
     for (const field of ['authorityId', 'repositoryId', 'catalogDeploymentId', 'clockDomain']) identifier(record[field]);
@@ -102,7 +120,8 @@ function scope(value: unknown): WitnessNamespace {
     for (const field of ['authorityId', 'repositoryId', 'deploymentId']) identifier(record[field]);
     return record as unknown as WitnessNamespace;
   }
-  return identity(value);
+  if (record?.kind === 'sink') throw new TypeError('sink witness requires a configured anchor scope');
+  return identity(value) as Exclude<WitnessIdentity, { kind: 'sink' }>;
 }
 function allowed(id: WitnessIdentity, list: readonly WitnessNamespace[]): boolean {
   const exact = canonical(id).toString('utf8');
@@ -114,6 +133,11 @@ function allowed(id: WitnessIdentity, list: readonly WitnessNamespace[]): boolea
     if (id.kind === 'host' && entry.kind === 'host-scope')
       return id.authorityId === entry.authorityId && id.repositoryId === entry.repositoryId
         && id.deploymentId === entry.deploymentId;
+    if (id.kind === 'sink' && entry.kind === 'sink-scope')
+      return id.authorityId === entry.authorityId && id.repositoryId === entry.anchor.repositoryId
+        && id.sinkAuthorityId === entry.anchor.sinkAuthorityId && id.sinkId === entry.anchor.sinkId
+        && id.sinkAnchorDigest === domainDigest('aether.sink-anchor/1', entry.anchor)
+        && id.adapterArtifactDigest === entry.adapterArtifactDigest;
     return false;
   });
 }
@@ -121,7 +145,7 @@ function location(dir: string, id: WitnessIdentity): string {
   return path.join(dir, `${createHash('sha256').update(canonical(id)).digest('hex')}.json`);
 }
 type Head = Readonly<{ revision: string; journal: string | null }>;
-function readHead(dir: string, id: WitnessIdentity): Head {
+function readHead(dir: string, id: WitnessIdentity, namespaces: readonly WitnessNamespace[]): Head {
   const file = location(dir, id);
   let bytes: Buffer;
   try { bytes = fs.readFileSync(file); }
@@ -137,17 +161,19 @@ function readHead(dir: string, id: WitnessIdentity): Head {
   if ((head.revision === '0') !== (head.journal === null)
     || (head.journal !== null && typeof head.journal !== 'string')) throw new Error('invalid witness stored head');
   const result = { revision: head.revision as string, journal: head.journal as string | null };
-  if (result.journal !== null) validateJournal(id, result.revision, result.journal);
+  if (result.journal !== null) validateJournal(id, result.revision, result.journal, namespaces);
   return result;
 }
-function validateJournal(id: WitnessIdentity, revision: string, journal: string): void {
+function validateJournal(id: WitnessIdentity, revision: string, journal: string,
+  namespaces: readonly WitnessNamespace[]): void {
   if (!journal || Buffer.byteLength(journal, 'utf8') > MAX_JOURNAL) throw new TypeError('invalid witness journal size');
   const bytes = Buffer.from(journal, 'utf8');
   const value = parse(bytes);
   const record = value as Record<string, unknown>;
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw new TypeError('invalid witness journal');
   const expectedFormat = id.kind === 'effect' ? ['aether.effect-journal/2', 'aether.effect-journal/3']
-    : id.kind === 'host' ? 'aether.process-host/4' : 'aether.process-deployment/9';
+    : id.kind === 'host' ? 'aether.process-host/4'
+      : id.kind === 'sink' ? 'aether.attested-sink-state/2' : 'aether.process-deployment/9';
   // The service owns transport, identity, CAS and durable custody. Runtime
   // wrappers validate the richer journal semantics before calling advance.
   if (id.kind === 'effect' ? !expectedFormat.includes(record.format as string) : record.format !== expectedFormat)
@@ -171,6 +197,15 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string)
     const body = { format: 'aether.process-deployment-journal-witness/1', ...parts };
     if (record.deploymentJournalWitnessDigest !== domainDigest(body.format, body))
       throw new TypeError('deployment journal witness binding mismatch');
+  }
+  if (id.kind === 'sink') {
+    const configured = namespaces.find(entry => entry.kind === 'sink-scope' && allowed(id, [entry]));
+    if (!configured || configured.kind !== 'sink-scope') throw new TypeError('sink witness lacks an operator anchor');
+    const trusted = createSinkStateWitness({ authorityId: configured.authorityId,
+      anchor: configured.anchor, adapterArtifactDigest: configured.adapterArtifactDigest,
+      read: () => ({ revision: '0', journal: null }),
+      advance: () => { throw new Error('validation-only sink witness'); } });
+    validateSinkStateJournalV2(record, trusted, revision);
   }
   if (id.kind !== 'effect' && record.witnessRevision !== revision)
     throw new TypeError('witness journal revision mismatch');
@@ -231,6 +266,14 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
       if (['committed', 'rejected', 'aborted'].includes(oldRow.state as string) && !same(oldRow, newRow))
         throw new Error('witnessed terminal effect changed');
     });
+    return;
+  }
+  if (id.kind === 'sink') {
+    prefix('decisions', (oldRow, newRow) => {
+      if (!same(oldRow, newRow)) throw new Error('witnessed sink decision changed');
+    });
+    if (array(next, 'decisions').length !== array(prior, 'decisions').length + 1)
+      throw new Error('sink witness advance must add exactly one decision');
     return;
   }
   if (id.kind === 'host') {
@@ -348,19 +391,19 @@ function processRequest(bytes: Buffer, key: Buffer, namespaces: readonly Witness
     if (!allowed(id, namespaces)) return signedResponse(key, nonce, { ok: false, code: 'DENIED' });
     if (request.op === 'read') {
       if (request.expectedRevision !== null || request.journal !== null) throw new TypeError('invalid read request');
-      return signedResponse(key, nonce, { ok: true, head: readHead(dir, id) });
+      return signedResponse(key, nonce, { ok: true, head: readHead(dir, id, namespaces) });
     }
     decimal(request.expectedRevision);
     if (typeof request.journal !== 'string') throw new TypeError('missing witness journal');
     const nextRevision = String(BigInt(request.expectedRevision) + 1n);
-    validateJournal(id, nextRevision, request.journal);
-    const current = readHead(dir, id);
+    validateJournal(id, nextRevision, request.journal, namespaces);
+    const current = readHead(dir, id, namespaces);
     if (current.revision !== request.expectedRevision) return signedResponse(key, nonce, { ok: false, code: 'STALE' });
     validateRetention(id, current.journal, request.journal);
     const head = { revision: nextRevision, journal: request.journal };
     try {
       writeHead(dir, id, head);
-      return signedResponse(key, nonce, { ok: true, head: readHead(dir, id) });
+      return signedResponse(key, nonce, { ok: true, head: readHead(dir, id, namespaces) });
     } catch {
       // Rename may have committed before fsync/read failed. The caller must
       // reread and reconcile; never report a definite validation failure.
@@ -449,6 +492,8 @@ export function createProcessWitnessClient(options: WitnessClientOptions): {
   effectCatalog(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string; clockDomain: string }>): NamespacedEffectJournalWitnessCatalog;
   hostCatalog(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string }>): HostJournalWitnessCatalog;
   deploymentWitness(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string }>): DeploymentJournalWitness;
+  sinkStateWitness(namespace: Readonly<{ authorityId: string; anchor: SinkPublicAnchorV1;
+    adapterArtifactDigest: string }>): SinkStateWitnessV1;
 } {
   const key = assertKey(options.key);
   if (!path.isAbsolute(options.socketPath)) throw new TypeError('witness socket path must be absolute');
@@ -523,6 +568,18 @@ export function createProcessWitnessClient(options: WitnessClientOptions): {
     deploymentWitness: namespace => {
       const id = { kind: 'deployment' as const, ...namespace };
       return createDeploymentJournalWitness({ ...namespace,
+        read: () => call(id, 'read', null, null),
+        advance: (revision, journal) => call(id, 'advance', revision, journal) });
+    },
+    sinkStateWitness: namespace => {
+      validateSinkPublicAnchor(namespace.anchor);
+      validateSinkAdapterArtifactDigest(namespace.adapterArtifactDigest);
+      const id = { kind: 'sink' as const, authorityId: namespace.authorityId,
+        repositoryId: namespace.anchor.repositoryId, sinkAuthorityId: namespace.anchor.sinkAuthorityId,
+        sinkId: namespace.anchor.sinkId,
+        sinkAnchorDigest: domainDigest('aether.sink-anchor/1', namespace.anchor),
+        adapterArtifactDigest: namespace.adapterArtifactDigest };
+      return createSinkStateWitness({ ...namespace,
         read: () => call(id, 'read', null, null),
         advance: (revision, journal) => call(id, 'advance', revision, journal) });
     },
