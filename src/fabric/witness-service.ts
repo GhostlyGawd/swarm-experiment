@@ -16,7 +16,9 @@ import { createDeploymentJournalWitness, type DeploymentJournalWitness } from '.
 import { JournalLock } from './journal-lock.ts';
 
 const FORMAT = 'aether.witness-service/1';
-const MAX_FRAME = 20 * 1024 * 1024;
+// A canonical 16 MiB journal can nearly double when quoted as the journal
+// field of the signed JSON frame. Keep the outer bound above that worst case.
+const MAX_FRAME = 36 * 1024 * 1024;
 const MAX_JOURNAL = 16 * 1024 * 1024;
 const LIMITS = { maxFrameBytes: MAX_FRAME, maxDecompressedBytes: MAX_FRAME, maxObjects: 500_000, maxDepth: 128 };
 const HEX = /^[0-9a-f]{64}$/;
@@ -270,7 +272,7 @@ export async function startWitnessService(options: WitnessServiceOptions): Promi
         });
         socket.on('error', () => socket.destroy());
       });
-      server.maxConnections = 16;
+      server.maxConnections = 4;
       await new Promise<void>((resolve, reject) => {
         server.once('error', reject); server.listen(options.socketPath, () => { server.off('error', reject); resolve(); });
       });
@@ -278,7 +280,6 @@ export async function startWitnessService(options: WitnessServiceOptions): Promi
       ready({ socketPath: options.socketPath, close: async () => {
         try {
           await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
-          fs.unlinkSync(options.socketPath);
         } finally {
           release();
           await serving;

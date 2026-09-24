@@ -9,7 +9,7 @@ import { capability } from '../../src/tier1/ids.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import { CapabilityRegistry, CapabilitySealer } from '../../src/tier2/ocap.ts';
-import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
+import { ScopedGrantAuthority, type ScopedGrantV2 } from '../../src/tier2/scoped-grants.ts';
 import { createEffectSignerAnchor } from '../../src/tier2/effect-signer-anchor.ts';
 import { createTrustedClockAnchor } from '../../src/tier2/trusted-clock-anchor.ts';
 import { wasmAdapterArtifactForBytes, admitWasmAdapterBytes, admittedAdapterArtifactDigest } from '../../src/tier2/adapter-artifact.ts';
@@ -24,7 +24,7 @@ import { DurableEffectBroker, effectAdapterDigest } from '../../src/fabric/effec
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
 import { PromotionCoordinator, approvePromotion, evidenceBundleDigest, migrationPlanDigest, effectPlanDigest, type PromotionInput } from '../../src/fabric/promotion.ts';
 import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
-import { ProcessHost, type ProcessHostOptions } from '../../src/tier4/process-host.ts';
+import { ProcessHost, PROCESS_INVOKE, type ProcessHostOptions } from '../../src/tier4/process-host.ts';
 import { ProcessDeployment, processMigrationPlan, processHostWitnessedWasmEffectPlan, type ProcessDeploymentOptions } from '../../src/tier4/process-deployment.ts';
 import type { TopologyPlan } from '../../src/tier4/topology.ts';
 
@@ -149,6 +149,24 @@ test('V9 protects complete host and broker history across real Wasm calls, promo
     host = await ProcessHost.open(hostOptions);
     const tokens = () => host!.issueScopedTokens(entry, 60_000, new Map([[CAP, ['wasm']]]));
     const hostFile = join(hostOptions.directory, 'host.json'), beforeDirect = readFileSync(hostFile, 'utf8');
+    const issued = tokens(), invokeGrant = issued.find(token => token.body.capability === PROCESS_INVOKE)!,
+      effectGrant = issued.find(token => token.body.capability === CAP)!;
+    const directAttacks: readonly [string, readonly ScopedGrantV2[]][] = [
+      ['missing-all', []], ['missing-effect', [invokeGrant]],
+      ['forged-effect', [invokeGrant, { ...effectGrant, signature: '0'.repeat(64) }]],
+      ['wrong-audience', [invokeGrant, grants.issue({ capability: CAP, audience: 'other-entry', path: effectGrant.body.path }, 60_000)]],
+      ['wrong-path', [invokeGrant, grants.issue({ capability: CAP, audience: entry, path: ['wrong'] }, 60_000)]],
+      ['duplicate-effect', [invokeGrant, effectGrant, effectGrant]],
+      ['narrowed-invoke', [grants.attenuate(invokeGrant, { capability: PROCESS_INVOKE, audience: entry,
+        path: [...invokeGrant.body.path, 'child'] }, 60_000), effectGrant]],
+    ];
+    const witnessCountBeforeDenials = witnesses.size;
+    for (const [name, denied] of directAttacks) {
+      await assert.rejects(host.call(entry, [{ tag: 'int', value: '7' }],
+        { operationId: `direct-denied-${name}`, tokens: denied }), /authority_denied|grant/);
+      assert.equal(readFileSync(hostFile, 'utf8'), beforeDirect, name);
+      assert.equal(witnesses.size, witnessCountBeforeDenials, name);
+    }
     const direct = await host.call(entry, [{ tag: 'int', value: '7' }], { operationId: 'direct-v9', tokens: tokens() });
     assert.equal(direct.state, 'completed');
     assert.equal(JSON.parse(readFileSync(hostFile, 'utf8')).configuration.split(':')[0], 'aether.process-host-config/7');

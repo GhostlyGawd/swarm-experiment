@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Process-external witness and controller crash campaign — 2026-09-23
+
+- Added an operator-run Unix socket witness service with authenticated bounded frames, namespace-scoped identities, durable atomic CAS and exact readback for V9 effect, host and deployment heads. A second live service is refused; service SIGKILL/restart recovers the exact heads. A controlled-close race was found in review and fixed.
+- Added real V9 ProcessHost and ProcessDeployment integration against the separate service. During service outage, reads fail closed; after restart, fresh witness objects reopen cached calls without broker redispatch. A separate controller SIGKILL after a committed read-only Wasm effect is recovered by a new controller, which refuses safe abort and records one guest dispatch.
+- Expanded signed V9 direct-call grant refusals under the full host/broker path. The service and controllers were tested under one UID; neither distinct-UID custody nor authenticated external sink results is qualified. T2-04, NFR-16 and the verified-task count remain open.
+
 ## V11 contract calls and V9 complete journal witnesses — 2026-09-23
 
 - Added executable projection V11 for synthesized, closed, pure scalar helpers called directly inside contracts, including `old(Call(...))`, transitive helpers and exact-address imports. Actual TS/Python/Rust execution and exact-root round trips pass; older V2/V7/V10 fixture bytes are unchanged. Blockless bindings and the 4× token requirement remain open, so T1-02 and Q03 do not close.

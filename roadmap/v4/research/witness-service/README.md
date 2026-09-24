@@ -24,7 +24,10 @@ node --experimental-strip-types src/fabric/witness-service-cli.ts --config /abso
 
 The CLI writes `witness service ready` after the Unix socket is listening.
 The Node API `startWitnessService({socketPath, storageDir, key, namespaces})`
-provides a `close()` method for controlled shutdown. A service-lifetime
+provides a `close()` method for controlled shutdown. Run this API in a separate
+process from the synchronous client: the client's transport subprocess blocks
+its calling event loop, so a service started in that same event loop cannot
+answer it. A service-lifetime
 `JournalLock` ticket serializes access to one storage directory, including
 across process restarts. A second live server using that directory is rejected.
 After SIGKILL, dead-ticket recovery and stale-socket removal allow restart.
@@ -51,9 +54,10 @@ const deploymentJournalWitness = remote.deploymentWitness({ authorityId, reposit
 
 Each synchronous callback launches a short-lived Node transport subprocess.
 It carries only a canonical length-framed signed request; the key stays in the
-controller and service processes. The 20 MiB frame bound includes a maximum
-16 MiB canonical journal. Both directions use HMAC-SHA256 over exact canonical
-payloads, and responses echo a random 256-bit request nonce. Wrong MAC,
+controller and service processes. Both directions use HMAC-SHA256 over exact
+canonical payloads, and responses echo a random 256-bit request nonce. The
+36 MiB outer frame bound accommodates JSON escaping of a canonical 16 MiB
+journal. Wrong MAC,
 noncanonical framing, wrong namespace, stale revision, and oversized frames
 fail closed. After a response failure or timeout, the client throws
 `uncertain witness response`; callers must read the head and reconcile before
@@ -85,3 +89,12 @@ same UID and access to the key or storage can impersonate or tamper; production
 custody requires separate OS ownership, operator controls, and an appropriate
 cross-UID transport/authentication design. HMAC and journal custody do not
 authenticate whether an external effect sink committed its result.
+
+The [V9 real host/deployment integration test](../../../../test/tier4/process-wasm-external-witness.test.ts)
+also runs real workers against this service, kills and restarts the service,
+reconstructs fresh controller witness objects, and verifies cached calls do
+not redispatch. The [controller crash test](../../../../test/tier4/process-wasm-controller-crash-witness.test.ts)
+SIGKILLs a real controller while the service stays up, then reopens and
+reconciles the exact read-only Wasm effect in a fresh controller without another
+guest dispatch. Neither test proves independent UID custody or external sink
+commitment.

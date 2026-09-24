@@ -9,12 +9,26 @@ import { once } from 'node:events';
 import { test } from 'node:test';
 import { encodeCanonical } from '../../../../src/fabric/encoding.ts';
 import { domainDigest } from '../../../../src/fabric/identity.ts';
-import { createProcessWitnessClient } from '../../../../src/fabric/witness-service.ts';
+import { createProcessWitnessClient, startWitnessService } from '../../../../src/fabric/witness-service.ts';
 import { selectEffectJournalWitness, readWitnessHead, advanceWitnessHead } from '../../../../src/fabric/effect-journal-witness.ts';
 import { selectHostJournalWitness, readHostJournalHead, advanceHostJournalHead } from '../../../../src/fabric/host-journal-witness.ts';
 import { readDeploymentJournalHead, advanceDeploymentJournalHead } from '../../../../src/fabric/deployment-journal-witness.ts';
 
 const root = path.resolve(import.meta.dirname, '../../../..');
+test('controlled service close releases the Unix socket and durable service ticket', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'aether-witness-close-'));
+  try {
+    const options = { socketPath: path.join(directory, 'w.sock'), storageDir: path.join(directory, 'store'),
+      key: randomBytes(32), namespaces: [{ kind: 'deployment' as const, authorityId: 'operator',
+        repositoryId: 'repository', deploymentId: 'deployment' }] };
+    const first = await startWitnessService(options);
+    assert.equal(fs.existsSync(options.socketPath), true);
+    await first.close();
+    assert.equal(fs.existsSync(options.socketPath), false);
+    const reopened = await startWitnessService(options);
+    await reopened.close();
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
 function canonical(value: unknown): string { return Buffer.from(encodeCanonical(value, {
   maxFrameBytes: 20 * 1024 * 1024, maxDecompressedBytes: 20 * 1024 * 1024,
   maxObjects: 500_000, maxDepth: 128 })).toString('utf8'); }
@@ -135,7 +149,7 @@ test('separate witness process authenticates bounded CAS and survives SIGKILL', 
       identity: id, expectedRevision: null, journal: null, mac: '0'.repeat(64) });
     const prefix = Buffer.alloc(4); prefix.writeUInt32BE(Buffer.byteLength(badRequest));
     assert.equal((await raw(socketPath, Buffer.concat([prefix, Buffer.from(badRequest)]))).length, 0);
-    const oversize = Buffer.alloc(4); oversize.writeUInt32BE(20 * 1024 * 1024 + 1);
+    const oversize = Buffer.alloc(4); oversize.writeUInt32BE(36 * 1024 * 1024 + 1);
     assert.equal((await raw(socketPath, oversize)).length, 0);
     const malformed = Buffer.from([0, 0, 0, 5, 123, 125]);
     assert.equal((await raw(socketPath, malformed)).length, 0);
@@ -149,6 +163,14 @@ test('separate witness process authenticates bounded CAS and survives SIGKILL', 
       { revision: '1', journal: hostJournal });
     assert.deepEqual(readDeploymentJournalHead(recovered.deploymentWitness(ns)),
       { revision: '1', journal: deploymentJournal });
+    const escapedState = { ...JSON.parse(deploymentJournal), witnessRevision: '2',
+      invocations: [{ diagnostic: '\\'.repeat(7_300_000) }] };
+    const escapedJournal = canonical(escapedState);
+    assert.ok(Buffer.byteLength(escapedJournal) < 16 * 1024 * 1024);
+    assert.ok(Buffer.byteLength(JSON.stringify({ journal: escapedJournal })) > 20 * 1024 * 1024,
+      'the former outer-frame bound could not carry an otherwise bounded journal');
+    assert.deepEqual(advanceDeploymentJournalHead(recovered.deploymentWitness(ns), '1', escapedJournal),
+      { revision: '2', journal: escapedJournal });
   } finally {
     if (forged && forged.exitCode === null) { forged.kill('SIGKILL'); await once(forged, 'exit'); }
     if (child && child.exitCode === null) { child.kill('SIGKILL'); await once(child, 'exit'); }
