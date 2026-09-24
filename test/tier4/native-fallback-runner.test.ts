@@ -58,6 +58,8 @@ test('native runner validates a complete Tier 2 frame against independent exact-
     assert.deepEqual(outcome.after.ownership[1],
       { objectId: '2', unit: 'worker', epoch: '0' });
     validateProcessNativeFallbackOutcome(input.binding, input.bindingInput, outcome, input.lowered);
+    assert.deepEqual(runProcessNativeFallback(input), outcome,
+      'two private rebuilds must produce the same exact bound image and result');
     assert.throws(() => validateProcessNativeFallbackOutcome(input.binding,
       input.bindingInput, { ...outcome, value: { tag: 'int', value: '12' } }, input.lowered),
     /differs from exact-source execution/);
@@ -100,7 +102,7 @@ test('native runner requires exact Tier 3 rollback and rejects changed artifact 
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('native runner refuses symlinked executable and forged complete-frame output', () => {
+test('native runner refuses symlinked and mismatched artifact bytes before launch', () => {
   const directory = mkdtempSync(join(tmpdir(), 'aether-native-runner-forged-'));
   try {
     const input = setup(directory, true);
@@ -108,22 +110,20 @@ test('native runner refuses symlinked executable and forged complete-frame outpu
     symlinkSync(input.executablePath, linked);
     assert.throws(() => runProcessNativeFallback({ ...input,
       executablePath: linked }), /ELOOP|symbolic link/);
-    const script = join(directory, 'forged');
-    writeFileSync(script, '#!/bin/sh\nprintf \'{"tier":2,"code":0,"value":999,"left":1,"right":1,"nextObjectId":3,"records":[[1,999],[2,888]]}\\n\'\n',
-      { mode: 0o700 });
-    const forgedInput = { ...input.bindingInput,
-      executableSha256: sha(readFileSync(script)) };
-    const forged = createProcessNativeFallbackBinding(forgedInput);
+    const changed = Buffer.from(readFileSync(input.executablePath));
+    changed[changed.length - 1] ^= 1;
+    const alternate = join(directory, 'alternate-artifact');
+    writeFileSync(alternate, changed, { mode: 0o700 });
+    const mismatchedInput = { ...input.bindingInput,
+      executableSha256: sha(readFileSync(alternate)) };
+    const mismatched = createProcessNativeFallbackBinding(mismatchedInput);
     assert.throws(() => runProcessNativeFallback({ ...input,
-      binding: forged, bindingInput: forgedInput, executablePath: script }),
-    /differs from independent exact-source execution/);
-    writeFileSync(script, '#!/bin/sh\nprintf \'{"tier":2,"code":0,"value":11,"left":1,"right":1,"nextObjectId":3,"records":[[1,11],[2,888]]}\\nextra\'\n',
-      { mode: 0o700 });
-    const extraInput = { ...input.bindingInput,
-      executableSha256: sha(readFileSync(script)) };
+      binding: mismatched, bindingInput: mismatchedInput, executablePath: alternate }),
+    /rebuilt executable differs from binding/,
+    'an otherwise valid identity for different bytes cannot enter this source profile');
+    writeFileSync(input.executablePath, changed);
     assert.throws(() => runProcessNativeFallback({ ...input,
-      binding: createProcessNativeFallbackBinding(extraInput),
-      bindingInput: extraInput, executablePath: script }),
-    /malformed native fallback output/);
+      executablePath: input.executablePath }), /executable digest mismatch/,
+    'the selected artifact path must still match the trusted rebuild');
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

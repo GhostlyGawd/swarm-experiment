@@ -4,15 +4,17 @@
  * compiler correctness. We therefore compare every native result against an
  * independently executed, contract-enforcing ProductionRuntime from the exact
  * bound module. This is an opt-in trusted-native profile: the binary still
- * runs with the controller UID, and executable/build custody and OS sandboxing
+ * runs with the controller UID, and compiler/toolchain custody and OS sandboxing
  * are separate admission requirements. The host must validate retained record
  * types, current grants, source head and witness before publishing this result.
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { constants, fstatSync, mkdtempSync, openSync, readFileSync, rmSync, closeSync, writeFileSync } from 'node:fs';
+import { constants, fstatSync, mkdtempSync, openSync, readFileSync, readSync,
+  rmSync, closeSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { encodeCanonical, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { domainDigest, type Digest } from '../fabric/identity.ts';
 import { validateRuntimeSnapshot, type RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
@@ -24,17 +26,22 @@ import { ProductionRuntime } from '../tier3/compile.ts';
 import type { ProductionSnapshot } from '../tier3/heap-state.ts';
 import { assertProcessNativeFallbackBinding, type ProcessNativeFallbackBindingInput,
   type ProcessNativeFallbackBindingV1 } from './native-fallback-contract.ts';
+import { lowerCheckedFallbackAst, type ProvedNativeFallbackOutput } from './native-fallback-compiler-v1.ts';
 
 const MAX_BINARY_BYTES = 16 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 8192;
 const TIMEOUT_MS = 5000;
+const COMPILE_TIMEOUT_MS = 30_000;
+const MAX_COMPILER_OUTPUT_BYTES = 65_536;
+const DRIVER_V1_SHA256 = '0d4a4433ea0d13912a3b70d7a0aa3307ee0496db0eb38bf7ec02b2115b98c2fc';
+const DRIVER_V1_URL = new URL('./native-fallback-driver-v1.c', import.meta.url);
+const CLANG = '/usr/bin/clang';
 const I64_MIN = -(1n << 63n), I64_MAX = (1n << 63n) - 1n;
 const canonical = (left: unknown, right: unknown): boolean =>
   Buffer.from(encodeCanonical(left)).equals(Buffer.from(encodeCanonical(right)));
 
-/** Metadata retained by the compiler build attestation. Its source digest is
- * a label here; the caller's trusted build process must bind it to source
- * bytes and the selected executable. The runner verifies executable bytes. */
+/** Metadata retained by the compiler build attestation. The runner separately
+ * regenerates source and executable bytes from the checked proof and AST. */
 export interface ProvedNativeFallbackArtifactV1 {
   readonly format: 'aether.proved-native-fallback-lowering/1';
   readonly root: Digest;
@@ -105,18 +112,29 @@ function parseOutput(stdout: string): NativeOutput {
     nextObjectId, records };
 }
 
-function readExactBinary(path: string, expectedSha256: string): Buffer {
-  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+function readBoundedBinary(path: string): Buffer {
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const stat = fstatSync(fd);
     if (!stat.isFile() || stat.size < 1 || stat.size > MAX_BINARY_BYTES)
       throw new RangeError('native fallback executable must be a bounded regular file');
-    const bytes = readFileSync(fd);
-    if (bytes.length !== stat.size || fstatSync(fd).size !== stat.size
-      || createHash('sha256').update(bytes).digest('hex') !== expectedSha256)
-      throw new TypeError('native fallback executable digest mismatch');
-    return bytes;
+    const bytes = Buffer.alloc(stat.size + 1);
+    let count = 0;
+    while (count < bytes.length) {
+      const length = readSync(fd, bytes, count, bytes.length - count, count);
+      if (length === 0) break;
+      count += length;
+    }
+    if (count !== stat.size || fstatSync(fd).size !== stat.size)
+      throw new TypeError('native fallback executable changed during bounded read');
+    return bytes.subarray(0, count);
   } finally { closeSync(fd); }
+}
+function readExactBinary(path: string, expectedSha256: string): Buffer {
+  const bytes = readBoundedBinary(path);
+  if (createHash('sha256').update(bytes).digest('hex') !== expectedSha256)
+    throw new TypeError('native fallback executable digest mismatch');
+  return bytes;
 }
 
 function execute(bytes: Buffer, args: readonly string[]): NativeOutput {
@@ -129,6 +147,31 @@ function execute(bytes: Buffer, args: readonly string[]): NativeOutput {
     if (child.error || child.signal || child.status !== 0 || child.stderr !== '')
       throw new Error('native fallback executable failed, timed out or wrote stderr');
     return parseOutput(child.stdout);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+}
+
+/** Rebuild the exact proof-bearing v1 image from checked source before native
+ * launch. Fixed basename matters on macOS because ad hoc Mach-O signing
+ * includes that basename. The OS/compiler/linker remain trusted components;
+ * this check rejects an arbitrary supplied binary even if it mimics output. */
+function rebuildBinary(source: string): Buffer {
+  const driver = readFileSync(fileURLToPath(DRIVER_V1_URL));
+  if (createHash('sha256').update(driver).digest('hex') !== DRIVER_V1_SHA256)
+    throw new TypeError('packaged native fallback driver changed');
+  const directory = mkdtempSync(join(tmpdir(), 'aether-native-build-'));
+  try {
+    const sourcePath = join(directory, 'driver.c');
+    const generated = join(directory, 'generated.h');
+    const binary = join(directory, 'native-fallback');
+    writeFileSync(sourcePath, driver, { flag: 'wx', mode: 0o600 });
+    writeFileSync(generated, source, { flag: 'wx', mode: 0o600 });
+    const child = spawnSync(CLANG, ['-O3', '-std=c11', '-Wall', '-Wextra', '-Werror',
+      '-fno-lto', '-I', directory, '-o', binary, sourcePath],
+    { cwd: directory, env: { PATH: '/usr/bin:/bin' }, encoding: 'utf8',
+      timeout: COMPILE_TIMEOUT_MS, maxBuffer: MAX_COMPILER_OUTPUT_BYTES, input: '' });
+    if (child.error || child.signal || child.status !== 0)
+      throw new Error('trusted native fallback compiler unavailable or failed');
+    return readBoundedBinary(binary);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 }
 
@@ -209,15 +252,24 @@ function replay(input: ReplayInput): Omit<ProcessNativeFallbackOutcomeV1, 'forma
 
 function assertSubject(binding: ProcessNativeFallbackBindingV1,
   bindingInput: ProcessNativeFallbackBindingInput,
-  lowered: ProcessNativeFallbackLowered): void {
+  lowered: ProcessNativeFallbackLowered): ProvedNativeFallbackOutput {
   assertProcessNativeFallbackBinding(binding, bindingInput);
+  const rebuilt = lowerCheckedFallbackAst({ module: bindingInput.context.module,
+    manifest: bindingInput.context.manifest, tier1: binding.tier1,
+    tier2: binding.tier2, checkedProof: bindingInput.checkedProof });
   if (lowered.format !== 'aether.proved-native-fallback-lowering/1'
     || lowered.root !== binding.astRoot || lowered.manifestDigest !== binding.manifestDigest
     || lowered.sourceSha256 !== binding.sourceSha256
     || lowered.conservativeProofDigest !== binding.proofDigest
     || lowered.proofProfileDigest !== RECORD_FALLBACK_PROFILE_DIGEST
-    || lowered.compilerProfileDigest !== binding.compilerProfileDigest)
+    || lowered.compilerProfileDigest !== binding.compilerProfileDigest
+    || rebuilt.sourceSha256 !== binding.sourceSha256
+    || rebuilt.root !== binding.astRoot
+    || rebuilt.manifestDigest !== binding.manifestDigest
+    || rebuilt.conservativeProofDigest !== binding.proofDigest
+    || rebuilt.compilerProfileDigest !== binding.compilerProfileDigest)
     throw new TypeError('native fallback compiler/proof subject mismatch');
+  return rebuilt;
 }
 function assertAuthorityFlags(input: { grant2: boolean; revokeAtFault?: boolean }): void {
   if (typeof input.grant2 !== 'boolean' || (input.revokeAtFault !== undefined
@@ -225,12 +277,17 @@ function assertAuthorityFlags(input: { grant2: boolean; revokeAtFault?: boolean 
 }
 
 export function runProcessNativeFallback(input: ProcessNativeFallbackRunInput): ProcessNativeFallbackOutcomeV1 {
-  assertSubject(input.binding, input.bindingInput, input.lowered);
+  const rebuilt = assertSubject(input.binding, input.bindingInput, input.lowered);
   assertAuthorityFlags(input);
   const { binding } = input;
+  const rebuiltBytes = rebuildBinary(rebuilt.source);
+  if (createHash('sha256').update(rebuiltBytes).digest('hex') !== binding.executableSha256)
+    throw new TypeError('native fallback rebuilt executable differs from binding');
   const bytes = readExactBinary(input.executablePath, binding.executableSha256);
+  if (!bytes.equals(rebuiltBytes))
+    throw new TypeError('native fallback artifact bytes differ from trusted rebuild');
   const frame = binding.frame;
-  const output = execute(bytes, ['--snapshot-case', frame.nextObjectId,
+  const output = execute(rebuiltBytes, ['--snapshot-case', frame.nextObjectId,
     frame.left.objectId, frame.right.objectId, '1', input.grant2 ? '1' : '0',
     input.revokeAtFault ? '1' : '0', ...frame.values]);
   if (output.left !== frame.left.objectId || output.right !== frame.right.objectId)

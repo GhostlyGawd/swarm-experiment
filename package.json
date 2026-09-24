@@ -70,7 +70,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/copy-native-fallback-driver.mjs",
     "prepack": "npm run build",
     "pretest": "npm run build",
     "typecheck": "tsc -p tsconfig.check.json",
