@@ -25,7 +25,7 @@
  * conservative and nonexpiring, so this does not reclaim protected history.
  * This bounded foundation does not by itself complete V4-T1-05.
  */
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { encodeCanonical, decodeCanonical, exactObject, identifier } from '../fabric/encoding.ts';
 import { domainDigest, executionManifestDigest, validateDigest, validateExecutionManifest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
@@ -43,6 +43,7 @@ import { SymbolSpace } from './symbols.ts';
 import type { NodeRef, SymbolId } from './ids.ts';
 import { atomicWrite } from './persistence.ts';
 import * as b from './build.ts';
+import { ProcessCheckpointActiveReleaseAuthority, type ProcessCheckpointActiveReleaseProof } from '../tier4/process-checkpoint-active-release.ts';
 
 export const SEMANTIC_GC_PROFILE = 'aether.semantic-gc-closed-forwarders/1';
 export const SEMANTIC_GC_BRANCH_PROFILE = 'aether.semantic-gc-closed-branches/1';
@@ -66,6 +67,8 @@ export interface SemanticGcOptions {
   readonly maxBranchProofs?: number;
   readonly maxShimComparisons?: number;
   readonly maxDeclarations?: number; readonly maxAstNodes?: number; readonly maxRecords?: number;
+  /** Opt-in witnessed ProcessHost checkpoint authority for V2 active-task releases. */
+  readonly activeReleaseAuthority?: ProcessCheckpointActiveReleaseAuthority;
 }
 interface Wrapper { readonly symbol: SymbolId; readonly target: SymbolId }
 interface BranchStep { readonly field: string; readonly index: number }
@@ -85,6 +88,11 @@ export interface SemanticGcProposal {
   readonly branches?: readonly BranchWitness[];
   readonly shims?: readonly ShimWitness[];
   readonly obligationDigest: Digest; readonly id: Digest;
+}
+interface ActiveReleaseV2 {
+  readonly format: 'aether.semantic-retention-release/2'; readonly configuration: Digest;
+  readonly proof: ProcessCheckpointActiveReleaseProof;
+  readonly activeRecords: readonly Digest[]; readonly replayRecords: readonly Digest[]; readonly id: Digest;
 }
 const WIRE_LIMITS = { maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024, maxObjects: 500000, maxDepth: 64 };
 function clone<T>(value: T): T { return decodeCanonical(encodeCanonical(value, WIRE_LIMITS), WIRE_LIMITS) as T; }
@@ -121,11 +129,18 @@ export class SemanticGarbageCollector {
   private readonly maxAstNodes: number;
   private readonly maxRecords: number;
   private readonly builderLease: string;
+  private readonly activeReleaseAuthority: ProcessCheckpointActiveReleaseAuthority | null;
   readonly profile: SemanticGcProfile;
   private readonly maxBranchProofs: number;
   private readonly maxShimComparisons: number;
   constructor(options: SemanticGcOptions) {
     this.options = { ...options }; identifier(options.repositoryId);
+    if (options.activeReleaseAuthority) {
+      ProcessCheckpointActiveReleaseAuthority.assertInstance(options.activeReleaseAuthority);
+      if (options.activeReleaseAuthority.repositoryId !== options.repositoryId)
+        throw new Error('semantic retention release authority repository mismatch');
+    }
+    this.activeReleaseAuthority = options.activeReleaseAuthority ?? null;
     this.profile = options.profile ?? SEMANTIC_GC_PROFILE;
     if (![SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, SEMANTIC_GC_CALL_SHIM_PROFILE, SEMANTIC_GC_FUEL_PROFILE].includes(this.profile)) throw new Error('unsupported semantic GC profile');
     this.maxShimComparisons = options.maxShimComparisons ?? 64;
@@ -140,19 +155,22 @@ export class SemanticGarbageCollector {
     for (const [limit, maximum] of [[this.maxDeclarations, 128], [this.maxAstNodes, 10000], [this.maxRecords, 10000]]) if (!Number.isSafeInteger(limit) || limit < 1 || limit > maximum) throw new RangeError('semantic GC resource profile');
     const profile = { format: this.profile, repositoryId: options.repositoryId, policy: this.policy, registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), maxDeclarations: this.maxDeclarations, maxAstNodes: this.maxAstNodes, maxRecords: this.maxRecords, ...(this.profile !== SEMANTIC_GC_PROFILE ? { maxBranchProofs: this.maxBranchProofs } : {}), ...(isShimProfile(this.profile) ? { maxShimComparisons: this.maxShimComparisons } : {}) };
     this.configuration = domainDigest('aether.semantic-gc-config/1', profile); this.builderLease = `semantic-gc-builder:${this.configuration}`;
-    durableDirectory(options.directory); durableDirectory(join(options.directory, 'proposals')); durableDirectory(join(options.directory, 'retention'));
+    durableDirectory(options.directory); durableDirectory(join(options.directory, 'proposals')); durableDirectory(join(options.directory, 'retention')); durableDirectory(join(options.directory, 'retention-releases'));
     this.lock = new JournalLock({ directory: join(options.directory, 'lock'), domain: 'aether.semantic-gc', maxTickets: 100000 });
     this.lock.run(() => {
       const path = join(options.directory, 'profile.json');
-      if (!existsSync(path)) { if (this.files('proposals').length || this.files('retention').length) throw new Error('missing initialized semantic GC profile'); write(path, profile); }
+      if (!existsSync(path)) { if (this.files('proposals').length || this.files('retention').length || this.files('retention-releases').length) throw new Error('missing initialized semantic GC profile'); write(path, profile); }
       else if (!same(this.read(path), profile)) throw new Error('semantic GC configuration changed; use a distinct workspace');
       for (const record of this.retentions()) this.options.store.retain(this.retentionLease(record), [record.root]);
+      for (const release of this.releaseRecords()) for (const record of this.retentionHistory().filter(item =>
+        item.kind === 'active-task' && item.reference === release.proof.reference))
+        this.options.store.release(this.retentionLease(record));
     }, 5000);
   }
-  private files(directory: 'proposals' | 'retention'): string[] { const files = readdirSync(join(this.options.directory, directory)).filter(name => !name.startsWith('.')); if (files.length > this.maxRecords || files.some(name => !/^[0-9a-f]{64}\.json$/.test(name))) throw new Error('semantic GC journal capacity/schema'); return files.sort(); }
+  private files(directory: 'proposals' | 'retention' | 'retention-releases'): string[] { const files = readdirSync(join(this.options.directory, directory)).filter(name => !name.startsWith('.')); if (files.length > this.maxRecords || files.some(name => !/^[0-9a-f]{64}\.json$/.test(name))) throw new Error('semantic GC journal capacity/schema'); return files.sort(); }
   private read(path: string): unknown { if (statSync(path).size > WIRE_LIMITS.maxFrameBytes) throw new Error('semantic GC record size limit'); return decodeCanonical(readFileSync(path), WIRE_LIMITS); }
-  private path(directory: 'proposals' | 'retention', id: Digest): string { validateDigest(id); return join(this.options.directory, directory, `${id.split(':').at(-1)}.json`); }
-  private immutable(directory: 'proposals' | 'retention', id: Digest, value: unknown): void {
+  private path(directory: 'proposals' | 'retention' | 'retention-releases', id: Digest): string { validateDigest(id); return join(this.options.directory, directory, `${id.split(':').at(-1)}.json`); }
+  private immutable(directory: 'proposals' | 'retention' | 'retention-releases', id: Digest, value: unknown): void {
     const path = this.path(directory, id);
     if (existsSync(path)) { if (!same(this.read(path), value)) throw new Error('semantic GC immutable record conflict'); return; }
     if (this.files(directory).length >= this.maxRecords) throw new Error('semantic GC journal capacity reached'); write(path, value);
@@ -176,18 +194,100 @@ export class SemanticGarbageCollector {
   retain(record: SemanticRetention): void {
     record = clone(record); this.validateRetention(record);
     this.lock.run(() => {
+      if (this.releaseRecords().some(release => release.proof.reference === record.reference && record.kind === 'active-task'))
+        throw new Error('active-task semantic retention identity was terminally released');
       this.options.store.retain(this.retentionLease(record), [record.root]);
       const id = domainDigest('aether.semantic-retention/1', { configuration: this.configuration, ...record });
       this.immutable('retention', id, { format: 'aether.semantic-retention/1', configuration: this.configuration, record, id });
     }, 5000);
   }
   private validateRetention(record: SemanticRetention): void { exactObject(record, ['kind', 'reference', 'root']); if (!['audit', 'replay', 'active-task', 'unstable-replication'].includes(record.kind)) throw new Error('unknown retention role'); identifier(record.reference); validateDigest(record.root, 'ast'); }
-  retentions(): readonly SemanticRetention[] {
+  /** Immutable V1 audit history, including records later released by V2. */
+  retentionHistory(): readonly SemanticRetention[] {
     return this.files('retention').map(file => {
       const value = exactObject(this.read(join(this.options.directory, 'retention', file)), ['format', 'configuration', 'record', 'id']); const record = value.record as SemanticRetention; this.validateRetention(record);
       const id = domainDigest('aether.semantic-retention/1', { configuration: this.configuration, ...record });
       if (value.format !== 'aether.semantic-retention/1' || value.configuration !== this.configuration || value.id !== id || file !== `${id.split(':').at(-1)}.json`) throw new Error('corrupt semantic retention'); return clone(record);
     });
+  }
+  private retentionId(record: SemanticRetention): Digest {
+    return domainDigest('aether.semantic-retention/1', { configuration: this.configuration, ...record });
+  }
+  private assertReleaseLocal(proof: ProcessCheckpointActiveReleaseProof): void {
+    if (proof.collectorDirectory !== realpathSync(this.options.directory)
+      || proof.storeDirectory !== realpathSync(this.options.store.directory))
+      throw new Error('semantic retention release names another collector or AST store');
+  }
+  private releaseRecords(): readonly ActiveReleaseV2[] {
+    const files = this.files('retention-releases');
+    if (files.length && !this.activeReleaseAuthority) throw new Error('semantic retention release authority missing');
+    const history = this.retentionHistory(), seen = new Set<string>();
+    return files.map(file => {
+      const value = exactObject(this.read(join(this.options.directory, 'retention-releases', file)),
+        ['format', 'configuration', 'proof', 'activeRecords', 'replayRecords', 'id']) as unknown as ActiveReleaseV2;
+      const { id, ...body } = value;
+      if (value.format !== 'aether.semantic-retention-release/2' || value.configuration !== this.configuration
+        || id !== domainDigest('aether.semantic-retention-release/2', body, WIRE_LIMITS)
+        || file !== `${id.split(':').at(-1)}.json` || !Array.isArray(value.activeRecords)
+        || !Array.isArray(value.replayRecords) || seen.has(value.proof.reference))
+        throw new Error('corrupt or duplicate semantic retention release');
+      this.activeReleaseAuthority!.verify(value.proof);
+      this.assertReleaseLocal(value.proof);
+      const ids = (kind: SemanticRetentionKind) => history.filter(record => record.kind === kind
+        && record.reference === value.proof.reference).map(record => this.retentionId(record)).sort();
+      const roots = (kind: SemanticRetentionKind) => history.filter(record => record.kind === kind
+        && record.reference === value.proof.reference).map(record => record.root).sort();
+      if (!same(value.activeRecords, ids('active-task')) || !same(value.replayRecords, ids('replay'))
+        || !same(roots('active-task'), value.proof.roots) || !same(roots('replay'), value.proof.roots))
+        throw new Error('semantic retention release does not cover exact active and replay roots');
+      const leases = this.options.store.roots().leases;
+      for (const record of history.filter(item => item.kind === 'replay' && item.reference === value.proof.reference)) {
+        if (!same(leases[this.retentionLease(record)], [record.root])) throw new Error('release lost replay semantic pin');
+        this.options.store.hydrate(record.root);
+      }
+      seen.add(value.proof.reference);
+      return value;
+    });
+  }
+  /** The current liveness view. Released V1 records remain in retentionHistory(). */
+  retentions(): readonly SemanticRetention[] {
+    const released = new Set(this.releaseRecords().flatMap(item => item.activeRecords));
+    return this.retentionHistory().filter(record => !released.has(this.retentionId(record)));
+  }
+  /** Retire only a complete active-task group after a witnessed committed
+   * ProcessHost checkpoint and its independently validated effect audit. */
+  releaseCommittedActiveTask(proof: ProcessCheckpointActiveReleaseProof): void {
+    if (!this.activeReleaseAuthority) throw new Error('semantic retention release authority missing');
+    this.lock.run(() => {
+      this.activeReleaseAuthority!.verify(proof);
+      this.assertReleaseLocal(proof);
+      const existing = this.releaseRecords().find(item => item.proof.reference === proof.reference);
+      if (existing) {
+        if (!same(existing.proof, { ...proof, hostRevision: existing.proof.hostRevision, id: existing.proof.id }))
+          throw new Error('semantic retention release identity conflict');
+        for (const record of this.retentionHistory().filter(item => item.kind === 'active-task' && item.reference === proof.reference))
+          this.options.store.release(this.retentionLease(record));
+        return;
+      }
+      const history = this.retentionHistory();
+      const active = history.filter(item => item.kind === 'active-task' && item.reference === proof.reference);
+      const replay = history.filter(item => item.kind === 'replay' && item.reference === proof.reference);
+      if (!same(active.map(item => item.root).sort(), proof.roots)
+        || !same(replay.map(item => item.root).sort(), proof.roots))
+        throw new Error('release lacks complete active and replay pin sets');
+      const leases = this.options.store.roots().leases;
+      for (const record of [...active, ...replay]) {
+        if (!same(leases[this.retentionLease(record)], [record.root]))
+          throw new Error('release physical semantic pin missing');
+        this.options.store.hydrate(record.root);
+      }
+      const body = { format: 'aether.semantic-retention-release/2' as const, configuration: this.configuration,
+        proof: clone(proof), activeRecords: active.map(item => this.retentionId(item)).sort(),
+        replayRecords: replay.map(item => this.retentionId(item)).sort() };
+      const id = domainDigest('aether.semantic-retention-release/2', body, WIRE_LIMITS);
+      this.immutable('retention-releases', id, { ...body, id });
+      for (const record of active) this.options.store.release(this.retentionLease(record));
+    }, 5000);
   }
   /** Serialize an adapter retirement publication with new replay, task and
    * replica pins. The snapshot check and caller's durable publication share
