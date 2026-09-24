@@ -27,8 +27,10 @@ key files must be regular 0600 files owned by the service UID. The socket parent
 must be service-owned and not group/other writable; storage is 0700 and the
 socket is 0600. Secrets are file bytes, never argv or environment values.
 
-The decision key is exactly `(repositoryId, deploymentId, executionId,
-effectId)`. A different full request digest on the same key is refused. The
+The logical decision key is exactly `(repositoryId, executionId, effectId)`
+across deployment generations. A different deployment or full request digest
+on the same key is refused; recovery must use the original deployment-bound
+receipt. The
 service stores each decision's exact request, result and signed receipt in one
 canonical state replacement, using a private temporary file, `fsync(file)`,
 atomic rename and `fsync(directory)` before replying. Repeated execution or
@@ -39,13 +41,19 @@ for status and must never be interpreted as noncommit. The state has a 1024
 decision / 8 MiB bound; capacity failure is uncertain to callers until they
 obtain an authenticated decision.
 
+Receipts and their request/value expectations are bounded to 64 KiB, 256
+objects and depth 16. The outer authenticated wire allows 192 KiB so JSON
+escaping and the signed receipt cannot strand an otherwise accepted committed
+value. Requests outside the receipt domain refuse before a decision is stored.
+
 ## Evidence and limits
 
 `node --test --experimental-strip-types test/fabric/attested-sink-service.test.ts`
 launches the real CLI as another process. It tests exact replay after SIGKILL
 and restart, a crash/response-loss-style client disconnect after complete
 request transmission, the signed noncommit fence, conflicting payloads, wrong
-transport secret and startup refusal after stored signature tampering.
+transport secret, cross-deployment reuse refusal, a near-limit recoverable
+response, and startup refusal after stored signature tampering.
 
 This fixture proves append-once behavior **inside its own private ledger** for
 the tested process crashes. It does not establish a production external

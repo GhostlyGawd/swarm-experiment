@@ -10,7 +10,9 @@ import { decimal, encodeCanonical, exactObject, identifier, validateTaggedValue,
 import { effectRequestDigest, validateEffectRequest, type EffectRequestV1 } from './effects.ts';
 import { domainDigest, validateDigest, type Digest } from './identity.ts';
 
-const LIMITS = { maxFrameBytes: 64 * 1024, maxDecompressedBytes: 64 * 1024, maxObjects: 256, maxDepth: 16, maxIntegerDigits: 40 } as const;
+export const SINK_RECEIPT_LIMITS = Object.freeze({ maxFrameBytes: 64 * 1024,
+  maxDecompressedBytes: 64 * 1024, maxObjects: 256, maxDepth: 16, maxIntegerDigits: 40 } as const);
+const LIMITS = SINK_RECEIPT_LIMITS;
 const SIGNATURE_DOMAIN = 'aether.sink-receipt-signature/1';
 
 export interface SinkPublicAnchorV1 {
@@ -100,6 +102,12 @@ export function sinkValueDigest(value: TaggedValueV1): Digest {
   return domainDigest('aether.sink-value/1', value, LIMITS);
 }
 
+export function validateSinkAdapterArtifactDigest(value: unknown): asserts value is Digest {
+  validateDigest(value);
+  if (!/^aether\.effect-adapter-artifact\/[1-9][0-9]*:b3:/.test(value as string))
+    throw new TypeError('invalid effect adapter artifact digest');
+}
+
 export function validateSinkPublicAnchor(value: unknown): asserts value is SinkPublicAnchorV1 {
   encodeCanonical(value, LIMITS);
   const anchor = exactObject(value, ['format', 'repositoryId', 'sinkAuthorityId', 'sinkId', 'keyId', 'keyEpoch', 'publicKey']);
@@ -118,8 +126,7 @@ export function validateSinkReceiptBody(value: unknown): asserts value is SinkRe
   if (body.format !== 'aether.sink-receipt-body/1') throw new TypeError('unsupported sink receipt body');
   for (const field of ['repositoryId', 'deploymentId', 'executionId', 'effectId', 'sinkAuthorityId', 'sinkId', 'capabilityGrantRef', 'keyId', 'decisionId'] as const) identifier(body[field]);
   validateDigest(body.requestDigest, 'aether.effect/1'); validateDigest(body.payloadDigest, 'aether.effect-payload/1');
-  validateDigest(body.adapterArtifactDigest);
-  if (!/^aether\.effect-adapter-artifact\/[1-9][0-9]*:b3:/.test(body.adapterArtifactDigest as string)) throw new TypeError('invalid effect adapter artifact digest');
+  validateSinkAdapterArtifactDigest(body.adapterArtifactDigest);
   decimal(body.policyEpoch, LIMITS); decimal(body.keyEpoch, LIMITS); decimal(body.sinkSequence, LIMITS);
   if (body.sinkSequence === '0') throw new TypeError('sink sequence must be positive');
   if (body.disposition === 'committed') {
@@ -154,7 +161,7 @@ export function verifySinkReceipt(value: unknown, anchor: SinkPublicAnchorV1, ex
     validateSignedSinkReceipt(value); validateSinkPublicAnchor(anchor);
     exactObject(expected, ['repositoryId', 'deploymentId', 'request', 'sinkAuthorityId', 'sinkId', 'adapterArtifactDigest', 'disposition', 'value']);
     identifier(expected.repositoryId); identifier(expected.deploymentId); identifier(expected.sinkAuthorityId); identifier(expected.sinkId);
-    validateEffectRequest(expected.request, LIMITS); validateDigest(expected.adapterArtifactDigest);
+    validateEffectRequest(expected.request, LIMITS); validateSinkAdapterArtifactDigest(expected.adapterArtifactDigest);
     if (expected.disposition !== 'committed' && expected.disposition !== 'not_committed') return false;
     if (expected.disposition === 'committed') validateTaggedValue(expected.value, LIMITS);
     else if (expected.value !== null) return false;

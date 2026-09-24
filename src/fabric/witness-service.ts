@@ -7,7 +7,8 @@ import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
 import { decodeCanonical, decimal, encodeCanonical, exactObject, identifier } from './encoding.ts';
-import { domainDigest } from './identity.ts';
+import { domainDigest, validateDigest } from './identity.ts';
+import { validateSinkPublicAnchor } from './sink-receipt.ts';
 import { createNamespacedEffectJournalWitness, createNamespacedEffectJournalWitnessCatalog,
   type NamespacedEffectJournalWitnessCatalog } from './effect-journal-witness.ts';
 import { createHostJournalWitness, createHostJournalWitnessCatalog,
@@ -145,16 +146,25 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string)
   const value = parse(bytes);
   const record = value as Record<string, unknown>;
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw new TypeError('invalid witness journal');
-  const expectedFormat = id.kind === 'effect' ? 'aether.effect-journal/2'
+  const expectedFormat = id.kind === 'effect' ? ['aether.effect-journal/2', 'aether.effect-journal/3']
     : id.kind === 'host' ? 'aether.process-host/4' : 'aether.process-deployment/9';
   // The service owns transport, identity, CAS and durable custody. Runtime
   // wrappers validate the richer journal semantics before calling advance.
-  if (record.format !== expectedFormat) throw new TypeError('invalid witness journal format');
+  if (id.kind === 'effect' ? !expectedFormat.includes(record.format as string) : record.format !== expectedFormat)
+    throw new TypeError('invalid witness journal format');
   if (id.kind === 'effect') {
     const { kind: _kind, ...parts } = id;
     const body = { format: 'aether.effect-journal-witness/2', ...parts };
     if (record.revision !== revision || record.witnessDigest !== domainDigest(body.format, body)
       || record.clockDomain !== id.clockDomain) throw new TypeError('effect journal witness binding mismatch');
+    if (record.format === 'aether.effect-journal/3') {
+      identifier(record.deploymentId);
+      validateDigest(record.approvedAdapterArtifactDigest);
+      validateSinkPublicAnchor(record.sinkAnchor);
+      if (record.deploymentId !== id.catalogDeploymentId
+        || (record.sinkAnchor as { repositoryId: string }).repositoryId !== id.repositoryId)
+        throw new TypeError('attested effect journal identity mismatch');
+    }
   }
   if (id.kind === 'deployment') {
     const { kind: _kind, ...parts } = id;
@@ -172,6 +182,7 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
   if (priorBytes === null) return;
   const prior = parse(Buffer.from(priorBytes, 'utf8')) as Record<string, unknown>;
   const next = parse(Buffer.from(nextBytes, 'utf8')) as Record<string, unknown>;
+  if (prior.format !== next.format) throw new Error('witnessed journal format changed');
   const same = (left: unknown, right: unknown): boolean => canonical(left).equals(canonical(right));
   const array = (record: Record<string, unknown>, field: string): unknown[] => {
     if (!Array.isArray(record[field])) throw new TypeError(`invalid witnessed ${field} inventory`);
@@ -196,6 +207,11 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
       || !graph[oldState]?.includes(newState)) throw new Error('witnessed operation state regressed');
   };
   if (id.kind === 'effect') {
+    if (prior.format === 'aether.effect-journal/3'
+      && (!same(prior.sinkAnchor, next.sinkAnchor)
+        || !same(prior.deploymentId, next.deploymentId)
+        || !same(prior.approvedAdapterArtifactDigest, next.approvedAdapterArtifactDigest)))
+      throw new Error('witnessed sink authority or artifact changed');
     prefix('records', (oldRow, newRow) => {
       fixed(oldRow, newRow, ['sequence', 'requestDigest', 'adapterId', 'adapterSemanticsDigest']);
       forward(oldRow.state, newRow.state, {
@@ -209,6 +225,9 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
       if (newTransitions.length < oldTransitions.length
         || oldTransitions.some((row, index) => !same(row, newTransitions[index])))
         throw new Error('witnessed effect transition prefix changed');
+      if (oldRow.signedSinkReceipt !== null && oldRow.signedSinkReceipt !== undefined
+        && !same(oldRow.signedSinkReceipt, newRow.signedSinkReceipt))
+        throw new Error('witnessed sink receipt changed');
       if (['committed', 'rejected', 'aborted'].includes(oldRow.state as string) && !same(oldRow, newRow))
         throw new Error('witnessed terminal effect changed');
     });

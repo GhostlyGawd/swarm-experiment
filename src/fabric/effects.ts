@@ -6,7 +6,7 @@ import { decimal, decodeCanonical, encodeCanonical, encodingLimits, exactObject,
 import { domainDigest, validateDigest, type Digest } from './identity.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 import { advanceWitnessHead, assertEffectJournalWitness, readWitnessHead, type AnyEffectJournalWitness } from './effect-journal-witness.ts';
-import { assertAttestedSinkAdapter, verifiedSinkReceipt } from './attested-sink-adapter.ts';
+import { assertAttestedSinkAdapter, isAttestedSinkAdapter, verifiedSinkReceipt } from './attested-sink-adapter.ts';
 import { validateSinkPublicAnchor, verifySinkReceipt, type SignedSinkReceiptV1, type SinkPublicAnchorV1 } from './sink-receipt.ts';
 
 export type ExecutionMode = 'live' | 'speculative' | 'shadow' | 'replay';
@@ -468,6 +468,8 @@ export class DurableEffectBroker {
    * mutation or current authorization. In V2 the complete journal is checked
    * against its witness before this can return a cached receipt. */
   inspectRecorded(input: EffectRequestV1, adapter: EffectAdapter): EffectOutcome | null {
+    if (!this.#attestedSink && isAttestedSinkAdapter(adapter))
+      throw new Error('attested sink adapter requires witnessed V3 broker');
     if (this.mode !== 'live') throw new Error('isolated_record_inspection_forbidden');
     validateEffectRequest(input, this.limits); const request = immutable(copy(input, this.limits));
     this.#assertAttestedAdapter(adapter);
@@ -541,6 +543,8 @@ export class DurableEffectBroker {
   events(): readonly EffectEventV1[] { return immutable(copy(this.read().records, this.limits)); }
 
   dispatch(input: EffectRequestV1, adapter: EffectAdapter, options: { signal?: AbortSignal } = {}): EffectOutcome {
+    if (!this.#attestedSink && isAttestedSinkAdapter(adapter))
+      throw new Error('attested sink adapter requires witnessed V3 broker');
     validateEffectRequest(input, this.limits);
     const request = immutable(copy(input, this.limits));
     this.#assertAttestedAdapter(adapter);
@@ -641,6 +645,8 @@ export class DurableEffectBroker {
   }
 
   reconcile(input: EffectRequestV1, adapter: EffectAdapter): EffectOutcome {
+    if (!this.#attestedSink && isAttestedSinkAdapter(adapter))
+      throw new Error('attested sink adapter requires witnessed V3 broker');
     if (this.mode !== 'live') throw new Error('isolated_reconciliation_forbidden');
     validateEffectRequest(input, this.limits); const request = immutable(copy(input, this.limits));
     this.#assertAttestedAdapter(adapter);

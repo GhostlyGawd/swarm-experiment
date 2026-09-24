@@ -125,6 +125,17 @@ test('V3 will not certify a forged sink commit or reuse an unsigned structural a
   assert.equal(broker.events()[0].signedSinkReceipt, null);
 });
 
+test('legacy brokers refuse an attested sink adapter before any durable intent or sink call', () => {
+  const f = fixture(), attested = f.adapter();
+  const legacy = new DurableEffectBroker(f.options({ directory: join(f.directory, 'legacy'),
+    witness: undefined, attestedSink: undefined }));
+  assert.throws(() => legacy.dispatch(f.request, attested), /requires witnessed V3 broker/);
+  assert.throws(() => legacy.inspectRecorded(f.request, attested), /requires witnessed V3 broker/);
+  assert.throws(() => legacy.reconcile(f.request, attested), /requires witnessed V3 broker/);
+  assert.equal(legacy.events().length, 0);
+  assert.equal(f.dispatches(), 0);
+});
+
 test('V3 verifies a signed durable noncommit fence before terminal abort', () => {
   const f = fixture(); f.failExecute();
   f.setDecision({ state: 'not_committed', receipt: f.signed('not_committed') });

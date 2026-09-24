@@ -19,7 +19,7 @@ after(() => {
   for (const root of roots) fs.rmSync(root, { recursive: true, force: true });
 });
 
-function fixture() {
+function fixture(artifactVersion: 1 | 2 = 1) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aether-attested-sink-'));
   roots.push(root);
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
@@ -28,7 +28,7 @@ function fixture() {
     sinkId: 'sink:ledger', keyId: 'key:1', keyEpoch: '1',
     publicKey: publicKey.export({ format: 'der', type: 'spki' }).toString('base64'),
   };
-  const artifact = domainDigest('aether.effect-adapter-artifact/1', 'attested-sink-echo-ledger-fixture');
+  const artifact = domainDigest(`aether.effect-adapter-artifact/${artifactVersion}`, 'attested-sink-echo-ledger-fixture');
   const authKey = randomBytes(32);
   const socketPath = path.join(root, 'sink.sock');
   const storageDir = path.join(root, 'store');
@@ -103,9 +103,33 @@ test('operator process commits exactly once and retains identical signed receipt
     assert.deepEqual(f.client.status(r), first);
     assert.deepEqual(f.client.execute(r), first);
     assert.equal(decisions(f.storageDir).length, 1);
+    const laterDeployment = createAttestedSinkClient({ ...f.clientOptions, deploymentId: 'deployment:2' });
+    assert.throws(() => laterDeployment.execute(r), /sink CONFLICT/);
+    assert.deepEqual(laterDeployment.status(r), { state: 'unknown' });
+    assert.equal(decisions(f.storageDir).length, 1,
+      'a new deployment cannot execute the same logical effect again');
     const altered = request('effect:commit', { tag: 'string', value: 'different' });
     assert.throws(() => f.client.execute(altered), /sink CONFLICT/);
     assert.deepEqual(f.client.status(altered), { state: 'unknown' });
+    assert.equal(decisions(f.storageDir).length, 1);
+  } finally { await kill(child); }
+});
+
+test('near-limit accepted payload retains a recoverable signed response after restart', async () => {
+  const f = fixture(2); let child = await launch(f.configFile);
+  try {
+    const r = request('effect:large-response', { tag: 'string', value: 'x'.repeat(64_400) });
+    const first = f.client.execute(r);
+    assert.equal(first.state, 'committed');
+    assert.equal(first.value.tag, 'string');
+    assert.deepEqual(f.client.status(r), first);
+    assert.equal(decisions(f.storageDir).length, 1);
+    const beyondReceiptLimit = request('effect:too-many-values', { tag: 'sequence',
+      items: Array.from({ length: 300 }, (_, index) => ({ tag: 'int' as const, value: String(index) })) });
+    assert.throws(() => f.client.execute(beyondReceiptLimit), /sink UNCERTAIN|uncertain sink response/);
+    assert.equal(decisions(f.storageDir).length, 1, 'unsupported receipt shapes refuse before sink publication');
+    await kill(child); child = await launch(f.configFile);
+    assert.deepEqual(f.client.status(r), first);
     assert.equal(decisions(f.storageDir).length, 1);
   } finally { await kill(child); }
 });

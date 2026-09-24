@@ -81,6 +81,7 @@
     "bench:v4:enforce": "node --experimental-strip-types bench/v4/cli.ts --enforce",
     "bench:v4:verify": "node --experimental-strip-types bench/v4/verify.ts",
     "witness:serve": "node --experimental-strip-types src/fabric/witness-service-cli.ts",
+    "sink:serve": "node --experimental-strip-types src/fabric/attested-sink-service-cli.ts",
     "demo": "node --experimental-strip-types src/cli.ts demo",
     "roadmap": "node --experimental-strip-types roadmap/render.ts",
     "roadmap:check": "node --experimental-strip-types roadmap/render.ts --check",

@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Opt-in authenticated sink receipt and V3 broker — 2026-09-23
+
+- Added a domain-separated Ed25519 sink receipt bound to the exact effect request, deployment, approved adapter artifact, grant/policy context and committed value or durable noncommit fence. A trusted wrapper and separate sink fixture verify and retain signed decisions; cross-deployment reuse of one logical effect ID conflicts rather than committing twice.
+- Added witnessed broker journal `/3` with operator-pinned sink anchor and exact signed receipt per terminal post-dispatch event. Broker dispatch, reconciliation, cached reads and replay reverify the proof; historical V1/V2 journal bytes remain explicit. A real controller SIGKILL after sink commit but before broker terminal publication reconciles through signed status without another sink decision. Near-limit committed responses remain retrievable after restart.
+- This is broker-level and same-UID fixture evidence. ProcessHost/Deployment admission, independent sink custody, general effectful adapters and a real third-party transaction are still required. T2-04/NFR-16 and the task count do not change. [Decision and limits](decisions/D09-authenticated-sink-outcomes.md).
+
 ## V12 blockless binding semantics — 2026-09-23
 
 - Added executable projection V12 for direct `Let` under `If`, `While` and `Atomic`. Scoped slots preserve branch selection, loop rebinding, temporary locals and reads/writes that fall back to an outer binding before a shadowing `Let` executes. Exact-root and import-closure checks pass; actual TypeScript, Python and Rust executions match the reference cases.

@@ -8,6 +8,7 @@ import { assertAttestedSinkAdapter, createAttestedSinkAdapter, verifiedSinkRecei
   type AttestedSinkClientV1, type AttestedSinkIdentityV1 } from '../../src/fabric/attested-sink-adapter.ts';
 import { type TaggedValueV1 } from '../../src/fabric/encoding.ts';
 import { DurableEffectBroker, effectPayloadDigest, effectRequestDigest, type EffectRequestV1 } from '../../src/fabric/effects.ts';
+import { createNamespacedEffectJournalWitness, type WitnessHead } from '../../src/fabric/effect-journal-witness.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
 import { signSinkReceipt, sinkValueDigest, type SignedSinkReceiptV1, type SinkPublicAnchorV1, type SinkReceiptBodyV1 } from '../../src/fabric/sink-receipt.ts';
 
@@ -120,8 +121,17 @@ test('broker keeps transport failure indeterminate and releases it only after si
   const adapter = createAttestedSinkAdapter({ id: 'adapter:payments/1', ...f.identity,
     client: { execute: () => { dispatches++; throw new Error('lost response'); },
       status: () => fenced ? { state: 'not_committed', receipt: f.receipt(req, 'not_committed') } : { state: 'unknown' } } });
+  let head: WitnessHead = { revision: '0', journal: null };
+  const witness = createNamespacedEffectJournalWitness({ authorityId: 'operator:test',
+    repositoryId: f.identity.repositoryId, catalogDeploymentId: f.identity.deploymentId,
+    operationId: 'adapter-broker', clockDomain: 'test-clock/1', read: () => head,
+    advance(expected, journal) { assert.equal(head.revision, expected);
+      head = { revision: String(BigInt(expected) + 1n), journal }; return head; } });
   const broker = new DurableEffectBroker({ directory: directory(), clockDomain: 'test-clock/1', clock: () => 100n,
-    authorize: () => true, budgets: { reserve: () => true, consume: () => {}, release: () => { releases++; } } });
+    authorize: () => true, authorizeReconciliation: () => true, witness,
+    attestedSink: { anchor: f.anchor, deploymentId: f.identity.deploymentId,
+      approvedAdapterArtifactDigest: f.identity.approvedAdapterArtifactDigest },
+    budgets: { reserve: () => true, consume: () => {}, release: () => { releases++; } } });
   const withBudget = request({ budgetReservationId: 'budget:reserved' });
   // The receipt must bind the exact budget-bearing request as well.
   const sink = createAttestedSinkAdapter({ id: 'adapter:payments/2', ...f.identity,

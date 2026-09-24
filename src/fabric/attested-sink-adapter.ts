@@ -55,7 +55,10 @@ interface RequestSnapshot { readonly request: EffectRequestV1; readonly digest: 
 interface AttestedBrand { readonly identity: AttestedSinkIdentityV1; readonly observed: Map<string, ObservedDecision> }
 const trustedInstances = new WeakMap<EffectAdapter, AttestedBrand>();
 
-const RECEIPT_LIMITS = { maxFrameBytes: 64 * 1024, maxDecompressedBytes: 64 * 1024, maxObjects: 256, maxDepth: 16, maxIntegerDigits: 40 } as const;
+// Keep this local to avoid reading a live binding during the intentional
+// sink-receipt -> effects -> adapter module cycle at initialization time.
+const RECEIPT_LIMITS = { maxFrameBytes: 64 * 1024, maxDecompressedBytes: 64 * 1024,
+  maxObjects: 256, maxDepth: 16, maxIntegerDigits: 40 } as const;
 function detached<T>(value: T): T { return decodeCanonical(encodeCanonical(value, RECEIPT_LIMITS), RECEIPT_LIMITS) as T; }
 function requestKey(request: EffectRequestV1): string { return JSON.stringify([request.executionId, request.effectId]); }
 
@@ -166,6 +169,12 @@ export class AttestedSinkAdapterV1 implements EffectAdapter {
 
 export function createAttestedSinkAdapter(options: AttestedSinkAdapterOptionsV1): AttestedSinkAdapterV1 {
   return new AttestedSinkAdapterV1(options);
+}
+
+/** Nonvirtual brand used to prevent a V1/V2 broker from dispatching this
+ * credential-bearing adapter without V3 receipt retention. */
+export function isAttestedSinkAdapter(adapter: EffectAdapter): boolean {
+  return trustedInstances.has(adapter);
 }
 
 // Prevent replacement of the trusted methods while allowing only instances

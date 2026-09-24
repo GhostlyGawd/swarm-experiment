@@ -11,14 +11,17 @@ import * as net from 'node:net';
 import * as path from 'node:path';
 import { decodeCanonical, encodeCanonical, exactObject, identifier, type EncodingLimits, type TaggedValueV1 } from './encoding.ts';
 import { effectRequestDigest, validateEffectRequest, type EffectRequestV1 } from './effects.ts';
-import { validateDigest } from './identity.ts';
 import { JournalLock } from './journal-lock.ts';
-import { signSinkReceipt, validateSinkPublicAnchor, validateSignedSinkReceipt, verifySinkReceipt, sinkValueDigest,
+import { SINK_RECEIPT_LIMITS, signSinkReceipt, validateSinkAdapterArtifactDigest, validateSinkPublicAnchor,
+  validateSignedSinkReceipt, verifySinkReceipt, sinkValueDigest,
   type SignedSinkReceiptV1, type SinkPublicAnchorV1, type SinkReceiptBodyV1 } from './sink-receipt.ts';
 
 const FORMAT = 'aether.attested-sink-service/1';
 const STATE_FORMAT = 'aether.attested-sink-state/1';
-const MAX_FRAME = 64 * 1024;
+// The request/value is at most 64 KiB, but a signed response embeds that
+// value and a receipt inside another JSON frame. The outer wire needs room
+// for escaping plus its authentication envelope.
+const MAX_FRAME = 192 * 1024;
 const MAX_STATE = 8 * 1024 * 1024;
 const MAX_DECISIONS = 1024;
 const LIMITS = { maxFrameBytes: MAX_FRAME, maxDecompressedBytes: MAX_FRAME, maxObjects: 1024, maxDepth: 24, maxIntegerDigits: 40 } as const;
@@ -93,8 +96,11 @@ function matchMac(key: Buffer, body: unknown, value: unknown): boolean {
     && timingSafeEqual(Buffer.from(value, 'hex'), Buffer.from(mac(key, body), 'hex'));
 }
 function same(left: unknown, right: unknown): boolean { return canonical(left).equals(canonical(right)); }
-function decisionKey(repositoryId: string, deploymentId: string, request: EffectRequestV1): string {
-  return JSON.stringify([repositoryId, deploymentId, request.executionId, request.effectId]);
+/** One logical effect keeps its sink identity across deployment generations.
+ * The original deployment remains bound in the signed receipt; a different
+ * deployment must recover through that history instead of executing anew. */
+function decisionKey(repositoryId: string, request: EffectRequestV1): string {
+  return JSON.stringify([repositoryId, request.executionId, request.effectId]);
 }
 function assertPaths(socketPath: string, storageDir: string): void {
   if (!path.isAbsolute(socketPath) || !path.isAbsolute(storageDir)) throw new TypeError('sink paths must be absolute');
@@ -124,7 +130,7 @@ function readState(dir: string, anchor: SinkPublicAnchorV1, adapterArtifactDiges
     validateEffectRequest(row.request, LIMITS); validateSignedSinkReceipt(row.receipt);
     const request = row.request as EffectRequestV1;
     const receipt = row.receipt as SignedSinkReceiptV1;
-    const id = decisionKey(row.repositoryId as string, row.deploymentId as string, request);
+    const id = decisionKey(row.repositoryId as string, request);
     if (seen.has(id)) throw new Error('duplicate sink decision');
     seen.add(id);
     if (receipt.body.sinkSequence !== String(index + 1) || row.repositoryId !== anchor.repositoryId
@@ -154,9 +160,10 @@ function decide(dir: string, options: AttestedSinkServiceOptions, op: 'execute' 
   repositoryId: string, deploymentId: string, request: EffectRequestV1): AttestedSinkDecision {
   if (repositoryId !== options.anchor.repositoryId) throw new Error('DENIED');
   const state = readState(dir, options.anchor, options.adapterArtifactDigest);
-  const id = decisionKey(repositoryId, deploymentId, request);
-  const prior = state.decisions.find(row => decisionKey(row.repositoryId, row.deploymentId, row.request) === id);
+  const id = decisionKey(repositoryId, request);
+  const prior = state.decisions.find(row => decisionKey(row.repositoryId, row.request) === id);
   if (prior) {
+    if (prior.deploymentId !== deploymentId) throw new Error('CONFLICT');
     if (effectRequestDigest(prior.request, LIMITS) !== effectRequestDigest(request, LIMITS)) throw new Error('CONFLICT');
     if (prior.receipt.body.disposition === 'not_committed') {
       if (op === 'execute') throw new Error('FENCED');
@@ -200,7 +207,7 @@ function processRequest(bytes: Buffer, key: Buffer, options: AttestedSinkService
   const nonce = request.nonce as string;
   try {
     identifier(request.repositoryId); identifier(request.deploymentId);
-    validateEffectRequest(request.request, LIMITS);
+    validateEffectRequest(request.request, SINK_RECEIPT_LIMITS);
     const result = decide(options.storageDir, options, request.op as 'execute' | 'status',
       request.repositoryId as string, request.deploymentId as string, request.request as EffectRequestV1);
     return response(key, nonce, result, null);
@@ -213,7 +220,7 @@ function processRequest(bytes: Buffer, key: Buffer, options: AttestedSinkService
 
 export async function startAttestedSinkService(options: AttestedSinkServiceOptions): Promise<AttestedSinkService> {
   const key = keyBytes(options.authKey);
-  validateSinkPublicAnchor(options.anchor); validateDigest(options.adapterArtifactDigest, 'aether.effect-adapter-artifact/1');
+  validateSinkPublicAnchor(options.anchor); validateSinkAdapterArtifactDigest(options.adapterArtifactDigest);
   if (options.privateKey.type !== 'private' || options.privateKey.asymmetricKeyType !== 'ed25519'
     || createPublicKey(options.privateKey).export({ format: 'der', type: 'spki' }).toString('base64') !== options.anchor.publicKey)
     throw new TypeError('sink private key does not match anchor');
@@ -276,7 +283,7 @@ export function createAttestedSinkClient(options: AttestedSinkClientOptions): {
   status(request: EffectRequestV1): AttestedSinkDecision;
 } {
   const key = keyBytes(options.authKey);
-  validateSinkPublicAnchor(options.anchor); validateDigest(options.adapterArtifactDigest, 'aether.effect-adapter-artifact/1');
+  validateSinkPublicAnchor(options.anchor); validateSinkAdapterArtifactDigest(options.adapterArtifactDigest);
   identifier(options.repositoryId); identifier(options.deploymentId);
   if (options.repositoryId !== options.anchor.repositoryId || !path.isAbsolute(options.socketPath))
     throw new TypeError('sink client context mismatch');

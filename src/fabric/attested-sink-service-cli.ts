@@ -7,8 +7,7 @@ import * as path from 'node:path';
 import { createPrivateKey } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { decodeCanonical, encodeCanonical, exactObject } from './encoding.ts';
-import { validateDigest } from './identity.ts';
-import { validateSinkPublicAnchor, type SinkPublicAnchorV1 } from './sink-receipt.ts';
+import { validateSinkAdapterArtifactDigest, validateSinkPublicAnchor, type SinkPublicAnchorV1 } from './sink-receipt.ts';
 import { startAttestedSinkService } from './attested-sink-service.ts';
 
 function privateFile(file: string, label: string): Buffer {
@@ -30,7 +29,7 @@ export async function runAttestedSinkServiceCli(args: readonly string[]): Promis
   if (typeof config.socketPath !== 'string' || typeof config.storageDir !== 'string'
     || typeof config.authKeyFile !== 'string' || typeof config.signingKeyFile !== 'string')
     throw new TypeError('invalid sink configuration');
-  validateSinkPublicAnchor(config.anchor); validateDigest(config.adapterArtifactDigest, 'aether.effect-adapter-artifact/1');
+  validateSinkPublicAnchor(config.anchor); validateSinkAdapterArtifactDigest(config.adapterArtifactDigest);
   const authKey = privateFile(config.authKeyFile, 'sink auth key');
   const privateKey = createPrivateKey(privateFile(config.signingKeyFile, 'sink signing key'));
   await startAttestedSinkService({ socketPath: config.socketPath, storageDir: config.storageDir,
