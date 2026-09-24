@@ -8,7 +8,7 @@ import type { CapabilityRegistry } from '../tier2/ocap.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { isRef, isSeqValue, isResultValue, isTaskValue, isClosureValue, type Value, type Ref } from './values.ts';
 import { validateMachineArguments, validateMachineResult, instantiateMachineType } from './resumable-types.ts';
-import { compileResumableProgram, type ResumableCode, type ResumableProgram } from './resumable-program.ts';
+import { compileResumableProgram, type ResumableCode, type ResumableProgram, type ResumableProgramOptions } from './resumable-program.ts';
 import { PackedHeap, unpackResumableCheckpoint, type PackedHeapImage, type PackedResumableCheckpoint } from './packed-heap.ts';
 import { MAX_MACHINE_EVENTS, MACHINE_LIMITS, checkpointDigest, emptyEventHead, eventDigest, machineClone, machineDigest, validateMachineCore, validateMachineValue, validateResumableSnapshot, type MachineCore, type MachineValue, type MachineFrame, type MachineEnvironment, type MachineCapture, type MachineEvent, type MachineSection, type ResumableSnapshot } from './resumable-state.ts';
 
@@ -28,9 +28,9 @@ export interface ResumableEffects {
   readonly grant: (capability: CapabilityName) => string;
   readonly reservation?: (capability: CapabilityName, effectId: string) => string | null;
 }
-export interface ResumableRuntimeOptions {
+export interface ResumableRuntimeOptions extends ResumableProgramOptions {
   readonly manifest: ExecutionManifestV1; readonly registry: CapabilityRegistry; readonly executionId: string;
-  readonly heapId?: string; readonly ownerEpoch?: string; readonly dependencies?: readonly Term[];
+  readonly heapId?: string; readonly ownerEpoch?: string;
   readonly mode?: MachineCore['mode']; readonly branchId?: string | null;
   /** Trusted host resolves current authority; checkpoint bytes only request names. */
   readonly capabilities?: () => readonly CapabilityName[];
@@ -84,6 +84,8 @@ export class ResumableRuntime {
   private restoredOrigin: Digest;
   private snapshotFormat: ResumableSnapshot['format'] = 'aether.resumable-state/1';
   constructor(module: Term, options: ResumableRuntimeOptions) {
+    if (options.virtualForward && options.effects)
+      throw new TypeError('virtual forward resumable profile is not admitted to the effect broker');
     this.program = compileResumableProgram(module, options); this.options = options;
     this.checkpointBytes = options.maxCheckpointBytes ?? MACHINE_LIMITS.maxFrameBytes;
     if (options.maxSteps !== undefined && (!Number.isSafeInteger(options.maxSteps) || options.maxSteps < 1 || options.maxSteps > 100_000)) throw new TypeError('invalid resumable step quota');

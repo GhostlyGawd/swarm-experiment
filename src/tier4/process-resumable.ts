@@ -87,12 +87,14 @@ export class ProcessResumableSession {
   private readonly options: ProcessResumableOptions;
   private constructor(binding: ProcessCheckpointBinding, options: ProcessResumableOptions) { this.binding = machineClone(binding); this.options = options; }
   static async begin(options: ProcessResumableOptions, base: ResumableSnapshot, initial: ResumableSnapshot, request: { operationId: string; symbol: SymbolId; expectedSnapshot: Digest; expectedGeneration: string }): Promise<ProcessResumableSession> {
+    if (options.runtime.virtualForward) throw new TypeError('ProcessHost does not admit virtual forward descriptor profiles');
     preflight(options.module);
     const binding = await options.host.beginCheckpoint(base, initial, { ...request, tokens: options.tokens() });
     ProcessHost.prototype.assertCheckpointSemanticRetention.call(options.host, binding);
     return new ProcessResumableSession(binding, options);
   }
   static reopen(options: ProcessResumableOptions, bindingId: Digest): ProcessResumableSession {
+    if (options.runtime.virtualForward) throw new TypeError('ProcessHost does not admit virtual forward descriptor profiles');
     preflight(options.module);
     const binding = options.host.checkpointStatus(bindingId).binding;
     ProcessHost.prototype.assertCheckpointSemanticRetention.call(options.host, binding);

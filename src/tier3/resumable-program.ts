@@ -7,12 +7,21 @@ import { children, type Term, type Ty, type Param } from '../tier1/ast.ts';
 import type { NodeRef, SymbolId, CapabilityName } from '../tier1/ids.ts';
 import { GraphStore } from '../tier1/store.ts';
 import { typecheck, underlying } from '../tier2/typecheck.ts';
+import { checkVirtualForwardDescriptor, type VirtualForwardBinding, type VirtualForwardDescriptor } from '../tier1/semantic-gc-virtual-forward.ts';
 import type { CapabilityRegistry } from '../tier2/ocap.ts';
 import { domainDigest, executionManifestDigest, decodeExecutionManifest, encodeExecutionManifest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import { encodeCanonical, exactObject, validString, type WireValue } from '../fabric/encoding.ts';
 
 export const RESUMABLE_PROGRAM_PROFILE = Object.freeze({ format: 'aether.resumable-profile/1', semantics: 'aether-reference/1', scheduler: 'lazy-cooperative-await', safePoints: 'completed-bytecode-instructions', capture: 'scope-value-copy-with-shared-heap-identity', atomic: 'rollback-fault-preserve-return', maxInstructions: 100_000, maxCodes: 4096 });
 export const RESUMABLE_PROFILE_DIGEST = domainDigest('aether.resumable-profile/1', RESUMABLE_PROGRAM_PROFILE);
+/** Physical source-wrapper lowering. The descriptor identity is part of the
+ * manifest's target profile, so it cannot be supplied as an unbound sidecar. */
+export function virtualForwardResumableProfileDigest(descriptor: VirtualForwardDescriptor): Digest {
+  return domainDigest('aether.resumable-virtual-forward-profile/1', {
+    baseProfile: RESUMABLE_PROFILE_DIGEST, lowering: 'checked-sites-to-archived-wrapper-bytecode/1',
+    descriptor: descriptor.id, sourceRoot: descriptor.sourceRoot, candidateRoot: descriptor.candidateRoot,
+  });
+}
 export interface Instruction { readonly op: string; readonly source: NodeRef; readonly args: readonly WireValue[] }
 export interface ResumableCode {
   readonly id: string; readonly kind: 'function' | 'lambda' | 'task'; readonly symbol: SymbolId;
@@ -25,7 +34,11 @@ export interface ResumableProgram {
   readonly manifestDigest: Digest; readonly profileDigest: Digest; readonly digest: Digest;
   readonly codes: readonly ResumableCode[];
 }
-export interface ResumableProgramOptions { readonly manifest: ExecutionManifestV1; readonly registry: CapabilityRegistry; readonly dependencies?: readonly Term[] }
+export interface ResumableProgramOptions { readonly manifest: ExecutionManifestV1; readonly registry: CapabilityRegistry;
+  /** Virtual forwarding accepts exactly one external dependency: the exact
+   * archived source wrapper. The target must be present in the candidate. */
+  readonly dependencies?: readonly Term[];
+  readonly virtualForward?: { readonly source: Extract<Term, { kind: 'Module' }>; readonly descriptor: VirtualForwardDescriptor } }
 const literal = (value: bigint | boolean | string | null): WireValue => value === null ? { tag: 'null' } : typeof value === 'bigint' ? { tag: 'int', value: String(value) } : typeof value === 'boolean' ? { tag: 'bool', value } : { tag: 'string', value };
 function freeze<T>(value: T): T { if (value && typeof value === 'object') { for (const child of Object.values(value)) freeze(child); Object.freeze(value); } return value; }
 
@@ -51,12 +64,55 @@ export function compileResumableProgram(inputModule: Term, options: ResumablePro
     } finally { active.delete(value); }
   };
   for (const input of [inputModule, ...(options.dependencies ?? [])]) encodeCanonical(inspect(input), { maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024, maxDepth: 128, maxObjects: 400_000 });
+  const virtualInput = options.virtualForward;
+  if (virtualInput) {
+    exactObject(virtualInput, ['source', 'descriptor']);
+    if (inputModule.kind !== 'Module') throw new TypeError('virtual forward requires a candidate Module');
+    // Check the caller's raw graph before structuredClone can invoke an
+    // accessor or proxy. Recheck clones below to bind object-identity sites.
+    checkVirtualForwardDescriptor(virtualInput.descriptor, virtualInput.source, inputModule);
+  }
   const module = structuredClone(inputModule), dependencies = structuredClone(options.dependencies ?? []);
   const manifest = decodeExecutionManifest(encodeExecutionManifest(options.manifest));
 
   if (module.kind !== 'Module' || manifest.semanticsVersion !== RESUMABLE_PROGRAM_PROFILE.semantics) throw new TypeError('unsupported resumable module/semantics');
+  if (!virtualInput && manifest.target.profileDigest.startsWith('aether.resumable-virtual-forward-profile/1:'))
+    throw new TypeError('virtual forward manifest profile requires its checked descriptor');
   const store = new GraphStore(), root = store.intern(module);
   if (root !== manifest.astRoot) throw new TypeError('resumable AST does not match trusted execution manifest');
+  const virtualByCall = new WeakMap<Term, VirtualForwardBinding>();
+  const sourceByTerm = new WeakMap<Term, NodeRef>();
+  let profileDigest = RESUMABLE_PROFILE_DIGEST;
+  if (virtualInput) {
+    const sourceModule = structuredClone(virtualInput.source);
+    const descriptor = structuredClone(virtualInput.descriptor);
+    const bindings = checkVirtualForwardDescriptor(descriptor, sourceModule, module);
+    profileDigest = virtualForwardResumableProfileDigest(descriptor);
+    if (manifest.target.profileDigest !== profileDigest)
+      throw new TypeError('virtual forward descriptor is not bound by manifest target profile');
+    const wrapper = sourceModule.members.find((member): member is Extract<Term, { kind: 'FunctionDecl' }> => member.kind === 'FunctionDecl' && member.symbol === descriptor.wrapper);
+    const target = module.members.find((member): member is Extract<Term, { kind: 'FunctionDecl' }> => member.kind === 'FunctionDecl' && member.symbol === descriptor.target);
+    if (!wrapper || !target || dependencies.length !== 1 || dependencies[0].kind !== 'FunctionDecl'
+      || store.intern(dependencies[0]) !== descriptor.wrapperDeclaration
+      || store.intern(target) !== descriptor.targetDeclaration)
+      throw new TypeError('virtual forward requires the exact archived wrapper and local target declarations');
+    for (const binding of bindings) virtualByCall.set(binding.candidateCall, binding);
+    const sourceDecls = new Map(sourceModule.members.filter((member): member is Extract<Term, { kind: 'FunctionDecl' }> => member.kind === 'FunctionDecl').map(decl => [decl.symbol, decl]));
+    const pair = (candidate: Term, source: Term): void => {
+      if (candidate.kind !== source.kind) throw new TypeError('virtual forward source/candidate node mismatch');
+      const ref = store.intern(source), previous = sourceByTerm.get(candidate);
+      if (previous !== undefined && previous !== ref) throw new TypeError('ambiguous shared virtual forward AST node');
+      sourceByTerm.set(candidate, ref);
+      const candidateChildren = children(candidate), sourceChildren = children(source);
+      if (candidateChildren.length !== sourceChildren.length) throw new TypeError('virtual forward source/candidate child mismatch');
+      candidateChildren.forEach((child, index) => pair(child, sourceChildren[index]));
+    };
+    for (const candidate of module.members) if (candidate.kind === 'FunctionDecl') {
+      const source = sourceDecls.get(candidate.symbol);
+      if (!source) throw new TypeError('virtual forward source declaration missing');
+      pair(candidate, source);
+    }
+  }
   const declarations = [...module.members.filter((node): node is Extract<Term, { kind: 'FunctionDecl' }> => node.kind === 'FunctionDecl')];
   for (const dependency of dependencies) {
     if (dependency.kind !== 'FunctionDecl' || declarations.some(decl => decl.symbol === dependency.symbol)) throw new TypeError('invalid resumable dependency');
@@ -68,7 +124,7 @@ export function compileResumableProgram(inputModule: Term, options: ResumablePro
     const declaration = bySymbol.get(dependency.symbol as SymbolId);
     if (!declaration || store.intern(declaration) !== dependency.declaration) throw new TypeError('resumable dependency closure mismatch');
   }
-  const callSymbols = (term: Term): SymbolId[] => [...(term.kind === 'Call' || term.kind === 'SeqMap' || term.kind === 'SeqFold' ? [term.callee] : []), ...children(term).flatMap(callSymbols)];
+  const callSymbols = (term: Term): SymbolId[] => [...(term.kind === 'Call' || term.kind === 'SeqMap' || term.kind === 'SeqFold' ? [term.kind === 'Call' ? (virtualByCall.get(term)?.wrapper.symbol ?? term.callee) : term.callee] : []), ...children(term).flatMap(callSymbols)];
   const closure = new Map<SymbolId, NodeRef>(), pending = module.members.filter(member => member.kind === 'FunctionDecl').flatMap(callSymbols);
   while (pending.length) { const symbol = pending.pop()!; if (closure.has(symbol)) continue; const declaration = bySymbol.get(symbol); if (!declaration) throw new TypeError('unresolved resumable dependency'); closure.set(symbol, store.intern(declaration)); pending.push(...callSymbols(declaration)); }
   const actual = [...closure].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([symbol, declaration]) => ({ symbol, declaration }));
@@ -83,7 +139,7 @@ export function compileResumableProgram(inputModule: Term, options: ResumablePro
     const instructions: Instruction[] = []; let tempId = 0;
     const lexicalTypes = new Map(capturedTypes); params.forEach(param => lexicalTypes.set(param.symbol, param.ty));
     surfaces.forEach(surface => { if (surface.kind === 'Surface') lexicalTypes.set(surface.symbol, typeof surface.current === 'bigint' ? { t: 'Int' } : { t: 'Str' }); });
-    const source = (term: Term) => store.intern(term);
+    const source = (term: Term) => sourceByTerm.get(term) ?? store.intern(term);
     const emit = (term: Term, op: string, ...args: WireValue[]): number => { if (++total > RESUMABLE_PROGRAM_PROFILE.maxInstructions) throw new RangeError('resumable instruction limit'); instructions.push({ op, source: source(term), args }); return instructions.length - 1; };
     const patch = (pc: number, target: number): void => { instructions[pc] = { ...instructions[pc], args: [target] }; };
     const temp = () => `register-${tempId++}`;
@@ -160,7 +216,7 @@ export function compileResumableProgram(inputModule: Term, options: ResumablePro
           } else { expression(term.right, old); emit(term, 'binary', term.op); }
           return;
         case 'Cond': { expression(term.cond, old); const no = emit(term, 'jump-false', 0); expression(term.then, old); const end = emit(term, 'jump', 0); patch(no, instructions.length); expression(term.otherwise, old); patch(end, instructions.length); return; }
-        case 'Call': term.args.forEach(arg => expression(arg, old)); emit(term, 'call', term.callee, term.args.length); return;
+        case 'Call': term.args.forEach(arg => expression(arg, old)); emit(term, 'call', virtualByCall.get(term)?.wrapper.symbol ?? term.callee, term.args.length); return;
         case 'Invoke': term.args.forEach(arg => expression(arg, old)); emit(term, 'effect', term.capability, term.args.length); return;
         case 'RecordLit': term.fields.forEach(([, value]) => expression(value, old)); emit(term, 'record', term.fields.map(([field]) => field), term.ty as unknown as WireValue); return;
         case 'ResultValue': expression(term.value, old); emit(term, 'result-wrap', term.variant); return;
@@ -246,7 +302,7 @@ export function compileResumableProgram(inputModule: Term, options: ResumablePro
   };
   for (const decl of declarations) { if (!decl.body) throw new TypeError('resumable function has no body'); compileCode(`function:${decl.symbol}`, 'function', decl.symbol, decl.params, decl.returns, decl.capabilities, decl.body, decl.contract, decl.surfaces); }
   codes.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-  const body = { format: 'aether.resumable-program/1' as const, manifest, manifestDigest: executionManifestDigest(manifest), profileDigest: RESUMABLE_PROFILE_DIGEST, codes };
+  const body = { format: 'aether.resumable-program/1' as const, manifest, manifestDigest: executionManifestDigest(manifest), profileDigest, codes };
   encodeCanonical(body, { maxDepth: 128, maxObjects: 1_000_000, maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024 });
   return freeze({ ...body, digest: domainDigest('aether.resumable-program/1', body, { maxDepth: 128, maxObjects: 1_000_000, maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024 }) });
 }
