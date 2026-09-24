@@ -10,6 +10,7 @@ import { assertAttestedSinkAdapter, isAttestedSinkAdapter, verifiedSinkReceipt }
 import { validateSinkPublicAnchor, verifySinkReceipt, type SignedSinkReceiptV1, type SinkPublicAnchorV1 } from './sink-receipt.ts';
 import { assertSinkStateWitness, readSinkStateHead, validateSinkStateJournalV2,
   type SinkStateJournalV2, type SinkStateWitnessV1 } from './sink-state-witness.ts';
+import { ResourceBudgetBridge } from '../tier2/resource-budget-bridge.ts';
 
 export type ExecutionMode = 'live' | 'speculative' | 'shadow' | 'replay';
 export interface EffectRequestV1 {
@@ -74,7 +75,7 @@ export interface EffectBudget {
   release(request: EffectRequestV1): void;
 }
 export interface EffectEventV1 {
-  readonly format: 'aether.effect-event/1' | 'aether.effect-event/3';
+  readonly format: 'aether.effect-event/1' | 'aether.effect-event/3' | 'aether.effect-event/4';
   readonly sequence: string;
   readonly request: EffectRequestV1;
   readonly requestDigest: Digest;
@@ -94,6 +95,10 @@ export type EffectEventV3 = EffectEventV1 & {
   readonly format: 'aether.effect-event/3';
   readonly signedSinkReceipt: SignedSinkReceiptV1 | null;
 };
+export type EffectEventV4 = EffectEventV1 & {
+  readonly format: 'aether.effect-event/4';
+  readonly signedSinkReceipt: SignedSinkReceiptV1 | null;
+};
 interface EffectJournalV1 { format: 'aether.effect-journal/1'; clockDomain: string; records: EffectEventV1[] }
 interface EffectJournalV2 { format: 'aether.effect-journal/2'; clockDomain: string; witnessDigest: Digest; revision: string; records: EffectEventV1[] }
 interface EffectJournalV3 { format: 'aether.effect-journal/3'; clockDomain: string; witnessDigest: Digest; revision: string;
@@ -101,7 +106,7 @@ interface EffectJournalV3 { format: 'aether.effect-journal/3'; clockDomain: stri
 interface EffectJournalV4 { format: 'aether.effect-journal/4'; clockDomain: string; witnessDigest: Digest; revision: string;
   deploymentId: string; approvedAdapterArtifactDigest: Digest; sinkAnchor: SinkPublicAnchorV1;
   sinkStateWitnessDigest: Digest; records: EffectEventV3[] }
-type EffectJournal = EffectJournalV1 | EffectJournalV2 | EffectJournalV3 | EffectJournalV4;
+type EffectJournal = EffectJournalV1 | EffectJournalV2 | EffectJournalV3 | EffectJournalV4 | EffectJournalV5;
 export interface AttestedEffectBrokerOptionsV3 {
   readonly anchor: SinkPublicAnchorV1;
   readonly deploymentId: string;
@@ -111,6 +116,15 @@ export interface AttestedEffectBrokerOptionsV4 extends AttestedEffectBrokerOptio
   /** Separately held monotonic sink decision inventory, selected by the operator. */
   readonly sinkStateWitness: SinkStateWitnessV1;
 }
+export interface AttestedSinkBudgetBrokerOptionsV1 {
+  readonly format: 'aether.attested-sink-budget-broker/1';
+  /** Exact bridge chosen by the operator outside a reloadable router factory. */
+  readonly bridge: ResourceBudgetBridge;
+  readonly bridgeProfileDigest: Digest;
+}
+interface EffectJournalV5 { format: 'aether.effect-journal/5'; clockDomain: string; witnessDigest: Digest; revision: string;
+  deploymentId: string; approvedAdapterArtifactDigest: Digest; sinkAnchor: SinkPublicAnchorV1;
+  sinkStateWitnessDigest: Digest; budgetBridgeProfileDigest: Digest; records: EffectEventV4[] }
 export interface EffectBrokerOptions {
   readonly directory: string;
   readonly mode?: ExecutionMode;
@@ -132,6 +146,8 @@ export interface EffectBrokerOptions {
   readonly attestedSink?: AttestedEffectBrokerOptionsV3;
   /** Explicit V4 profile; V3 journals cannot be silently adopted. */
   readonly attestedSinkV4?: AttestedEffectBrokerOptionsV4;
+  /** Explicit V5 profile. An exact operator bridge and signed sink fence are required. */
+  readonly attestedSinkBudgetV1?: AttestedSinkBudgetBrokerOptionsV1;
   /** Fault-injection/observability hook; runs before a proposed journal replacement. */
   readonly beforePersist?: (event: EffectEventV1) => void;
   /** Immutable ticket slots prevent ABA lock reuse. Exhaustion fails closed;
@@ -197,6 +213,9 @@ export class DurableEffectBroker {
   readonly #witness: AnyEffectJournalWitness | null;
   readonly #attestedSink: Readonly<AttestedEffectBrokerOptionsV3> | null;
   readonly #sinkStateWitness: SinkStateWitnessV1 | null;
+  readonly #budgetBridge: ResourceBudgetBridge | null;
+  readonly #budgetBridgeProfileDigest: Digest | null;
+  #budgetAuthorityPinned = false;
   #trustedClock: { anchor: TrustedClockAnchor; windows: readonly { issuedAt: number; expiresAt: number }[] } | null = null;
   get executionMode(): ExecutionMode { return this.mode; }
   /** Host-owned independent deadline source for a versioned isolated profile.
@@ -215,6 +234,19 @@ export class DurableEffectBroker {
   constructor(options: EffectBrokerOptions) {
     identifier(options.clockDomain);
     this.options = options; this.limits = encodingLimits(options.limits); this.mode = options.mode ?? 'live';
+    if (options.attestedSinkBudgetV1) {
+      exactObject(options.attestedSinkBudgetV1, ['format', 'bridge', 'bridgeProfileDigest']);
+      if (!options.attestedSinkV4 || options.attestedSink || options.budgets || this.mode !== 'live'
+        || options.attestedSinkBudgetV1.format !== 'aether.attested-sink-budget-broker/1')
+        throw new TypeError('budgeted sink requires its exclusive live V4 authority');
+      ResourceBudgetBridge.assertInstance(options.attestedSinkBudgetV1.bridge);
+      ResourceBudgetBridge.prototype.assertWitnessed.call(options.attestedSinkBudgetV1.bridge);
+      validateDigest(options.attestedSinkBudgetV1.bridgeProfileDigest, 'aether.resource-budget-bridge/1');
+      if (options.attestedSinkBudgetV1.bridge.profileDigest !== options.attestedSinkBudgetV1.bridgeProfileDigest)
+        throw new TypeError('operator budget bridge profile mismatch');
+      this.#budgetBridge = options.attestedSinkBudgetV1.bridge;
+      this.#budgetBridgeProfileDigest = options.attestedSinkBudgetV1.bridgeProfileDigest;
+    } else { this.#budgetBridge = null; this.#budgetBridgeProfileDigest = null; }
     this.#witness = options.witness ?? null;
     if (options.attestedSink && options.attestedSinkV4)
       throw new TypeError('select one attested sink broker profile');
@@ -254,6 +286,10 @@ export class DurableEffectBroker {
         throw new Error('V2 effect journal requires explicit offline migration');
       if (this.#sinkStateWitness && existsSync(join(options.directory, 'effects-v3.json')))
         throw new Error('V3 effect journal requires explicit offline migration');
+      if (this.#budgetBridge && existsSync(join(options.directory, 'effects-v4.json')))
+        throw new Error('V4 effect journal requires explicit offline migration');
+      if (!this.#budgetBridge && existsSync(join(options.directory, 'effects-v5.json')))
+        throw new Error('V5 budgeted effect journal requires its original authority');
       if (!this.#attestedSink && existsSync(join(options.directory, 'effects-v3.json')))
         throw new Error('V3 attested effect journal requires its original authority');
       if (!this.#sinkStateWitness && existsSync(join(options.directory, 'effects-v4.json')))
@@ -263,7 +299,7 @@ export class DurableEffectBroker {
       throw new Error('V3 attested effect journal requires its original authority');
     if (!this.#witness && existsSync(join(options.directory, 'effects-v4.json')))
       throw new Error('V4 attested effect journal requires its original authority');
-    this.file = join(options.directory, this.#sinkStateWitness ? 'effects-v4.json'
+    this.file = join(options.directory, this.#budgetBridge ? 'effects-v5.json' : this.#sinkStateWitness ? 'effects-v4.json'
       : this.#attestedSink ? 'effects-v3.json' : this.#witness ? 'effects-v2.json' : 'effects.json');
     mkdirSync(options.directory, { recursive: true });
     if (existsSync(join(options.directory, 'effects.lock')) || existsSync(join(options.directory, 'effects.lock.recovery'))) throw new Error('legacy effect lock layout requires explicit offline migration');
@@ -302,19 +338,35 @@ export class DurableEffectBroker {
       throw new TypeError('broker sink authority differs from operator selection');
     readSinkStateHead(sinkStateWitness);
   }
+  /** The caller supplies the operator-selected instance, never a factory hook. */
+  assertBudgetAuthority(expectedBridge: ResourceBudgetBridge, expectedProfileDigest: Digest): void {
+    ResourceBudgetBridge.assertInstance(expectedBridge);
+    ResourceBudgetBridge.prototype.assertWitnessed.call(expectedBridge);
+    if (!this.#budgetBridge || this.#budgetBridge !== expectedBridge
+      || this.#budgetBridgeProfileDigest !== expectedProfileDigest
+      || expectedBridge.profileDigest !== expectedProfileDigest || !this.#sinkStateWitness || !this.#witness)
+      throw new TypeError('broker budget authority differs from operator selection');
+    readWitnessHead(this.#witness);
+    readSinkStateHead(this.#sinkStateWitness);
+    this.#budgetAuthorityPinned = true;
+  }
   recoverDeadWriter(): void { this.journalLock.recoverDeadWriter(); }
   private validateEvent(value: unknown, sinkState?: SinkStateJournalV2): asserts value is EffectEventV1 {
     const v3 = this.#attestedSink !== null;
+    const budgeted = this.#budgetBridge !== null;
     const e = exactObject(value, ['format', 'sequence', 'request', 'requestDigest', 'adapterId', 'adapterSemanticsDigest', 'state', 'transitions', 'dispatchStarted', 'prepared', 'observedAt', 'recordedAt', 'outcome', ...(v3 ? ['signedSinkReceipt'] : [])]);
-    if (e.format !== (v3 ? 'aether.effect-event/3' : 'aether.effect-event/1')) throw new TypeError('unsupported effect event version');
+    if (e.format !== (budgeted ? 'aether.effect-event/4' : v3 ? 'aether.effect-event/3' : 'aether.effect-event/1')) throw new TypeError('unsupported effect event version');
     validateEffectRequest(e.request, this.limits); decimal(e.sequence, this.limits); decimal(e.observedAt, this.limits); decimal(e.recordedAt, this.limits);
+    if (budgeted && (e.request as EffectRequestV1).budgetReservationId === null)
+      throw new TypeError('budgeted sink event requires exact reservation ID');
     if (effectRequestDigest(e.request, this.limits) !== e.requestDigest) throw new TypeError('corrupt effect request binding');
     identifier(e.adapterId); validateDigest(e.adapterSemanticsDigest, 'aether.effect-adapter/1');
     const states = ['requested', 'reserved', 'prepared', 'committed', 'rejected', 'aborted', 'indeterminate'];
     if (typeof e.state !== 'string' || !states.includes(e.state) || typeof e.dispatchStarted !== 'boolean' || !Array.isArray(e.transitions) || e.transitions.length === 0) throw new TypeError('invalid effect event');
     let previousState: string | null = null, previousDispatch = false;
     const allowed: Record<string, readonly string[]> = {
-      requested: ['reserved', 'rejected', 'aborted'], reserved: ['prepared', 'aborted'],
+      requested: budgeted ? ['reserved', 'rejected', 'aborted', 'indeterminate'] : ['reserved', 'rejected', 'aborted'],
+      reserved: budgeted ? ['prepared', 'aborted', 'committed', 'indeterminate'] : ['prepared', 'aborted'],
       prepared: ['prepared', 'committed', 'indeterminate', 'rejected', 'aborted'],
       indeterminate: ['committed', 'aborted', 'indeterminate'], committed: [], rejected: [], aborted: [],
     };
@@ -329,7 +381,10 @@ export class DurableEffectBroker {
         if (t.state === 'prepared' && (previousState === 'reserved' ? t.dispatchStarted : previousDispatch || !t.dispatchStarted)) throw new TypeError('invalid durable dispatch transition');
         if (!previousDispatch && t.dispatchStarted && !(previousState === 'prepared' && t.state === 'prepared')) throw new TypeError('dispatch marker missing prepared predecessor');
         if (previousDispatch && !t.dispatchStarted && !(previousState === 'prepared' && (t.state === 'aborted' || t.state === 'rejected'))) throw new TypeError('dispatch marker cannot be forgotten');
-        if (['committed', 'indeterminate'].includes(t.state) && !t.dispatchStarted) throw new TypeError('terminal effect lacks dispatch marker');
+        if (['committed', 'indeterminate'].includes(t.state) && !t.dispatchStarted
+          && !(budgeted && (previousState === 'requested' || previousState === 'reserved'
+            || previousState === 'prepared' || previousState === 'indeterminate')))
+          throw new TypeError('terminal effect lacks dispatch marker');
       }
       previousState = t.state; previousDispatch = t.dispatchStarted;
     }
@@ -346,14 +401,21 @@ export class DurableEffectBroker {
       } else if (state === 'indeterminate') { identifier(out.recoveryId); if (out.recoveryId !== e.requestDigest) throw new TypeError('corrupt effect recovery binding'); }
       else if (state === 'rejected' || state === 'aborted') {
         identifier(out.code);
-        if (state === 'rejected' && (e.dispatchStarted || !['deadline_exceeded', 'trusted_clock_denied', 'branch_not_admitted', 'authorization_denied', 'budget_adapter_missing', 'budget_exhausted', 'adapter_preflight_rejected'].includes(out.code))) throw new TypeError('rejection cannot follow an uncertain dispatch');
-        if (state === 'aborted' && (e.dispatchStarted ? out.code !== 'sink_confirmed_not_committed' : !['cancelled', 'recovered_before_dispatch'].includes(out.code))) throw new TypeError('abort lacks matching noncommit evidence');
+        if (state === 'rejected' && (e.dispatchStarted
+          || budgeted && (e.transitions as EffectEventV1['transitions']).some(t => t.state === 'reserved')
+          || !['deadline_exceeded', 'trusted_clock_denied', 'branch_not_admitted', 'authorization_denied', 'budget_adapter_missing', 'budget_exhausted', 'adapter_preflight_rejected'].includes(out.code)))
+          throw new TypeError('rejection cannot follow an uncertain dispatch');
+        if (state === 'aborted' && (e.dispatchStarted || budgeted && (e.transitions as EffectEventV1['transitions']).some(t => t.state === 'reserved' || t.state === 'indeterminate')
+          ? out.code !== 'sink_confirmed_not_committed' : !['cancelled', 'recovered_before_dispatch'].includes(out.code)))
+          throw new TypeError('abort lacks matching noncommit evidence');
       }
       else throw new TypeError('unsupported effect outcome');
     } else if (['committed', 'rejected', 'aborted', 'indeterminate'].includes(e.state)) throw new TypeError('missing effect outcome');
     if (v3) {
       const context = this.#attestedSink!;
-      const disposition = e.state === 'committed' ? 'committed' : e.state === 'aborted' && e.dispatchStarted ? 'not_committed' : null;
+      const disposition = e.state === 'committed' ? 'committed' : e.state === 'aborted'
+        && (e.dispatchStarted || budgeted && (e.transitions as EffectEventV1['transitions']).some(t => t.state === 'reserved' || t.state === 'indeterminate'))
+        ? 'not_committed' : null;
       if (disposition === null) {
         if (e.signedSinkReceipt !== null) throw new TypeError('V3 nonterminal or pre-dispatch event carries a sink decision');
       } else {
@@ -386,10 +448,16 @@ export class DurableEffectBroker {
     if (this.#witness) {
       const witness = this.#witness, head = readWitnessHead(witness);
       const context = this.#attestedSink;
-      const format = this.#sinkStateWitness ? 'aether.effect-journal/4'
+      const format = this.#budgetBridge ? 'aether.effect-journal/5' : this.#sinkStateWitness ? 'aether.effect-journal/4'
         : context ? 'aether.effect-journal/3' : 'aether.effect-journal/2';
       if (head.journal === null) {
         if (existsSync(this.file)) throw new Error('local effect journal is ahead of witness genesis');
+        if (context && this.#sinkStateWitness && this.#budgetBridgeProfileDigest)
+          return { format: 'aether.effect-journal/5', clockDomain: this.options.clockDomain,
+            witnessDigest: witness.digest, revision: '0', deploymentId: context.deploymentId,
+            approvedAdapterArtifactDigest: context.approvedAdapterArtifactDigest, sinkAnchor: context.anchor,
+            sinkStateWitnessDigest: this.#sinkStateWitness.digest,
+            budgetBridgeProfileDigest: this.#budgetBridgeProfileDigest, records: [] };
         if (context && this.#sinkStateWitness) return { format: 'aether.effect-journal/4',
           clockDomain: this.options.clockDomain, witnessDigest: witness.digest, revision: '0',
           deploymentId: context.deploymentId,
@@ -404,7 +472,8 @@ export class DurableEffectBroker {
       if (Buffer.byteLength(head.journal) > this.limits.maxFrameBytes) throw new RangeError('witness journal frame limit exceeded');
       const keys = ['format', 'clockDomain', 'witnessDigest', 'revision', 'records',
         ...(context ? ['deploymentId', 'approvedAdapterArtifactDigest', 'sinkAnchor'] : []),
-        ...(this.#sinkStateWitness ? ['sinkStateWitnessDigest'] : [])];
+        ...(this.#sinkStateWitness ? ['sinkStateWitnessDigest'] : []),
+        ...(this.#budgetBridge ? ['budgetBridgeProfileDigest'] : [])];
       const j = exactObject(decodeCanonical(Buffer.from(head.journal), this.limits), keys);
       if (j.format !== format || j.clockDomain !== this.options.clockDomain || j.witnessDigest !== witness.digest
         || j.revision !== head.revision || !Array.isArray(j.records)
@@ -412,6 +481,7 @@ export class DurableEffectBroker {
           || j.approvedAdapterArtifactDigest !== context.approvedAdapterArtifactDigest
           || Buffer.from(encodeCanonical(j.sinkAnchor, this.limits)).toString('utf8') !== Buffer.from(encodeCanonical(context.anchor, this.limits)).toString('utf8'))
         || this.#sinkStateWitness && j.sinkStateWitnessDigest !== this.#sinkStateWitness.digest
+        || this.#budgetBridge && j.budgetBridgeProfileDigest !== this.#budgetBridgeProfileDigest
         || Buffer.from(encodeCanonical(j, this.limits)).toString('utf8') !== head.journal)
         throw new TypeError('witnessed effect journal identity/canonical mismatch');
       this.validateOrderedEvents(j.records);
@@ -428,6 +498,7 @@ export class DurableEffectBroker {
                 && prior.approvedAdapterArtifactDigest === context.approvedAdapterArtifactDigest
                 && Buffer.from(encodeCanonical(prior.sinkAnchor, this.limits)).toString('utf8') === Buffer.from(encodeCanonical(context.anchor, this.limits)).toString('utf8'))
               && (!this.#sinkStateWitness || prior.sinkStateWitnessDigest === this.#sinkStateWitness.digest)
+              && (!this.#budgetBridge || prior.budgetBridgeProfileDigest === this.#budgetBridgeProfileDigest)
               && BigInt(prior.revision) < BigInt(head.revision);
           } catch { /* A corrupt or same-revision file is quarantined. */ }
           if (!older) throw new Error('local effect journal diverges from witness');
@@ -435,7 +506,7 @@ export class DurableEffectBroker {
         }
       } else atomicWrite(this.file, head.journal);
       const fd = openSync(this.options.directory, 'r'); try { fsyncSync(fd); } finally { closeSync(fd); }
-      return j as unknown as EffectJournalV2 | EffectJournalV3 | EffectJournalV4;
+      return j as unknown as EffectJournalV2 | EffectJournalV3 | EffectJournalV4 | EffectJournalV5;
     }
     if (!existsSync(this.file)) return { format: 'aether.effect-journal/1', clockDomain: this.options.clockDomain, records: [] };
     if (statSync(this.file).size > this.limits.maxFrameBytes) throw new RangeError('journal frame limit exceeded');
@@ -459,7 +530,7 @@ export class DurableEffectBroker {
     atomicWrite(this.file, Buffer.from(encoded).toString('utf8'));
     const fd = openSync(this.options.directory, 'r'); try { fsyncSync(fd); } finally { closeSync(fd); }
     journal.records = records;
-    if (journal.format !== 'aether.effect-journal/1') journal.revision = (next as EffectJournalV2 | EffectJournalV3 | EffectJournalV4).revision;
+    if (journal.format !== 'aether.effect-journal/1') journal.revision = (next as EffectJournalV2 | EffectJournalV3 | EffectJournalV4 | EffectJournalV5).revision;
   }
   private key(request: EffectRequestV1): string { return JSON.stringify([request.executionId, request.effectId]); }
   private find(journal: EffectJournal, request: EffectRequestV1): EffectEventV1 | undefined {
@@ -473,10 +544,94 @@ export class DurableEffectBroker {
   }
   private uncertain(event: EffectEventV1): EffectOutcome { return { state: 'indeterminate', recoveryId: event.requestDigest }; }
   private terminalBudgetReleaseNeeded(request: EffectRequestV1, event: EffectEventV1): boolean {
-    return request.budgetReservationId !== null && this.options.budgets !== undefined
+    return request.budgetReservationId !== null && (this.options.budgets !== undefined || this.#budgetBridge !== null)
       && (event.outcome?.state === 'rejected' || event.outcome?.state === 'aborted')
-      && (event.transitions.some(transition => transition.state === 'reserved')
+      && (this.#budgetBridge && event.outcome.state === 'aborted' && event.signedSinkReceipt != null
+        || event.transitions.some(transition => transition.state === 'reserved')
         || event.outcome.state === 'aborted' && event.outcome.code === 'recovered_before_dispatch');
+  }
+  private budgetReserve(request: EffectRequestV1): boolean {
+    if (this.#budgetBridge) return ResourceBudgetBridge.prototype.reserve.call(this.#budgetBridge, request);
+    if (!this.options.budgets) throw new TypeError('budget_adapter_missing');
+    return this.options.budgets.reserve(request);
+  }
+  private budgetConsume(request: EffectRequestV1, value: TaggedValueV1): void {
+    if (this.#budgetBridge) ResourceBudgetBridge.prototype.consume.call(this.#budgetBridge, request, value);
+    else this.options.budgets!.consume(request, value);
+  }
+  private budgetRelease(request: EffectRequestV1): void {
+    if (this.#budgetBridge) ResourceBudgetBridge.prototype.release.call(this.#budgetBridge, request);
+    else this.options.budgets!.release(request);
+  }
+  private assertCachedBudgetSettlement(event: EffectEventV1): void {
+    if (!this.#budgetBridge || !event.outcome) return;
+    ResourceBudgetBridge.prototype.assertWitnessed.call(this.#budgetBridge);
+    const disposition = event.outcome.state === 'committed' ? 'committed'
+      : event.outcome.state === 'aborted' && event.signedSinkReceipt != null ? 'not_committed' : null;
+    if (!disposition) return;
+    const requireReservation = disposition === 'committed'
+      || event.transitions.some(transition => transition.state === 'reserved');
+    ResourceBudgetBridge.prototype.assertSettled.call(this.#budgetBridge,
+      event.request, disposition, requireReservation);
+  }
+  /** A budgeted terminal decision must come from the branded adapter's
+   * read-only status path and the independently witnessed signed sink row. */
+  private budgetedSinkStatus(request: EffectRequestV1, adapter: EffectAdapter, prepared: TaggedValueV1 | null):
+    | { state: 'committed'; value: TaggedValueV1; receipt: SignedSinkReceiptV1 }
+    | { state: 'not_committed'; receipt: SignedSinkReceiptV1 }
+    | { state: 'unknown' } {
+    if (!this.#budgetBridge) throw new TypeError('budgeted sink profile absent');
+    this.#assertAttestedAdapter(adapter);
+    let resolution: ReturnType<NonNullable<EffectAdapter['reconcile']>>;
+    try { resolution = adapter.reconcile!(request, prepared); }
+    catch { return { state: 'unknown' }; }
+    if (resolution.state === 'unknown') return { state: 'unknown' };
+    try {
+      const receipt = this.#attestedReceipt(request, adapter, resolution.state,
+        resolution.state === 'committed' ? resolution.value : null);
+      return resolution.state === 'committed'
+        ? { state: 'committed', value: resolution.value, receipt }
+        : { state: 'not_committed', receipt };
+    } catch { return { state: 'unknown' }; }
+  }
+  private budgetedResolve(journal: EffectJournal, event: EffectEventV1, adapter: EffectAdapter): EffectOutcome {
+    const request = event.request;
+    const status = this.budgetedSinkStatus(request, adapter, event.prepared);
+    if (status.state === 'unknown') {
+      const outcome = this.uncertain(event);
+      if (event.state !== 'indeterminate') {
+        try { this.step(journal, event, 'indeterminate', { outcome }); }
+        catch { /* The prior durable event still requires reconciliation. */ }
+      }
+      return outcome;
+    }
+    // A reserve call can have reached the bridge before its broker event was
+    // published. Keep that uncertainty durable before settling either result.
+    if (event.state === 'requested') {
+      try { event = this.step(journal, event, 'indeterminate', { outcome: this.uncertain(event) }); }
+      catch { return this.uncertain(event); }
+    }
+    try {
+      if (status.state === 'committed') {
+        this.budgetConsume(request, status.value);
+        const outcome: EffectOutcome = { state: 'committed',
+          receiptDigest: outcomeDigest(event, status.value, this.limits), value: immutable(copy(status.value, this.limits)) };
+        this.step(journal, event, 'committed', { outcome, signedSinkReceipt: status.receipt });
+        return outcome;
+      }
+      this.budgetRelease(request);
+      const outcome: EffectOutcome = { state: 'aborted', code: 'sink_confirmed_not_committed' };
+      this.step(journal, event, 'aborted', { outcome, signedSinkReceipt: status.receipt });
+      return outcome;
+    } catch {
+      // A bridge or witness failure must not convert a pending settlement into
+      // a terminal broker claim. The signed status can be queried again.
+      const outcome = this.uncertain(event);
+      if (event.state !== 'indeterminate') {
+        try { this.step(journal, event, 'indeterminate', { outcome }); } catch { /* Original event remains recoverable. */ }
+      }
+      return outcome;
+    }
   }
   private authorize(request: EffectRequestV1, signal?: AbortSignal): string | null {
     if (signal?.aborted) return 'cancelled';
@@ -557,12 +712,15 @@ export class DurableEffectBroker {
       throw new Error('attested sink adapter requires witnessed V3 broker');
     if (this.mode !== 'live') throw new Error('isolated_record_inspection_forbidden');
     validateEffectRequest(input, this.limits); const request = immutable(copy(input, this.limits));
+    if (this.#budgetBridge && (!this.#budgetAuthorityPinned || request.budgetReservationId === null))
+      throw new TypeError('budgeted sink inspection requires pinned non-null reservation authority');
     this.#assertAttestedAdapter(adapter);
     const semanticsDigest = effectAdapterDigest(adapter);
     return this.locked(() => {
       const journal = this.read(), event = this.find(journal, request);
       if (!event) return null;
       if (event.adapterId !== adapter.id || event.adapterSemanticsDigest !== semanticsDigest) throw new Error('effect_adapter_conflict');
+      this.assertCachedBudgetSettlement(event);
       return event.outcome === null ? null : immutable(copy(event.outcome, this.limits));
     });
   }
@@ -632,6 +790,8 @@ export class DurableEffectBroker {
       throw new Error('attested sink adapter requires witnessed V3 broker');
     validateEffectRequest(input, this.limits);
     const request = immutable(copy(input, this.limits));
+    if (this.#budgetBridge && (!this.#budgetAuthorityPinned || request.budgetReservationId === null))
+      throw new TypeError('budgeted sink dispatch requires pinned non-null reservation authority');
     this.#assertAttestedAdapter(adapter);
     if (this.mode === 'replay') return this.replay(request, adapter);
     if (this.mode !== 'live') {
@@ -653,12 +813,14 @@ export class DurableEffectBroker {
       if (old) {
         if (old.adapterId !== adapter.id || old.adapterSemanticsDigest !== semanticsDigest) throw new Error('effect_adapter_conflict');
         if (this.terminalBudgetReleaseNeeded(request, old)
-          && (this.options.authorizeReconciliation ?? this.options.authorize)(request) === true) this.options.budgets!.release(request);
+          && (this.options.authorizeReconciliation ?? this.options.authorize)(request) === true) this.budgetRelease(request);
+        this.assertCachedBudgetSettlement(old);
         return old.outcome ?? this.uncertain(old);
       }
       const now = this.time();
       let event: EffectEventV1 = {
-        format: this.#attestedSink ? 'aether.effect-event/3' : 'aether.effect-event/1', sequence: String(journal.records.length), request,
+        format: this.#budgetBridge ? 'aether.effect-event/4' : this.#attestedSink ? 'aether.effect-event/3' : 'aether.effect-event/1',
+        sequence: String(journal.records.length), request,
         requestDigest: effectRequestDigest(request, this.limits), adapterId: adapter.id, adapterSemanticsDigest: semanticsDigest,
         state: 'requested', transitions: [{ state: 'requested', time: now, dispatchStarted: false }], dispatchStarted: false,
         prepared: null, observedAt: now, recordedAt: now, outcome: null,
@@ -668,11 +830,12 @@ export class DurableEffectBroker {
       this.persist(journal, event);
       let reserved = false;
       const abort = (code: string, confirmedBeforeSink = false): EffectOutcome => {
+        if (reserved && this.#budgetBridge) return this.budgetedResolve(journal, event, adapter);
         if (event.prepared !== null) adapter.abort?.(request, event.prepared);
         const outcome: EffectOutcome = { state: code === 'cancelled' ? 'aborted' : 'rejected', code };
         event = this.step(journal, event, outcome.state, { outcome,
           ...(confirmedBeforeSink ? { dispatchStarted: false } : {}) });
-        if (reserved) this.options.budgets!.release(request);
+        if (reserved) this.budgetRelease(request);
         return outcome;
       };
       try {
@@ -687,8 +850,8 @@ export class DurableEffectBroker {
         refusal = this.authorize(request, options.signal);
         if (refusal) return abort(refusal);
         if (request.budgetReservationId !== null) {
-          if (!this.options.budgets) return abort('budget_adapter_missing');
-          if (!this.options.budgets.reserve(request)) return abort('budget_exhausted');
+          if (!this.options.budgets && !this.#budgetBridge) return abort('budget_adapter_missing');
+          if (!this.budgetReserve(request)) return abort('budget_exhausted');
           reserved = true;
         }
         event = this.step(journal, event, 'reserved');
@@ -712,11 +875,12 @@ export class DurableEffectBroker {
         validateTaggedValue(value, this.limits);
         event = { ...event, observedAt: this.time() };
         const signedSinkReceipt = this.#attestedSink ? this.#attestedReceipt(request, adapter, 'committed', value) : null;
-        if (reserved) this.options.budgets!.consume(request, value);
+        if (reserved) this.budgetConsume(request, value);
         const outcome: EffectOutcome = { state: 'committed', receiptDigest: outcomeDigest(event, value, this.limits), value: immutable(copy(value, this.limits)) };
         event = this.step(journal, event, 'committed', { outcome,
           ...(this.#attestedSink ? { signedSinkReceipt } : {}) }); return outcome;
       } catch (error) {
+        if (this.#budgetBridge && reserved) return this.budgetedResolve(journal, event, adapter);
         if (event.dispatchStarted) {
           const outcome = this.uncertain(event);
           try { this.step(journal, event, 'indeterminate', { outcome }); } catch { /* Durable prepared dispatch marker remains the recovery authority. */ }
@@ -734,6 +898,8 @@ export class DurableEffectBroker {
       throw new Error('attested sink adapter requires witnessed V3 broker');
     if (this.mode !== 'live') throw new Error('isolated_reconciliation_forbidden');
     validateEffectRequest(input, this.limits); const request = immutable(copy(input, this.limits));
+    if (this.#budgetBridge && (!this.#budgetAuthorityPinned || request.budgetReservationId === null))
+      throw new TypeError('budgeted sink reconciliation requires pinned non-null reservation authority');
     this.#assertAttestedAdapter(adapter);
     const semanticsDigest = effectAdapterDigest(adapter);
     return this.locked(() => {
@@ -742,13 +908,15 @@ export class DurableEffectBroker {
       if (found.adapterId !== adapter.id || found.adapterSemanticsDigest !== semanticsDigest) throw new Error('effect_adapter_conflict');
       if (found.outcome && found.outcome.state !== 'indeterminate') {
         if (this.terminalBudgetReleaseNeeded(request, found)
-          && (this.options.authorizeReconciliation ?? this.options.authorize)(request) === true) this.options.budgets!.release(request);
+          && (this.options.authorizeReconciliation ?? this.options.authorize)(request) === true) this.budgetRelease(request);
+        this.assertCachedBudgetSettlement(found);
         return found.outcome;
       }
       let event = found;
       // Reconciliation authority never implies permission to dispatch. The read-only
       // adapter query must be allowed under current policy (including after revocation).
       if (!(this.options.authorizeReconciliation ?? this.options.authorize)(request)) return this.uncertain(event);
+      if (this.#budgetBridge) return this.budgetedResolve(journal, event, adapter);
       if (!event.dispatchStarted) {
         if (request.budgetReservationId !== null && !this.options.budgets) return this.uncertain(event);
         if (adapter.semantics.transactional) adapter.abort!(request, event.prepared);

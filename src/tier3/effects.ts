@@ -1,10 +1,11 @@
 import type { CapabilityName, NodeRef } from '../tier1/ids.ts';
-import { decodeExecutionManifest, encodeExecutionManifest, executionManifestDigest, type ExecutionManifestV1 } from '../fabric/identity.ts';
-import { encodeCanonical, validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
+import { decodeExecutionManifest, encodeExecutionManifest, executionManifestDigest, validateDigest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
+import { encodeCanonical, exactObject, identifier, validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { DurableEffectBroker, effectPayloadDigest, effectAdapterDigest, type EffectAdapter, type EffectOutcome, type EffectRequestV1, type ExecutionMode } from '../fabric/effects.ts';
 import { assertEffectJournalWitness, type AnyEffectJournalWitness } from '../fabric/effect-journal-witness.ts';
 import { assertAttestedSinkAdapter, isAttestedSinkAdapter, type AttestedSinkIdentityV1 } from '../fabric/attested-sink-adapter.ts';
 import type { SinkStateWitnessV1 } from '../fabric/sink-state-witness.ts';
+import { ResourceBudgetBridge } from '../tier2/resource-budget-bridge.ts';
 import { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from '../tier2/adapter-artifact.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 import { isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
@@ -41,6 +42,8 @@ export interface RuntimeEffectRouterOptions {
   /** V4 signed-host path: immutable host-derived reference, no callback at replay. */
   readonly grantRef?: string;
   readonly reservation?: (capability: CapabilityName, effectId: string) => string | null;
+  /** V5 host selected fixed grant. A callback cannot assign a live reservation. */
+  readonly budgetReservationId?: string;
   readonly references?: { encode(ref: Ref): LogicalRefV1; decode(ref: LogicalRefV1): Ref };
   /** Explicit host factory, because sandbox state/recorded inputs are host resources. */
   readonly isolatedFork?: () => RuntimeEffectRouter;
@@ -54,6 +57,13 @@ export interface BrokerAttestedContext {
   readonly clockDomain: string;
   readonly capability: CapabilityName;
   readonly grantRef: string;
+  /** Omitted from V10/V11 historical signed context bytes. */
+  readonly budget?: BrokerBudgetAttestedContextV1;
+}
+export interface BrokerBudgetAttestedContextV1 {
+  readonly format: 'aether.attested-sink-budget-router/1';
+  readonly reservationId: string;
+  readonly bridgeProfileDigest: Digest;
 }
 
 /** One logical execution; replay/retry reconstructs the router with the same context. */
@@ -67,6 +77,8 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   #trustedClock: { anchor: TrustedClockAnchor; windows: readonly { issuedAt: number; expiresAt: number }[] } | null = null;
   #trustedWitness: AnyEffectJournalWitness | null = null;
   #trustedSinkAuthority = false;
+  #budgetContext: Readonly<BrokerBudgetAttestedContextV1> | null = null;
+  #budgetAuthorityPinned = false;
   get mode(): ExecutionMode { return this.#options.broker.executionMode; }
 
   constructor(options: RuntimeEffectRouterOptions) {
@@ -99,6 +111,16 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
       || (this.#options.branchId ?? null) !== null || this.#options.reservation !== undefined
       || this.#options.references !== undefined) throw new TypeError('broker router context differs from signed host effect');
     if (this.#options.grantRef !== expected.grantRef) throw new TypeError('broker router grant reference differs from signed host effect');
+    if (expected.budget) {
+      exactObject(expected.budget, ['format', 'reservationId', 'bridgeProfileDigest']);
+      if (expected.budget.format !== 'aether.attested-sink-budget-router/1'
+        || this.#options.budgetReservationId !== expected.budget.reservationId)
+        throw new TypeError('broker router reservation differs from signed host effect');
+      identifier(expected.budget.reservationId);
+      validateDigest(expected.budget.bridgeProfileDigest, 'aether.resource-budget-bridge/1');
+      this.#budgetContext = Object.freeze({ ...expected.budget });
+    } else if (this.#options.budgetReservationId !== undefined)
+      throw new TypeError('unattested budget reservation in broker router');
     this.#attested = Object.freeze({ capability: expected.capability, grantRef: expected.grantRef });
   }
   pinTrustedClock(anchor: TrustedClockAnchor, windows: readonly { issuedAt: number; expiresAt: number }[]): void {
@@ -134,6 +156,18 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     }, sinkStateWitness);
     this.#trustedSinkAuthority = true;
   }
+  attestBudgetAuthority(expectedBridge: ResourceBudgetBridge, expected: BrokerBudgetAttestedContextV1): void {
+    ResourceBudgetBridge.assertInstance(expectedBridge);
+    if (!this.#bound || !this.#attested || !this.#trustedSinkAuthority || !this.#trustedWitness
+      || this.#sequence !== 0n || this.#budgetAuthorityPinned || !this.#budgetContext
+      || this.#budgetContext.format !== expected.format
+      || this.#budgetContext.reservationId !== expected.reservationId
+      || this.#budgetContext.bridgeProfileDigest !== expected.bridgeProfileDigest)
+      throw new TypeError('broker router budget authority differs from signed host selection');
+    DurableEffectBroker.prototype.assertBudgetAuthority.call(this.#options.broker,
+      expectedBridge, expected.bridgeProfileDigest);
+    this.#budgetAuthorityPinned = true;
+  }
   fork(): RuntimeEffectRouter {
     if (!this.#options.isolatedFork) throw new Error('broker-backed fork requires an isolated effect router');
     const child = this.#options.isolatedFork();
@@ -143,6 +177,8 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   }
   invoke(capability: CapabilityName, args: readonly Value[]): Value {
     if (!this.#bound) throw new Error('effect router is not bound to loaded code');
+    if (this.#budgetContext && !this.#budgetAuthorityPinned)
+      throw new TypeError('budgeted broker router lacks operator authority');
     if (this.#attested && this.#attested.capability !== capability) throw new TypeError('attested effect capability mismatch');
     if (this.#trustedClock && this.#options.broker.executionMode === 'live') {
       for (const window of this.#trustedClock.windows) assertGrantLifetime(this.#trustedClock.anchor, window.issuedAt, window.expiresAt);
@@ -222,7 +258,9 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
       || request.executionId !== this.#options.executionId || request.executionManifest !== this.#manifestDigest
       || request.policyEpoch !== this.#options.policyEpoch || request.deadline !== this.#options.deadline
       || request.capabilityGrantRef !== this.#attested.grantRef || request.branchId !== null
-      || request.budgetReservationId !== null) throw new TypeError('recorded Wasm effect differs from attested broker context');
+      || request.budgetReservationId !== (this.#budgetContext?.reservationId ?? null)
+      || this.#budgetContext && !this.#budgetAuthorityPinned)
+      throw new TypeError('recorded Wasm effect differs from attested broker context');
     if (!this.#options.adapters.has(capability)) throw new TypeError('recorded Wasm effect lacks an adapter');
   }
   #request(capability: CapabilityName, args: readonly Value[], effectId: string) {
@@ -235,7 +273,7 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
       branchId: this.#options.branchId ?? null, executionManifest: this.#manifestDigest,
       capabilityGrantRef: this.#attested?.grantRef ?? this.#options.grant(capability), policyEpoch: this.#options.policyEpoch,
       payloadDigest: effectPayloadDigest(payload), payload,
-      budgetReservationId: this.#options.reservation?.(capability, effectId) ?? null,
+      budgetReservationId: this.#budgetContext?.reservationId ?? this.#options.reservation?.(capability, effectId) ?? null,
       deadline: this.#options.deadline,
     } as const;
   }
@@ -315,6 +353,12 @@ export function brokerAssertAttestedSinkAuthority(router: RuntimeEffectRouter,
   sinkStateWitness: SinkStateWitnessV1): void {
   if (!brokerRouters.has(router)) throw new TypeError('sink authority requires a broker-backed router');
   BrokerEffectRouter.prototype.assertAttestedSinkAuthority.call(router, capability, expected, sinkStateWitness);
+}
+/** Nonvirtual operator bridge attestation; the factory cannot swap a budget hook. */
+export function brokerAttestBudgetAuthority(router: RuntimeEffectRouter,
+  expectedBridge: ResourceBudgetBridge, expected: BrokerBudgetAttestedContextV1): void {
+  if (!brokerRouters.has(router)) throw new TypeError('budget authority requires a broker-backed router');
+  BrokerEffectRouter.prototype.attestBudgetAuthority.call(router, expectedBridge, expected);
 }
 export function brokerReconcileLast(router: RuntimeEffectRouter, capability: CapabilityName, args: readonly Value[]): Value {
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');
