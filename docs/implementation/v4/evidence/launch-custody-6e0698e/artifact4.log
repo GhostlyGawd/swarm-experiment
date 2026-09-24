@@ -1,0 +1,19 @@
+✔ Artifact/4 signed target binds independently rebuilt V2 bundle and exact virtual proof (10341.636ms)
+✔ Artifact/4 rejects omitted input, changed tool, native library, Node and bundle identity (12192.95725ms)
+✔ Artifact/4 remeasures actual current input and build-recipe bytes on decode (10149.556791ms)
+✔ Artifact/4 rejects swapped descriptor, evidence and forged direct ancestry (24292.581167ms)
+✔ Artifact/4 bounded launch check starts only its measured worker bundle (12436.701709ms)
+✔ Artifact/4 init/3 executes the signed pure candidate and restores its real-worker snapshot (13458.858041ms)
+✔ Artifact/4 init/3 refuses tampered proof, authority, and packaged bytes before execution (13508.987167ms)
+✔ Artifact/4 packaged child independently rejects altered init/3 proof (7804.387833ms)
+✔ Artifact/4 ProcessHost config/16 dispatches and reopens exact durable pure state (18011.038625ms)
+✔ Artifact/4 ProcessHost reconciles a real controller SIGKILL before commit (22995.837708ms)
+✔ Artifact/4 ProcessHost refuses effect services and stale signed lineage before call intent (15713.651916ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 163203.960333
