@@ -7,6 +7,8 @@ import { spawnSync } from 'node:child_process';
 import * as b from '../../src/tier1/build.ts';
 import type { Term } from '../../src/tier1/ast.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
+import { DurableGraphStore } from '../../src/tier1/durable-store.ts';
+import { CausalLineageLedger } from '../../src/tier1/causal-lineage.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import type { SymbolId, CapabilityName } from '../../src/tier1/ids.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
@@ -15,6 +17,7 @@ import { domainDigest, type ExecutionManifestV1 } from '../../src/fabric/identit
 import { compileResumableProgram, virtualForwardResumableProfileDigest } from '../../src/tier3/resumable-program.ts';
 import { ResumableRuntime, type ResumableRuntimeOptions } from '../../src/tier3/resumable-runtime.ts';
 import { ResumableCheckpointStore } from '../../src/tier3/resumable-checkpoint.ts';
+import { CheckpointSemanticRetention } from '../../src/tier3/checkpoint-semantic-retention.ts';
 import { encodeStored } from '../../src/tier1/persistence.ts';
 import { ProcessResumableSession } from '../../src/tier4/process-resumable.ts';
 
@@ -137,6 +140,40 @@ test('fresh process restores the archived wrapper frame and reaches the same res
   assert.equal(output.result.state, 'completed');
   assert.equal(output.result.value.value, '5');
   assert.equal(original.run().state, 'completed');
+});
+
+test('direct replay retention keeps a virtual wrapper and target available after collection', () => {
+  const f = fixture(), directory = temporary(), astDirectory = join(directory, 'ast');
+  const store = new DurableGraphStore({ directory: astDirectory });
+  assert.equal(store.intern(f.candidate, { leaseId: 'draft' }), f.candidateManifest.astRoot);
+  for (const member of [f.source.members[0], f.wrapperDecl]) store.intern(member, { leaseId: 'draft' });
+  const gcOptions = (graph: DurableGraphStore) => ({
+    directory: join(directory, 'gc'), repositoryId: 'virtual-replay-retention', store: graph,
+    lineage: new CausalLineageLedger({ directory: join(directory, 'lineage'), repositoryId: 'virtual-replay-retention',
+      store: graph, authority: () => ({ policyEpoch: '0', eligibleAuthors: ['author'] }), authorKey: () => undefined }),
+    registry: f.registry,
+    policy: { epoch: '1', exports: [f.pure], protectedSymbols: [] },
+  });
+  const runtime = new ResumableRuntime(f.candidate, { ...f.candidateOptions, maxSteps: 100 });
+  runtime.start(f.pure, [2n]);
+  while (!runtime.inspect().frames.some(frame => frame.code === `function:${f.descriptor.wrapper}`)) runtime.step();
+  const authority = new CheckpointSemanticRetention(gcOptions(store));
+  const checkpointDirectory = join(directory, 'checkpoints');
+  const checkpoints = new ResumableCheckpointStore({ directory: checkpointDirectory,
+    program: runtime.program, executionId: f.candidateOptions.executionId, semanticRetention: authority });
+  const head = checkpoints.save(runtime.snapshot(), null);
+  store.release('draft'); authority.collector.collect();
+  assert.equal(store.hydrate(f.descriptor.wrapperDeclaration).kind, 'FunctionDecl');
+  assert.equal(store.hydrate(f.descriptor.targetDeclaration).kind, 'FunctionDecl');
+  const reopenedStore = new DurableGraphStore({ directory: astDirectory });
+  const reopened = new ResumableCheckpointStore({ directory: checkpointDirectory,
+    program: runtime.program, executionId: f.candidateOptions.executionId,
+    semanticRetention: new CheckpointSemanticRetention(gcOptions(reopenedStore)) });
+  const resumed = new ResumableRuntime(f.candidate, { ...f.candidateOptions, maxSteps: 100 });
+  resumed.restore(reopened.load(head.id), head.snapshot);
+  assert.equal(resumed.run().state, 'completed');
+  assert.equal(resumed.decodeValue(resumed.result().value!), 3n);
+  assert.equal(reopenedStore.hydrate(f.candidateManifest.astRoot as ReturnType<GraphStore['intern']>).kind, 'Module');
 });
 
 test('unadmitted effect broker and ProcessHost routes reject the profile before side effects', async () => {
