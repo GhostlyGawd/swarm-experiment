@@ -6,6 +6,8 @@ import { decimal, decodeCanonical, encodeCanonical, encodingLimits, exactObject,
 import { domainDigest, validateDigest, type Digest } from './identity.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 import { advanceWitnessHead, assertEffectJournalWitness, readWitnessHead, type AnyEffectJournalWitness } from './effect-journal-witness.ts';
+import { assertAttestedSinkAdapter, verifiedSinkReceipt } from './attested-sink-adapter.ts';
+import { validateSinkPublicAnchor, verifySinkReceipt, type SignedSinkReceiptV1, type SinkPublicAnchorV1 } from './sink-receipt.ts';
 
 export type ExecutionMode = 'live' | 'speculative' | 'shadow' | 'replay';
 export interface EffectRequestV1 {
@@ -70,7 +72,7 @@ export interface EffectBudget {
   release(request: EffectRequestV1): void;
 }
 export interface EffectEventV1 {
-  readonly format: 'aether.effect-event/1';
+  readonly format: 'aether.effect-event/1' | 'aether.effect-event/3';
   readonly sequence: string;
   readonly request: EffectRequestV1;
   readonly requestDigest: Digest;
@@ -83,10 +85,23 @@ export interface EffectEventV1 {
   readonly observedAt: string;
   readonly recordedAt: string;
   readonly outcome: EffectOutcome | null;
+  /** Present only in V3. A terminal external decision retains the exact sink statement. */
+  readonly signedSinkReceipt?: SignedSinkReceiptV1 | null;
 }
+export type EffectEventV3 = EffectEventV1 & {
+  readonly format: 'aether.effect-event/3';
+  readonly signedSinkReceipt: SignedSinkReceiptV1 | null;
+};
 interface EffectJournalV1 { format: 'aether.effect-journal/1'; clockDomain: string; records: EffectEventV1[] }
 interface EffectJournalV2 { format: 'aether.effect-journal/2'; clockDomain: string; witnessDigest: Digest; revision: string; records: EffectEventV1[] }
-type EffectJournal = EffectJournalV1 | EffectJournalV2;
+interface EffectJournalV3 { format: 'aether.effect-journal/3'; clockDomain: string; witnessDigest: Digest; revision: string;
+  deploymentId: string; approvedAdapterArtifactDigest: Digest; sinkAnchor: SinkPublicAnchorV1; records: EffectEventV3[] }
+type EffectJournal = EffectJournalV1 | EffectJournalV2 | EffectJournalV3;
+export interface AttestedEffectBrokerOptionsV3 {
+  readonly anchor: SinkPublicAnchorV1;
+  readonly deploymentId: string;
+  readonly approvedAdapterArtifactDigest: Digest;
+}
 export interface EffectBrokerOptions {
   readonly directory: string;
   readonly mode?: ExecutionMode;
@@ -104,6 +119,8 @@ export interface EffectBrokerOptions {
   /** Opt-in complete-journal CAS outside this directory. Provider custody is
    * a separate deployment obligation; a reloadable factory must not supply it. */
   readonly witness?: AnyEffectJournalWitness;
+  /** Opt-in V3. Requires the independently operated journal witness above. */
+  readonly attestedSink?: AttestedEffectBrokerOptionsV3;
   /** Fault-injection/observability hook; runs before a proposed journal replacement. */
   readonly beforePersist?: (event: EffectEventV1) => void;
   /** Immutable ticket slots prevent ABA lock reuse. Exhaustion fails closed;
@@ -167,6 +184,7 @@ export class DurableEffectBroker {
   private readonly buffered: EffectRequestV1[] = [];
   private readonly bufferedHistory = new Map<string, Digest>();
   readonly #witness: AnyEffectJournalWitness | null;
+  readonly #attestedSink: Readonly<AttestedEffectBrokerOptionsV3> | null;
   #trustedClock: { anchor: TrustedClockAnchor; windows: readonly { issuedAt: number; expiresAt: number }[] } | null = null;
   get executionMode(): ExecutionMode { return this.mode; }
   /** Host-owned independent deadline source for a versioned isolated profile.
@@ -186,13 +204,32 @@ export class DurableEffectBroker {
     identifier(options.clockDomain);
     this.options = options; this.limits = encodingLimits(options.limits); this.mode = options.mode ?? 'live';
     this.#witness = options.witness ?? null;
+    if (options.attestedSink) {
+      if (!this.#witness) throw new TypeError('V3 attested broker requires independent effect witness');
+      validateSinkPublicAnchor(options.attestedSink.anchor);
+      identifier(options.attestedSink.deploymentId);
+      validateDigest(options.attestedSink.approvedAdapterArtifactDigest);
+      if (!/^aether\.effect-adapter-artifact\/[1-9][0-9]*:b3:/.test(options.attestedSink.approvedAdapterArtifactDigest))
+        throw new TypeError('V3 approved adapter artifact digest required');
+      this.#attestedSink = immutable(copy(options.attestedSink, this.limits));
+    } else this.#attestedSink = null;
     if (!['live', 'speculative', 'shadow', 'replay'].includes(this.mode)) throw new TypeError('unknown execution mode');
     if (this.#witness) {
       assertEffectJournalWitness(this.#witness);
       if (this.#witness.clockDomain !== options.clockDomain) throw new TypeError('effect witness clock domain mismatch');
+      if (this.#attestedSink && (this.#witness.format !== 'aether.effect-journal-witness/2'
+        || this.#witness.repositoryId !== this.#attestedSink.anchor.repositoryId
+        || this.#witness.catalogDeploymentId !== this.#attestedSink.deploymentId))
+        throw new TypeError('V3 requires a namespaced witness bound to the sink deployment');
       if (existsSync(join(options.directory, 'effects.json'))) throw new Error('legacy effect journal requires explicit offline migration');
+      if (this.#attestedSink && existsSync(join(options.directory, 'effects-v2.json')))
+        throw new Error('V2 effect journal requires explicit offline migration');
+      if (!this.#attestedSink && existsSync(join(options.directory, 'effects-v3.json')))
+        throw new Error('V3 attested effect journal requires its original authority');
     } else if (existsSync(join(options.directory, 'effects-v2.json'))) throw new Error('witnessed effect journal requires its original authority');
-    this.file = join(options.directory, this.#witness ? 'effects-v2.json' : 'effects.json');
+    if (!this.#witness && existsSync(join(options.directory, 'effects-v3.json')))
+      throw new Error('V3 attested effect journal requires its original authority');
+    this.file = join(options.directory, this.#attestedSink ? 'effects-v3.json' : this.#witness ? 'effects-v2.json' : 'effects.json');
     mkdirSync(options.directory, { recursive: true });
     if (existsSync(join(options.directory, 'effects.lock')) || existsSync(join(options.directory, 'effects.lock.recovery'))) throw new Error('legacy effect lock layout requires explicit offline migration');
     this.journalLock = new JournalLock({ directory: join(options.directory, 'effect-lock-tickets'), domain: 'aether.effect-lock', limits: this.limits, maxTickets: options.maxLockTickets, fault: options.lockFault, busyError: 'effect_broker_busy: explicit dead-owner recovery required after a crash' });
@@ -211,7 +248,8 @@ export class DurableEffectBroker {
     assertEffectJournalWitness(expected);
     if (this.#witness !== expected) throw new TypeError('effect broker witness differs from operator authority');
     if (Object.getPrototypeOf(this) !== DurableEffectBroker.prototype
-      || ['read', 'persist', 'locked', 'find', 'step', 'authorize', 'dispatch', 'reconcile', 'inspectRecorded']
+      || ['read', 'persist', 'locked', 'find', 'step', 'authorize', 'dispatch', 'reconcile', 'inspectRecorded',
+        'validateEvent', 'validateOrderedEvents', 'replay', 'events', 'recordedRequest']
         .some(name => Object.hasOwn(this, name)))
       throw new TypeError('witnessed effect broker has a replaceable method boundary');
     Object.preventExtensions(this);
@@ -219,8 +257,9 @@ export class DurableEffectBroker {
   }
   recoverDeadWriter(): void { this.journalLock.recoverDeadWriter(); }
   private validateEvent(value: unknown): asserts value is EffectEventV1 {
-    const e = exactObject(value, ['format', 'sequence', 'request', 'requestDigest', 'adapterId', 'adapterSemanticsDigest', 'state', 'transitions', 'dispatchStarted', 'prepared', 'observedAt', 'recordedAt', 'outcome']);
-    if (e.format !== 'aether.effect-event/1') throw new TypeError('unsupported effect event version');
+    const v3 = this.#attestedSink !== null;
+    const e = exactObject(value, ['format', 'sequence', 'request', 'requestDigest', 'adapterId', 'adapterSemanticsDigest', 'state', 'transitions', 'dispatchStarted', 'prepared', 'observedAt', 'recordedAt', 'outcome', ...(v3 ? ['signedSinkReceipt'] : [])]);
+    if (e.format !== (v3 ? 'aether.effect-event/3' : 'aether.effect-event/1')) throw new TypeError('unsupported effect event version');
     validateEffectRequest(e.request, this.limits); decimal(e.sequence, this.limits); decimal(e.observedAt, this.limits); decimal(e.recordedAt, this.limits);
     if (effectRequestDigest(e.request, this.limits) !== e.requestDigest) throw new TypeError('corrupt effect request binding');
     identifier(e.adapterId); validateDigest(e.adapterSemanticsDigest, 'aether.effect-adapter/1');
@@ -265,6 +304,20 @@ export class DurableEffectBroker {
       }
       else throw new TypeError('unsupported effect outcome');
     } else if (['committed', 'rejected', 'aborted', 'indeterminate'].includes(e.state)) throw new TypeError('missing effect outcome');
+    if (v3) {
+      const context = this.#attestedSink!;
+      const disposition = e.state === 'committed' ? 'committed' : e.state === 'aborted' && e.dispatchStarted ? 'not_committed' : null;
+      if (disposition === null) {
+        if (e.signedSinkReceipt !== null) throw new TypeError('V3 nonterminal or pre-dispatch event carries a sink decision');
+      } else {
+        if (!verifySinkReceipt(e.signedSinkReceipt, context.anchor, {
+          repositoryId: context.anchor.repositoryId, deploymentId: context.deploymentId,
+          request: e.request as EffectRequestV1, sinkAuthorityId: context.anchor.sinkAuthorityId,
+          sinkId: context.anchor.sinkId, adapterArtifactDigest: context.approvedAdapterArtifactDigest,
+          disposition, value: disposition === 'committed' ? (e.outcome as EffectOutcome & { value: TaggedValueV1 }).value : null,
+        })) throw new TypeError('V3 signed sink receipt invalid or missing');
+      }
+    }
   }
   private validateOrderedEvents(events: readonly EffectEventV1[]): void {
     if (!Array.isArray(events)) throw new TypeError('invalid effect trace');
@@ -279,15 +332,25 @@ export class DurableEffectBroker {
   private read(): EffectJournal {
     if (this.#witness) {
       const witness = this.#witness, head = readWitnessHead(witness);
+      const context = this.#attestedSink;
+      const format = context ? 'aether.effect-journal/3' : 'aether.effect-journal/2';
       if (head.journal === null) {
         if (existsSync(this.file)) throw new Error('local effect journal is ahead of witness genesis');
+        if (context) return { format, clockDomain: this.options.clockDomain,
+          witnessDigest: witness.digest, revision: '0', deploymentId: context.deploymentId,
+          approvedAdapterArtifactDigest: context.approvedAdapterArtifactDigest, sinkAnchor: context.anchor, records: [] };
         return { format: 'aether.effect-journal/2', clockDomain: this.options.clockDomain,
           witnessDigest: witness.digest, revision: '0', records: [] };
       }
       if (Buffer.byteLength(head.journal) > this.limits.maxFrameBytes) throw new RangeError('witness journal frame limit exceeded');
-      const j = exactObject(decodeCanonical(Buffer.from(head.journal), this.limits), ['format', 'clockDomain', 'witnessDigest', 'revision', 'records']);
-      if (j.format !== 'aether.effect-journal/2' || j.clockDomain !== this.options.clockDomain || j.witnessDigest !== witness.digest
+      const keys = ['format', 'clockDomain', 'witnessDigest', 'revision', 'records',
+        ...(context ? ['deploymentId', 'approvedAdapterArtifactDigest', 'sinkAnchor'] : [])];
+      const j = exactObject(decodeCanonical(Buffer.from(head.journal), this.limits), keys);
+      if (j.format !== format || j.clockDomain !== this.options.clockDomain || j.witnessDigest !== witness.digest
         || j.revision !== head.revision || !Array.isArray(j.records)
+        || context && (j.deploymentId !== context.deploymentId
+          || j.approvedAdapterArtifactDigest !== context.approvedAdapterArtifactDigest
+          || Buffer.from(encodeCanonical(j.sinkAnchor, this.limits)).toString('utf8') !== Buffer.from(encodeCanonical(context.anchor, this.limits)).toString('utf8'))
         || Buffer.from(encodeCanonical(j, this.limits)).toString('utf8') !== head.journal)
         throw new TypeError('witnessed effect journal identity/canonical mismatch');
       this.validateOrderedEvents(j.records);
@@ -297,17 +360,20 @@ export class DurableEffectBroker {
         if (local !== head.journal) {
           let older = false;
           try {
-            const prior = exactObject(decodeCanonical(Buffer.from(local), this.limits), ['format', 'clockDomain', 'witnessDigest', 'revision', 'records']);
+            const prior = exactObject(decodeCanonical(Buffer.from(local), this.limits), keys);
             decimal(prior.revision, this.limits);
-            older = prior.format === 'aether.effect-journal/2' && prior.clockDomain === this.options.clockDomain
-              && prior.witnessDigest === witness.digest && BigInt(prior.revision) < BigInt(head.revision);
+            older = prior.format === format && prior.clockDomain === this.options.clockDomain
+              && prior.witnessDigest === witness.digest && (!context || prior.deploymentId === context.deploymentId
+                && prior.approvedAdapterArtifactDigest === context.approvedAdapterArtifactDigest
+                && Buffer.from(encodeCanonical(prior.sinkAnchor, this.limits)).toString('utf8') === Buffer.from(encodeCanonical(context.anchor, this.limits)).toString('utf8'))
+              && BigInt(prior.revision) < BigInt(head.revision);
           } catch { /* A corrupt or same-revision file is quarantined. */ }
           if (!older) throw new Error('local effect journal diverges from witness');
           atomicWrite(this.file, head.journal);
         }
       } else atomicWrite(this.file, head.journal);
       const fd = openSync(this.options.directory, 'r'); try { fsyncSync(fd); } finally { closeSync(fd); }
-      return j as unknown as EffectJournalV2;
+      return j as unknown as EffectJournalV2 | EffectJournalV3;
     }
     if (!existsSync(this.file)) return { format: 'aether.effect-journal/1', clockDomain: this.options.clockDomain, records: [] };
     if (statSync(this.file).size > this.limits.maxFrameBytes) throw new RangeError('journal frame limit exceeded');
@@ -319,19 +385,19 @@ export class DurableEffectBroker {
   private persist(journal: EffectJournal, event: EffectEventV1): void {
     this.validateEvent(event);
     const records = [...journal.records]; records[Number(event.sequence)] = event;
-    const next = journal.format === 'aether.effect-journal/2'
+    const next = journal.format !== 'aether.effect-journal/1'
       ? { ...journal, revision: String(BigInt(journal.revision) + 1n), records }
       : { ...journal, records };
     const encoded = encodeCanonical(next, this.limits);
     this.options.beforePersist?.(immutable(copy(event, this.limits)));
-    if (journal.format === 'aether.effect-journal/2') {
+    if (journal.format !== 'aether.effect-journal/1') {
       if (!this.#witness) throw new Error('effect witness missing at publication');
       advanceWitnessHead(this.#witness, journal.revision, Buffer.from(encoded).toString('utf8'));
     }
     atomicWrite(this.file, Buffer.from(encoded).toString('utf8'));
     const fd = openSync(this.options.directory, 'r'); try { fsyncSync(fd); } finally { closeSync(fd); }
     journal.records = records;
-    if (journal.format === 'aether.effect-journal/2') journal.revision = (next as EffectJournalV2).revision;
+    if (journal.format !== 'aether.effect-journal/1') journal.revision = (next as EffectJournalV2 | EffectJournalV3).revision;
   }
   private key(request: EffectRequestV1): string { return JSON.stringify([request.executionId, request.effectId]); }
   private find(journal: EffectJournal, request: EffectRequestV1): EffectEventV1 | undefined {
@@ -366,9 +432,35 @@ export class DurableEffectBroker {
     if (this.options.authorize(request) !== true) return 'authorization_denied';
     return trustedRefusal();
   }
+  #assertAttestedAdapter(adapter: EffectAdapter): void {
+    if (!this.#attestedSink) return;
+    assertAttestedSinkAdapter(adapter, {
+      repositoryId: this.#attestedSink.anchor.repositoryId,
+      deploymentId: this.#attestedSink.deploymentId,
+      approvedAdapterArtifactDigest: this.#attestedSink.approvedAdapterArtifactDigest,
+      anchor: this.#attestedSink.anchor,
+    });
+  }
+  /** The wrapper's observation is only a source of exact proof bytes. The
+   * broker verifies the sink signature and every operator-pinned field again. */
+  #attestedReceipt(request: EffectRequestV1, adapter: EffectAdapter,
+    disposition: 'committed' | 'not_committed', value: TaggedValueV1 | null): SignedSinkReceiptV1 {
+    const context = this.#attestedSink;
+    if (!context) throw new TypeError('V3 sink authority required');
+    this.#assertAttestedAdapter(adapter);
+    const receipt = verifiedSinkReceipt(adapter, request);
+    if (!verifySinkReceipt(receipt, context.anchor, {
+      repositoryId: context.anchor.repositoryId, deploymentId: context.deploymentId, request,
+      sinkAuthorityId: context.anchor.sinkAuthorityId, sinkId: context.anchor.sinkId,
+      adapterArtifactDigest: context.approvedAdapterArtifactDigest, disposition, value,
+    })) throw new TypeError('V3 signed sink receipt invalid or missing');
+    return immutable(copy(receipt, this.limits));
+  }
   /** Replay is isolated from current grants; exactly matches the recorded logical event sequence. */
   private replay(request: EffectRequestV1, adapter: EffectAdapter): EffectOutcome {
+    this.#assertAttestedAdapter(adapter);
     const event = this.trace[this.cursor];
+    if (event) this.validateEvent(event);
     if (!event || event.requestDigest !== effectRequestDigest(request, this.limits) || event.adapterId !== adapter.id || event.adapterSemanticsDigest !== effectAdapterDigest(adapter) || event.outcome === null || event.outcome.state === 'indeterminate') throw new Error('replay_mismatch');
     this.cursor++; return immutable(copy(event.outcome, this.limits));
   }
@@ -378,6 +470,7 @@ export class DurableEffectBroker {
   inspectRecorded(input: EffectRequestV1, adapter: EffectAdapter): EffectOutcome | null {
     if (this.mode !== 'live') throw new Error('isolated_record_inspection_forbidden');
     validateEffectRequest(input, this.limits); const request = immutable(copy(input, this.limits));
+    this.#assertAttestedAdapter(adapter);
     const semanticsDigest = effectAdapterDigest(adapter);
     return this.locked(() => {
       const journal = this.read(), event = this.find(journal, request);
@@ -450,6 +543,7 @@ export class DurableEffectBroker {
   dispatch(input: EffectRequestV1, adapter: EffectAdapter, options: { signal?: AbortSignal } = {}): EffectOutcome {
     validateEffectRequest(input, this.limits);
     const request = immutable(copy(input, this.limits));
+    this.#assertAttestedAdapter(adapter);
     if (this.mode === 'replay') return this.replay(request, adapter);
     if (this.mode !== 'live') {
       // Inputs are consumed from an isolated recorded snapshot; no adapter is invoked.
@@ -475,10 +569,11 @@ export class DurableEffectBroker {
       }
       const now = this.time();
       let event: EffectEventV1 = {
-        format: 'aether.effect-event/1', sequence: String(journal.records.length), request,
+        format: this.#attestedSink ? 'aether.effect-event/3' : 'aether.effect-event/1', sequence: String(journal.records.length), request,
         requestDigest: effectRequestDigest(request, this.limits), adapterId: adapter.id, adapterSemanticsDigest: semanticsDigest,
         state: 'requested', transitions: [{ state: 'requested', time: now, dispatchStarted: false }], dispatchStarted: false,
         prepared: null, observedAt: now, recordedAt: now, outcome: null,
+        ...(this.#attestedSink ? { signedSinkReceipt: null } : {}),
       };
       // ID, authorization context and ordered input are durable before any adapter or budget call.
       this.persist(journal, event);
@@ -527,9 +622,11 @@ export class DurableEffectBroker {
         const value = adapter.semantics.transactional ? adapter.commit!(request, event.prepared!) : adapter.execute!(request);
         validateTaggedValue(value, this.limits);
         event = { ...event, observedAt: this.time() };
+        const signedSinkReceipt = this.#attestedSink ? this.#attestedReceipt(request, adapter, 'committed', value) : null;
         if (reserved) this.options.budgets!.consume(request, value);
         const outcome: EffectOutcome = { state: 'committed', receiptDigest: outcomeDigest(event, value, this.limits), value: immutable(copy(value, this.limits)) };
-        event = this.step(journal, event, 'committed', { outcome }); return outcome;
+        event = this.step(journal, event, 'committed', { outcome,
+          ...(this.#attestedSink ? { signedSinkReceipt } : {}) }); return outcome;
       } catch (error) {
         if (event.dispatchStarted) {
           const outcome = this.uncertain(event);
@@ -546,6 +643,7 @@ export class DurableEffectBroker {
   reconcile(input: EffectRequestV1, adapter: EffectAdapter): EffectOutcome {
     if (this.mode !== 'live') throw new Error('isolated_reconciliation_forbidden');
     validateEffectRequest(input, this.limits); const request = immutable(copy(input, this.limits));
+    this.#assertAttestedAdapter(adapter);
     const semanticsDigest = effectAdapterDigest(adapter);
     return this.locked(() => {
       const journal = this.read(); const found = this.find(journal, request);
@@ -576,18 +674,30 @@ export class DurableEffectBroker {
       if (resolution.state === 'unknown') return this.uncertain(event);
       if (resolution.state === 'not_committed') {
         if (request.budgetReservationId !== null && !this.options.budgets) return this.uncertain(event);
+        let signedSinkReceipt: SignedSinkReceiptV1 | null = null;
+        if (this.#attestedSink) {
+          try { signedSinkReceipt = this.#attestedReceipt(request, adapter, 'not_committed', null); }
+          catch { return this.uncertain(event); }
+        }
         const outcome: EffectOutcome = { state: 'aborted', code: 'sink_confirmed_not_committed' };
-        event = this.step(journal, event, 'aborted', { outcome });
+        event = this.step(journal, event, 'aborted', { outcome,
+          ...(this.#attestedSink ? { signedSinkReceipt } : {}) });
         if (request.budgetReservationId !== null) this.options.budgets!.release(request);
         return outcome;
       }
       validateTaggedValue(resolution.value, this.limits);
+      let signedSinkReceipt: SignedSinkReceiptV1 | null = null;
+      if (this.#attestedSink) {
+        try { signedSinkReceipt = this.#attestedReceipt(request, adapter, 'committed', resolution.value); }
+        catch { return this.uncertain(event); }
+      }
       if (request.budgetReservationId !== null) {
         if (!this.options.budgets) return this.uncertain(event);
         this.options.budgets.consume(request, resolution.value);
       }
       const outcome: EffectOutcome = { state: 'committed', receiptDigest: outcomeDigest(event, resolution.value, this.limits), value: immutable(copy(resolution.value, this.limits)) };
-      event = this.step(journal, event, 'committed', { outcome }); return outcome;
+      event = this.step(journal, event, 'committed', { outcome,
+        ...(this.#attestedSink ? { signedSinkReceipt } : {}) }); return outcome;
     });
   }
 }
