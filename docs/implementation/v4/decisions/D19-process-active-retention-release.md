@@ -20,12 +20,10 @@ release authority finishes lease retirement. A missing witness, altered
 receipt, missing replay lease, or missing authority blocks reopen/collection.
 The AST store permanently retires those lease identities.
 
-The verifier currently exposes an explicit release API; ProcessHost does not
-yet invoke it under its host journal lock. Existing ProcessHost reopen checks
-also still require both V1 pin kinds and will reject a released active-task
-pin. The next integration must call release after the witnessed terminal host
-decision and reconcile it on reopen, then make retention assertions require
-active-task pins for active leases and replay pins for all historical leases.
+The [D20 opt-in V9 ProcessHost profile](D20-witnessed-process-active-release.md)
+now invokes release after a witnessed terminal host decision and reconciles it
+on reopen. It requires active-task pins for active leases and replay pins for
+released historical leases. Other host profiles retain their V1 pin behavior.
 The host must use the same independently supplied witness object as the
 release authority. The release proof can be rechecked at a later witness
 revision because a committed checkpoint remains in the append-only host
@@ -34,7 +32,7 @@ history. Old V1 markers and all other retention kinds remain monotone.
 This slice does not establish full audit expiration, replay deletion,
 unstable-replication release, or actual AST object reclamation. A signed
 lineage artifact or replay pin may still protect the same object after the
-active-task lease is retired. The focused test mirrors a real committed
-ProcessHost journal into a branded operator witness to exercise the verifier;
-an end-to-end test with ProcessHost's own V4/V13 witness and crash boundaries
-is required before this is a production release profile.
+active-task lease is retired. The V2 journal test mirrors a real committed
+ProcessHost journal into a branded operator witness. D20 adds a real V9
+witnessed host and controller crash campaign. V13 signed-sink external-effect
+qualification remains open.

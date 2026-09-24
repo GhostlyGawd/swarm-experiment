@@ -4,7 +4,7 @@ Status: bounded V4-T1-05/G2 integration slice. G2 remains open.
 
 `semanticActiveReleaseProfile: 'witnessed-active-task-release-v1'` gives a
 ProcessHost a distinct `aether.process-host-config/15` identity. It requires
-an existing host-witnessed signed policy profile, the same operator-held
+the qualified V9 `isolated-wasm-v7-host-witness` policy profile, the same operator-held
 `HostJournalWitness` used by ProcessHost, and a same-program
 `ProcessCheckpointActiveReleaseAuthority` inside `ProcessSemanticRetention`.
 The old V13 and other host configurations are unchanged; an old journal

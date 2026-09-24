@@ -25,7 +25,9 @@ ProcessHost launches these measured bytes. The subject is suitable for a later
 versioned process transport binding, not a deployment admission claim.
 The current independent worker build verifies a closed import graph and can
 supply its measured bundle and input list to Artifact/3 in a real-worker test;
-that builder's manifest is not yet a mandatory Artifact/3 admission field.
+that builder's V2 manifest also measures static non-system native links but is
+not yet a mandatory Artifact/3 admission field. A caller can still omit native
+libraries from Artifact/3's signed subject.
 
 The live `ProcessDeployment` state, factories, references, migration plan and
 worker transport continue to accept Artifact/1 or Artifact/2 only. Artifact/3

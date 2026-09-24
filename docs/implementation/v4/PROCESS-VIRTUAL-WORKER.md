@@ -19,9 +19,11 @@ order in tests.
 This path is **not** a ProcessHost or ProcessDeployment promotion profile.
 Artifact/3 currently permits a caller-supplied bounded source list. Rechecking
 those files detects changes, but this worker protocol does not independently
-prove that the list covers every transitive import and installed package byte.
-The OS can also change a path between measurement and module loading. A complete
-executable closure and launch-time custody are required before live deployment
+require the closed bundle manifest. The V2 bundle build measures transitive
+non-system Mach-O static links in addition to JS inputs; macOS system-cache
+member bytes and dynamic loads remain outside that profile. The OS can also
+change a path between measurement and module loading. Complete executable
+custody and a versioned host/deployment binding are required before live
 admission. The worker has no durable journal or recovery authority by itself;
 `kill` and `startVirtual` exercise a fresh process, not replay of committed state.
 A focused integration test independently rebuilds and verifies the closed

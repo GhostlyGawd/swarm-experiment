@@ -319,9 +319,10 @@ export class ProcessHost {
       && options.semanticActiveReleaseProfile !== 'witnessed-active-task-release-v1')
       throw new TypeError('unsupported semantic active release host profile');
     this.activeReleaseProfile = options.semanticActiveReleaseProfile === 'witnessed-active-task-release-v1';
-    if (this.activeReleaseProfile && (!hostWitnessed || !retainedCheckpoints || nativeProfile
+    if (this.activeReleaseProfile && (options.anchoredEffectPolicyProfile !== 'isolated-wasm-v7-host-witness'
+      || !hostWitnessed || !retainedCheckpoints || nativeProfile
       || !options.hostJournalWitness || ProcessSemanticRetention.releaseAuthorityDigest(options.semanticCheckpointRetention!) === null))
-      throw new TypeError('active release requires a witnessed host and operator semantic release authority');
+      throw new TypeError('active release requires the qualified V9 witnessed host and operator semantic release authority');
     if (!this.activeReleaseProfile && retainedCheckpoints
       && ProcessSemanticRetention.releaseAuthorityDigest(options.semanticCheckpointRetention!) !== null)
       throw new TypeError('semantic release authority requires its versioned host profile');

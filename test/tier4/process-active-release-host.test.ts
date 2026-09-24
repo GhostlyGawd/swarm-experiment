@@ -184,6 +184,8 @@ test('opt-in config/15 releases active pins from the host witness and reopens wi
     assert.ok(reopened.checkpointReceipt(session.binding.id, reopened.issueScopedTokens(f.entry)));
     await assert.rejects(ProcessHost.open({ ...f.options, semanticActiveReleaseProfile: undefined }),
       /requires its versioned host profile/);
+    await assert.rejects(ProcessHost.open({ ...f.options,
+      anchoredEffectPolicyProfile: 'attested-sink-v8-host-witness' }), /qualified V9 witnessed host/);
   } finally { await f.close(); }
 });
 
