@@ -85,7 +85,8 @@ export function verifyBenchmarkEvidence(directory: string, options: { sourceRoot
   }
   const requiredFailures = enforcementFailures(selected, manifest.measurements as Measurement[]);
   return { verified: true, subjectCommit: manifest.subjectCommit, sourceMatches, requiredFailures,
-    releaseEligible: !manifest.workingTreeDirty && sourceMatches === true && requiredFailures.length === 0 };
+    releaseEligible: manifest.profile.id.startsWith('v4-release/')
+      && !manifest.workingTreeDirty && sourceMatches === true && requiredFailures.length === 0 };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
