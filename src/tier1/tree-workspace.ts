@@ -91,6 +91,11 @@ export class DurableTreeWorkspace {
         this.save(state);
       }
       const state = this.read(); this.replica(state);
+      // A prior process may have died after publishing an authenticated frame
+      // but before its content lease was recorded. Rebuild the current epoch's
+      // complete protection set before releasing any predecessor epoch lease.
+      // Missing content is a recovery error, never a reason to drop a frame.
+      this.options.store.retain(this.lease(state), this.contentRoots(state.base, this.replica(state).framesFor(), state.membership));
       for (const lease of state.retiredLeases) this.options.store.release(lease);
     }, 5000);
   }
@@ -106,10 +111,12 @@ export class DurableTreeWorkspace {
   ingest(frame: Uint8Array): ReturnType<DurableReplica['ingest']> {
     return this.lock.run(() => {
       const state = this.read(), envelope = decodeMutation(frame, state.membership);
-      const result = this.replica(state).ingest(frame);
       const content = this.contentOf(envelope);
-      if (content && this.options.store.listRefs().includes(content)) this.options.store.retain(this.lease(state), [content]);
-      return result;
+      // The replica journal may publish the frame before returning. Protect its
+      // AST closure first so a crash at that boundary cannot leave a durable
+      // operation whose content the store may collect.
+      if (content) this.options.store.retain(this.lease(state), [content]);
+      return this.replica(state).ingest(frame);
     }, 5000);
   }
   seed(term: Term): { rootOccurrence: Digest; frames: Uint8Array[] } {

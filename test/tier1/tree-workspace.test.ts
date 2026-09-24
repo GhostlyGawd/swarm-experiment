@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DurableGraphStore } from '../../src/tier1/durable-store.ts';
 import { DurableTreeWorkspace, type TreeCheckpointCertificate, type TreeWorkspaceOptions } from '../../src/tier1/tree-workspace.ts';
-import { enrollment, decodeMutation, type MutationEnvelopeV1, type MembershipV1 } from '../../src/fabric/replication.ts';
+import { DurableReplica, enrollment, decodeMutation, type MutationEnvelopeV1, type MembershipV1 } from '../../src/fabric/replication.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
@@ -28,6 +28,77 @@ function setup(extraOptions: Partial<TreeWorkspaceOptions> = {}) {
   return { directory, membership, keys, registry, stores, options, a, z, transfer, cleanup: () => rmSync(directory, { recursive: true, force: true }) };
 }
 const fingerprint = (value: unknown) => domainDigest('aether.tree-test/1', value);
+const epochDirectory = (directory: string, membership: MembershipV1, replicaId: string): string => join(directory, replicaId, 'epochs', domainDigest('aether.tree-epoch-directory/1', { repositoryId: membership.repositoryId, epoch: membership.membershipEpoch }).split(':').at(-1)!);
+
+test('Tree-CRDT refuses an imported content frame before it can become durable when its AST is absent', () => {
+  const f = setup();
+  try {
+    const seeded = f.a.seed(b.int(7));
+    assert.equal(seeded.frames.length, 1);
+    assert.throws(() => f.z.ingest(seeded.frames[0]), /ENOENT/);
+    assert.equal(f.z.exportOperations().length, 0);
+    f.z.importContent(f.a.exportContent());
+    f.z.ingest(seeded.frames[0]);
+    assert.equal(f.z.materialize({ leaseId: 'after-content-import' }).status, 'materialized');
+  } finally { f.cleanup(); }
+});
+
+test('Tree-CRDT reopens a historically published frame lacking a lease by rebuilding current epoch roots before GC', () => {
+  const f = setup();
+  try {
+    const seeded = f.a.seed(b.int(11));
+    f.stores.b.importArchive(f.a.exportContent(), { leaseId: 'temporary-transfer' });
+    f.stores.b.release('temporary-transfer');
+    const raw = new DurableReplica({ directory: epochDirectory(f.directory, f.membership, 'b'), membership: f.membership, replicaId: 'b' });
+    assert.equal(raw.ingest(seeded.frames[0]).disposition, 'accepted');
+    const reopened = new DurableTreeWorkspace(f.options('b'));
+    f.stores.b.collectGarbage();
+    assert.equal(reopened.materialize({ leaseId: 'reconciled-frame' }).status, 'materialized');
+    const frame = decodeMutation(seeded.frames[0], f.membership);
+    if (frame.payload.format !== 'aether.tree-insert/1') throw new Error('expected insert');
+    assert.equal(reopened.inspect().nodes[0].content, frame.payload.content);
+  } finally { f.cleanup(); }
+});
+
+test('Tree-CRDT reopen fails closed on a durable frame whose required AST content is missing', () => {
+  const f = setup();
+  try {
+    const seeded = f.a.seed(b.int(13));
+    const raw = new DurableReplica({ directory: epochDirectory(f.directory, f.membership, 'b'), membership: f.membership, replicaId: 'b' });
+    raw.ingest(seeded.frames[0]);
+    assert.throws(() => new DurableTreeWorkspace(f.options('b')), /ENOENT/);
+    f.z.importContent(f.a.exportContent());
+    const reopened = new DurableTreeWorkspace(f.options('b'));
+    assert.equal(reopened.materialize({ leaseId: 'recovered-content' }).status, 'materialized');
+  } finally { f.cleanup(); }
+});
+
+test('Tree-CRDT SIGKILL after inbound frame publication leaves its AST pinned for direct GC and reopened materialization', () => {
+  const f = setup();
+  try {
+    const seeded = f.a.seed(b.int(17));
+    f.stores.b.importArchive(f.a.exportContent(), { leaseId: 'temporary-transfer' });
+    f.stores.b.release('temporary-transfer');
+    const input = join(f.directory, 'ingest-crash-input.json');
+    writeFileSync(input, JSON.stringify({ directory: f.directory, membership: f.membership, frame: Buffer.from(seeded.frames[0]).toString('base64') }));
+    const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', `
+      import { readFileSync } from 'node:fs'; import { join } from 'node:path';
+      import { DurableGraphStore } from './src/tier1/durable-store.ts';
+      import { DurableTreeWorkspace } from './src/tier1/tree-workspace.ts';
+      import { DurableReplica } from './src/fabric/replication.ts';
+      import { CapabilityRegistry } from './src/tier2/ocap.ts';
+      const x = JSON.parse(readFileSync(process.argv[1], 'utf8'));
+      const original = DurableReplica.prototype.ingest;
+      DurableReplica.prototype.ingest = function(frame) { original.call(this, frame); process.kill(process.pid, 'SIGKILL'); };
+      const workspace = new DurableTreeWorkspace({ directory: join(x.directory, 'b'), membership: x.membership, replicaId: 'b', store: new DurableGraphStore({ directory: join(x.directory, 'store-b') }), registry: new CapabilityRegistry() });
+      workspace.ingest(Buffer.from(x.frame, 'base64'));
+    `, input], { encoding: 'utf8', timeout: 15000 });
+    assert.equal(child.signal, 'SIGKILL', child.stderr);
+    assert.equal(f.stores.b.collectGarbage().removedObjects, 0);
+    const reopened = new DurableTreeWorkspace(f.options('b'));
+    assert.equal(reopened.materialize({ leaseId: 'after-ingest-crash' }).status, 'materialized');
+  } finally { f.cleanup(); }
+});
 
 test('Tree-CRDT materializes actual CAS roots; shared content has independent occurrences and concurrent edits converge', () => {
   const f = setup();
