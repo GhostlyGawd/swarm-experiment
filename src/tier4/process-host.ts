@@ -172,9 +172,9 @@ export interface ProcessHostOptions {
   readonly plan: TopologyPlan;
   readonly registry: CapabilityRegistry;
   readonly sealer: CapabilitySealer;
-  /** Opt-in host-config/16. Operator-held trust and exact signed Artifact/4;
-   * one pure unit only, with no broker or cross-unit callbacks. */
-  readonly virtualArtifactV4?: Readonly<{ format: 'aether.process-host-virtual/1';
+  /** Opt-in host-config/16 local or host-config/17 witnessed pure Artifact/4.
+   * Both require operator-held trust and one pure unit without a broker. */
+  readonly virtualArtifactV4?: Readonly<{ format: 'aether.process-host-virtual/1' | 'aether.process-host-virtual/2';
     artifact: ProcessVirtualArtifactV4; trust: ProcessVirtualWorkerTrustV1 }>;
   /** Explicit strict profile; its presence is committed into host identity. */
   readonly scopedGrants?: ScopedGrantAuthority;
@@ -297,6 +297,7 @@ export class ProcessHost {
   private readonly historicalV7Inspection: boolean;
   private readonly activeReleaseProfile: boolean;
   private readonly virtualProfile: ProcessHostOptions['virtualArtifactV4'];
+  private readonly witnessedVirtualProfile: boolean;
   private readonly file: string;
   readonly #hostJournalWitness: HostJournalWitness | null;
   readonly #journalWitnessBases = new WeakMap<HostJournal, { revision: string; journal: string | null }>();
@@ -311,15 +312,19 @@ export class ProcessHost {
 
   private constructor(options: ProcessHostOptions) {
     const virtual = options.virtualArtifactV4;
+    this.witnessedVirtualProfile = virtual?.format === 'aether.process-host-virtual/2';
+    if (this.witnessedVirtualProfile && options.hostJournalWitness === undefined)
+      throw new TypeError('Artifact/4 witnessed host requires an operator witness');
     if (virtual) {
-      if (virtual.format !== 'aether.process-host-virtual/1'
+      if (!['aether.process-host-virtual/1', 'aether.process-host-virtual/2'].includes(virtual.format)
         || options.plan.units.length !== 1
         || options.registry.names.length !== 1 || options.registry.names[0] !== PURE_COMPUTE
         || options.scopedGrants !== undefined || options.signedEffectResourcePolicy !== undefined
         || options.effectRouterFactory !== undefined || options.effectResourcePath !== undefined
         || options.effectResourcePolicyDigest !== undefined || options.effectSignerAnchor !== undefined
         || options.anchoredEffectPolicyProfile !== undefined || options.legacyAnchoredEffectPolicy !== undefined
-        || options.nativeFallback !== undefined || options.hostJournalWitness !== undefined
+        || options.nativeFallback !== undefined
+        || (virtual.format === 'aether.process-host-virtual/1' && options.hostJournalWitness !== undefined)
         || options.budgetedSinkAuthority !== undefined || options.semanticCheckpointRetention !== undefined
         || options.semanticActiveReleaseProfile !== undefined || options.attestedSinkAuthority !== undefined
         || options.effectJournalWitnessCatalog !== undefined || options.trustedClockAnchor !== undefined
@@ -380,7 +385,11 @@ export class ProcessHost {
         throw new TypeError('effect witness catalog differs from signed repository/clock');
     } else if (options.effectJournalWitnessCatalog !== undefined)
       throw new TypeError('effect witness catalog requires witnessed Wasm profile');
-    if (hostWitnessed) {
+    if (this.witnessedVirtualProfile) {
+      assertHostJournalWitness(options.hostJournalWitness);
+      if (options.hostJournalWitness.repositoryId !== virtual!.trust.repositoryId)
+        throw new TypeError('Artifact/4 host witness differs from signed lineage repository');
+    } else if (hostWitnessed) {
       assertHostJournalWitness(options.hostJournalWitness);
       if (options.hostJournalWitness.repositoryId !== options.effectSignerAnchor?.repositoryId
         || options.hostJournalWitness.deploymentId !== options.effectJournalWitnessCatalog?.deploymentId)
@@ -562,9 +571,10 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest(virtual ? 'aether.process-host-config/16' : this.activeReleaseProfile ? 'aether.process-host-config/15' : tableSink ? retainedCheckpoints ? 'aether.process-host-config/14' : 'aether.process-host-config/13' : retainedCheckpoints ? 'aether.process-host-config/12' : nativeProfile ? 'aether.process-host-config/10' : budgetedSink ? 'aether.process-host-config/11' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+    this.configuration = domainDigest(this.witnessedVirtualProfile ? 'aether.process-host-config/17' : virtual ? 'aether.process-host-config/16' : this.activeReleaseProfile ? 'aether.process-host-config/15' : tableSink ? retainedCheckpoints ? 'aether.process-host-config/14' : 'aether.process-host-config/13' : retainedCheckpoints ? 'aether.process-host-config/12' : nativeProfile ? 'aether.process-host-config/10' : budgetedSink ? 'aether.process-host-config/11' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
       ...(virtual ? { virtualArtifactDigest: processVirtualArtifactDigestV4(virtual.artifact),
-        virtualTrustDigest: domainDigest('aether.process-host-virtual-trust/1', virtual.trust) } : {}),
+        virtualTrustDigest: domainDigest('aether.process-host-virtual-trust/1', virtual.trust),
+        ...(this.witnessedVirtualProfile ? { hostJournalWitness: options.hostJournalWitness!.digest } : {}) } : {}),
       ...(retainedCheckpoints ? { semanticCheckpointRetentionAuthority: ProcessSemanticRetention.authorityDigest(options.semanticCheckpointRetention!) } : {}),
       ...(this.activeReleaseProfile ? { semanticActiveReleaseProfile: options.semanticActiveReleaseProfile,
         semanticActiveReleaseAuthority: ProcessSemanticRetention.releaseAuthorityDigest(options.semanticCheckpointRetention!) } : {}),
@@ -2038,7 +2048,10 @@ export class ProcessHost {
           ...(this.options.nativeFallback ? ['nativeFallbacks'] : [])]);
       decimal(prior.witnessRevision);
       return prior.format === (this.options.nativeFallback ? 'aether.process-host/5' : 'aether.process-host/4') && prior.configuration === this.configuration
-        && BigInt(prior.witnessRevision) < BigInt(revision);
+        && BigInt(prior.witnessRevision) < BigInt(revision)
+        // A CAS may finish just before a controller SIGKILL prevents its local
+        // mirror write. Older mirrors are rollback, not a torn publication.
+        && (!this.witnessedVirtualProfile || BigInt(prior.witnessRevision) + 1n === BigInt(revision));
     } catch { return false; }
   }
   private persist(journal: HostJournal): void {

@@ -4,6 +4,9 @@ Artifact/4 is a versioned process-worker admission subject for the pure D16
 virtual-forward rewrite. `ProcessChannel` admits it through explicit
 `startVirtualV4` and worker `init/3`. An opt-in `ProcessHost`
 config/16 admits the same one-unit pure candidate and durable journal.
+An explicit `aether.process-host-virtual/2` selects host config/17 and the
+operator-held complete host-journal CAS witness. Config/16 retains its local
+journal identity and behavior.
 `ProcessDeployment` still does not register or promote Artifact/4.
 
 ## Signed binding
@@ -64,6 +67,22 @@ refuses new calls before an intent is written. This qualifies a bounded pure
 host profile, not governor-promoted deployment or arbitrary checkpoint recovery.
 Its durable host journal is local and has no independent monotone witness
 custody; rollback resistance at that boundary is still unproved.
+
+Config/17 binds the Artifact/4 digest, trust digest and witness identity into
+the host configuration. It requires the witness repository to match signed
+lineage, publishes the complete canonical `/4` host journal before its local
+mirror, and reads the witness as authority for snapshots, calls and state
+heads. An older local mirror more than one revision behind is rejected; an
+exactly one-revision lag is treated as a possible controller crash between
+CAS and local write and restored from the witness. Same-revision divergence
+and witness outage fail closed. A separate witness-service process was used
+for pure calls, local-mirror deletion, service outage/restart and real controller SIGKILL before and
+after commit. Fresh reopening leaves a precommit call indeterminate until
+authorized isolated replay and preserves a postcommit result without replay.
+The service is same-UID in this campaign; the profile does not prove distinct
+custody or whole-machine rollback protection. Its `/4` journal envelope is
+the existing complete witnessed format; config/17 is a separate identity and
+cannot reopen config/16 bytes.
 
 Focused [integration evidence](evidence/integration-d9be39e/REVIEW.md):
 Artifact/4 tests 8/8 and Artifact/3 plus bundle tests 13/13 passed at

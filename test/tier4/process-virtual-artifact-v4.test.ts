@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Writable } from 'node:stream';
 import { ProcessAuthenticator } from '../../src/tier4/process-values.ts';
 import { encodeCanonical } from '../../src/fabric/encoding.ts';
+import { createProcessWitnessClient } from '../../src/fabric/witness-service.ts';
+import { createHostJournalWitness, readHostJournalHead, selectHostJournalWitness } from '../../src/fabric/host-journal-witness.ts';
 import * as b from '../../src/tier1/build.ts';
 import type { Term } from '../../src/tier1/ast.ts';
 import type { NodeRef } from '../../src/tier1/ids.ts';
@@ -143,6 +145,31 @@ function hostOptions(f: ReturnType<typeof fixture>): ProcessHostOptions {
     registry: new CapabilityRegistry(), sealer: new CapabilitySealer(new Uint8Array(32).fill(7), () => 100),
     virtualArtifactV4: { format: 'aether.process-host-virtual/1',
       artifact: candidate, trust: f.trust }, authorizeRecovery: () => true };
+}
+
+async function launchHostWitness(configFile: string): Promise<ChildProcess> {
+  const root = fileURLToPath(new URL('../..', import.meta.url));
+  const child = spawn(process.execPath, ['--experimental-strip-types',
+    join(root, 'src/fabric/witness-service-cli.ts'), '--config', configFile],
+  { cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' } });
+  await new Promise<void>((resolveReady, reject) => {
+    let output = '', errors = '';
+    const timer = setTimeout(() => reject(new Error(`host witness startup timeout: ${errors}`)), 10_000);
+    child.stdout!.on('data', chunk => {
+      output += String(chunk);
+      if (output.includes('witness service ready')) { clearTimeout(timer); resolveReady(); }
+    });
+    child.stderr!.on('data', chunk => { errors += String(chunk).slice(0, 2048); });
+    child.once('exit', code => { clearTimeout(timer); reject(new Error(`host witness exited ${code}: ${errors}`)); });
+    child.once('error', error => { clearTimeout(timer); reject(error); });
+  });
+  return child;
+}
+async function killHostWitness(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = new Promise<void>(resolveExit => child.once('exit', () => resolveExit()));
+  child.kill('SIGKILL'); await exited;
 }
 
 test('Artifact/4 signed target binds independently rebuilt V2 bundle and exact virtual proof', () => {
@@ -453,6 +480,104 @@ test('Artifact/4 ProcessHost reconciles a real controller SIGKILL before commit'
       { operationId: 'artifact4-controller-crash', tokens: host.issueTokens(f.entry) }))),
     JSON.parse(JSON.stringify(recovered)));
   } finally { await host?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('Artifact/4 ProcessHost config/17 witnesses pure calls and recovers controller crashes', async () => {
+  const f = fixture(manifest);
+  const local = hostOptions(f);
+  const namespace = { authorityId: 'artifact4-host-operator',
+    repositoryId: f.trust.repositoryId, deploymentId: 'artifact4-pure-deployment' };
+  const witnessConfig = { ...namespace, hostId: 'artifact4-pure-host',
+    socketPath: join(f.directory, 'witness.sock'), keyPath: join(f.directory, 'witness.key') };
+  const configFile = join(f.directory, 'witness.json');
+  const key = randomBytes(32);
+  writeFileSync(witnessConfig.keyPath, key, { mode: 0o600 });
+  writeFileSync(configFile, encodeCanonical({ socketPath: witnessConfig.socketPath,
+    storageDir: join(f.directory, 'operator-store'), keyFile: witnessConfig.keyPath,
+    namespaces: [{ kind: 'host-scope', ...namespace }] }), { mode: 0o600 });
+  const selected = () => selectHostJournalWitness(createProcessWitnessClient({
+    socketPath: witnessConfig.socketPath, key }).hostCatalog(namespace), witnessConfig.hostId);
+  const options = (): ProcessHostOptions => ({ ...local,
+    virtualArtifactV4: { ...local.virtualArtifactV4!, format: 'aether.process-host-virtual/2' },
+    hostJournalWitness: selected() });
+  let service: ChildProcess | undefined, host: ProcessHost | undefined;
+  try {
+    service = await launchHostWitness(configFile);
+    await assert.rejects(ProcessHost.open({ ...local,
+      virtualArtifactV4: { ...local.virtualArtifactV4!, format: 'aether.process-host-virtual/2' } }),
+    /witness/);
+    await assert.rejects(ProcessHost.open({ ...options(), hostJournalWitness: createHostJournalWitness({
+      ...namespace, repositoryId: 'different-signed-repository', hostId: witnessConfig.hostId,
+      read: () => ({ revision: '0', journal: null }),
+      advance: () => { throw new Error('wrong repository witness must not be written'); },
+    }) }), /differs from signed lineage repository/);
+    await assert.rejects(ProcessHost.open({ ...options(),
+      effectRouterFactory: () => { throw new Error('must not dispatch'); } }),
+    /one pure unit without effect/);
+    host = await ProcessHost.open(options());
+    const call = (id: string) => host!.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: id, tokens: host!.issueTokens(f.entry) });
+    const first = await call('artifact4-witness-first');
+    const oldLocal = readFileSync(join(local.directory, 'host.json'), 'utf8');
+    const second = await call('artifact4-witness-second');
+    const exactSnapshot = await host.snapshot();
+    const head = readHostJournalHead(selected());
+    assert.equal(JSON.parse(head.journal!).configuration,
+      JSON.parse(readFileSync(join(local.directory, 'host.json'), 'utf8')).configuration);
+    assert.deepEqual(JSON.parse(head.journal!).snapshot, JSON.parse(JSON.stringify(exactSnapshot)));
+    assert.deepEqual(JSON.parse(head.journal!).calls.map((row: { operationId: string }) => row.operationId),
+      ['artifact4-witness-first', 'artifact4-witness-second']);
+    const currentLocal = readFileSync(join(local.directory, 'host.json'), 'utf8');
+    writeFileSync(join(local.directory, 'host.json'), oldLocal);
+    assert.throws(() => host!.operationResult('artifact4-witness-first'), /local host journal diverges/);
+    const forged = JSON.parse(currentLocal);
+    forged.snapshot.eventCursor = String(BigInt(forged.snapshot.eventCursor) + 1n);
+    writeFileSync(join(local.directory, 'host.json'), encodeCanonical(forged));
+    assert.throws(() => host!.operationResult('artifact4-witness-first'), /local host journal diverges/);
+    writeFileSync(join(local.directory, 'host.json'), currentLocal);
+    await killHostWitness(service); service = undefined;
+    assert.throws(() => host!.operationResult('artifact4-witness-first'), /witness|uncertain/);
+    await assert.rejects(async () => call('artifact4-witness-during-outage'), /witness|uncertain/);
+    await host.close(); host = undefined;
+    service = await launchHostWitness(configFile);
+    rmSync(join(local.directory, 'host.json'));
+    host = await ProcessHost.open(options());
+    assert.deepEqual(JSON.parse(JSON.stringify(await host.snapshot())), JSON.parse(JSON.stringify(exactSnapshot)));
+    assert.deepEqual(await call('artifact4-witness-first'), first);
+    assert.deepEqual(await call('artifact4-witness-second'), second);
+    await host.close(); host = undefined;
+
+    const controller = fileURLToPath(new URL('./process-virtual-host-crash-controller.ts', import.meta.url));
+    const crash = (operationId: string, crashPhase: 'call-before-commit' | 'call-committed') => {
+      const controllerConfig = join(f.directory, `${operationId}.json`);
+      writeFileSync(controllerConfig, JSON.stringify({ directory: local.directory,
+        artifact: f.artifact, trust: f.trust, plan: local.plan, entry: f.entry,
+        witness: witnessConfig, operationId, crashPhase }));
+      const result = spawnSync(process.execPath,
+        ['--experimental-strip-types', controller, controllerConfig],
+        { cwd: process.cwd(), timeout: 30_000, encoding: 'utf8' });
+      assert.equal(result.signal, 'SIGKILL', result.stderr);
+    };
+    crash('artifact4-witness-before', 'call-before-commit');
+    host = await ProcessHost.open(options());
+    assert.equal(host.operationResult('artifact4-witness-before')?.state, 'indeterminate');
+    const recovered = await host.recoverOperation('artifact4-witness-before',
+      { strategy: 'isolated-replay' });
+    assert.equal(recovered.state, 'completed');
+    assert.deepEqual(await call('artifact4-witness-before'), recovered);
+    await host.close(); host = undefined;
+    crash('artifact4-witness-after', 'call-committed');
+    host = await ProcessHost.open(options());
+    const committed = host.operationResult('artifact4-witness-after');
+    assert.equal(committed?.state, 'completed');
+    assert.deepEqual(await call('artifact4-witness-after'), committed);
+    assert.ok(readHostJournalHead(selected()).journal?.includes('artifact4-witness-after'));
+    await host.close(); host = undefined;
+    await assert.rejects(ProcessHost.open({ ...local }), /configuration|profile/i);
+  } finally {
+    await host?.close(); if (service) await killHostWitness(service);
+    rmSync(f.directory, { recursive: true, force: true });
+  }
 });
 
 test('Artifact/4 ProcessHost refuses effect services and stale signed lineage before call intent', async () => {
