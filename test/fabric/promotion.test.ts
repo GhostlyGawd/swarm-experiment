@@ -67,6 +67,58 @@ test('F08 core: exact governor-approved subject commits and filesystem activatio
   assert.equal(JSON.parse(readFileSync(join(f.directory,'driver','serving.json'),'utf8')).activations,1);
 });
 
+function fencedDriver(driver:FileDriver,commitFence:NonNullable<PromotionDriver['commitFence']>):PromotionDriver{
+  return {prepare:driver.prepare.bind(driver),activate:driver.activate.bind(driver),abort:driver.abort.bind(driver),
+    recover:driver.recover.bind(driver),commitFence};
+}
+
+test('production commit fence holds the final decision before activation and can recover a postcommit interruption',async()=>{
+  const f=fixture(),coordinator=new PromotionCoordinator(f.options),input=f.input();
+  let calls=0;
+  const driver=fencedDriver(f.driver,(_binding,commit)=>{
+    calls++;assert.equal(coordinator.state().committedManifest,f.genesis);
+    commit();assert.equal(coordinator.state().committedManifest,input.proposal.candidateManifest);
+    assert.equal(coordinator.state().activationPending,true);
+  });
+  await coordinator.promote(input,driver);
+  assert.equal(calls,1);assert.equal(coordinator.servingManifest(),input.proposal.candidateManifest);
+
+  const later=fixture(),interrupted=new PromotionCoordinator(later.options),candidate=later.input();
+  const crash=fencedDriver(later.driver,(_binding,commit)=>{commit();throw new Error('postcommit fence interruption');});
+  await assert.rejects(interrupted.promote(candidate,crash),/postcommit fence interruption/);
+  assert.equal(interrupted.state().committedManifest,candidate.proposal.candidateManifest);
+  assert.equal(interrupted.state().activationPending,true);
+  await new PromotionCoordinator(later.options).recover(later.driver);
+  assert.equal(new PromotionCoordinator(later.options).servingManifest(),candidate.proposal.candidateManifest);
+});
+
+test('production commit fence refuses omitted, late, repeated and stale-authority decisions',async()=>{
+  {
+    const f=fixture(),coordinator=new PromotionCoordinator(f.options),input=f.input();
+    let escaped:(()=>void)|null=null;
+    const driver=fencedDriver(f.driver,(_binding,commit)=>{escaped=commit;});
+    await assert.rejects(coordinator.promote(input,driver),/omitted the durable decision/);
+    assert.equal(coordinator.servingManifest(),f.genesis);
+    assert.throws(()=>escaped!(),/outside its single decision/);
+    assert.equal(coordinator.state().committedManifest,f.genesis);
+  }
+  {
+    const f=fixture(),coordinator=new PromotionCoordinator(f.options),input=f.input();
+    const driver=fencedDriver(f.driver,(_binding,commit)=>{f.authority.policyEpoch='2';commit();});
+    await assert.rejects(coordinator.promote(input,driver),/policy|epoch|authority|approval/i);
+    assert.equal(coordinator.state().committedManifest,f.genesis);
+  }
+  {
+    const f=fixture(),coordinator=new PromotionCoordinator(f.options),input=f.input();
+    const driver=fencedDriver(f.driver,(_binding,commit)=>{commit();commit();});
+    await assert.rejects(coordinator.promote(input,driver),/single decision/);
+    assert.equal(coordinator.state().committedManifest,input.proposal.candidateManifest);
+    assert.equal(coordinator.state().activationPending,true);
+    await coordinator.recover(f.driver);
+    assert.equal(coordinator.servingManifest(),input.proposal.candidateManifest);
+  }
+});
+
 test('F08 core: individually valid literal edits fail when their composed root violates a+b >= 18',async()=>{
   const f=fixture();mintLocalEvidence(context(8,10));mintLocalEvidence(context(10,8));
   assert.throws(()=>mintLocalEvidence(context(8,8)),/refuted|incomplete/);

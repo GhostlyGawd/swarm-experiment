@@ -36,6 +36,11 @@ export interface PreparedPromotionHandleV1 {
 export interface PromotionDriver {
   /** Isolate preparation by proposalDigest. A crash may require abort with no returned handle. */
   prepare(binding: PromotionBindingV1, evidence: VettedEvidence): Promise<PreparedPromotionHandleV1>;
+  /** Optional operator-held synchronous fence around the final authority
+   * recheck and durable commit. A retention authority can hold its own lock
+   * across `commit()` so a new task pin cannot race the active decision.
+   * The callback must invoke `commit()` exactly once before returning. */
+  commitFence?(binding: PromotionBindingV1, commit: () => void): void;
   /** Idempotent commit installation. Never serve the old target after the coordinator commits. */
   activate(binding: PromotionBindingV1, handle: PreparedPromotionHandleV1): Promise<void>;
   abort(binding: PromotionBindingV1, handle: PreparedPromotionHandleV1 | null): Promise<void>;
@@ -283,10 +288,27 @@ export class PromotionCoordinator {
         // immediately before the synchronous durable compare-and-swap decision.
         vetted=validateEvidence(input.evidence,input.context);
         if(vetted.manifestDigest!==proposal.candidateManifest||evidenceBundleDigest(input.evidence)!==proposal.evidenceBundleDigest)throw new TypeError('candidate changed during preparation');
-        journal=this.read();record=journal.records.find(r=>r.binding.proposalDigest===id)!;
-        const commitTime=this.now();this.current(journal,proposal,approval);
-        checkpoint();
-        journal=this.record(journal,record,'commit',{phase:'active'},commitTime);record=journal.records.at(-1)!;this.options.fault?.('after-commit');
+        let fenceOpen=true,committed=false;
+        const commit=()=>{
+          if(!fenceOpen||committed)throw new Error('promotion commit fence invoked outside its single decision');
+          // A fence may wait for an independent retention lock. Recheck the
+          // candidate and current authority *inside* that lock, immediately
+          // before the synchronous durable decision.
+          vetted=validateEvidence(input.evidence,input.context);
+          if(vetted.manifestDigest!==proposal.candidateManifest||evidenceBundleDigest(input.evidence)!==proposal.evidenceBundleDigest)throw new TypeError('candidate changed inside promotion commit fence');
+          journal=this.read();record=journal.records.find(r=>r.binding.proposalDigest===id)!;
+          const commitTime=this.now();this.current(journal,proposal,approval);
+          checkpoint();
+          journal=this.record(journal,record,'commit',{phase:'active'},commitTime);record=journal.records.at(-1)!;committed=true;
+        };
+        if(driver.commitFence){
+          try{
+            const result:unknown=driver.commitFence(binding,commit);
+            if(result&&typeof result==='object'&&'then'in result)throw new TypeError('promotion commit fence must be synchronous');
+          }finally{fenceOpen=false;}
+          if(!committed)throw new Error('promotion commit fence omitted the durable decision');
+        }else{commit();fenceOpen=false;}
+        this.options.fault?.('after-commit');
         await driver.activate(binding,record.handle!);
         journal=this.record(journal,record,'activation-complete',{activated:true});this.options.fault?.('after-activation');
         return this.state();

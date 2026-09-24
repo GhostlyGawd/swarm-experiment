@@ -6,6 +6,7 @@ import { assertEffectJournalWitness, type AnyEffectJournalWitness } from '../fab
 import { assertAttestedSinkAdapter, isAttestedSinkAdapter, type AttestedSinkIdentityV1 } from '../fabric/attested-sink-adapter.ts';
 import type { SinkStateWitnessV1 } from '../fabric/sink-state-witness.ts';
 import { ResourceBudgetBridge } from '../tier2/resource-budget-bridge.ts';
+import { assertDeclarativeSinkRuntimeMapV2, type SignedSinkTableSelectionV2 } from '../tier2/declarative-sink-table.ts';
 import { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from '../tier2/adapter-artifact.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 import { isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
@@ -44,6 +45,8 @@ export interface RuntimeEffectRouterOptions {
   readonly reservation?: (capability: CapabilityName, effectId: string) => string | null;
   /** V5 host selected fixed grant. A callback cannot assign a live reservation. */
   readonly budgetReservationId?: string;
+  /** V13 host selected complete signed adapter table. */
+  readonly admissionTableDigest?: Digest;
   readonly references?: { encode(ref: Ref): LogicalRefV1; decode(ref: LogicalRefV1): Ref };
   /** Explicit host factory, because sandbox state/recorded inputs are host resources. */
   readonly isolatedFork?: () => RuntimeEffectRouter;
@@ -59,6 +62,8 @@ export interface BrokerAttestedContext {
   readonly grantRef: string;
   /** Omitted from V10/V11 historical signed context bytes. */
   readonly budget?: BrokerBudgetAttestedContextV1;
+  /** Omitted from all historical router contexts. */
+  readonly admissionTableDigest?: Digest;
 }
 export interface BrokerBudgetAttestedContextV1 {
   readonly format: 'aether.attested-sink-budget-router/1';
@@ -79,6 +84,8 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   #trustedSinkAuthority = false;
   #budgetContext: Readonly<BrokerBudgetAttestedContextV1> | null = null;
   #budgetAuthorityPinned = false;
+  #admissionTableDigest: Digest | null = null;
+  #admissionTablePinned = false;
   get mode(): ExecutionMode { return this.#options.broker.executionMode; }
 
   constructor(options: RuntimeEffectRouterOptions) {
@@ -121,6 +128,13 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
       this.#budgetContext = Object.freeze({ ...expected.budget });
     } else if (this.#options.budgetReservationId !== undefined)
       throw new TypeError('unattested budget reservation in broker router');
+    if (expected.admissionTableDigest !== undefined) {
+      validateDigest(expected.admissionTableDigest, 'aether.declarative-adapter-table/2');
+      if (this.#options.admissionTableDigest !== expected.admissionTableDigest)
+        throw new TypeError('broker router adapter table differs from signed host effect');
+      this.#admissionTableDigest = expected.admissionTableDigest;
+    } else if (this.#options.admissionTableDigest !== undefined)
+      throw new TypeError('unattested adapter table in broker router');
     this.#attested = Object.freeze({ capability: expected.capability, grantRef: expected.grantRef });
   }
   pinTrustedClock(anchor: TrustedClockAnchor, windows: readonly { issuedAt: number; expiresAt: number }[]): void {
@@ -168,6 +182,18 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
       expectedBridge, expected.bridgeProfileDigest);
     this.#budgetAuthorityPinned = true;
   }
+  /** Inspect the private complete adapter map under the operator's V7 policy.
+   * A factory's self-reported map or override cannot satisfy this check. */
+  assertAdmissionTableV2(selection: SignedSinkTableSelectionV2,
+    authority: AttestedSinkIdentityV1, witness: SinkStateWitnessV1): void {
+    if (!this.#bound || !this.#attested || !this.#trustedSinkAuthority || !this.#trustedWitness
+      || this.#sequence !== 0n || this.#admissionTablePinned || !this.#admissionTableDigest
+      || this.#admissionTableDigest !== selection.policy.body.adapterTableDigest
+      || executionManifestDigest(selection.manifest) !== this.#manifestDigest)
+      throw new TypeError('broker adapter table differs from operator signed host selection');
+    assertDeclarativeSinkRuntimeMapV2(selection, this.#options.adapters, authority, witness);
+    this.#admissionTablePinned = true;
+  }
   fork(): RuntimeEffectRouter {
     if (!this.#options.isolatedFork) throw new Error('broker-backed fork requires an isolated effect router');
     const child = this.#options.isolatedFork();
@@ -179,6 +205,8 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     if (!this.#bound) throw new Error('effect router is not bound to loaded code');
     if (this.#budgetContext && !this.#budgetAuthorityPinned)
       throw new TypeError('budgeted broker router lacks operator authority');
+    if (this.#admissionTableDigest && !this.#admissionTablePinned)
+      throw new TypeError('signed adapter table lacks complete broker map attestation');
     if (this.#attested && this.#attested.capability !== capability) throw new TypeError('attested effect capability mismatch');
     if (this.#trustedClock && this.#options.broker.executionMode === 'live') {
       for (const window of this.#trustedClock.windows) assertGrantLifetime(this.#trustedClock.anchor, window.issuedAt, window.expiresAt);
@@ -259,7 +287,8 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
       || request.policyEpoch !== this.#options.policyEpoch || request.deadline !== this.#options.deadline
       || request.capabilityGrantRef !== this.#attested.grantRef || request.branchId !== null
       || request.budgetReservationId !== (this.#budgetContext?.reservationId ?? null)
-      || this.#budgetContext && !this.#budgetAuthorityPinned)
+      || this.#budgetContext && !this.#budgetAuthorityPinned
+      || this.#admissionTableDigest && !this.#admissionTablePinned)
       throw new TypeError('recorded Wasm effect differs from attested broker context');
     if (!this.#options.adapters.has(capability)) throw new TypeError('recorded Wasm effect lacks an adapter');
   }
@@ -359,6 +388,13 @@ export function brokerAttestBudgetAuthority(router: RuntimeEffectRouter,
   expectedBridge: ResourceBudgetBridge, expected: BrokerBudgetAttestedContextV1): void {
   if (!brokerRouters.has(router)) throw new TypeError('budget authority requires a broker-backed router');
   BrokerEffectRouter.prototype.attestBudgetAuthority.call(router, expectedBridge, expected);
+}
+/** Nonvirtual complete-map check for signed V7 sink deployments. */
+export function brokerAssertAdmissionTableV2(router: RuntimeEffectRouter,
+  selection: SignedSinkTableSelectionV2, authority: AttestedSinkIdentityV1,
+  witness: SinkStateWitnessV1): void {
+  if (!brokerRouters.has(router)) throw new TypeError('adapter table requires a broker-backed router');
+  BrokerEffectRouter.prototype.assertAdmissionTableV2.call(router, selection, authority, witness);
 }
 export function brokerReconcileLast(router: RuntimeEffectRouter, capability: CapabilityName, args: readonly Value[]): Value {
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');

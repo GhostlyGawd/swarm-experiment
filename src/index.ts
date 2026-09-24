@@ -16,6 +16,9 @@ export { CausalLineageLedger, LineageAdmissionError, signSpecRevision, signInten
 export { CognitiveBlackboard, type BlackboardItem, type BlackboardAcl, type BlackboardPolicy, type BlackboardEntry, type BlackboardView, type CognitiveBlackboardOptions } from './tier1/cognitive-blackboard.ts';
 export { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, SEMANTIC_GC_CALL_SHIM_PROFILE, SEMANTIC_GC_FUEL_PROFILE, type SemanticGcProfile, type SemanticGcOptions, type SemanticGcPolicy, type SemanticGcProposal, type SemanticRetention, type SemanticRetentionKind } from './tier1/semantic-gc.ts';
 export { SemanticAdapterGarbageCollector, declarativeAdapterTableDigest, type DeclarativeAdapterRegistration, type DeclarativeAdapterTable, type AdapterRetirementProposal, type SemanticAdapterGcOptions } from './tier1/semantic-gc-adapters.ts';
+export { proposeSemanticSinkRetirementV2, verifySemanticSinkRetirementV2,
+  type SinkRetirementSelectionV2, type SemanticSinkRetirementContextV2,
+  type SemanticSinkRetirementProposalV2 } from './tier1/semantic-gc-sink-retirement.ts';
 export { agentIr3Snapshot, encodeAgentIr3, decodeAgentIr3, AGENT_IR3_PROFILE, AGENT_IR3_LIMITS, type AgentIr3Snapshot, type AgentIr3Format } from './tier1/agent-ir-v3.ts';
 export { AgentIrWarmReferenceV5, AGENT_IR5_REFERENCE_PROFILE } from './tier1/agent-ir-v5.ts';
 export { DurableTreeWorkspace, type TreeWorkspaceOptions, type TreePlacement, type TreeMutation, type TreeFence, type TreeCheckpoint, type TreeCheckpointAck, type TreeCheckpointCertificate } from './tier1/tree-workspace.ts';
@@ -53,6 +56,9 @@ export { validateEffectResourcePolicyBodyV2, effectResourcePolicyDigestV2, signE
 export { validateEffectResourcePolicyBodyV3, effectResourcePolicyDigestV3, signEffectResourcePolicyV3, assertSignedEffectResourcePolicyV3, effectResourcePathV3, assertEffectResourceAdapterV3, type EffectResourceRuleV3, type EffectResourcePolicyBodyV3, type SignedEffectResourcePolicyV3 } from './tier2/effect-resource-policy.ts';
 export { validateEffectResourcePolicyBodyV4, effectResourcePolicyDigestV4, signEffectResourcePolicyV4, assertSignedEffectResourcePolicyV4, effectResourcePathV4, assertEffectResourceAdapterV4, type EffectResourceRuleV4, type EffectResourcePolicyBodyV4, type SignedEffectResourcePolicyV4 } from './tier2/effect-resource-policy.ts';
 export { validateEffectResourcePolicyBodyV7, effectResourcePolicyDigestV7, signEffectResourcePolicyV7, assertSignedEffectResourcePolicyV7, effectResourcePathV7, assertEffectResourceAdapterV7, assertEffectResourceSinkContextV7, type EffectResourceRuleV7, type EffectResourcePolicyBodyV7, type SignedEffectResourcePolicyV7 } from './tier2/effect-resource-policy.ts';
+export { declarativeSinkTableDigestV2, assertDeclarativeSinkTablePolicyV2,
+  assertDeclarativeSinkRuntimeMapV2, type DeclarativeSinkRegistrationV2,
+  type DeclarativeSinkTableV2, type SignedSinkTableSelectionV2 } from './tier2/declarative-sink-table.ts';
 export { createEffectSignerAnchor, type EffectSignerAnchor } from './tier2/effect-signer-anchor.ts';
 export { createTrustedClockAnchor, assertTrustedClockAnchor, readTrustedClock, assertGrantLifetime, assertBeforeDeadline, type TrustedClockAnchor, type TrustedClockReading } from './tier2/trusted-clock-anchor.ts';
 export { ProofCache, type ProofCacheStats } from './tier2/proof-cache.ts';
@@ -120,6 +126,7 @@ export { BrokerEffectRouter, EffectInvocationError, type RuntimeEffectRouter, ty
 export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessOperationEffectDisposition, type ProcessEffectContext, type ProcessCheckpointAccess, type ProcessInvocationGrant, type ProcessNativeFallbackTokens, type ProcessHostNativeFallbackResult } from './tier4/process-host.ts';
 export { ProcessFallbackSupervisor, type ProcessFallbackOptions, type ProcessFallbackRepairEvent, type ProcessFallbackResult } from './tier4/process-fallback.ts';
 export { ProcessResumableSession, type ProcessResumableOptions, type ProcessResumableEffectsContext } from './tier4/process-resumable.ts';
+export { ProcessSemanticRetention } from './tier4/process-semantic-retention.ts';
 export { PackedNativeProcessRunner, PackedNativeRun, executePackedCheckpointNative, type PackedNativeProcessRunnerOptions, type NativeOperation, type NativeBridgeResult } from './tier4/packed-native-process.ts';
 export { seedProcessCheckpoint, seededProcessReference, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointSeed, type ProcessCheckpointAuthorization, type ProcessCheckpointAction, type ProcessCheckpointControlRequest, type ProcessCheckpointControl } from './tier4/process-checkpoint-contract.ts';
 export { ProcessDeployment, processArtifactContext, processArtifactDigest, processMigrationPlan, processEffectPlan, processAnchoredEffectPlan, processImportFreeEffectPlan, processIsolatedWasmEffectPlan, processClockedWasmEffectPlan, type ProcessArtifactInput, type ProcessDeploymentOptions, type CapabilityDeploymentProfile } from './tier4/process-deployment.ts';

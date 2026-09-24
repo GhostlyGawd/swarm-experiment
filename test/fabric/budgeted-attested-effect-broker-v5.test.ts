@@ -4,10 +4,10 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import type { CapabilityName, NodeRef } from '../../src/tier1/ids.ts';
+import { capability as capabilityName, type CapabilityName, type NodeRef } from '../../src/tier1/ids.ts';
 import { encodeCanonical, type TaggedValueV1 } from '../../src/fabric/encoding.ts';
 import { domainDigest, executionManifestDigest, type ExecutionManifestV1 } from '../../src/fabric/identity.ts';
-import { DurableEffectBroker, effectPayloadDigest, effectRequestDigest, type EffectRequestV1 } from '../../src/fabric/effects.ts';
+import { DurableEffectBroker, effectAdapterDigest, effectPayloadDigest, effectRequestDigest, type EffectRequestV1 } from '../../src/fabric/effects.ts';
 import { createAttestedSinkAdapter, type AttestedSinkClientV1 } from '../../src/fabric/attested-sink-adapter.ts';
 import { createNamespacedEffectJournalWitness, type WitnessHead } from '../../src/fabric/effect-journal-witness.ts';
 import { createBudgetJournalWitness, type BudgetJournalHead } from '../../src/fabric/budget-journal-witness.ts';
@@ -17,8 +17,12 @@ import { ResourceBudgetLedger, RESOURCE_BUDGET_PROFILE, type ResourceAmounts } f
 import { ResourceBudgetBridge, type ResourceBudgetBridgeProfile } from '../../src/tier2/resource-budget-bridge.ts';
 import { attestedSinkBudgetEvidencePolicyDigest, createAttestedSinkBudgetEvidence,
   type AttestedSinkBudgetEvidence } from '../../src/tier2/attested-sink-budget-evidence.ts';
+import { declarativeSinkTableDigestV2, type DeclarativeSinkTableV2 } from '../../src/tier2/declarative-sink-table.ts';
+import { effectResourcePolicyDigestV7, signEffectResourcePolicyV7,
+  type EffectResourcePolicyBodyV7 } from '../../src/tier2/effect-resource-policy.ts';
 import { BrokerEffectRouter, brokerAssertAttestedSinkAuthority, brokerAttestBudgetAuthority,
-  brokerAttestContext, brokerBind, brokerInspectRecorded, brokerInvoke, brokerPinWitness } from '../../src/tier3/effects.ts';
+  brokerAssertAdmissionTableV2, brokerAttestContext, brokerBind, brokerInspectRecorded,
+  brokerInvoke, brokerPinWitness } from '../../src/tier3/effects.ts';
 
 const amount = (n: number): ResourceAmounts => ({ usdMicros: String(n), tokens: String(n), nanoseconds: String(n), memoryBytes: String(n) });
 const value: TaggedValueV1 = { tag: 'int', value: '42' };
@@ -236,6 +240,64 @@ test('V5 router pins operator bridge, grant and full recorded reservation identi
     assert.equal(f.broker.events()[0].request.capabilityGrantRef, 'grant:sink');
     assert.throws(() => brokerInspectRecorded(router, capability, { ...f.req, budgetReservationId: 'grant-other' }),
       /recorded Wasm effect differs/);
+  } finally { f.close(); }
+});
+
+test('signed V7 router checks its private complete adapter map before any live dispatch', () => {
+  const f = fixture();
+  try {
+    const capability = capabilityName('cap:test:sink');
+    const entry = { id: 'registration:sink', capability, adapterId: f.adapter.id,
+      adapterDigest: effectAdapterDigest(f.adapter),
+      adapterArtifactDigest: f.identity.approvedAdapterArtifactDigest,
+      deploymentId: f.identity.deploymentId,
+      sinkAnchorDigest: domainDigest('aether.sink-anchor/1', f.identity.anchor),
+      sinkStateWitnessDigest: f.sinkWitness.digest,
+      lifecycle: 'attested-external-no-unload/1' as const };
+    const table: DeclarativeSinkTableV2 = { format: 'aether.declarative-adapter-table/2',
+      repositoryId: f.identity.repositoryId, registrations: [entry] };
+    const tableDigest = declarativeSinkTableDigestV2(table);
+    const body: EffectResourcePolicyBodyV7 = { format: 'aether.effect-resource-policy/7',
+      repositoryId: f.identity.repositoryId, astRoot: manifest.astRoot,
+      policyEpoch: '1', adapterTableDigest: tableDigest,
+      rules: [{ capability, prefix: ['sink'], argument: null,
+        adapterId: entry.adapterId, adapterDigest: entry.adapterDigest,
+        adapterArtifactDigest: entry.adapterArtifactDigest, deadline: '1000',
+        clockDomain: 'clock:v5', deploymentId: entry.deploymentId,
+        sinkAnchorDigest: entry.sinkAnchorDigest,
+        sinkStateWitnessDigest: entry.sinkStateWitnessDigest }] };
+    const keys = generateKeyPairSync('ed25519');
+    const signed = signEffectResourcePolicyV7(body, 'policy:sink-table', keys.privateKey);
+    const selectedManifest = { ...manifest,
+      capabilityPolicyDigest: effectResourcePolicyDigestV7(body) };
+    const selection = { table, policy: signed, manifest: selectedManifest,
+      currentEpoch: '1', signerKey: keys.publicKey };
+    const makeRouter = (adapters: Map<CapabilityName, typeof f.adapter>) => {
+      const router = new BrokerEffectRouter({ broker: f.broker,
+        manifest: selectedManifest, executionId: f.req.executionId,
+        policyEpoch: f.req.policyEpoch, deadline: f.req.deadline,
+        adapters, grant: () => 'forged:callback',
+        grantRef: f.req.capabilityGrantRef, admissionTableDigest: tableDigest });
+      brokerBind(router, manifest.astRoot as NodeRef);
+      brokerAttestContext(router, { executionId: f.req.executionId,
+        manifestDigest: executionManifestDigest(selectedManifest), mode: 'live',
+        policyEpoch: f.req.policyEpoch, deadline: f.req.deadline,
+        clockDomain: 'clock:v5', capability,
+        grantRef: f.req.capabilityGrantRef, admissionTableDigest: tableDigest });
+      brokerPinWitness(router, f.effectWitness);
+      brokerAssertAttestedSinkAuthority(router, capability, f.identity, f.sinkWitness);
+      return router;
+    };
+    const router = makeRouter(new Map([[capability, f.adapter]]));
+    assert.throws(() => brokerInvoke(router, capability, [42n]), /lacks complete broker map attestation/);
+    brokerAssertAdmissionTableV2(router, selection, f.identity, f.sinkWitness);
+    assert.throws(() => brokerAssertAdmissionTableV2(router, selection, f.identity, f.sinkWitness),
+      /differs from operator signed host selection/);
+    const extra = makeRouter(new Map([[capability, f.adapter],
+      ['cap:test:extra' as CapabilityName, f.adapter]]));
+    Object.assign(extra, { assertAdmissionTableV2: () => undefined });
+    assert.throws(() => brokerAssertAdmissionTableV2(extra, selection, f.identity, f.sinkWitness),
+      /exact native adapter map/);
   } finally { f.close(); }
 });
 

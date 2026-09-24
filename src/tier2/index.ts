@@ -14,6 +14,9 @@ export { validateEffectResourcePolicyBodyV2, effectResourcePolicyDigestV2, signE
 export { validateEffectResourcePolicyBodyV3, effectResourcePolicyDigestV3, signEffectResourcePolicyV3, assertSignedEffectResourcePolicyV3, effectResourcePathV3, assertEffectResourceAdapterV3, type EffectResourceRuleV3, type EffectResourcePolicyBodyV3, type SignedEffectResourcePolicyV3 } from './effect-resource-policy.ts';
 export { validateEffectResourcePolicyBodyV4, effectResourcePolicyDigestV4, signEffectResourcePolicyV4, assertSignedEffectResourcePolicyV4, effectResourcePathV4, assertEffectResourceAdapterV4, type EffectResourceRuleV4, type EffectResourcePolicyBodyV4, type SignedEffectResourcePolicyV4 } from './effect-resource-policy.ts';
 export { validateEffectResourcePolicyBodyV7, effectResourcePolicyDigestV7, signEffectResourcePolicyV7, assertSignedEffectResourcePolicyV7, effectResourcePathV7, assertEffectResourceAdapterV7, assertEffectResourceSinkContextV7, type EffectResourceRuleV7, type EffectResourcePolicyBodyV7, type SignedEffectResourcePolicyV7 } from './effect-resource-policy.ts';
+export { declarativeSinkTableDigestV2, assertDeclarativeSinkTablePolicyV2,
+  assertDeclarativeSinkRuntimeMapV2, type DeclarativeSinkRegistrationV2,
+  type DeclarativeSinkTableV2, type SignedSinkTableSelectionV2 } from './declarative-sink-table.ts';
 export { createEffectSignerAnchor, type EffectSignerAnchor } from './effect-signer-anchor.ts';
 export { createTrustedClockAnchor, assertTrustedClockAnchor, readTrustedClock, assertGrantLifetime, assertBeforeDeadline, type TrustedClockAnchor, type TrustedClockReading } from './trusted-clock-anchor.ts';
 export { ProofCache, type ProofCacheStats } from './proof-cache.ts';
