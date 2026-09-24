@@ -24,6 +24,11 @@ The OS can also change a path between measurement and module loading. A complete
 executable closure and launch-time custody are required before live deployment
 admission. The worker has no durable journal or recovery authority by itself;
 `kill` and `startVirtual` exercise a fresh process, not replay of committed state.
+A focused integration test independently rebuilds and verifies the closed
+single-file worker bundle, uses all measured input paths to create Artifact/3,
+and launches that exact bundle through init/2. This demonstrates the bundled
+path, but arbitrary Artifact/3 callers are not yet required to present a
+verified closure manifest.
 
 Focused verification:
 

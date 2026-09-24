@@ -18,11 +18,14 @@ candidate's current signed intent must have that source intent as a direct
 parent. A structural object with no-op lineage methods is rejected.
 
 The measured subject hashes the current Node binary, a caller-selected bundle,
-and a caller-declared nonempty source-file list. The validator re-reads those
+and a caller-declared nonempty source-file list of at most 128 files. The validator re-reads those
 paths and compares actual bytes on every read. Those paths **do not yet prove**
 the complete transitive worker source closure, how the bundle was built, or that
 ProcessHost launches these measured bytes. The subject is suitable for a later
 versioned process transport binding, not a deployment admission claim.
+The current independent worker build verifies a closed import graph and can
+supply its measured bundle and input list to Artifact/3 in a real-worker test;
+that builder's manifest is not yet a mandatory Artifact/3 admission field.
 
 The live `ProcessDeployment` state, factories, references, migration plan and
 worker transport continue to accept Artifact/1 or Artifact/2 only. Artifact/3

@@ -27,6 +27,9 @@ const SUBJECT_FORMAT = 'aether.measured-executable-subject/1' as const;
 const LIMITS = { maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024,
   maxObjects: 500_000, maxDepth: 128 };
 const MAX_EXECUTABLE_BYTES = 512 * 1024 * 1024;
+/** Current closed worker graph has more than 64 inputs; keep a finite bound
+ * while admitting the independently recounted complete source set. */
+const MAX_SOURCE_FILES = 128;
 const same = (a: unknown, b: unknown): boolean =>
   Buffer.from(encodeCanonical(a, LIMITS)).equals(Buffer.from(encodeCanonical(b, LIMITS)));
 const clone = <T>(value: T): T => decodeCanonical(encodeCanonical(value, LIMITS), LIMITS) as T;
@@ -98,7 +101,7 @@ function measureFile(path: string): MeasuredFileV1 {
 
 export function measureExecutableSubjectV1(bundlePath: string,
   sourcePaths: readonly string[]): MeasuredExecutableSubjectV1 {
-  if (!Array.isArray(sourcePaths) || sourcePaths.length === 0 || sourcePaths.length > 64)
+  if (!Array.isArray(sourcePaths) || sourcePaths.length === 0 || sourcePaths.length > MAX_SOURCE_FILES)
     throw new TypeError('complete bounded executable source list required');
   const node = measureFile(realpathSync(process.execPath));
   const bundle = measureFile(bundlePath);

@@ -1,4 +1,4 @@
-# D18 — Witnessed active-task pin release candidate
+# D19 — Witnessed active-task pin release candidate
 
 Status: bounded G2 implementation slice. V4-T1-05/G2 remains open.
 

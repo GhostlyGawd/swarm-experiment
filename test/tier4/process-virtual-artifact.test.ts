@@ -25,18 +25,20 @@ import { decodeProcessVirtualArtifactV3, encodeProcessVirtualArtifactV3,
   makeProcessVirtualArtifactV3, measureExecutableSubjectV1,
   processVirtualArtifactDigestV3, validateProcessVirtualArtifactV3 } from '../../src/tier4/process-virtual-artifact.ts';
 import { processMigrationPlan } from '../../src/tier4/process-deployment.ts';
+import { verifyWorkerBundle } from '../../scripts/process-worker-bundle.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
 
-function fixture(options: { unrelatedCandidate?: boolean; effectfulEntry?: boolean; realWorker?: boolean } = {}) {
+function fixture(options: { unrelatedCandidate?: boolean; effectfulEntry?: boolean; realWorker?: boolean;
+  bundledWorker?: { bundlePath: string; sourcePaths: readonly string[] } } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'aether-process-artifact-v3-'));
   const bundlePath = join(directory, 'worker.mjs'), sourcePath = join(directory, 'worker.ts');
   writeFileSync(bundlePath, 'export const worker = 1;\n');
   writeFileSync(sourcePath, 'export const worker: number = 1;\n');
-  const workerPaths = options.realWorker
+  const workerPaths = options.bundledWorker ?? (options.realWorker
     ? { bundlePath: fileURLToPath(new URL('../../src/tier4/process-worker.ts', import.meta.url)),
       sourcePaths: [join(process.cwd(), 'package.json')] }
-    : { bundlePath, sourcePaths: [sourcePath] };
+    : { bundlePath, sourcePaths: [sourcePath] });
   const subject = measureExecutableSubjectV1(workerPaths.bundlePath, workerPaths.sourcePaths);
   const symbols = new SymbolSpace('process-virtual-artifact');
   const target = symbols.define('target'), wrapper = symbols.define('wrapper');
@@ -133,6 +135,28 @@ test('Artifact/3 init/2 executes source and candidate in separate real workers',
     await candidate?.close(); await source?.close();
     rmSync(f.directory, { recursive: true, force: true });
   }
+});
+
+test('Artifact/3 launches the rebuilt closed worker bundle with its measured input set', async () => {
+  const manifest = await verifyWorkerBundle();
+  const f = fixture({ bundledWorker: { bundlePath: manifest.bundle.path,
+    sourcePaths: manifest.inputs.map(item => item.path) } });
+  let worker: ProcessChannel | undefined;
+  try {
+    assert.equal(f.artifact!.executableSubject.bundle.sha256, manifest.bundle.sha256);
+    assert.deepEqual(f.artifact!.executableSubject.sources.map(item => item.path),
+      manifest.inputs.map(item => item.path));
+    worker = await ProcessChannel.startVirtual({ artifact: f.artifact!, trust: f.trust,
+      unit: 'pure', heapId: 'bundled-heap', ownershipEpoch: '1' });
+    assert.notEqual(worker.pid, process.pid);
+    const result = await worker.call(f.entry, [3n], await worker.snapshot());
+    assert.deepEqual(result.execution, { ok: true, value: 4n, steps: 0 });
+    await worker.kill();
+    worker = await ProcessChannel.startVirtual({ artifact: f.artifact!, trust: f.trust,
+      unit: 'pure', heapId: 'bundled-heap', ownershipEpoch: '1' });
+    assert.deepEqual((await worker.call(f.entry, [3n], await worker.snapshot())).execution,
+      result.execution);
+  } finally { await worker?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });
 
 test('Artifact/3 virtual worker preserves source production guard denial order', async () => {
