@@ -192,6 +192,26 @@ test('Artifact/3 worker denies altered roots, descriptor and executable bytes be
   }
 });
 
+test('Artifact/3 worker refuses trust accessors and proxies before reading them', async () => {
+  const f = fixture();
+  try {
+    let touched = 0;
+    const trust = { ...f.trust };
+    Object.defineProperty(trust, 'repositoryId', { enumerable: true,
+      get() { touched++; return f.trust.repositoryId; } });
+    const init = { artifact: f.artifact!, unit: 'pure', heapId: 'trust-heap', ownershipEpoch: '1' };
+    await assert.rejects(ProcessChannel.startVirtual({ ...init, trust }), /accessor/);
+    assert.equal(touched, 0);
+    await assert.rejects(ProcessChannel.startVirtual({ ...init,
+      trust: new Proxy(f.trust, {}) }), /proxy/);
+    const changing = { ...init, trust: f.trust };
+    Object.defineProperty(changing, 'heapId', { enumerable: true,
+      get() { touched++; return 'changed-heap'; } });
+    await assert.rejects(ProcessChannel.startVirtual(changing), /accessor/);
+    assert.equal(touched, 0);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
 test('Artifact/3 init/2 independently rejects tampered child payload before a worker call', async () => {
   const f = fixture({ realWorker: true });
   const WorkerConstructor = ProcessChannel as unknown as {

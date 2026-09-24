@@ -11,7 +11,7 @@ import type { CapabilityDescriptor } from '../tier2/ocap.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
 import { EffectInvocationError } from '../tier3/effects.ts';
 import type { Value } from '../tier3/values.ts';
-import { encodeCanonical, exactObject, identifier, type TaggedValueV1 } from '../fabric/encoding.ts';
+import { decodeCanonical, encodeCanonical, exactObject, identifier, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { executionManifestDigest, validateExecutionManifest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import type { RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
 import { ProcessAuthenticator, fromWireSnapshot, encodeProcessValue, decodeProcessValue, type ProcessScope } from './process-values.ts';
@@ -182,12 +182,22 @@ export class ProcessChannel {
     options: ProcessChannelOptions = {}): Promise<ProcessChannel> {
     if (options.onCall || options.onEffect)
       throw new TypeError('pure virtual worker does not admit remote calls or effects');
-    if (init.maxGuardChecks !== undefined && (!Number.isSafeInteger(init.maxGuardChecks)
-      || init.maxGuardChecks < 0 || init.maxGuardChecks > 1_000_000))
+    // Snapshot the entire caller-owned init before any semantic read. This
+    // rejects accessors/proxies and prevents an option from changing between
+    // parent admission, worker spawn and the init/2 payload.
+    const limits = { maxFrameBytes: 16 * 1024 * 1024,
+      maxDecompressedBytes: 16 * 1024 * 1024, maxObjects: 500_000, maxDepth: 128 };
+    const safe = decodeCanonical(encodeCanonical(init, limits), limits) as unknown as ProcessVirtualChannelInitV2;
+    const fields = ['artifact', 'trust', 'unit', 'heapId', 'ownershipEpoch'];
+    if (Object.hasOwn(safe, 'snapshot')) fields.push('snapshot');
+    if (Object.hasOwn(safe, 'maxGuardChecks')) fields.push('maxGuardChecks');
+    exactObject(safe, fields);
+    if (safe.maxGuardChecks !== undefined && (!Number.isSafeInteger(safe.maxGuardChecks)
+      || safe.maxGuardChecks < 0 || safe.maxGuardChecks > 1_000_000))
       throw new RangeError('invalid virtual worker guard budget');
-    const trust = structuredClone(init.trust);
+    const trust = safe.trust as ProcessVirtualWorkerTrustV1;
     const lineage = openProcessVirtualWorkerLineageV1(trust);
-    const artifact = validateProcessVirtualArtifactV3(init.artifact, lineage);
+    const artifact = validateProcessVirtualArtifactV3(safe.artifact, lineage);
     assertProcessVirtualWorkerBundleV1(artifact, artifact.executableSubject.bundle.path);
     const module = decodeIR(artifact.candidateIr);
     if (module.kind !== 'Module') throw new TypeError('Artifact/3 candidate is not a module');
@@ -196,17 +206,17 @@ export class ProcessChannel {
     if (!includeSymbols.includes(artifact.descriptor.target))
       throw new TypeError('virtual target must be compiled locally');
     const channel = new ProcessChannel({ module, manifest: artifact.candidateEvidence.manifest,
-      unit: init.unit, includeSymbols, capabilities: [], heapId: init.heapId,
-      ownershipEpoch: init.ownershipEpoch, snapshot: init.snapshot }, options,
+      unit: safe.unit, includeSymbols, capabilities: [], heapId: safe.heapId,
+      ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, options,
     artifact.executableSubject.bundle.path);
     channel.virtualAdmission = { artifact, lineage };
     try {
       assertProcessVirtualWorkerBundleV1(artifact, channel.workerPath);
-      if (init.snapshot) fromWireSnapshot(init.snapshot, channel.scope);
+      if (safe.snapshot) fromWireSnapshot(safe.snapshot, channel.scope);
       const ready = await channel.request('init-virtual', {
         format: 'aether.process-worker-init/2', artifact, trust,
-        unit: init.unit, heapId: init.heapId, ownershipEpoch: init.ownershipEpoch,
-        snapshot: init.snapshot ?? null, maxGuardChecks: init.maxGuardChecks ?? null,
+        unit: safe.unit, heapId: safe.heapId, ownershipEpoch: safe.ownershipEpoch,
+        snapshot: safe.snapshot ?? null, maxGuardChecks: safe.maxGuardChecks ?? null,
       });
       const message = exactObject(ready, ['pid']);
       if (message.pid !== channel.pid) throw new TypeError('worker PID handshake mismatch');

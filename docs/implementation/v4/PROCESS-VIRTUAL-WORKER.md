@@ -6,6 +6,9 @@ operator-held `aether.process-virtual-worker-trust/1` anchor. The parent and chi
 independently reopen the durable signed lineage, validate the exact source and
 candidate IR, D16 descriptor, archived wrapper dependency, evidence and measured
 subject, and bind the artifact's measured bundle path to the actual launched file.
+The parent canonicalizes the entire init request before admission, so caller
+accessors, proxies or later changes cannot alter trust or guard options between
+validation and the worker handshake.
 Both sides repeat validation before a call. The worker compiles every candidate
 function locally with `virtualForward`; the target cannot be remote. It registers
 no effect handler or cross-unit call handler, and Artifact/3 rejects effectful and
