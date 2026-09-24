@@ -41,9 +41,11 @@ async function kill(child: ChildProcess | undefined): Promise<void> {
 // Three long-lived service processes survive both short-lived controller processes.
 // This exercises the service boundary under one UID; separate-user custody is a
 // distinct acceptance gate.
-for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-postcommit'] as const) test(
-  `${scenario === 'v11-resource-postcommit' ? 'V11' : 'V10'} Deployment ${scenario} recovery across real controller SIGKILL`, async t => {
-  const resourceScoped = scenario === 'v11-resource-postcommit';
+for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-postcommit',
+  'v11-revoked-postcommit'] as const) test(
+  `${scenario.startsWith('v11-') ? 'V11' : 'V10'} Deployment ${scenario} recovery across real controller SIGKILL`, async t => {
+  const resourceScoped = scenario === 'v11-resource-postcommit' || scenario === 'v11-revoked-postcommit';
+  const revokedRecovery = scenario === 'v11-revoked-postcommit';
   const operationId = resourceScoped ? 'v11-resource-crash' : 'v10-crash';
   const target = resourceScoped ? 'alice' : 'append-once';
   const directory = mkdtempSync(join(tmpdir(), 'aether-v10-crash-'));
@@ -103,7 +105,7 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-
       grantKeyFile, sealerKeyFile, governorKeyFile, resourceScoped }), { mode: 0o600 });
     const controllerFile = join(root, 'test/tier4/process-attested-sink-controller.ts');
     const run = (mode: 'crash' | 'recover' | 'crash-pre-sink' | 'recover-abort'
-      | 'crash-before-sink-entry' | 'recover-fenced') => spawnSync(process.execPath,
+      | 'crash-before-sink-entry' | 'recover-fenced' | 'recover-revoked') => spawnSync(process.execPath,
       ['--experimental-strip-types', controllerFile, fixtureFile, mode],
       { cwd: root, encoding: 'utf8', timeout: 90_000,
         env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' } });
@@ -179,8 +181,12 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-
         assert.equal(sinkJournal.decisions[0].receipt.body.disposition, 'not_committed');
       }
     }
-    const recovered = run(scenario === 'postcommit' || resourceScoped ? 'recover'
-      : scenario === 'pre-sink' ? 'recover-abort' : 'recover-fenced');
+    if (revokedRecovery) writeFileSync(fixtureFile, encodeCanonical({
+      ...JSON.parse(readFileSync(fixtureFile, 'utf8')), revoked: true,
+    }), { mode: 0o600 });
+    const recovered = run(revokedRecovery ? 'recover-revoked'
+      : scenario === 'postcommit' || resourceScoped ? 'recover'
+        : scenario === 'pre-sink' ? 'recover-abort' : 'recover-fenced');
     assert.equal(recovered.status, 0, recovered.stderr || recovered.error?.message);
     const result = JSON.parse(recovered.stdout.trim().split('\n').at(-1)!);
     assert.notEqual(result.pid, crashed.pid);
@@ -192,7 +198,8 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-
       assert.equal(JSON.parse(readFileSync(join(directory, 'deployment', 'deployment.json'), 'utf8')).format,
         'aether.process-deployment/11');
     }
-    assert.deepEqual(result.cached, result.recovered);
+    if (revokedRecovery) assert.equal(result.revoked, true);
+    else assert.deepEqual(result.cached, result.recovered);
     assert.deepEqual(readSinkStateHead(sinkWitness), sinkHeadBefore,
       'recovery must not append or redispatch a sink decision');
     const effectHeadAfter = readWitnessHead(effectWitness);

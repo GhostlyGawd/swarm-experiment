@@ -46,12 +46,13 @@ interface Fixture {
   readonly sealerKeyFile: string;
   readonly governorKeyFile: string;
   readonly resourceScoped?: boolean;
+  readonly revoked?: boolean;
 }
 
 const fixture = JSON.parse(readFileSync(process.argv[2]!, 'utf8')) as Fixture;
 const mode = process.argv[3];
 assert.ok(['crash', 'recover', 'crash-pre-sink', 'recover-abort',
-  'crash-before-sink-entry', 'recover-fenced'].includes(mode ?? ''));
+  'crash-before-sink-entry', 'recover-fenced', 'recover-revoked'].includes(mode ?? ''));
 const f = fixture;
 const resourceScoped = f.resourceScoped === true;
 const operationId = resourceScoped ? 'v11-resource-crash' : 'v10-crash';
@@ -124,8 +125,10 @@ const clock = createTrustedClockAnchor({ authorityId: 'clock:operator',
   clockDomain: f.clockDomain, nowMs: () => 100, revision: () => '0' });
 const grants = new ScopedGrantAuthority({ key: readFileSync(f.grantKeyFile),
   repositoryId: f.repositoryId, clock: () => 100, policyEpoch: () => '0',
-  revocationEpoch: () => '0', isRevoked: () => false,
-  authorizeIssue: () => true, authorizeDelegate: () => true });
+  revocationEpoch: () => f.revoked === true ? '1' : '0',
+  isRevoked: () => f.revoked === true,
+  authorizeIssue: () => f.revoked !== true,
+  authorizeDelegate: () => f.revoked !== true });
 const sealer = new CapabilitySealer(readFileSync(f.sealerKeyFile), () => 100);
 const coordinator = new PromotionCoordinator({ profile: 'baseline-governor-v1',
   directory: join(f.directory, 'coordinator'), repositoryId: f.repositoryId,
@@ -186,6 +189,16 @@ try {
       { operationId, tokens: tokens() });
     assert.deepEqual(encodeCanonical(cached), encodeCanonical(recovered));
     process.stdout.write(JSON.stringify({ pid: process.pid, recovered, cached }) + '\n');
+  } else if (mode === 'recover-revoked') {
+    assert.equal(resourceScoped, true);
+    assert.equal(f.revoked, true);
+    assert.throws(tokens, /capability grant issuance denied/);
+    const recovered = await deployment.recoverOperation(operationId, { strategy: 'isolated-replay' });
+    assert.equal(recovered.state, 'completed', JSON.stringify(recovered));
+    assert.equal(recovered.execution.ok, true);
+    if (recovered.execution.value.tag !== 'string') throw new Error('recovered the wrong value type');
+    assert.equal(recovered.execution.value.value, target);
+    process.stdout.write(JSON.stringify({ pid: process.pid, recovered, revoked: true }) + '\n');
   } else if (mode === 'recover-fenced') {
     await assert.rejects(deployment.recoverOperation(operationId,
       { strategy: 'abort-before-effects' }), /cannot abort committed or indeterminate external effects/);
