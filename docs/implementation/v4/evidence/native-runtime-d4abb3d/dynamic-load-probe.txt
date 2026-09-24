@@ -1,0 +1,5 @@
+/opt/homebrew/Cellar/node/26.7.0/bin/node [arm64]:
+    -dlopens:
+/opt/homebrew/Cellar/node/26.7.0/lib/libnode.147.dylib [arm64]:
+    -dlopens:
+        [dlopen] <unknown> at 0x00008E668

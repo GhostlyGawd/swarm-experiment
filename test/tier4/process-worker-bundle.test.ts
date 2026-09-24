@@ -48,7 +48,7 @@ test('worker bundle is rebuilt from a closed input graph and refuses stale or ta
   const bundle = join(dir, 'worker.mjs'), manifestPath = join(dir, 'worker.json');
   try {
     const built = await writeWorkerBundle(bundle, manifestPath);
-    assert.equal(built.format, 'aether.process-worker-bundle/1');
+    assert.equal(built.format, 'aether.process-worker-bundle/2');
     assert.ok(built.inputs.length > 20);
     assert.equal(built.bundle.bytes, readFileSync(bundle).length);
     assert.ok(built.externalNodeImports.every(name => name.startsWith('node:')));

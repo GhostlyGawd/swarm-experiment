@@ -7,12 +7,13 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { fileURLToPath } from 'node:url';
 import { build, version as esbuildVersion, type Metafile } from 'esbuild';
 import ts from 'typescript';
+import { measureMacosNativeRuntime } from './macos-native-runtime.ts';
 
 const ROOT = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
 const ENTRY = join(ROOT, 'src/tier4/process-worker.ts');
 const DEFAULT_BUNDLE = join(ROOT, 'dist/process-worker.bundle.mjs');
 const DEFAULT_MANIFEST = join(ROOT, 'dist/process-worker.bundle.manifest.json');
-const FORMAT = 'aether.process-worker-bundle/1';
+const FORMAT = 'aether.process-worker-bundle/2';
 const NODE_BUILTINS = new Set(builtinModules.map(name => name.replace(/^node:/, '')));
 const require = createRequire(import.meta.url);
 type FileMeasurement = { path: string; bytes: number; sha256: string };
@@ -116,6 +117,7 @@ function toolIdentity() {
     scanner: { version: ts.version,
       api: measure(join(ROOT, 'node_modules/typescript/lib/typescript.js')) },
     recipe: measure(join(ROOT, 'scripts/process-worker-bundle.ts')),
+    nativeProbeRecipe: measure(join(ROOT, 'scripts/macos-native-runtime.ts')),
     lockfile: measure(join(ROOT, 'package-lock.json')) };
 }
 
@@ -150,8 +152,15 @@ export async function expectedManifest(bundlePath = DEFAULT_BUNDLE) {
   assert.deepStrictEqual(repeatedInputs, inputs, 'worker inputs changed during build');
   assert.deepStrictEqual(repeated.meta, compiled.meta, 'worker import graph changed during build');
   assert.equal(sha(repeated.bytes), sha(compiled.bytes), 'worker bundle is nondeterministic or changed during build');
+  const node = measure(process.execPath);
+  const nativeRuntime = process.platform === 'darwin' ? measureMacosNativeRuntime()
+      : { format: 'aether.native-runtime-unmeasured/1' as const, platform: process.platform,
+        reason: 'this build only resolves Darwin Mach-O static links' };
+  if (nativeRuntime.format === 'aether.macos-node-static-link-closure/1')
+    assert.deepStrictEqual(nativeRuntime.executable, node,
+      'Node binary changed during native closure measurement');
   return { compiled, manifest: { format: FORMAT, entry: realpathSync(ENTRY),
-    node: measure(process.execPath), tool: toolIdentity(),
+    node, tool: toolIdentity(), nativeRuntime,
     bundle: { path: join(realpathSync(dirname(bundlePath)), basename(bundlePath)),
       bytes: compiled.bytes.length, sha256: sha(compiled.bytes) },
     inputs, externalNodeImports: compiled.external } };
@@ -186,6 +195,9 @@ if (invoked) {
     : await verifyWorkerBundle(bundle, manifest);
   process.stdout.write(`${JSON.stringify({ format: result.format,
     bundle: result.bundle, node: result.node,
+    nativeScope: result.nativeRuntime.format,
+    nativeLibraries: result.nativeRuntime.format === 'aether.macos-node-static-link-closure/1'
+      ? result.nativeRuntime.libraries.length : null,
     inputCount: result.inputs.length, externalNodeImports: result.externalNodeImports,
     toolVersion: result.tool.version })}\n`);
 }

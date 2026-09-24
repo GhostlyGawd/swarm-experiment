@@ -70,7 +70,7 @@ const verifyMs = +(performance.now() - verifyStart).toFixed(3);
 const protocol = await launch(manifest!.bundle.path);
 const local = (file: { path: string; bytes: number; sha256: string }) =>
   ({ ...file, path: relative(ROOT, file.path) });
-const raw = { format: 'aether.process-worker-measurement/1',
+const raw = { format: 'aether.process-worker-measurement/2',
   platform: process.platform, architecture: process.arch,
   nodeVersion: process.version, node: manifest!.node,
   tool: { version: manifest!.tool.version,
@@ -82,9 +82,12 @@ const raw = { format: 'aether.process-worker-measurement/1',
     selectedNativeBinary: local(manifest!.tool.selectedNativeBinary),
     scanner: { version: manifest!.tool.scanner.version,
       api: local(manifest!.tool.scanner.api) },
-    recipe: local(manifest!.tool.recipe), lockfile: local(manifest!.tool.lockfile) },
+    recipe: local(manifest!.tool.recipe),
+    nativeProbeRecipe: local(manifest!.tool.nativeProbeRecipe),
+    lockfile: local(manifest!.tool.lockfile) },
   bundle: local(manifest!.bundle), inputCount: manifest!.inputs.length,
   inputs: manifest!.inputs.map(local),
+  nativeRuntime: manifest!.nativeRuntime,
   externalNodeImports: manifest!.externalNodeImports,
   buildSamplesMs: durations, verifyMs, protocol };
 const text = `${JSON.stringify(raw, null, 2)}\n`;
