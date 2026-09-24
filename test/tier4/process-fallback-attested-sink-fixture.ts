@@ -1,4 +1,4 @@
-import { generateKeyPairSync, randomBytes } from 'node:crypto';
+import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, type KeyObject } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -49,8 +49,17 @@ async function kill(child: ChildProcess | null): Promise<void> {
     child.kill('SIGKILL'); await once(child, 'exit');
   }
 }
+function signer(path: string, connect: boolean): { privateKey: KeyObject; publicKey: KeyObject } {
+  if (connect) {
+    const privateKey = createPrivateKey(readFileSync(path));
+    return { privateKey, publicKey: createPublicKey(privateKey) };
+  }
+  const pair = generateKeyPairSync('ed25519');
+  writeFileSync(path, pair.privateKey.export({ format: 'pem', type: 'pkcs8' }), { mode: 0o600 });
+  return pair;
+}
 
-export async function attestedFallbackFixture(directory: string, scenario: 'commit' | 'fence' | 'outage') {
+export async function attestedFallbackFixture(directory: string, scenario: 'commit' | 'fence' | 'outage', connect = false) {
   const repositoryId = 'repo:fallback-sink', deploymentId = 'deployment:fallback-sink';
   const clockDomain = 'clock:fallback-sink';
   const symbols = new SymbolSpace('attested-fallback'), tier1 = symbols.define('tier1'),
@@ -73,35 +82,42 @@ export async function attestedFallbackFixture(directory: string, scenario: 'comm
   const plan: TopologyPlan = { shape: 'containers', units: [{ id: 'worker', members: [tier1, tier2],
     capabilities: [CAP], placement: 'container', memoryMb: 16 }], crossEdges: [],
     transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
-  const sinkKeys = generateKeyPairSync('ed25519'), policyKeys = generateKeyPairSync('ed25519');
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const sinkSignerFile = join(directory, 'sink.pem'), policySignerFile = join(directory, 'policy.pem');
+  const fallbackSignerFile = join(directory, 'fallback.pem');
+  const sinkKeys = signer(sinkSignerFile, connect), policyKeys = signer(policySignerFile, connect);
+  const fallbackKeys = signer(fallbackSignerFile, connect);
   const anchor: SinkPublicAnchorV1 = { format: 'aether.sink-anchor/1', repositoryId,
     sinkAuthorityId: 'authority:fallback-sink', sinkId: 'sink:fallback-ledger', keyId: 'key:fallback-sink',
     keyEpoch: '0', publicKey: sinkKeys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') };
   const adapterArtifactDigest = domainDigest('aether.effect-adapter-artifact/2', 'fallback-signed-sink');
   const sinkSocket = join(directory, 'sink.sock'), witnessSocket = join(directory, 'witness.sock');
   const sinkKeyFile = join(directory, 'sink.key'), witnessKeyFile = join(directory, 'witness.key');
-  const sinkSignerFile = join(directory, 'sink.pem'), sinkConfig = join(directory, 'sink.json');
+  const sinkConfig = join(directory, 'sink.json');
   const witnessConfig = join(directory, 'witness.json');
-  const sinkKey = randomBytes(32), witnessKey = randomBytes(32);
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  writeFileSync(sinkKeyFile, sinkKey, { mode: 0o600 });
-  writeFileSync(witnessKeyFile, witnessKey, { mode: 0o600 });
-  writeFileSync(sinkSignerFile, sinkKeys.privateKey.export({ format: 'pem', type: 'pkcs8' }), { mode: 0o600 });
-  writeFileSync(witnessConfig, encodeCanonical({ socketPath: witnessSocket,
+  const sinkKey = connect ? readFileSync(sinkKeyFile) : randomBytes(32);
+  const witnessKey = connect ? readFileSync(witnessKeyFile) : randomBytes(32);
+  if (!connect) {
+    writeFileSync(sinkKeyFile, sinkKey, { mode: 0o600 });
+    writeFileSync(witnessKeyFile, witnessKey, { mode: 0o600 });
+    writeFileSync(witnessConfig, encodeCanonical({ socketPath: witnessSocket,
     storageDir: join(directory, 'witness-store'), keyFile: witnessKeyFile, namespaces: [
       { kind: 'sink-scope', authorityId: 'operator:fallback-sink', anchor, adapterArtifactDigest },
       { kind: 'effect-scope', authorityId: 'operator:fallback-effects', repositoryId,
         catalogDeploymentId: deploymentId, clockDomain },
       { kind: 'host-scope', authorityId: 'operator:fallback-host', repositoryId, deploymentId },
     ] }), { mode: 0o600 });
-  writeFileSync(sinkConfig, encodeCanonical({ format: 'aether.attested-sink-config/2',
+    writeFileSync(sinkConfig, encodeCanonical({ format: 'aether.attested-sink-config/2',
     socketPath: sinkSocket, storageDir: join(directory, 'sink-store'), authKeyFile: sinkKeyFile,
     signingKeyFile: sinkSignerFile, anchor, adapterArtifactDigest,
-    witnessSocketPath: witnessSocket, witnessKeyFile, witnessAuthorityId: 'operator:fallback-sink' }), { mode: 0o600 });
+      witnessSocketPath: witnessSocket, witnessKeyFile, witnessAuthorityId: 'operator:fallback-sink' }), { mode: 0o600 });
+  }
   let witness: ChildProcess | null = null, sink: ChildProcess | null = null;
   try {
-    witness = await launch('witness-service-cli.ts', witnessConfig, 'witness service ready');
-    sink = await launch('attested-sink-service-cli.ts', sinkConfig, 'attested sink service ready');
+    if (!connect) {
+      witness = await launch('witness-service-cli.ts', witnessConfig, 'witness service ready');
+      sink = await launch('attested-sink-service-cli.ts', sinkConfig, 'attested sink service ready');
+    }
     const operator = createProcessWitnessClient({ socketPath: witnessSocket, key: witnessKey, timeoutMs: 5000 });
     const sinkStateWitness = operator.sinkStateWitness({ authorityId: 'operator:fallback-sink', anchor, adapterArtifactDigest });
     const catalog = operator.effectCatalog({ authorityId: 'operator:fallback-effects', repositoryId, deploymentId, clockDomain });
@@ -151,7 +167,7 @@ export async function attestedFallbackFixture(directory: string, scenario: 'comm
     const grants = new ScopedGrantAuthority({ key: new Uint8Array(32).fill(91), repositoryId,
       clock: () => 100, policyEpoch: () => '0', revocationEpoch: () => '0',
       isRevoked: () => false, authorizeIssue: () => true, authorizeDelegate: () => true });
-    const key = generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+    const key = fallbackKeys.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
     const factory: NonNullable<ProcessHostOptions['effectRouterFactory']> = effect => {
       const broker = new DurableEffectBroker({ directory: join(directory, 'effects',
         domainDigest('aether.fallback-sink-effect-dir/1', effect.operationId).split(':').at(-1)!),
@@ -171,15 +187,16 @@ export async function attestedFallbackFixture(directory: string, scenario: 'comm
         approvedAdapterArtifactDigest: adapterArtifactDigest, anchor }, sinkStateWitness,
       anchoredEffectPolicyProfile: 'attested-sink-v8-host-witness', signedEffectResourcePolicy: signed,
       authorizeRecovery: () => true, effectRouterFactory: factory };
-    const open = async () => {
+    const open = async (fault?: ConstructorParameters<typeof ProcessFallbackSupervisor>[0]['fault']) => {
       const host = await ProcessHost.open(hostOptions);
       const supervisor = new ProcessFallbackSupervisor({ directory: join(directory, 'supervisor'),
-        host, module, manifest, tier1, tier2, key, conservativeProof,
+        host, module, manifest, tier1, tier2, key, conservativeProof, fault,
         tokensFor: (_tier, symbol) => host.issueScopedTokens(symbol, 60_000,
           symbol === tier1 ? new Map([[CAP, ['sink']]]) : new Map()) });
       return { host, supervisor };
     };
     return { open, module, manifest, tier1, tier2, conservativeProof, anchor, adapterArtifactDigest,
+      servicePids: { sink: sink?.pid ?? null, witness: witness?.pid ?? null },
       witnessedDecisions: () => {
         const head = readSinkStateHead(sinkStateWitness);
         return { revision: head.revision,
