@@ -342,9 +342,20 @@ test('V12 witnessed deployment retires one dead signed sink, preserves live disp
     const old = await deployment.call(f.gc.live, [], { operationId: 'semantic:old', tokens: tokens() });
     assert.equal(old.state, 'completed');
     assert.equal(f.decisions.length, 1);
+    const cutoverTokens = tokens();
     f.setEpoch('2');
     assert.equal(deployment.status().servingReady, false,
       'source V7 policy is stale during the signed epoch cutover');
+    await deployment.close(); deployment = null;
+    deployment = await ProcessDeployment.open({ ...f.options, genesis: undefined });
+    assert.equal(deployment.status().servingReady, false,
+      'restart during epoch cutover opens only for administrative recovery');
+    assert.throws(() => deployment!.issueScopedTokens(f.gc.live), /policy epoch|serving/i);
+    await assert.rejects(deployment.call(f.gc.live, [], {
+      operationId: 'semantic:cutover-denied', tokens: cutoverTokens }), /policy epoch|serving/i);
+    assert.deepEqual(await deployment.recoverOperation('semantic:old'), old);
+    assert.equal(f.decisions.length, 1,
+      'historical receipt inspection never redispatches a stale source effect');
     const candidateArtifactDigest = registerRetirementCandidate(f, deployment);
     const predecessorArtifactDigest = processArtifactDigest(
       deployment.artifact(executionManifestDigest(f.source.evidence.manifest)));
@@ -411,4 +422,16 @@ test('V12 commit fence rejects a new active-task pin after candidate preparation
     f.setEpoch('1');
     assert.equal(deployment.status().servingReady, true);
   } finally { await deployment?.close(); f.cleanup(); }
+});
+
+test('V12 rejects semantic checkpoint custody smuggled through a reloadable factory', async () => {
+  const f = fixture();
+  try {
+    const original = f.options.semanticSinkFactories!.get(f.factoryId)!;
+    await assert.rejects(ProcessDeployment.open({ ...f.options,
+      directory: join(f.directory, 'factory-checkpoint-smuggle'),
+      semanticSinkFactories: new Map([[f.factoryId, (artifact: ProcessArtifactV2) => ({
+        ...original(artifact), semanticCheckpointRetention: {} }) as ProcessHostServices]]),
+    }), /semantic checkpoint retention authority must be independently provisioned/);
+  } finally { f.cleanup(); }
 });

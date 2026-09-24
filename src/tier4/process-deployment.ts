@@ -741,7 +741,14 @@ export class ProcessDeployment implements PromotionDriver {
         }
         // Pending decisions are recovered explicitly, never by booting the old target.
         if (state.readiness === 'ready' && options.coordinator.servingReady()) {
-          deployment.assertServing(state); await deployment.hostFor(state.active);
+          const staleSemanticSource = semanticSinkProfile(deployment.capabilityProfile)
+            && (() => { const artifact = deployment.readArtifact(state.active.manifest);
+              return artifact.format !== 'aether.process-artifact/2'
+                || artifact.signedEffectResourcePolicyV7.body.policyEpoch
+                  !== options.effectSignerAnchor!.currentEpoch(); })();
+          if (staleSemanticSource) deployment.assertCommittedSource(state);
+          else deployment.assertServing(state);
+          await deployment.hostFor(state.active);
           if (witnessedProfile(deployment.capabilityProfile))
             for (const invocation of state.invocations.filter(row => row.phase === 'settled' && row.deployment.id === state.active.id))
               await deployment.assertWitnessedInvocationReceipt(invocation);
@@ -1039,9 +1046,11 @@ export class ProcessDeployment implements PromotionDriver {
     if (processArtifactDigest(artifact) !== reference.artifactDigest) throw new TypeError('prepared artifact registry changed');
     const semanticHistorical = artifact.format === 'aether.process-artifact/2'
       && (() => { const state = this.readState();
-        return state.active.id !== reference.id
-          && (state.pendingProposal === null
-            || suffix(state.pendingProposal) !== reference.id); })();
+        return artifact.signedEffectResourcePolicyV7.body.policyEpoch
+          !== this.options.effectSignerAnchor!.currentEpoch()
+          || state.active.id !== reference.id
+            && (state.pendingProposal === null
+              || suffix(state.pendingProposal) !== reference.id); })();
     const context = processArtifactContext(artifact), factory = this.factoryFor(artifact.factoryId);
     const services = factory(artifact);
     this.assertServices(services, context.module, artifact.policy, artifact.manifest,
@@ -1156,6 +1165,8 @@ export class ProcessDeployment implements PromotionDriver {
       if ((services as ProcessHostOptions).sinkTableV2 !== undefined
         || (services as ProcessHostOptions).historicalEffectPolicyEpochV7 !== undefined)
         throw new TypeError('semantic sink table/history authority must come from Artifact/2');
+      if ((services as ProcessHostOptions).semanticCheckpointRetention !== undefined)
+        throw new TypeError('semantic checkpoint retention authority must be independently provisioned');
       if (services.effectResourceSignerKey !== undefined || services.currentEffectPolicyEpoch !== undefined
         || (services as ProcessHostOptions).effectSignerAnchor !== undefined
         || (services as ProcessHostOptions).legacyEffectSignerTrust !== undefined
