@@ -88,6 +88,9 @@ const stats = (samplesNs: readonly number[]) => {
     overBound: samplesNs.filter(value => value > profile.hardMaximumNs).length };
 };
 const json = (value: unknown): string => JSON.stringify(value, null, 2) + '\n';
+const environment = () => ({ node: process.version, platform: platform(), release: release(),
+  arch: process.arch, cpu: cpus()[0]?.model, logicalCpus: cpus().length,
+  ramBytes: totalmem() });
 
 function measure(output: string): void {
   if (git('status', '--porcelain')) throw new Error('proof-check timing requires a clean source worktree');
@@ -108,9 +111,7 @@ function measure(output: string): void {
     sourceFiles: sourceFiles(), profile, profileSha256: sha(readFileSync(profilePath)),
     samplesSha256: sha(json(samples)), certificateDigest: portableCertificateDigest(certificate),
     certificateBytes: encodePortableCertificate(certificate).length,
-    environment: { node: process.version, platform: platform(), release: release(),
-      arch: process.arch, cpu: cpus()[0]?.model, logicalCpus: cpus().length,
-      ramBytes: totalmem() }, warmupChecks: profile.warmupChecks,
+    environment: environment(), warmupChecks: profile.warmupChecks,
     measuredChecks: profile.measuredChecks, ...observed,
     verdict: observed.maximumNs <= profile.hardMaximumNs ? 'pass' : 'fail' };
   mkdirSync(output, { recursive: true });
@@ -133,6 +134,7 @@ function verify(output: string): void {
     || JSON.stringify(manifest.profile) !== JSON.stringify(profile)
     || manifest.profileSha256 !== sha(readFileSync(profilePath))
     || manifest.samplesSha256 !== sha(samplesBytes)
+    || JSON.stringify(manifest.environment) !== JSON.stringify(environment())
     || manifest.warmupChecks !== profile.warmupChecks
     || manifest.measuredChecks !== profile.measuredChecks)
     throw new TypeError('proof-check evidence source or profile changed');
