@@ -1,0 +1,376 @@
+/** Operator-run, process-external journal witness. The secret is supplied as
+ * bytes by the caller and is never placed in an argument or environment value.
+ * The caller must keep the service storage outside runtime-writable paths. */
+import { createHmac, randomBytes, timingSafeEqual, createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as net from 'node:net';
+import * as path from 'node:path';
+import { decodeCanonical, decimal, encodeCanonical, exactObject, identifier } from './encoding.ts';
+import { domainDigest } from './identity.ts';
+import { createNamespacedEffectJournalWitness, createNamespacedEffectJournalWitnessCatalog,
+  type NamespacedEffectJournalWitnessCatalog } from './effect-journal-witness.ts';
+import { createHostJournalWitness, createHostJournalWitnessCatalog,
+  type HostJournalWitnessCatalog } from './host-journal-witness.ts';
+import { createDeploymentJournalWitness, type DeploymentJournalWitness } from './deployment-journal-witness.ts';
+import { JournalLock } from './journal-lock.ts';
+
+const FORMAT = 'aether.witness-service/1';
+const MAX_FRAME = 20 * 1024 * 1024;
+const MAX_JOURNAL = 16 * 1024 * 1024;
+const LIMITS = { maxFrameBytes: MAX_FRAME, maxDecompressedBytes: MAX_FRAME, maxObjects: 500_000, maxDepth: 128 };
+const HEX = /^[0-9a-f]{64}$/;
+const WIRE_WORKER = `import net from 'node:net';
+const s=net.createConnection(process.argv[1]);
+s.on('connect',()=>process.stdin.pipe(s));
+s.on('data',c=>{if(!process.stdout.write(c))s.pause()});
+process.stdout.on('drain',()=>s.resume());
+s.on('error',()=>process.exitCode=3);
+s.on('end',()=>{if(!s.destroyed)s.destroy()});
+`;
+
+export type WitnessIdentity =
+  | Readonly<{ kind: 'effect'; authorityId: string; repositoryId: string; catalogDeploymentId: string; operationId: string; clockDomain: string }>
+  | Readonly<{ kind: 'host'; authorityId: string; repositoryId: string; deploymentId: string; hostId: string }>
+  | Readonly<{ kind: 'deployment'; authorityId: string; repositoryId: string; deploymentId: string }>;
+export type WitnessNamespace = WitnessIdentity
+  | Readonly<{ kind: 'effect-scope'; authorityId: string; repositoryId: string; catalogDeploymentId: string; clockDomain: string }>
+  | Readonly<{ kind: 'host-scope'; authorityId: string; repositoryId: string; deploymentId: string }>;
+export interface WitnessService { readonly socketPath: string; close(): Promise<void> }
+export interface WitnessServiceOptions {
+  readonly socketPath: string;
+  readonly storageDir: string;
+  readonly key: Uint8Array;
+  readonly namespaces: readonly WitnessNamespace[];
+}
+export interface WitnessClientOptions { readonly socketPath: string; readonly key: Uint8Array; readonly timeoutMs?: number }
+
+function assertKey(key: Uint8Array): Buffer {
+  if (!(key instanceof Uint8Array) || key.byteLength < 32) throw new TypeError('witness key requires at least 32 bytes');
+  return Buffer.from(key);
+}
+function canonical(value: unknown): Buffer { return Buffer.from(encodeCanonical(value, LIMITS)); }
+function parse(bytes: Buffer): unknown {
+  const value = decodeCanonical(bytes, LIMITS);
+  if (!canonical(value).equals(bytes)) throw new TypeError('noncanonical witness frame');
+  return value;
+}
+function frame(value: unknown): Buffer {
+  const body = canonical(value);
+  if (body.length > MAX_FRAME) throw new RangeError('oversized witness frame');
+  const prefix = Buffer.alloc(4); prefix.writeUInt32BE(body.length);
+  return Buffer.concat([prefix, body]);
+}
+function unframe(bytes: Buffer): unknown {
+  if (bytes.length < 4) throw new TypeError('incomplete witness frame');
+  const length = bytes.readUInt32BE(0);
+  if (!length || length > MAX_FRAME || bytes.length !== length + 4) throw new TypeError('invalid witness frame length');
+  return parse(bytes.subarray(4));
+}
+function mac(key: Buffer, value: unknown): string {
+  return createHmac('sha256', key).update(canonical(value)).digest('hex');
+}
+function matchMac(key: Buffer, body: unknown, signature: unknown): boolean {
+  if (typeof signature !== 'string' || !HEX.test(signature)) return false;
+  return timingSafeEqual(Buffer.from(mac(key, body), 'hex'), Buffer.from(signature, 'hex'));
+}
+function identity(value: unknown): WitnessIdentity {
+  const record = value as Record<string, unknown>;
+  if (!record || typeof record !== 'object') throw new TypeError('missing witness identity');
+  const fields = record.kind === 'effect'
+    ? ['kind', 'authorityId', 'repositoryId', 'catalogDeploymentId', 'operationId', 'clockDomain']
+    : record.kind === 'host' ? ['kind', 'authorityId', 'repositoryId', 'deploymentId', 'hostId']
+    : record.kind === 'deployment' ? ['kind', 'authorityId', 'repositoryId', 'deploymentId']
+    : null;
+  if (!fields) throw new TypeError('unsupported witness identity');
+  exactObject(record, fields);
+  for (const field of fields.slice(1)) identifier(record[field]);
+  return record as unknown as WitnessIdentity;
+}
+function scope(value: unknown): WitnessNamespace {
+  const record = value as Record<string, unknown>;
+  if (record?.kind === 'effect-scope') {
+    exactObject(record, ['kind', 'authorityId', 'repositoryId', 'catalogDeploymentId', 'clockDomain']);
+    for (const field of ['authorityId', 'repositoryId', 'catalogDeploymentId', 'clockDomain']) identifier(record[field]);
+    return record as unknown as WitnessNamespace;
+  }
+  if (record?.kind === 'host-scope') {
+    exactObject(record, ['kind', 'authorityId', 'repositoryId', 'deploymentId']);
+    for (const field of ['authorityId', 'repositoryId', 'deploymentId']) identifier(record[field]);
+    return record as unknown as WitnessNamespace;
+  }
+  return identity(value);
+}
+function allowed(id: WitnessIdentity, list: readonly WitnessNamespace[]): boolean {
+  const exact = canonical(id).toString('utf8');
+  return list.some(entry => {
+    if (entry.kind === id.kind && canonical(entry).toString('utf8') === exact) return true;
+    if (id.kind === 'effect' && entry.kind === 'effect-scope')
+      return id.authorityId === entry.authorityId && id.repositoryId === entry.repositoryId
+        && id.catalogDeploymentId === entry.catalogDeploymentId && id.clockDomain === entry.clockDomain;
+    if (id.kind === 'host' && entry.kind === 'host-scope')
+      return id.authorityId === entry.authorityId && id.repositoryId === entry.repositoryId
+        && id.deploymentId === entry.deploymentId;
+    return false;
+  });
+}
+function location(dir: string, id: WitnessIdentity): string {
+  return path.join(dir, `${createHash('sha256').update(canonical(id)).digest('hex')}.json`);
+}
+type Head = Readonly<{ revision: string; journal: string | null }>;
+function readHead(dir: string, id: WitnessIdentity): Head {
+  const file = location(dir, id);
+  let bytes: Buffer;
+  try { bytes = fs.readFileSync(file); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { revision: '0', journal: null };
+    throw error;
+  }
+  const record = exactObject(parse(bytes), ['format', 'identity', 'head']);
+  if (record.format !== FORMAT || canonical(record.identity).toString('utf8') !== canonical(id).toString('utf8'))
+    throw new Error('witness storage identity mismatch');
+  const head = exactObject(record.head, ['revision', 'journal']);
+  decimal(head.revision);
+  if ((head.revision === '0') !== (head.journal === null)
+    || (head.journal !== null && typeof head.journal !== 'string')) throw new Error('invalid witness stored head');
+  const result = { revision: head.revision as string, journal: head.journal as string | null };
+  if (result.journal !== null) validateJournal(id, result.revision, result.journal);
+  return result;
+}
+function validateJournal(id: WitnessIdentity, revision: string, journal: string): void {
+  if (!journal || Buffer.byteLength(journal, 'utf8') > MAX_JOURNAL) throw new TypeError('invalid witness journal size');
+  const bytes = Buffer.from(journal, 'utf8');
+  const value = parse(bytes);
+  const record = value as Record<string, unknown>;
+  if (!record || typeof record !== 'object' || Array.isArray(record)) throw new TypeError('invalid witness journal');
+  const expectedFormat = id.kind === 'effect' ? 'aether.effect-journal/2'
+    : id.kind === 'host' ? 'aether.process-host/4' : 'aether.process-deployment/9';
+  // The service owns transport, identity, CAS and durable custody. Runtime
+  // wrappers validate the richer journal semantics before calling advance.
+  if (record.format !== expectedFormat) throw new TypeError('invalid witness journal format');
+  if (id.kind === 'effect') {
+    const { kind: _kind, ...parts } = id;
+    const body = { format: 'aether.effect-journal-witness/2', ...parts };
+    if (record.revision !== revision || record.witnessDigest !== domainDigest(body.format, body)
+      || record.clockDomain !== id.clockDomain) throw new TypeError('effect journal witness binding mismatch');
+  }
+  if (id.kind === 'deployment') {
+    const { kind: _kind, ...parts } = id;
+    const body = { format: 'aether.process-deployment-journal-witness/1', ...parts };
+    if (record.deploymentJournalWitnessDigest !== domainDigest(body.format, body))
+      throw new TypeError('deployment journal witness binding mismatch');
+  }
+  if (id.kind !== 'effect' && record.witnessRevision !== revision)
+    throw new TypeError('witness journal revision mismatch');
+}
+function writeHead(dir: string, id: WitnessIdentity, head: Head): void {
+  const dest = location(dir, id);
+  const tmp = path.join(dir, `.witness-${randomBytes(16).toString('hex')}.tmp`);
+  const bytes = canonical({ format: FORMAT, identity: id, head });
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(tmp, 'wx', 0o600);
+    fs.writeFileSync(fd, bytes); fs.fsyncSync(fd); fs.closeSync(fd); fd = undefined;
+    fs.renameSync(tmp, dest);
+    const dfd = fs.openSync(dir, 'r');
+    try { fs.fsyncSync(dfd); } finally { fs.closeSync(dfd); }
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+    try { fs.unlinkSync(tmp); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  }
+}
+function signedResponse(key: Buffer, nonce: string, result: { ok: true; head: Head } | { ok: false; code: string }): Buffer {
+  const body = { format: FORMAT, nonce, ...result };
+  return frame({ ...body, mac: mac(key, body) });
+}
+function processRequest(bytes: Buffer, key: Buffer, namespaces: readonly WitnessNamespace[], dir: string): Buffer | null {
+  let request: Record<string, unknown>;
+  try {
+    request = exactObject(unframe(bytes), ['format', 'nonce', 'op', 'identity', 'expectedRevision', 'journal', 'mac']);
+    if (request.format !== FORMAT || typeof request.nonce !== 'string' || !HEX.test(request.nonce)
+      || !['read', 'advance'].includes(request.op as string)) return null;
+    const body = { format: request.format, nonce: request.nonce, op: request.op,
+      identity: request.identity, expectedRevision: request.expectedRevision, journal: request.journal };
+    if (!matchMac(key, body, request.mac)) return null;
+  } catch { return null; }
+  const nonce = request.nonce as string;
+  try {
+    const id = identity(request.identity);
+    if (!allowed(id, namespaces)) return signedResponse(key, nonce, { ok: false, code: 'DENIED' });
+    if (request.op === 'read') {
+      if (request.expectedRevision !== null || request.journal !== null) throw new TypeError('invalid read request');
+      return signedResponse(key, nonce, { ok: true, head: readHead(dir, id) });
+    }
+    decimal(request.expectedRevision);
+    if (typeof request.journal !== 'string') throw new TypeError('missing witness journal');
+    const nextRevision = String(BigInt(request.expectedRevision) + 1n);
+    validateJournal(id, nextRevision, request.journal);
+    const current = readHead(dir, id);
+    if (current.revision !== request.expectedRevision) return signedResponse(key, nonce, { ok: false, code: 'STALE' });
+    const head = { revision: nextRevision, journal: request.journal };
+    try {
+      writeHead(dir, id, head);
+      return signedResponse(key, nonce, { ok: true, head: readHead(dir, id) });
+    } catch {
+      // Rename may have committed before fsync/read failed. The caller must
+      // reread and reconcile; never report a definite validation failure.
+      return signedResponse(key, nonce, { ok: false, code: 'UNCERTAIN' });
+    }
+  } catch {
+    return signedResponse(key, nonce, { ok: false, code: 'INVALID' });
+  }
+}
+
+export async function startWitnessService(options: WitnessServiceOptions): Promise<WitnessService> {
+  const key = assertKey(options.key);
+  if (!path.isAbsolute(options.socketPath) || !path.isAbsolute(options.storageDir))
+    throw new TypeError('witness paths must be absolute');
+  if (!Array.isArray(options.namespaces) || !options.namespaces.length) throw new TypeError('empty witness allowlist');
+  const namespaces = options.namespaces.map(scope);
+  fs.mkdirSync(options.storageDir, { recursive: true, mode: 0o700 });
+  const dirStat = fs.lstatSync(options.storageDir);
+  if (!dirStat.isDirectory() || dirStat.isSymbolicLink() || (dirStat.mode & 0o077))
+    throw new Error('witness storage directory must be private');
+  const lock = new JournalLock({ directory: path.join(options.storageDir, '.service-lock'),
+    domain: 'aether.witness-service', maxTickets: 10_000, busyError: 'witness storage already served' });
+  lock.recoverDeadWriter(false);
+  let release!: () => void;
+  const lifetime = new Promise<void>(resolve => { release = resolve; });
+  let ready!: (service: WitnessService) => void;
+  let failed!: (reason: unknown) => void;
+  const started = new Promise<WitnessService>((resolve, reject) => { ready = resolve; failed = reject; });
+  const serving = lock.runAsync(async () => {
+    try {
+      try {
+        const prior = fs.lstatSync(options.socketPath);
+        if (!prior.isSocket()) throw new Error('witness socket path occupied');
+        await new Promise<void>((resolve, reject) => {
+          const probe = net.createConnection(options.socketPath);
+          probe.once('connect', () => { probe.destroy(); reject(new Error('witness socket already live')); });
+          probe.once('error', (error: NodeJS.ErrnoException) => {
+            if (error.code === 'ECONNREFUSED') resolve(); else reject(error);
+          });
+        });
+        fs.unlinkSync(options.socketPath);
+      } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+      const server = net.createServer({ allowHalfOpen: true }, socket => {
+        const chunks: Buffer[] = []; let size = 0; let rejected = false;
+        socket.setTimeout(5000, () => socket.destroy());
+        socket.on('data', chunk => {
+          size += chunk.length;
+          if (size > MAX_FRAME + 4 || (size >= 4 && Buffer.concat(chunks.concat(chunk), Math.min(size, 4)).readUInt32BE(0) > MAX_FRAME)) {
+            rejected = true; socket.destroy(); return;
+          }
+          chunks.push(chunk);
+        });
+        socket.on('end', () => {
+          if (rejected) return;
+          const response = processRequest(Buffer.concat(chunks, size), key, namespaces, options.storageDir);
+          if (response) socket.end(response); else socket.destroy();
+        });
+        socket.on('error', () => socket.destroy());
+      });
+      server.maxConnections = 16;
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject); server.listen(options.socketPath, () => { server.off('error', reject); resolve(); });
+      });
+      fs.chmodSync(options.socketPath, 0o600);
+      ready({ socketPath: options.socketPath, close: async () => {
+        try {
+          await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+          fs.unlinkSync(options.socketPath);
+        } finally {
+          release();
+          await serving;
+        }
+      } });
+      await lifetime;
+    } catch (error) { failed(error); throw error; }
+  }, 250);
+  serving.catch(failed);
+  return started;
+}
+
+export function createProcessWitnessClient(options: WitnessClientOptions): {
+  effectCatalog(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string; clockDomain: string }>): NamespacedEffectJournalWitnessCatalog;
+  hostCatalog(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string }>): HostJournalWitnessCatalog;
+  deploymentWitness(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string }>): DeploymentJournalWitness;
+} {
+  const key = assertKey(options.key);
+  if (!path.isAbsolute(options.socketPath)) throw new TypeError('witness socket path must be absolute');
+  const timeout = options.timeoutMs ?? 5000;
+  if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 120_000) throw new TypeError('invalid witness timeout');
+  const call = (id: WitnessIdentity, op: 'read' | 'advance', expectedRevision: string | null,
+    journal: string | null): Head => {
+    identity(id);
+    const nonce = randomBytes(32).toString('hex');
+    const body = { format: FORMAT, nonce, op, identity: id, expectedRevision, journal };
+    const request = frame({ ...body, mac: mac(key, body) });
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', WIRE_WORKER, options.socketPath],
+      { input: request, encoding: 'buffer', maxBuffer: MAX_FRAME + 4, timeout });
+    if (result.error || result.status !== 0 || !Buffer.isBuffer(result.stdout))
+      throw new Error('uncertain witness response');
+    let response: Record<string, unknown>;
+    try {
+      const candidate = unframe(result.stdout) as Record<string, unknown>;
+      response = exactObject(candidate, ['format', 'nonce', 'ok', candidate?.ok === true ? 'head' : 'code', 'mac']);
+      if (response.format !== FORMAT || response.nonce !== nonce || typeof response.ok !== 'boolean')
+        throw new TypeError('wrong witness response');
+      const signed = response.ok
+        ? { format: response.format, nonce: response.nonce, ok: response.ok, head: response.head }
+        : { format: response.format, nonce: response.nonce, ok: response.ok, code: response.code };
+      if (!matchMac(key, signed, response.mac)) throw new TypeError('altered witness response');
+      if (!response.ok) {
+        if (response.code === 'UNCERTAIN') throw new Error('uncertain witness response');
+        if (!['STALE', 'DENIED', 'INVALID'].includes(response.code as string)) throw new TypeError('unknown witness error');
+        throw new Error(`witness ${response.code}`);
+      }
+      const head = exactObject(response.head, ['revision', 'journal']);
+      decimal(head.revision);
+      if ((head.revision === '0') !== (head.journal === null) || (head.journal !== null && typeof head.journal !== 'string'))
+        throw new TypeError('invalid witness head');
+      return { revision: head.revision as string, journal: head.journal as string | null };
+    } catch (error) {
+      if (error instanceof Error && /^witness (STALE|DENIED|INVALID)$/.test(error.message)) throw error;
+      throw new Error('uncertain witness response', { cause: error });
+    }
+  };
+  return {
+    effectCatalog: namespace => {
+      const selected = new Map<string, ReturnType<typeof createNamespacedEffectJournalWitness>>();
+      return createNamespacedEffectJournalWitnessCatalog({ ...namespace,
+      witnessFor: operationId => {
+        const prior = selected.get(operationId);
+        if (prior) return prior;
+        const id = { kind: 'effect' as const, authorityId: namespace.authorityId,
+          repositoryId: namespace.repositoryId, catalogDeploymentId: namespace.deploymentId,
+          operationId, clockDomain: namespace.clockDomain };
+        const witness = createNamespacedEffectJournalWitness({ ...id,
+          read: () => call(id, 'read', null, null),
+          advance: (revision, journal) => call(id, 'advance', revision, journal) });
+        selected.set(operationId, witness);
+        return witness;
+      } });
+    },
+    hostCatalog: namespace => {
+      const selected = new Map<string, ReturnType<typeof createHostJournalWitness>>();
+      return createHostJournalWitnessCatalog({ ...namespace,
+      witnessFor: hostId => {
+        const prior = selected.get(hostId);
+        if (prior) return prior;
+        const id = { kind: 'host' as const, ...namespace, hostId };
+        const witness = createHostJournalWitness({ ...namespace, hostId,
+          read: () => call(id, 'read', null, null),
+          advance: (revision, journal) => call(id, 'advance', revision, journal) });
+        selected.set(hostId, witness);
+        return witness;
+      } });
+    },
+    deploymentWitness: namespace => {
+      const id = { kind: 'deployment' as const, ...namespace };
+      return createDeploymentJournalWitness({ ...namespace,
+        read: () => call(id, 'read', null, null),
+        advance: (revision, journal) => call(id, 'advance', revision, journal) });
+    },
+  };
+}
