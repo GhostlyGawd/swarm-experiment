@@ -6,7 +6,7 @@ import { decode as decodeIR, encode as encodeIR } from '../tier1/agent-ir.ts';
 import { GraphStore } from '../tier1/store.ts';
 import { atomicWrite } from '../tier1/persistence.ts';
 import { capability, type CapabilityName, type NodeRef, type SymbolId } from '../tier1/ids.ts';
-import { CapabilityRegistry, CapabilitySealer, RevocationList, type CapabilityToken } from '../tier2/ocap.ts';
+import { CapabilityRegistry, CapabilitySealer, RevocationList, PURE_COMPUTE, type CapabilityToken } from '../tier2/ocap.ts';
 import { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2 } from '../tier2/scoped-grants.ts';
 import { assertSignedEffectResourcePolicy, assertSignedEffectResourcePolicyV2, assertSignedEffectResourcePolicyV3, assertSignedEffectResourcePolicyV4, assertSignedEffectResourcePolicyV7, assertEffectResourceAdapter, assertEffectResourceAdapterV2, assertEffectResourceAdapterV3, assertEffectResourceAdapterV4, effectResourcePath as signedEffectResourcePath, effectResourcePathV2, effectResourcePathV3, effectResourcePathV4, effectResourcePathV5, effectResourcePathV6, effectResourcePathV7, assertEffectResourceAdapterV5, assertEffectResourceAdapterV6, assertEffectResourceAdapterV7, assertEffectResourceSinkContextV5, assertEffectResourceSinkContextV6, assertEffectResourceSinkContextV7, effectResourcePolicyDigest, effectResourcePolicyDigestV2, effectResourcePolicyDigestV3, effectResourcePolicyDigestV4, effectResourcePolicyDigestV5, effectResourcePolicyDigestV6, effectResourcePolicyDigestV7, type SignedEffectResourcePolicyV1, type SignedEffectResourcePolicyV2, type SignedEffectResourcePolicyV3, type SignedEffectResourcePolicyV4, type SignedEffectResourcePolicyV5, type SignedEffectResourcePolicyV6, type SignedEffectResourcePolicyV7 } from '../tier2/effect-resource-policy.ts';
 import { assertDeclarativeSinkTablePolicyV2, declarativeSinkTableDigestV2,
@@ -45,6 +45,11 @@ import { assertProcessNativeFallbackBinding, createProcessNativeFallbackBinding,
 import { runProcessNativeFallback, validateProcessNativeFallbackOutcome, type ProcessNativeFallbackOutcomeV1, type ProcessNativeFallbackLowered } from './native-fallback-runner.ts';
 import { RECORD_FALLBACK_PROFILE_DIGEST, validateCheckedRecordFallbackProof, type CheckedRecordFallbackProof } from '../tier2/record-fallback-proof-checker.ts';
 import { ProcessSemanticRetention } from './process-semantic-retention.ts';
+import { processVirtualArtifactDigestV4, validateProcessVirtualArtifactV4,
+  type ProcessVirtualArtifactV4 } from './process-virtual-artifact-v4.ts';
+import { openProcessVirtualWorkerLineageV1,
+  type ProcessVirtualWorkerTrustV1 } from './process-virtual-worker-contract.ts';
+import { validatePackagedProcessVirtualArtifactV4 } from './process-virtual-worker-v4.ts';
 
 export const PROCESS_INVOKE = capability('cap:process:invoke');
 export type ProcessInvocationGrant = CapabilityToken | ScopedGrantV2;
@@ -167,6 +172,10 @@ export interface ProcessHostOptions {
   readonly plan: TopologyPlan;
   readonly registry: CapabilityRegistry;
   readonly sealer: CapabilitySealer;
+  /** Opt-in host-config/16. Operator-held trust and exact signed Artifact/4;
+   * one pure unit only, with no broker or cross-unit callbacks. */
+  readonly virtualArtifactV4?: Readonly<{ format: 'aether.process-host-virtual/1';
+    artifact: ProcessVirtualArtifactV4; trust: ProcessVirtualWorkerTrustV1 }>;
   /** Explicit strict profile; its presence is committed into host identity. */
   readonly scopedGrants?: ScopedGrantAuthority;
   /** Trusted adapter policy maps the concrete effect target to grant path suffixes. */
@@ -287,6 +296,7 @@ export class ProcessHost {
   private readonly signedEffectResourcePolicy: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3 | SignedEffectResourcePolicyV4 | SignedEffectResourcePolicyV5 | SignedEffectResourcePolicyV6 | SignedEffectResourcePolicyV7 | null;
   private readonly historicalV7Inspection: boolean;
   private readonly activeReleaseProfile: boolean;
+  private readonly virtualProfile: ProcessHostOptions['virtualArtifactV4'];
   private readonly file: string;
   readonly #hostJournalWitness: HostJournalWitness | null;
   readonly #journalWitnessBases = new WeakMap<HostJournal, { revision: string; journal: string | null }>();
@@ -300,6 +310,34 @@ export class ProcessHost {
   private checkpointProgramCache: ResumableProgram | null = null;
 
   private constructor(options: ProcessHostOptions) {
+    const virtual = options.virtualArtifactV4;
+    if (virtual) {
+      if (virtual.format !== 'aether.process-host-virtual/1'
+        || options.plan.units.length !== 1
+        || options.registry.names.length !== 1 || options.registry.names[0] !== PURE_COMPUTE
+        || options.scopedGrants !== undefined || options.signedEffectResourcePolicy !== undefined
+        || options.effectRouterFactory !== undefined || options.effectResourcePath !== undefined
+        || options.effectResourcePolicyDigest !== undefined || options.effectSignerAnchor !== undefined
+        || options.anchoredEffectPolicyProfile !== undefined || options.legacyAnchoredEffectPolicy !== undefined
+        || options.nativeFallback !== undefined || options.hostJournalWitness !== undefined
+        || options.budgetedSinkAuthority !== undefined || options.semanticCheckpointRetention !== undefined
+        || options.semanticActiveReleaseProfile !== undefined || options.attestedSinkAuthority !== undefined
+        || options.effectJournalWitnessCatalog !== undefined || options.trustedClockAnchor !== undefined
+        || options.sinkStateWitness !== undefined || options.sinkTableV2 !== undefined)
+        throw new TypeError('Artifact/4 host requires one pure unit without effect or legacy profiles');
+      const lineage = openProcessVirtualWorkerLineageV1(virtual.trust);
+      const artifact = validateProcessVirtualArtifactV4(virtual.artifact, lineage);
+      if (encodeIR(options.module).text !== artifact.candidateIr
+        || executionManifestDigest(options.manifest)
+          !== executionManifestDigest(artifact.candidateEvidence.manifest))
+        throw new TypeError('Artifact/4 host module/manifest differs from signed candidate');
+      const members = options.module.kind === 'Module'
+        ? options.module.members.filter(member => member.kind === 'FunctionDecl').map(member => member.symbol)
+        : [];
+      if (members.length !== options.plan.units[0].members.length
+        || members.some(symbol => !options.plan.units[0].members.includes(symbol)))
+        throw new TypeError('Artifact/4 host requires all pure declarations in its one unit');
+    }
     if (options.effectResourcePath && !options.scopedGrants || !!options.effectResourcePath !== !!options.effectResourcePolicyDigest) throw new TypeError('strict effect resource policy requires an exact policy digest');
     if (options.effectResourcePolicyDigest) validateDigest(options.effectResourcePolicyDigest, 'aether.effect-resource-policy/1');
     const nativeProfile = options.nativeFallback !== undefined;
@@ -444,6 +482,7 @@ export class ProcessHost {
       || options.attestedSinkAuthority !== undefined || options.sinkStateWitness !== undefined))
       throw new TypeError('native fallback profile requires an independent pure host');
     this.options = { ...options, plan: JSON.parse(planBytes(options.plan)) as TopologyPlan,
+      virtualArtifactV4: virtual ? freeze(copy(virtual)) : undefined,
       initialSnapshot: options.initialSnapshot ? copy(options.initialSnapshot) : undefined,
       nativeFallback: nativeProfile ? Object.freeze({ ...options.nativeFallback!,
         lowered: freeze(copy(options.nativeFallback!.lowered)) }) : undefined,
@@ -452,6 +491,9 @@ export class ProcessHost {
     this.#hostJournalWitness = options.hostJournalWitness ?? null;
     this.module = decodeIR(encodeIR(options.module).text);
     this.manifest = decodeExecutionManifest(encodeExecutionManifest(options.manifest));
+    this.virtualProfile = this.options.virtualArtifactV4;
+    if (!virtual && this.manifest.target.profileDigest.startsWith('aether.resumable-virtual-forward-profile/1:'))
+      throw new TypeError('virtual-forward manifest requires explicit Artifact/4 host profile');
     if (new GraphStore().intern(this.module) !== this.manifest.astRoot) throw new TypeError('ProcessHost module/manifest mismatch');
     if (nativeProfile) {
       if (this.module.kind !== 'Module' || this.module.members.length !== 2
@@ -520,7 +562,9 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest(this.activeReleaseProfile ? 'aether.process-host-config/15' : tableSink ? retainedCheckpoints ? 'aether.process-host-config/14' : 'aether.process-host-config/13' : retainedCheckpoints ? 'aether.process-host-config/12' : nativeProfile ? 'aether.process-host-config/10' : budgetedSink ? 'aether.process-host-config/11' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+    this.configuration = domainDigest(virtual ? 'aether.process-host-config/16' : this.activeReleaseProfile ? 'aether.process-host-config/15' : tableSink ? retainedCheckpoints ? 'aether.process-host-config/14' : 'aether.process-host-config/13' : retainedCheckpoints ? 'aether.process-host-config/12' : nativeProfile ? 'aether.process-host-config/10' : budgetedSink ? 'aether.process-host-config/11' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+      ...(virtual ? { virtualArtifactDigest: processVirtualArtifactDigestV4(virtual.artifact),
+        virtualTrustDigest: domainDigest('aether.process-host-virtual-trust/1', virtual.trust) } : {}),
       ...(retainedCheckpoints ? { semanticCheckpointRetentionAuthority: ProcessSemanticRetention.authorityDigest(options.semanticCheckpointRetention!) } : {}),
       ...(this.activeReleaseProfile ? { semanticActiveReleaseProfile: options.semanticActiveReleaseProfile,
         semanticActiveReleaseAuthority: ProcessSemanticRetention.releaseAuthorityDigest(options.semanticCheckpointRetention!) } : {}),
@@ -1813,7 +1857,12 @@ export class ProcessHost {
     const plan = JSON.parse(journal.plan) as TopologyPlan, channels = new Map<string, ProcessChannel>();
     try {
       for (const unit of plan.units) {
-        const channel = await ProcessChannel.start({ module: this.module, manifest: this.manifest, unit: unit.id, includeSymbols: unit.members, capabilities: this.registry.names.map(name => this.registry.get(name)!), heapId: journal.snapshot.heapId, ownershipEpoch: journal.generation, snapshot: journal.snapshot }, { timeoutMs: this.options.timeoutMs ?? 5000, onCall: request => this.onCall(unit.id, request), onEffect: request => this.onEffect(unit.id, request) });
+        const channel = this.virtualProfile
+          ? await ProcessChannel.startVirtualV4({ artifact: this.virtualProfile.artifact,
+            trust: this.virtualProfile.trust, unit: unit.id, heapId: journal.snapshot.heapId,
+            ownershipEpoch: journal.generation, snapshot: journal.snapshot },
+            { timeoutMs: this.options.timeoutMs ?? 5000 })
+          : await ProcessChannel.start({ module: this.module, manifest: this.manifest, unit: unit.id, includeSymbols: unit.members, capabilities: this.registry.names.map(name => this.registry.get(name)!), heapId: journal.snapshot.heapId, ownershipEpoch: journal.generation, snapshot: journal.snapshot }, { timeoutMs: this.options.timeoutMs ?? 5000, onCall: request => this.onCall(unit.id, request), onEffect: request => this.onEffect(unit.id, request) });
         channels.set(unit.id, channel);
       }
       return channels;
@@ -1826,7 +1875,12 @@ export class ProcessHost {
     await Promise.all([...old.values()].map(channel => channel.close()));
   }
   private async stopWorkers(): Promise<void> { const channels = this.channels; this.channels = new Map(); this.workersGeneration = null; await Promise.all([...channels.values()].map(channel => channel.kill())); }
-  private assertOpen(): void { if (this.closed) throw new Error('ProcessHost is closed'); }
+  private assertOpen(): void {
+    if (this.closed) throw new Error('ProcessHost is closed');
+    if (this.virtualProfile) validatePackagedProcessVirtualArtifactV4(this.virtualProfile.artifact,
+      openProcessVirtualWorkerLineageV1(this.virtualProfile.trust),
+      this.virtualProfile.artifact.executableSubject.manifest.bundle.path);
+  }
   private requireActive(): Active { if (!this.active) throw new Error('unsolicited process callback'); this.assertActive(this.active); return this.active; }
   private assertActive(active: Active): void {
     if (this.active !== active || active.cancelled || this.closed) throw new Error('process operation is no longer authoritative');

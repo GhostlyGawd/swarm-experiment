@@ -2,8 +2,9 @@
 
 Artifact/4 is a versioned process-worker admission subject for the pure D16
 virtual-forward rewrite. `ProcessChannel` admits it through explicit
-`startVirtualV4` and worker `init/3`. Existing live ProcessDeployment and
-ProcessHost paths do not accept or dispatch it.
+`startVirtualV4` and worker `init/3`. An opt-in `ProcessHost`
+config/16 admits the same one-unit pure candidate and durable journal.
+`ProcessDeployment` still does not register or promote Artifact/4.
 
 ## Signed binding
 
@@ -54,13 +55,33 @@ The checks before and after spawn reduce stale-file exposure but cannot prove
 the bytes loaded by the OS at the intervening instant. Per-call rehashing is
 also too expensive to qualify the v4 latency target; a separately measured
 custody and fast-path profile is still needed.
-There is no Artifact/4 ProcessHost deployment, effect-broker dispatch,
-integrated checkpoint recovery, or signed GC promotion. A one-worker snapshot
-restart does not prove ProcessHost recovery. This slice does not close
-V4-T1-05 or a release target.
+ProcessHost config/16 pins the Artifact/4 and operator trust digest, verifies
+one pure unit, and refuses effect services and legacy profiles. It reopens its
+exact durable snapshot and head after a fresh worker launch; a real controller
+SIGKILL before the call commit becomes an indeterminate intent and is resolved
+through explicit authorized isolated pure replay. Signed-spec invalidation
+refuses new calls before an intent is written. This qualifies a bounded pure
+host profile, not governor-promoted deployment or arbitrary checkpoint recovery.
+Its durable host journal is local and has no independent monotone witness
+custody; rollback resistance at that boundary is still unproved.
 
 Focused [integration evidence](evidence/integration-d9be39e/REVIEW.md):
 Artifact/4 tests 8/8 and Artifact/3 plus bundle tests 13/13 passed at
 `719e5ca`. The later `d9be39e` source passed build, typecheck, roadmap,
 worker-bundle verification and 99/99 projection tests with the same measured
 worker bundle bytes. These are separate tested commits, as the record states.
+
+`ProcessDeployment` still registers only Artifact/1–2 and retains its legacy
+same-schema migration guard. Legacy artifact registration/read and a legacy
+`ProcessHost` refuse the virtual-forward target profile; a legacy factory
+cannot inject `virtualArtifactV4` into `ProcessHost`. A production Artifact/4
+deployment needs a new versioned
+registry/prepared/state record, governor plan binding to the exact signed
+candidate, a virtual wrapper schema/ABI contract, and controller-crash recovery
+across the promotion commit. There is no Artifact/4 effect-broker dispatch,
+integrated checkpoint recovery, or signed GC promotion. This slice does not
+close V4-T1-05 or a release target.
+
+The config/16 direct host campaign is tested separately from the earlier
+worker and projection checkpoints. The tracker remains 20/62 until the
+complete gate passes.

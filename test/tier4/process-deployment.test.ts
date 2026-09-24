@@ -133,6 +133,30 @@ test('live ProcessDeployment refuses Artifact/3 before worker or effect dispatch
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });
 
+test('legacy ProcessDeployment factory cannot inject Artifact/4 host admission', async () => {
+  const f = fixture();
+  const factory = f.options.factories.get('ledger-services/1')!;
+  const factories = new Map(f.options.factories);
+  factories.set('ledger-services/1', artifact => ({ ...factory(artifact),
+    virtualArtifactV4: { format: 'aether.process-host-virtual/1' } }));
+  try {
+    await assert.rejects(ProcessDeployment.open({ ...f.options, factories }),
+      /cannot inject Artifact\/4 host admission/);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('legacy ProcessDeployment refuses a virtual-forward target under Artifact/1', async () => {
+  const f = fixture(); let deployment: ProcessDeployment | undefined;
+  try {
+    deployment = await ProcessDeployment.open(f.options);
+    const context = { ...f.original, target: { ...f.original.target,
+      profileDigest: domainDigest('aether.resumable-virtual-forward-profile/1', 'forged-legacy') } };
+    assert.throws(() => deployment!.registerArtifact({ context,
+      evidence: f.originalEvidence, plan: f.plan(), factoryId: 'ledger-services/1' }),
+    /cannot register virtual-forward Artifact\/4 target/);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
 test('strict process deployment carries scoped grants through the production host and sink', async () => {
   const f = fixture(); let deployment: ProcessDeployment | undefined;
   const epochs = new DurableGrantEpochs({ directory: join(f.directory, 'grant-epochs'), repositoryId: 'deployment-test' });

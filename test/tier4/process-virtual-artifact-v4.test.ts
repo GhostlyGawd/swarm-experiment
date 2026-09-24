@@ -4,7 +4,8 @@ import { generateKeyPairSync } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import type { Writable } from 'node:stream';
 import { ProcessAuthenticator } from '../../src/tier4/process-values.ts';
 import { encodeCanonical } from '../../src/fabric/encoding.ts';
@@ -16,7 +17,7 @@ import { DurableGraphStore } from '../../src/tier1/durable-store.ts';
 import { encode as encodeIR } from '../../src/tier1/agent-ir.ts';
 import { CausalLineageLedger, signIntent, signSpecRevision } from '../../src/tier1/causal-lineage.ts';
 import { buildVirtualForwardCandidate } from '../../src/tier1/semantic-gc-virtual-forward.ts';
-import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
+import { CapabilityRegistry, CapabilitySealer } from '../../src/tier2/ocap.ts';
 import { createEvidenceManifest, DEFAULT_EVIDENCE_POLICY_V2, DEFAULT_EVIDENCE_POLICY_V3,
   mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
@@ -28,6 +29,8 @@ import { decodeProcessVirtualArtifactV4, encodeProcessVirtualArtifactV4,
   type ProcessWorkerBundleManifestV2 } from '../../src/tier4/process-virtual-artifact-v4.ts';
 import { verifyWorkerBundle } from '../../scripts/process-worker-bundle.ts';
 import { ProcessChannel } from '../../src/tier4/process-channel.ts';
+import { ProcessHost, type ProcessHostOptions } from '../../src/tier4/process-host.ts';
+import type { TopologyPlan } from '../../src/tier4/topology.ts';
 import { type ProcessVirtualWorkerTrustV1 } from '../../src/tier4/process-virtual-worker-contract.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
@@ -102,7 +105,7 @@ function fixture(manifest: Awaited<ReturnType<typeof verifyWorkerBundle>>,
       publicKeyPem: keys.publicKey.export({ type: 'spki', format: 'pem' }).toString() }],
   };
   return { directory, source, candidate, descriptor, wrapper,
-    entry, target, lineage, artifact, trust, input };
+    entry, target, lineage, artifact, trust, input, keys, revision };
 }
 
 
@@ -129,6 +132,18 @@ function responseFrame(stream: NodeJS.ReadableStream): Promise<Buffer> {
 }
 
 const manifest = await verifyWorkerBundle();
+function hostOptions(f: ReturnType<typeof fixture>): ProcessHostOptions {
+  const candidate = f.artifact!;
+  const plan: TopologyPlan = { shape: 'containers', units: [
+    { id: 'pure', members: [f.entry, f.target], capabilities: [],
+      placement: 'container', memoryMb: 16 }], crossEdges: [],
+    transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
+  return { directory: join(f.directory, 'host'), module: f.candidate,
+    manifest: candidate.candidateEvidence.manifest, plan,
+    registry: new CapabilityRegistry(), sealer: new CapabilitySealer(new Uint8Array(32).fill(7), () => 100),
+    virtualArtifactV4: { format: 'aether.process-host-virtual/1',
+      artifact: candidate, trust: f.trust }, authorizeRecovery: () => true };
+}
 
 test('Artifact/4 signed target binds independently rebuilt V2 bundle and exact virtual proof', () => {
   const f = fixture(manifest);
@@ -344,4 +359,87 @@ test('Artifact/4 packaged child independently rejects altered init/3 proof', asy
     assert.equal(body.ok, false);
     assert.match(body.value, /descriptor/);
   } finally { child.kill(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('Artifact/4 ProcessHost config/16 dispatches and reopens exact durable pure state', async () => {
+  const f = fixture(manifest);
+  const options = hostOptions(f);
+  let host: ProcessHost | undefined;
+  try {
+    await assert.rejects(ProcessHost.open({ ...options,
+      directory: join(f.directory, 'legacy-host'), virtualArtifactV4: undefined }),
+    /requires explicit Artifact\/4 host profile/);
+    host = await ProcessHost.open(options);
+    assert.ok(host.workerPids.pure !== process.pid);
+    const result = await host.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: 'artifact4-host-call', tokens: host.issueTokens(f.entry) });
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), { state: 'completed', operationId: 'artifact4-host-call',
+      generation: '1', unit: 'pure', execution: { ok: true,
+        value: { tag: 'int', value: '4' }, steps: 0 } });
+    const before = await host.snapshot(), pid = host.workerPids.pure;
+    await host.close(); host = undefined;
+    await assert.rejects(ProcessHost.open({ ...options, virtualArtifactV4: undefined }),
+      /configuration|profile/i);
+    host = await ProcessHost.open(options);
+    assert.notEqual(host.workerPids.pure, pid);
+    assert.deepEqual(JSON.parse(JSON.stringify(await host.snapshot())), JSON.parse(JSON.stringify(before)));
+    assert.deepEqual(JSON.parse(JSON.stringify(await host.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: 'artifact4-host-call', tokens: host.issueTokens(f.entry) }))),
+    JSON.parse(JSON.stringify(result)));
+    await assert.rejects(ProcessHost.open({ ...options,
+      virtualArtifactV4: { ...options.virtualArtifactV4!, artifact: { ...f.artifact!,
+        descriptor: { ...f.artifact!.descriptor, sites: [] } } } }), /descriptor/);
+  } finally { await host?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('Artifact/4 ProcessHost reconciles a real controller SIGKILL before commit', async () => {
+  const f = fixture(manifest);
+  const options = hostOptions(f);
+  const configPath = join(f.directory, 'controller.json');
+  writeFileSync(configPath, JSON.stringify({ directory: options.directory,
+    artifact: f.artifact, trust: f.trust, plan: options.plan, entry: f.entry }));
+  let host: ProcessHost | undefined;
+  try {
+    const controller = fileURLToPath(new URL('./process-virtual-host-crash-controller.ts', import.meta.url));
+    const result = spawnSync(process.execPath,
+      ['--experimental-strip-types', controller, configPath],
+      { cwd: process.cwd(), timeout: 30_000, encoding: 'utf8' });
+    assert.equal(result.signal, 'SIGKILL', result.stderr);
+    host = await ProcessHost.open(options);
+    assert.ok(host.workerPids.pure !== process.pid);
+    assert.equal(host.operationResult('artifact4-controller-crash')?.state, 'indeterminate');
+    const recovered = await host.recoverOperation('artifact4-controller-crash',
+      { strategy: 'isolated-replay' });
+    assert.deepEqual(JSON.parse(JSON.stringify(recovered)), {
+      state: 'completed', operationId: 'artifact4-controller-crash', generation: '1',
+      unit: 'pure', execution: { ok: true, value: { tag: 'int', value: '4' }, steps: 0 },
+    });
+    assert.deepEqual(JSON.parse(JSON.stringify(await host.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: 'artifact4-controller-crash', tokens: host.issueTokens(f.entry) }))),
+    JSON.parse(JSON.stringify(recovered)));
+  } finally { await host?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('Artifact/4 ProcessHost refuses effect services and stale signed lineage before call intent', async () => {
+  const f = fixture(manifest);
+  const options = hostOptions(f);
+  let host: ProcessHost | undefined;
+  try {
+    await assert.rejects(ProcessHost.open({ ...options,
+      effectRouterFactory: () => { throw new Error('broker must not be reached'); } }),
+    /one pure unit without effect/);
+    host = await ProcessHost.open(options);
+    const tokens = host.issueTokens(f.entry);
+    f.lineage.publishSpec(signSpecRevision({ repositoryId: 'process-virtual-artifact',
+      id: 'behavior', revision: 2, previous: f.revision, parents: [],
+      text: 'Updated behavior.', requirements: [], author: 'author', policyEpoch: '0',
+      nonce: 'revoke-artifact4' }, f.keys.privateKey));
+    await assert.rejects(host.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: 'revoked-before-intent', tokens }),
+    /InvalidatedSpec|stale|current/i);
+    const journal = JSON.parse(readFileSync(join(options.directory, 'host.json'), 'utf8'));
+    assert.equal(journal.calls.length, 0);
+    await host.close(); host = undefined;
+    await assert.rejects(ProcessHost.open(options), /InvalidatedSpec|stale|current/i);
+  } finally { await host?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });

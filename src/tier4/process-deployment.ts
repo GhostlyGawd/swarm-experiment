@@ -430,6 +430,8 @@ export function processArtifactContext(artifact: ProcessArtifact): EvidenceConte
 }
 function makeArtifact(input: ProcessArtifactInput, semanticSink = false): ProcessArtifact {
   identifier(input.factoryId);
+  if (input.context.target.profileDigest.startsWith('aether.resumable-virtual-forward-profile/1:'))
+    throw new TypeError('legacy ProcessDeployment cannot register virtual-forward Artifact/4 target');
   const vetted = validateEvidence(input.evidence, input.context);
   const own = new Set([...walk(input.context.module)].filter(node => node.kind === 'FunctionDecl').map(node => (node as Extract<Term, { kind: 'FunctionDecl' }>).symbol));
   const externals = vetted.manifest.dependencies.filter(dependency => !own.has(dependency.symbol as SymbolId)).map(dependency => {
@@ -806,6 +808,8 @@ export class ProcessDeployment implements PromotionDriver {
       || typeof value.ir !== 'string' || typeof value.specification !== 'string' || typeof value.plan !== 'string' || !Array.isArray(value.capabilities) || !Array.isArray(value.externals)) throw new TypeError('invalid durable artifact');
     identifier(value.factoryId); validateDigest(value.schemaDigest, 'aether.process-schema/1');
     const artifact = value as unknown as ProcessArtifact;
+    if (artifact.manifest.target.profileDigest.startsWith('aether.resumable-virtual-forward-profile/1:'))
+      throw new TypeError('legacy ProcessDeployment cannot read virtual-forward Artifact/4 target');
     if (executionManifestDigest(artifact.manifest) !== manifest) throw new TypeError('artifact identity/factory mismatch');
     this.factoryFor(artifact.factoryId);
     const context = processArtifactContext(artifact);
@@ -1121,6 +1125,8 @@ export class ProcessDeployment implements PromotionDriver {
   private assertServices(services: ProcessHostServices, module: Term, evidencePolicy: EvidencePolicy,
     manifest: ExecutionManifestV1, plan: TopologyPlan, artifact: ProcessArtifact,
     historicalSemantic = false): void {
+    if (Object.hasOwn(services, 'virtualArtifactV4'))
+      throw new TypeError('legacy ProcessDeployment factory cannot inject Artifact/4 host admission');
     if (semanticSinkProfile(this.capabilityProfile)) {
       if (artifact.format !== 'aether.process-artifact/2'
         || !equal(services.signedEffectResourcePolicy, artifact.signedEffectResourcePolicyV7))
