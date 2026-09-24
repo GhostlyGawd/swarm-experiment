@@ -1,0 +1,20 @@
+{
+  "verified": true,
+  "sourceMatches": true,
+  "rows": 65,
+  "unqualifiedOrRefused": 30,
+  "aggregate": {
+    "cl100k_base": {
+      "legacyTsReviewTokens": 7780,
+      "ae2CompleteModelTokens": 27233,
+      "ratioOfSums": 0.2856828112951199,
+      "meetsFourfoldDiagnostic": false
+    },
+    "o200k_base": {
+      "legacyTsReviewTokens": 7792,
+      "ae2CompleteModelTokens": 26974,
+      "ratioOfSums": 0.28887076443983095,
+      "meetsFourfoldDiagnostic": false
+    }
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "directory": "/private/tmp/aether-v17-exact-audit-67b4f90",
+  "commit": "67b4f90b4375eefe6644723ceb1830a7f6878ff8",
+  "rows": 65,
+  "aggregate": {
+    "cl100k_base": {
+      "legacyTsReviewTokens": 7780,
+      "ae2CompleteModelTokens": 27233,
+      "ratioOfSums": 0.2856828112951199,
+      "meetsFourfoldDiagnostic": false
+    },
+    "o200k_base": {
+      "legacyTsReviewTokens": 7792,
+      "ae2CompleteModelTokens": 26974,
+      "ratioOfSums": 0.28887076443983095,
+      "meetsFourfoldDiagnostic": false
+    }
+  },
+  "refused": [
+    {
+      "id": "task_record_field/inline",
+      "target": "typescript",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/inline",
+      "target": "python",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/inline",
+      "target": "rust",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/direct_factory",
+      "target": "typescript",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/direct_factory",
+      "target": "python",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/direct_factory",
+      "target": "rust",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/block_factory",
+      "target": "typescript",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/block_factory",
+      "target": "python",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/block_factory",
+      "target": "rust",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/branch_factory",
+      "target": "typescript",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/branch_factory",
+      "target": "python",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/branch_factory",
+      "target": "rust",
+      "reason": "TypeError: contract task requires a scalar callback-free body"
+    },
+    {
+      "id": "task_record_field/passed_parameter",
+      "target": "typescript",
+      "reason": "passed closure has no checked certificate; contract guard refuses at execution"
+    },
+    {
+      "id": "task_record_field/passed_parameter",
+      "target": "python",
+      "reason": "passed closure has no checked certificate; contract guard refuses at execution"
+    },
+    {
+      "id": "task_record_field/passed_parameter",
+      "target": "rust",
+      "reason": "passed closure has no checked certificate; contract guard refuses at execution"
+    },
+    {
+      "id": "task_identity/inline",
+      "target": "typescript",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/inline",
+      "target": "python",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/inline",
+      "target": "rust",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/direct_factory",
+      "target": "typescript",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/direct_factory",
+      "target": "python",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/direct_factory",
+      "target": "rust",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/block_factory",
+      "target": "typescript",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/block_factory",
+      "target": "python",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/block_factory",
+      "target": "rust",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/branch_factory",
+      "target": "typescript",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/branch_factory",
+      "target": "python",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/branch_factory",
+      "target": "rust",
+      "reason": "TypeError: contract task requires a directly awaited new task"
+    },
+    {
+      "id": "task_identity/passed_parameter",
+      "target": "typescript",
+      "reason": "passed closure has no checked certificate; contract guard refuses at execution"
+    },
+    {
+      "id": "task_identity/passed_parameter",
+      "target": "python",
+      "reason": "passed closure has no checked certificate; contract guard refuses at execution"
+    },
+    {
+      "id": "task_identity/passed_parameter",
+      "target": "rust",
+      "reason": "passed closure has no checked certificate; contract guard refuses at execution"
+    }
+  ]
+}
