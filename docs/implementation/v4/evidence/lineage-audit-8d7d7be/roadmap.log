@@ -1,0 +1,5 @@
+
+> @ghostlygawd/aether@0.1.0 roadmap:v4:check
+> node --experimental-strip-types roadmap/v4/render.ts --check
+
+v4 0.1.0: graph, evidence and tracker valid (62 tasks, 71 obligations).

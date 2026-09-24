@@ -1,0 +1,41 @@
+✔ every admitted artifact and shared child resolves to all signed causal links after reopen and GC (761.482583ms)
+✔ signed audit lineage refuses a missing physical spec, intent or artifact lease before collection (1701.356042ms)
+✔ malformed lineage authority cannot authorize through string substring membership (430.15ms)
+✔ forged signatures, missing intent ancestry and mismatched evidence cannot authorize artifacts (446.4495ms)
+✔ spec revisions invalidate every derived artifact, shared node and ancestor without a clear-flag bypass (844.147416ms)
+✔ explicit signed reconciliation preserves historical causes while requiring new specification-bound evidence (838.095709ms)
+✔ transitive specification parents propagate invalidation through derived clauses (679.4955ms)
+✔ fences reject pruning, removed contracts and vacuous proofs from strengthened preconditions (986.272708ms)
+✔ strict promotion adapter requires full parent lineage and an explicit fresh precommit checkpoint (1094.060584ms)
+✔ authority revocation during asynchronous preparation is rechecked before commit (747.393584ms)
+✔ specification compare-and-swap rejects stale edits and missing initialized metadata fails closed (368.35125ms)
+✔ actual SIGKILL before-state-publish preserves a complete old or new specification epoch (705.57775ms)
+✔ actual SIGKILL after-state-publish preserves a complete old or new specification epoch (793.857541ms)
+✔ a recomputed journal checksum cannot swap signed evidence or hide shared child lineage (1152.383333ms)
+✔ an actual concurrent spec editor waits for the strict promotion admission lock (1056.422833ms)
+✔ external dependency AST content is persisted, pinned and linked to its signed artifact (657.514791ms)
+✔ strict adapters are branded and renewed artifact authorization does not erase historical causes (753.479625ms)
+✔ V2 sink retirement proves exact unused registration and rule removal without live mutation (1204.231666ms)
+✔ exported, protected, fenced and retained sink consumers cannot retire (4963.20325ms)
+✔ V2 sink retirement includes retained dependency capabilities and still removes unrelated sinks (3086.307334ms)
+✔ V2 sink retirement rejects a retained dependency without its module (996.002334ms)
+✔ changed retention and dishonest liveness or table/rule edits fail independent verification (1184.963584ms)
+✔ committed retirement proof remains auditable after later task pins but cannot be reused for a new commit (1250.754083ms)
+✔ changed source/candidate roots, epochs and portable proof fail closed (1187.270791ms)
+✔ independent verifier checks a portable proof when proof production is unavailable (1437.717083ms)
+✔ V2 one-wrapper proposal promotes signed V3 exact dependencies and retains predecessor (4012.975416ms)
+✔ V2 refuses altered descriptor, substituted plans, stale lineage and retention (3652.273666ms)
+✔ V2 committed decision recovers only with its exact persisted proposal (3554.112333ms)
+✔ V2 ignores a caller-owned store pointer swapped after construction (4168.879875ms)
+✔ V2 keeps its original export fence when caller-owned policy arrays change (1172.352792ms)
+✔ V2 recovery refuses a finalized retry after another writer moved the local head (3897.035834ms)
+✔ V2 local pure execution requires the signed serving manifest and matching head (4251.200791ms)
+✔ V2 retention fence rejects a ledger for another store or policy (1392.484583ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 55877.978459
