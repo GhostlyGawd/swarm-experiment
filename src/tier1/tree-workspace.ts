@@ -1,5 +1,5 @@
 import { createPrivateKey, createPublicKey, sign, verify, type KeyObject } from 'node:crypto';
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { CapabilityRegistry } from '../tier2/ocap.ts';
 import { decodeCanonical, encodeCanonical, exactObject, identifier, decimal, type EncodingLimits } from '../fabric/encoding.ts';
@@ -10,6 +10,7 @@ import { atomicWrite } from './persistence.ts';
 import { linkGroups, type Term } from './ast.ts';
 import type { NodeRef } from './ids.ts';
 import { DurableGraphStore } from './durable-store.ts';
+import { SemanticGarbageCollector, type SemanticGcOptions, type SemanticRetention } from './semantic-gc.ts';
 import { allocateFractionalPosition } from './fractional-position.ts';
 import { compactOccurrenceProjection, lexical, occurrenceIdForInsert, orderChildren, projectOccurrences, TREE_SEMANTICS, validateOccurrenceNodes, type OccurrenceNode, type OccurrenceProjection, type ReindexEntry } from './occurrence-tree.ts';
 import { materializeOccurrences, type TreeMaterialization } from './tree-materialization.ts';
@@ -38,8 +39,16 @@ export interface TreeMutation { occurrenceId: Digest; frame: Uint8Array }
 export interface TreeWorkspaceOptions {
   directory: string; membership: MembershipV1; replicaId: string; privateKey?: KeyObject | string;
   store: DurableGraphStore; registry: CapabilityRegistry;
+  /** Optional exact-epoch retention authority. Each epoch needs a separate
+   * collector policy; old epoch pins remain monotone after checkpointing. */
+  semanticRetention?: (membershipEpoch: string) => SemanticGcOptions;
   maxOccurrences?: number; maxOperations?: number; maxCheckpointBytes?: number;
   fault?: (point: 'after-fence' | 'checkpoint-prepared' | 'checkpoint-committed' | 'checkpoint-collected') => void;
+}
+interface ReplicationRetentionMarker {
+  format: 'aether.tree-semantic-retention/1'; repositoryId: string; membershipEpoch: string;
+  configuration: Digest; workspaceDirectory: string; storeDirectory: string;
+  collectorDirectory: string; collectorConfiguration: Digest; reference: string; id: Digest;
 }
 function clone<T>(value: T, limits: Partial<EncodingLimits> = {}): T { return decodeCanonical(encodeCanonical(value, limits), limits) as T; }
 function durableDirectory(path: string): void {
@@ -66,6 +75,7 @@ export class DurableTreeWorkspace {
   private readonly maxOccurrences: number;
   private readonly limits: Partial<EncodingLimits>;
   private cached: { epoch: string; replica: DurableReplica } | null = null;
+  private readonly collectors = new Map<string, { collector: SemanticGarbageCollector; marker: ReplicationRetentionMarker }>();
 
   constructor(options: TreeWorkspaceOptions) {
     this.options = { ...options }; identifier(options.replicaId); this.replicaId = options.replicaId;
@@ -81,12 +91,12 @@ export class DurableTreeWorkspace {
       this.key = typeof options.privateKey === 'string' ? createPrivateKey(options.privateKey) : options.privateKey;
       if (enrollment(this.replicaId, this.key).publicKey !== this.initialMembership.replicas.find(member => member.replicaId === this.replicaId)?.publicKey) throw new Error('workspace signer does not match membership');
     }
-    durableDirectory(options.directory); durableDirectory(join(options.directory, 'epochs')); durableDirectory(join(options.directory, 'checkpoints')); durableDirectory(join(options.directory, 'fences'));
+    durableDirectory(options.directory); durableDirectory(join(options.directory, 'epochs')); durableDirectory(join(options.directory, 'checkpoints')); durableDirectory(join(options.directory, 'fences')); durableDirectory(join(options.directory, 'semantic-retention'));
     this.file = join(options.directory, 'workspace.json');
     this.lock = new JournalLock({ directory: join(options.directory, 'workspace-lock'), domain: 'aether.tree-workspace-lock', maxTickets: 100000 });
     this.lock.run(() => {
       if (!existsSync(this.file)) {
-        if (readdirSync(join(options.directory, 'epochs')).length || readdirSync(join(options.directory, 'checkpoints')).length || readdirSync(join(options.directory, 'fences')).length) throw new Error('missing initialized workspace metadata');
+        if (readdirSync(join(options.directory, 'epochs')).length || readdirSync(join(options.directory, 'checkpoints')).length || readdirSync(join(options.directory, 'fences')).length || readdirSync(join(options.directory, 'semantic-retention')).length) throw new Error('missing initialized workspace metadata');
         const state: WorkspaceState = { format: 'aether.tree-workspace/1', configuration: this.configuration, membership: this.initialMembership, lamportFloor: '0', base: [], history: [], fence: null, acknowledged: null, retiredLeases: [] };
         this.save(state);
       }
@@ -96,6 +106,7 @@ export class DurableTreeWorkspace {
       // complete protection set before releasing any predecessor epoch lease.
       // Missing content is a recovery error, never a reason to drop a frame.
       this.options.store.retain(this.lease(state), this.contentRoots(state.base, this.replica(state).framesFor(), state.membership));
+      this.assertSemanticHistory(state, true);
       for (const lease of state.retiredLeases) this.options.store.release(lease);
     }, 5000);
   }
@@ -116,6 +127,7 @@ export class DurableTreeWorkspace {
       // AST closure first so a crash at that boundary cannot leave a durable
       // operation whose content the store may collect.
       if (content) this.options.store.retain(this.lease(state), [content]);
+      if (content) this.pinReplication(state, content);
       return this.replica(state).ingest(frame);
     }, 5000);
   }
@@ -147,6 +159,7 @@ export class DurableTreeWorkspace {
       const state = this.read(); this.mutable(state);
       if (!this.projection(state).nodes.some(node => node.occurrenceId === occurrenceId)) throw new Error('missing occurrence');
       this.options.store.retain(this.lease(state), [content]);
+      this.pinReplication(state, content);
       return this.replica(state).author(occurrenceId, 'replace', { format: 'aether.tree-replace/1', content });
     }, 5000);
   }
@@ -158,6 +171,15 @@ export class DurableTreeWorkspace {
     }, 5000);
   }
   materialize(options: { leaseId: string }): TreeMaterialization { return this.lock.run(() => { const state = this.read(); return materializeOccurrences(this.projection(state), this.options.store, this.registry, options.leaseId); }, 5000); }
+  /** Verify the complete signed epoch history and physical GC leases before
+   * sweeping. This never interprets a local ACK as global causal stability. */
+  collectGarbage(): ReturnType<DurableGraphStore['collectGarbage']> {
+    return this.lock.run(() => {
+      const state = this.read();
+      this.assertSemanticHistory(state, false);
+      return this.options.semanticRetention ? this.retention(state.membership.membershipEpoch).collector.collect() : this.options.store.collectGarbage();
+    }, 5000);
+  }
 
   /** Writer fencing is durable before the signature is released. Fences bind
    * inventories, not competing proposed roots. Ordinary old-epoch deliveries
@@ -225,6 +247,7 @@ export class DurableTreeWorkspace {
       const imported = this.options.store.importArchive(Buffer.from(checkpoint.proposal.archive, 'base64'), { leaseId: stageLease });
       void imported;
       this.options.store.retain(this.lease(next), [...new Set(next.base.map(node => node.content))]);
+      this.assertSemanticEpoch(next.membership.membershipEpoch, [...new Set(next.base.map(node => node.content))], true);
       // The new epoch/profile exists before the single authoritative pointer moves.
       this.replica(next); this.options.fault?.('checkpoint-prepared');
       this.save(next); this.options.fault?.('checkpoint-committed');
@@ -238,6 +261,7 @@ export class DurableTreeWorkspace {
     if (projection.nodes.length >= this.maxOccurrences) throw new RangeError('occurrence workspace capacity reached');
     const bounds = this.bounds(projection, placement);
     this.options.store.retain(this.lease(state), [content]);
+    this.pinReplication(state, content);
     let occurrenceId = '';
     const frame = this.replica(state).authorMutation(identity => {
       occurrenceId = occurrenceIdForInsert(identity.operationId);
@@ -262,6 +286,116 @@ export class DurableTreeWorkspace {
     return projection;
   }
   private mutable(state: WorkspaceState): void { if (state.fence) throw new Error('writer fenced pending unanimous checkpoint; timeout cannot release it'); }
+  private retentionPath(epoch: string): string {
+    identifier(epoch);
+    const digest = domainDigest('aether.tree-retention-epoch/1', { configuration: this.configuration, epoch });
+    return join(this.options.directory, 'semantic-retention', `${digest.split(':').at(-1)}.json`);
+  }
+  private retention(epoch: string): { collector: SemanticGarbageCollector; marker: ReplicationRetentionMarker } {
+    const cached = this.collectors.get(epoch); if (cached) return cached;
+    const factory = this.options.semanticRetention;
+    if (!factory) throw new Error('unstable-replication semantic retention authority required');
+    const options = factory(epoch);
+    if (!options || options.store !== this.options.store || options.repositoryId !== this.initialMembership.repositoryId || options.policy?.epoch !== epoch)
+      throw new Error('unstable-replication authority store/repository/epoch mismatch');
+    const collector = new SemanticGarbageCollector(options);
+    const collectorDirectory = realpathSync(options.directory), storeDirectory = realpathSync(this.options.store.directory);
+    const profile = decodeCanonical(readFileSync(join(collectorDirectory, 'profile.json')));
+    const collectorConfiguration = domainDigest('aether.semantic-gc-config/1', profile);
+    const reference = `tree-replication:${domainDigest('aether.tree-replication-reference/1', {
+      configuration: this.configuration, repositoryId: this.initialMembership.repositoryId,
+      membershipEpoch: epoch, replicaId: this.replicaId, workspaceDirectory: realpathSync(this.options.directory),
+    }).split(':').at(-1)}`;
+    const body = { format: 'aether.tree-semantic-retention/1' as const, repositoryId: this.initialMembership.repositoryId,
+      membershipEpoch: epoch, configuration: this.configuration, workspaceDirectory: realpathSync(this.options.directory),
+      storeDirectory, collectorDirectory, collectorConfiguration, reference };
+    const marker = { ...body, id: domainDigest('aether.tree-semantic-retention/1', body) };
+    const result = { collector, marker }; this.collectors.set(epoch, result); return result;
+  }
+  private assertRetentionPins(collector: SemanticGarbageCollector, marker: ReplicationRetentionMarker, roots: readonly NodeRef[]): void {
+    const records = SemanticGarbageCollector.prototype.retentions.call(collector);
+    const leases = DurableGraphStore.prototype.roots.call(this.options.store).leases;
+    const present = new Set(records.filter(item => item.kind === 'unstable-replication' && item.reference === marker.reference).map(item => item.root));
+    for (const root of roots) {
+      const record: SemanticRetention = { kind: 'unstable-replication', reference: marker.reference, root };
+      const expectedLease = `semantic-gc-retention:${domainDigest('aether.semantic-retention/1', { configuration: marker.collectorConfiguration, ...record })}`;
+      const lease = leases[expectedLease];
+      if (!present.has(root) || !Array.isArray(lease) || lease.length !== 1 || lease[0] !== root)
+        throw new Error('unstable-replication semantic retention record or physical lease missing');
+      DurableGraphStore.prototype.hydrate.call(this.options.store, root);
+    }
+  }
+  /** The collector constructor normally reconstructs lost leases from its
+   * journal. A workspace with an established marker must detect that loss
+   * before constructing the collector, otherwise reopen would self-heal a
+   * broken publication invariant without surfacing it. */
+  private preflightRetentionPins(epoch: string, roots: readonly NodeRef[]): void {
+    const marker = exactObject(decodeCanonical(this.readFile(this.retentionPath(epoch)), this.limits),
+      ['format', 'repositoryId', 'membershipEpoch', 'configuration', 'workspaceDirectory', 'storeDirectory', 'collectorDirectory', 'collectorConfiguration', 'reference', 'id']) as unknown as ReplicationRetentionMarker;
+    const { id, ...body } = marker;
+    if (marker.format !== 'aether.tree-semantic-retention/1' || marker.membershipEpoch !== epoch ||
+      id !== domainDigest('aether.tree-semantic-retention/1', body))
+      throw new Error('unstable-replication semantic retention marker corrupt');
+    const leases = DurableGraphStore.prototype.roots.call(this.options.store).leases;
+    for (const root of roots) {
+      const record: SemanticRetention = { kind: 'unstable-replication', reference: marker.reference, root };
+      const retentionId = domainDigest('aether.semantic-retention/1', { configuration: marker.collectorConfiguration, ...record });
+      const path = join(marker.collectorDirectory, 'retention', `${retentionId.split(':').at(-1)}.json`);
+      if (!existsSync(path)) throw new Error('unstable-replication semantic retention record missing');
+      const value = exactObject(decodeCanonical(this.readFile(path), this.limits), ['format', 'configuration', 'record', 'id']);
+      if (value.format !== 'aether.semantic-retention/1' || value.configuration !== marker.collectorConfiguration || value.id !== retentionId ||
+        domainDigest('aether.tree-retention-record/1', value.record) !== domainDigest('aether.tree-retention-record/1', record))
+        throw new Error('unstable-replication semantic retention record changed');
+      const lease = `semantic-gc-retention:${retentionId}`;
+      if (!Array.isArray(leases[lease]) || leases[lease].length !== 1 || leases[lease][0] !== root)
+        throw new Error('unstable-replication physical lease missing or changed');
+    }
+  }
+  private assertSemanticEpoch(epoch: string, roots: readonly NodeRef[], allowCreate: boolean): void {
+    const path = this.retentionPath(epoch);
+    if (!this.options.semanticRetention) {
+      if (existsSync(path)) throw new Error('unstable-replication semantic retention authority required');
+      return;
+    }
+    if (existsSync(path)) this.preflightRetentionPins(epoch, roots);
+    const { collector, marker } = this.retention(epoch);
+    if (existsSync(path)) {
+      const value = exactObject(decodeCanonical(this.readFile(path), this.limits), ['format', 'repositoryId', 'membershipEpoch', 'configuration', 'workspaceDirectory', 'storeDirectory', 'collectorDirectory', 'collectorConfiguration', 'reference', 'id']);
+      if (domainDigest('aether.tree-semantic-retention-marker/1', value, this.limits) !== domainDigest('aether.tree-semantic-retention-marker/1', marker, this.limits))
+        throw new Error('unstable-replication semantic retention marker changed');
+    } else {
+      if (!allowCreate) throw new Error('unstable-replication semantic retention marker missing');
+      for (const root of roots) SemanticGarbageCollector.prototype.retain.call(collector, { kind: 'unstable-replication', reference: marker.reference, root });
+      this.assertRetentionPins(collector, marker, roots);
+      this.writeImmutable(path, marker);
+    }
+    this.assertRetentionPins(collector, marker, roots);
+  }
+  private assertSemanticHistory(state: WorkspaceState, allowCurrentCreate: boolean): void {
+    const markers = readdirSync(join(this.options.directory, 'semantic-retention')).filter(name => !name.startsWith('.'));
+    if (!this.options.semanticRetention) {
+      if (markers.length) throw new Error('unstable-replication semantic retention authority required');
+      return;
+    }
+    for (const digest of state.history) {
+      const certificate = decodeCanonical(this.readFile(this.checkpointPath(digest)), this.limits) as unknown as TreeCheckpointCertificate;
+      const proposal = certificate.checkpoint.proposal;
+      const roots = this.contentRoots(proposal.before, proposal.frames.map(frame => Buffer.from(frame, 'base64')), proposal.membership);
+      this.assertSemanticEpoch(proposal.membership.membershipEpoch, roots, false);
+    }
+    const roots = this.contentRoots(state.base, this.replica(state).framesFor(), state.membership);
+    this.assertSemanticEpoch(state.membership.membershipEpoch, roots, allowCurrentCreate);
+  }
+  private pinReplication(state: WorkspaceState, root: NodeRef): void {
+    if (!this.options.semanticRetention) {
+      if (existsSync(this.retentionPath(state.membership.membershipEpoch))) throw new Error('unstable-replication semantic retention authority required');
+      return;
+    }
+    this.assertSemanticEpoch(state.membership.membershipEpoch, this.contentRoots(state.base, this.replica(state).framesFor(), state.membership), false);
+    const { collector, marker } = this.retention(state.membership.membershipEpoch);
+    SemanticGarbageCollector.prototype.retain.call(collector, { kind: 'unstable-replication', reference: marker.reference, root });
+    this.assertRetentionPins(collector, marker, [root]);
+  }
   private lease(state: WorkspaceState): string { return domainDigest('aether.tree-live-lease/1', { configuration: this.configuration, replicaId: this.replicaId, epoch: state.membership.membershipEpoch }); }
   private stagingLease(checkpoint: Digest): string { return domainDigest('aether.tree-checkpoint-stage/1', { configuration: this.configuration, replicaId: this.replicaId, checkpoint }); }
   private replica(state: WorkspaceState): DurableReplica {
