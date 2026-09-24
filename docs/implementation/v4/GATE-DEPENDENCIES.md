@@ -1,6 +1,6 @@
 # Active gate dependencies
 
-Status snapshot: 2026-09-23, specification 0.1.0. The generated [tracker](TRACKER.md) remains the authority for task status: **20/62 verified** (13/13 baseline, 7/20 v2, 0/14 v3, 0/15 v4). All seven tasks below have verified prerequisites and are in progress. No individual gate below is claimed verified; each task needs complete evidence for both gates before its status can change. There are 17 failed or unmeasured required release benchmark targets. The count is intentionally strict, but its long plateau is a real delivery risk; partial prototypes are tracked here so effort and remaining distance stay visible.
+Status snapshot: 2026-09-24, specification 0.1.0. The generated [tracker](TRACKER.md) remains the authority for task status: **20/62 verified** (13/13 baseline, 7/20 v2, 0/14 v3, 0/15 v4). All seven tasks below have verified prerequisites and are in progress. No individual gate below is claimed verified; each task needs complete evidence for both gates before its status can change. There are 17 failed or unmeasured required release benchmark targets. The count is intentionally strict, but its long plateau is a real delivery risk; partial prototypes are tracked here so effort and remaining distance stay visible.
 
 | Task and gates | Evidence already available | Work still required to close the whole task | First downstream tasks waiting on it |
 | --- | --- | --- | --- |
@@ -14,9 +14,11 @@ Status snapshot: 2026-09-23, specification 0.1.0. The generated [tracker](TRACKE
 
 ## Closure order
 
-1. Finish **T2-04's remaining V11 crash/fence phases, full external-effect path matrix and budget settlement**. It blocks resource typing and production topology. A signing key or monotonic head inside the reloadable factory would not establish the required independent authority. A signed broker assertion also cannot prove that an external sink acted; authenticated sink status or an isolated trusted executor is required. Historical V1 journals stay explicit.
-2. Finish **T1-02's semantic coverage** to unlock cross-layer specifications and their v2 dependents. Keep actual 4× token efficiency as a separate unchanged release result.
-3. Target **T3-07 for the next complete task closure** by finishing its two production gates, then retain the 50 ns release measurement separately. Do not count its current pure/effect candidate slices as the whole task.
+T2-04's [D12 budget slice](decisions/D12-signed-sink-budget-evidence.md) adds a real broker/sink charge, signed-fence refund and unknown encumbrance campaign. It does not close the row above: V11 host and deployment admission still require a versioned non-null reservation identity, deterministic operator grant selection, independent budget-journal custody and measured charges. A generic pre-dispatch bridge release needs a signed fence in that profile. These gaps remain visible even though the focused campaign passes.
+
+1. Close the current **T2-04 budget evidence checkpoint**, then make **T3-07 the next complete-task target**. Its two gates have verified prerequisites and a narrower remaining integration path than T2-04. The separate 50 ns release measurement remains unchanged. Do not count current pure/effect candidate slices as the whole task.
+2. Resume **T2-04's remaining V11 crash/fence phases, full external-effect path matrix and budget settlement**. It blocks resource typing and production topology. A signing key or monotonic head inside the reloadable factory would not establish the required independent authority. A signed broker assertion also cannot prove that an external sink acted; authenticated sink status or an isolated trusted executor is required. Historical V1 journals stay explicit.
+3. Finish **T1-02's semantic coverage** to unlock cross-layer specifications and their v2 dependents. Keep actual 4× token efficiency as a separate unchanged release result.
 4. Continue T2-06 and T3-03 production integration and T3-10 full-runtime work. Recompute the graph and benchmark manifest after each complete gate campaign. Only a passing evidence manifest for every gate changes the 20/62 count.
 
 This ledger tracks the reason for a stationary task count without subdividing tasks to inflate progress. It is a work queue, not acceptance evidence or a change to the v4 PRD, task gates or thresholds.

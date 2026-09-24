@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Bounded signed sink budget settlement — 2026-09-24
+
+- Added a helper that checks fixed-charge settlement against the exact signed `/2` sink witness head and full operator-pinned effect requests. It supplies bridge observations and ledger settlement verification. Its stable policy digest binds trust roots, charge and request inventory into opt-in ledger identity.
+- A real sink/broker test covers one charge after witnessed commit, cached/reopened idempotence, signed-fence refund, early and late witness outage, retained encumbrance and recovery. Focused helper, broker and historical bridge tests pass 18/18. This remains broker-level fixed-charge evidence; V11 host admission, measured usage, independent budget-journal custody and complete T2-04/T2-05 gates remain open. [Decision and limits](decisions/D12-signed-sink-budget-evidence.md).
+
 ## Opt-in V11 resource-scoped sink profile — 2026-09-24
 
 - Added signed external sink policy `/6`, host configuration `/9`, deployment state `/11`, prepared `/9` and effect plan `/9`. One bounded tagged string argument selects a signed target path segment. The concrete path is checked against the original scoped grant before the proposed worker snapshot or effect intent is published and again before dispatch. Grant reference `/2` binds its path digest into the broker's signed request. V5/V10 sink-wide and earlier bytes remain explicit.

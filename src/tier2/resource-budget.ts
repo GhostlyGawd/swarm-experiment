@@ -63,6 +63,12 @@ export interface ResourceBudgetOptions {
   /** Trusted verification of actual sink/broker/meter evidence. Merely accepting
    * a caller's claimed receipt digest does not satisfy this contract. */
   readonly verifySettlement: (settlement: ResourceSettlement) => boolean;
+  /** Opt-in external-evidence check on every historical read/reopen. A missing
+   * witness makes the ledger unavailable rather than accepting a cached charge. */
+  readonly revalidateSettlementOnRead?: boolean;
+  /** Operator-pinned identity of the exact evidence verifier configuration.
+   * Required by historical revalidation and bound into the ledger digest. */
+  readonly settlementEvidencePolicyDigest?: Digest;
   readonly fault?: (phase: ResourceBudgetFault) => void;
 }
 interface JournalRecord { readonly format: 'aether.resource-transition/1'; readonly sequence: number; readonly previous: Digest; readonly request: ResourceRequest; readonly receipt: ResourceReceipt; readonly signature: string }
@@ -108,6 +114,12 @@ export class ResourceBudgetLedger {
   private readonly file: string;
   private readonly lock: JournalLock;
   constructor(options: ResourceBudgetOptions) {
+    if (options.revalidateSettlementOnRead !== undefined
+      && typeof options.revalidateSettlementOnRead !== 'boolean')
+      throw new TypeError('invalid settlement revalidation profile');
+    if (options.revalidateSettlementOnRead) validateDigest(options.settlementEvidencePolicyDigest);
+    else if (options.settlementEvidencePolicyDigest !== undefined)
+      throw new TypeError('settlement evidence policy requires historical revalidation');
     this.profile = freeze(clone(options.profile)); this.options = { ...options };
     exactObject(this.profile, ['format', 'ledgerId', 'policyEpoch', 'initialOwner', 'initial', 'maxOperations']);
     if (this.profile.format !== RESOURCE_BUDGET_PROFILE) throw new TypeError('unsupported resource budget profile');
@@ -117,7 +129,11 @@ export class ResourceBudgetLedger {
     if (this.key.type !== 'private' || this.key.asymmetricKeyType !== 'ed25519') throw new TypeError('Ed25519 ledger issuer key required');
     this.verificationKey = createPublicKey(this.key); this.publicKey = this.verificationKey.export({ type: 'spki', format: 'der' }).toString('base64');
     directory(resolve(options.directory)); this.directory = realpathSync(resolve(options.directory));
-    this.ledgerDigest = digest(RESOURCE_BUDGET_PROFILE, { profile: this.profile, publicKey: this.publicKey, authorityDirectory: this.directory });
+    this.ledgerDigest = digest(RESOURCE_BUDGET_PROFILE, { profile: this.profile,
+      publicKey: this.publicKey, authorityDirectory: this.directory,
+      ...(options.revalidateSettlementOnRead
+        ? { settlementEvidencePolicy: 'aether.resource-settlement-revalidation/1',
+          settlementEvidencePolicyDigest: options.settlementEvidencePolicyDigest } : {}) });
     directory(join(this.directory, 'tickets'));
     this.file = join(this.directory, 'journal.json');
     this.lock = new JournalLock({ directory: join(this.directory, 'tickets'), maxTickets: 100_000, domain: 'aether.resource-budget-lock' });
@@ -250,6 +266,11 @@ export class ResourceBudgetLedger {
       exactObject(record, ['format', 'sequence', 'previous', 'request', 'receipt', 'signature']);
       if (record.format !== 'aether.resource-transition/1' || record.sequence !== index + 1 || record.previous !== previous) throw new Error('resource journal transition order mismatch');
       const { signature, ...body } = record; this.verify('aether.resource-transition-signature/1', body, signature); this.validateRequest(record.request);
+      if (this.options.revalidateSettlementOnRead) {
+        const settlement = this.settlement(record.request);
+        if (settlement && this.options.verifySettlement(settlement) !== true)
+          throw new Error('historical resource settlement evidence rejected');
+      }
       if (fold.receipts.has(record.request.operationId)) throw new Error('duplicate durable operation ID');
       const expected = this.derive(record.request, fold, record.sequence); if (!equal(expected, record.receipt)) throw new Error('resource receipt disagrees with exact transition');
       fold.receipts.set(record.request.operationId, { request: expected.requestDigest, receipt: record.receipt }); previous = digest('aether.resource-transition/1', record);
