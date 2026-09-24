@@ -1,0 +1,25 @@
+# V10 witnessed sink operating profile
+
+This is the opt-in local operating procedure for [D10](decisions/D10-attested-sink-host-profile.md). It applies to the bounded append-once sink fixture and does not qualify an arbitrary external API or full V4 containment.
+
+## Provisioned authorities
+
+Use three separately launched processes: the sink service, a sink decision witness, and an operator witness for effect, host and deployment journals. The sink witness configuration has one `sink-scope` namespace containing the full `aether.sink-anchor/1` public anchor and approved adapter artifact digest. The operator witness configuration has an `effect-scope`, a `host-scope` and an exact `deployment` namespace. All use the same repository and deployment identities where required by `scoped-anchored-sink-v10`. The sink authority, V5 policy signer and trusted clock are supplied to ProcessDeployment outside its reloadable service factory.
+
+The sink's canonical `aether.attested-sink-config/2` file contains `socketPath`, `storageDir`, `authKeyFile`, `signingKeyFile`, `anchor`, `adapterArtifactDigest`, `witnessSocketPath`, `witnessKeyFile` and `witnessAuthorityId`. The witness service uses its existing canonical config shape: `socketPath`, `storageDir`, `keyFile`, `namespaces`. Keep all config and key files private to their service owners and use absolute paths. The sink CLI rejects a witness socket/key under its own storage directory and a witness key equal to its sink transport key.
+
+Start the sink witness and operator witness first with `npm run witness:serve -- --config /absolute/private/witness.json`, each with its own config, key and durable storage. Then start `npm run sink:serve -- --config /absolute/private/sink.json`. Finally open ProcessDeployment with `capabilityProfile: 'scoped-anchored-sink-v10'`, the V5 signed policy, both witness catalogs, deployment witness, sink authority and sink state witness. The factory supplies the effect router and policy bytes; it must not supply operator anchors or witnesses.
+
+## Recovery
+
+If a controller stops during an effect, preserve all three stores and the original execution/effect IDs. Restart the witness processes with their original keys, namespace allowlists and storage directories, then restart the sink service with its original signer and `/2` config. A missing or older sink-local mirror is restored from the sink witness head; a same-revision disagreement or local state ahead of the head refuses service. Do not delete the witness head or create a new sink identity to make an uncertain call appear absent.
+
+Reopen the deployment under its original V10 profile and operator objects. A pending operation with a possible external commit requires `recoverOperation(operationId, { strategy: 'isolated-replay' })` under the separate recovery authorization. The broker asks the sink for its signed status, checks the exact receipt against the sink witness, and the host/deployment publish their recovered outcomes through their own witnesses. `abort-before-effects` is valid only when durable evidence proves the effect never entered dispatch; `abort-readonly-wasm` is not an external-write recovery path. A missing sink witness makes `servingReady` false and blocks new V10 source transitions.
+
+The [controller crash campaign](../../../test/tier4/process-attested-sink-controller-crash.test.ts) kills the controller after the sink commit but before the broker terminal journal replacement, while the broker's durable dispatch ticket is held. Fresh recovery uses the exact dead-owner ticket check before querying sink status; a live or unverifiable owner must remain fenced. It refuses `abort-before-effects`, completes isolated replay, and observes the same cached result with one sink decision.
+
+Check the sink witness's decision count and receipt against the sink's local mirror, the V4 broker terminal event, the host effect record and the deployment invocation receipt. For the same logical effect, the sink decision count must not increase during recovery or cached retry. Signed `not_committed` is terminal only with the sink's durable fence; unknown status remains indeterminate.
+
+## Limits
+
+The current sink state is bounded to 1,024 decisions and 8 MiB. The authenticated socket transport is synchronous, and the immutable service lock ticket log needs quiescent maintenance after its configured ticket capacity. The tested processes still run under one UID. The approved adapter digest is a pinned subject label rather than measured executable code, and the V5 grant path covers the whole sink. Distinct-UID custody, payload-specific target scopes, a third-party irreversible transaction and whole-machine rollback protection remain outside this profile's evidence.

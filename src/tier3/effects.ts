@@ -175,6 +175,10 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     if (!adapter.semantics.reconciliation || !adapter.semantics.readOnly
       && !(this.#trustedSinkAuthority && isAttestedSinkAdapter(adapter)))
       throw new TypeError('recorded effect lacks trusted reconciliation');
+    // The prior controller may have died while holding the broker's durable
+    // dispatch ticket. Recovery checks that exact owner is dead before asking
+    // the original sink for status; a live or unverifiable writer stays fenced.
+    DurableEffectBroker.prototype.recoverDeadWriter.call(this.#options.broker);
     return this.#trustedWitness
       ? DurableEffectBroker.prototype.reconcile.call(this.#options.broker, request, adapter)
       : this.#options.broker.reconcile(request, adapter);

@@ -257,8 +257,10 @@ test('V10 ProcessHost and Deployment pin witnessed sink outcomes across workers,
         audience: 'other-entry', path: effectGrant.body.path }, 60_000)]],
       ['wrong-path', [...onlyInvoke, grants.issue({ capability: CAP,
         audience: entry, path: ['wrong'] }, 60_000)]],
-      ['widened', [...onlyInvoke, { ...effectGrant,
-        body: { ...effectGrant.body, path: ['sink', 'other'] } }]],
+      ['forged-widening', [...onlyInvoke, { ...effectGrant,
+        body: { ...effectGrant.body, path: effectGrant.body.path.slice(0, -1) } }]],
+      ['narrowed-child', [...onlyInvoke, grants.attenuate(effectGrant, { capability: CAP,
+        audience: entry, path: [...effectGrant.body.path, 'other'] }, 60_000)]],
     ] as const;
     for (const [name, denied] of deniedGrants)
       await assert.rejects(deployment.call(entry, [{ tag: 'string', value: 'denied' }],

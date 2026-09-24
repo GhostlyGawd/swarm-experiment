@@ -1270,10 +1270,19 @@ export class ProcessHost {
       for (const cap of required) {
         const matches = tokens.filter(token => (token as ScopedGrantV2).body.capability === cap);
         const scoped = matches[0] as ScopedGrantV2 | undefined;
+        // V4 Wasm and V5 sink policies use fixed signed resource paths. Check
+        // that concrete path at admission, before recording a call intent or
+        // starting a worker. A valid but narrower child grant cannot defer
+        // denial until after the effect boundary has begun.
+        const fixedRule = this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4'
+          || this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/5'
+          ? this.signedEffectResourcePolicy.body.rules.find(rule => rule.capability === cap) : undefined;
+        const requiredPath = cap === PROCESS_INVOKE ? basePath
+          : fixedRule ? [...basePath, ...fixedRule.prefix] : scoped?.body.path;
         if (!scoped || matches.length !== 1 || basePath.some((part, index) => scoped.body.path[index] !== part)
           || cap === PROCESS_INVOKE && scoped.body.path.length !== basePath.length
           || !this.options.scopedGrants.verify(scoped, { capability: cap, audience: symbol,
-            path: cap === PROCESS_INVOKE ? basePath : scoped.body.path })) throw new Error(`authority_denied: missing valid ${cap}`);
+            path: requiredPath! })) throw new Error(`authority_denied: missing valid ${cap}`);
         if (this.options.trustedClockAnchor) assertGrantLifetime(this.options.trustedClockAnchor, scoped.body.issuedAt, scoped.body.expiresAt);
       }
       this.checkRevocations(symbol, unit, generation, 'live'); return;

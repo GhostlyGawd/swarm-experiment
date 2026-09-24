@@ -683,13 +683,13 @@ export class ProcessDeployment implements PromotionDriver {
     if(this.closed)throw new Error('deployment is closed');
     const admission=this.options.coordinator.state();
     if(admission.activationPending||state.readiness!=='ready'||state.active.manifest!==admission.committedManifest||state.active.generation!==admission.generation)throw new Error('deployment source is frozen or does not match committed target');
+    if (sinkProfile(this.capabilityProfile)) readSinkStateHead(this.options.sinkStateWitness!);
   }
   private assertServing(state = this.readState()): void {
     if(this.closed)throw new Error('deployment is closed');
     const manifest = this.options.coordinator.servingManifest(), admission = this.options.coordinator.state();
     this.assertCommittedSource(state);
     if (state.readiness !== 'ready' || state.active.manifest !== manifest || state.active.generation !== admission.generation) throw new Error('deployment serving is frozen or does not match committed target');
-    if (sinkProfile(this.capabilityProfile)) readSinkStateHead(this.options.sinkStateWitness!);
   }
   servingManifest(): Digest { const state = this.readState(); this.assertServing(state); return state.active.manifest; }
   status(): { readiness: DeploymentState['readiness']; servingReady:boolean; capabilityProfile: CapabilityDeploymentProfile; activeManifest: Digest; generation: string; workerPids: Readonly<Record<string, number>> } {
