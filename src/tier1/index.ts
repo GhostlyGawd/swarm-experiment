@@ -8,6 +8,9 @@ export { CausalLineageLedger, LineageAdmissionError, signSpecRevision, signInten
 export { CognitiveBlackboard, type BlackboardItem, type BlackboardAcl, type BlackboardPolicy, type BlackboardEntry, type BlackboardView, type CognitiveBlackboardOptions } from './cognitive-blackboard.ts';
 export { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, SEMANTIC_GC_CALL_SHIM_PROFILE, SEMANTIC_GC_FUEL_PROFILE, type SemanticGcProfile, type SemanticGcOptions, type SemanticGcPolicy, type SemanticGcProposal, type SemanticRetention, type SemanticRetentionKind } from './semantic-gc.ts';
 export { SemanticAdapterGarbageCollector, declarativeAdapterTableDigest, type DeclarativeAdapterRegistration, type DeclarativeAdapterTable, type AdapterRetirementProposal, type SemanticAdapterGcOptions } from './semantic-gc-adapters.ts';
+export { proposeSemanticSinkRetirementV2, verifySemanticSinkRetirementV2,
+  type SinkRetirementSelectionV2, type SemanticSinkRetirementContextV2,
+  type SemanticSinkRetirementProposalV2 } from './semantic-gc-sink-retirement.ts';
 export { DurableTreeWorkspace, type TreeWorkspaceOptions, type TreePlacement, type TreeMutation, type TreeFence, type TreeCheckpoint, type TreeCheckpointAck, type TreeCheckpointCertificate } from './tree-workspace.ts';
 export { allocateFractionalPosition, compareFractionalPositions, parseFractionalPosition } from './fractional-position.ts';
 export { projectOccurrences, occurrenceIdForInsert, type OccurrenceNode, type OccurrenceProjection, type TreeDiagnostic } from './occurrence-tree.ts';
