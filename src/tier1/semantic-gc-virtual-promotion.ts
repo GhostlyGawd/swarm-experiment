@@ -24,6 +24,8 @@ import { CapabilityRegistry, PURE_COMPUTE } from '../tier2/ocap.ts';
 import { typecheck } from '../tier2/typecheck.ts';
 import { compileResumableProgram, RESUMABLE_PROFILE_DIGEST,
   virtualForwardResumableProfileDigest } from '../tier3/resumable-program.ts';
+import { ResumableRuntime, type ResumableRunResult } from '../tier3/resumable-runtime.ts';
+import type { Value } from '../tier3/values.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
 type Decl = Extract<Term, { kind: 'FunctionDecl' }>;
@@ -388,5 +390,36 @@ export class SemanticVirtualGcPromotionV2 {
     if (coordinator.admissionProfile !== 'strict-lineage-v1')
       throw new Error('virtual GC recovery requires strict signed-lineage coordinator');
     return coordinator.recover(this.localDriver(id));
+  }
+  /** Pure local serving boundary. The coordinator's signed serving decision
+   * and the exact AST head must agree before and after the call. No external
+   * effect can escape if another writer moves the public head during it. */
+  execute(id: Digest, coordinator: PromotionCoordinator, symbol: SymbolId,
+    args: readonly Value[], executionId: string, maxSteps = 100_000): ResumableRunResult {
+    identifier(executionId);
+    if (coordinator.admissionProfile !== 'strict-lineage-v1')
+      throw new Error('virtual GC serving requires strict signed-lineage coordinator');
+    const proposal = this.readProposal(id, false);
+    const checkHead = () => {
+      if (coordinator.servingManifest() !== proposal.candidateManifestDigest)
+        throw new Error('virtual GC candidate is not the signed serving manifest');
+      const head = this.options.store.head('production');
+      if (!head || head.root !== proposal.descriptor.candidateRoot)
+        throw new Error('virtual GC local serving head differs from signed candidate');
+      return head.generation;
+    };
+    const generation = checkHead();
+    const source = moduleAt(this.options.store, proposal.descriptor.sourceRoot);
+    const candidate = moduleAt(this.options.store, proposal.descriptor.candidateRoot);
+    const wrapper = source.members.find((item): item is Decl =>
+      item.kind === 'FunctionDecl' && item.symbol === proposal.descriptor.wrapper)!;
+    const runtime = new ResumableRuntime(candidate, { manifest: proposal.candidateManifest,
+      registry: this.options.registry, executionId, maxSteps, dependencies: [wrapper],
+      virtualForward: { source, descriptor: proposal.descriptor } });
+    runtime.start(symbol, args);
+    const outcome = runtime.run();
+    if (!['completed', 'faulted'].includes(outcome.state) || checkHead() !== generation)
+      throw new Error('virtual GC serving head changed during local execution');
+    return outcome;
   }
 }

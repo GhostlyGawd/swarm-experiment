@@ -49,7 +49,11 @@ and their own crash/concurrency evidence before broader promotion.
 The coordinator and public AST store do not share one lock after activation.
 A later independent writer can still change the local head; callers must not
 equate the coordinator's serving manifest with an externally mutable store head
-without a serving-time head check or exclusive write authority.
+without a serving-time head check or exclusive write authority. The bounded
+`execute()` entrypoint now checks the strict-lineage serving manifest and
+candidate head/generation before and after a pure local resumable call. It
+refuses to return the result if the head moved during execution. This is a
+local pure-serving guard, not an atomic lock against every later writer.
 
 ## Boundary and remaining work
 
@@ -75,4 +79,4 @@ npm run build
 The focused test covers signed promotion, exact dependency/profile checks,
 descriptor and plan substitution, source revocation, retention changes, caller
 options mutation, a postcommit crash with exact-ID recovery, wrong-head retry
-refusal, and retained predecessor AST roots.
+refusal, serving-time head refusal, and retained predecessor AST roots.

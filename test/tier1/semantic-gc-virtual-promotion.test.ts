@@ -253,6 +253,22 @@ test('V2 recovery refuses a finalized retry after another writer moved the local
   } finally { f.cleanup(); }
 });
 
+test('V2 local pure execution requires the signed serving manifest and matching head', async () => {
+  const f = fixture();
+  try {
+    assert.throws(() => f.gc.execute(f.proposal.id, f.coordinator, f.entry, [3n], 'before-promotion'),
+      /serving manifest/);
+    await f.gc.promote(f.proposal.id, f.input(), f.coordinator);
+    const served = f.gc.execute(f.proposal.id, f.coordinator, f.entry, [3n], 'served-local');
+    assert.equal(served.value?.tag, 'int');
+    if (served.value?.tag === 'int') assert.equal(served.value.value, '4');
+    const candidateHead = f.store.head('production')!;
+    f.store.commit('production', f.descriptor.sourceRoot, candidateHead);
+    assert.throws(() => f.gc.execute(f.proposal.id, f.coordinator, f.entry, [3n], 'moved-head'),
+      /serving head differs/);
+  } finally { f.cleanup(); }
+});
+
 test('V2 retention fence rejects a ledger for another store or policy', () => {
   const f = fixture();
   const separate = new DurableGraphStore({ directory: join(f.directory, 'other-ast') });
