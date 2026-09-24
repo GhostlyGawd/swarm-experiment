@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Read-only closure contract projection V14 — 2026-09-24
+
+- Added `aether.executable-projection/14` for inline capability-free contract lambdas and direct pure factories returning visible lambdas with scalar captures. A transitive static check refuses mutable/opaque captures, effectful or unknown targets, nonlocal writes and unsupported closure state. Actual TypeScript, Python and Rust execution, exact-root edits and imported-factory checks pass. [Profile and limits](../../../roadmap/v4/research/projections/READ-ONLY-CONTRACT-CLOSURES.md).
+- A function-valued parameter and a factory with a captured block local remain valid in the reference runtime but are explicitly rejected by the native projection profile. V4-T1-02/G1 remains open. FR-1.2's measured cold/changed-session density misses and V4-Q03 are unchanged; no task count changes.
+
 ## Signed effectful living campaign and current-source T3-03 measurement — 2026-09-24
 
 - Added an opt-in signed `LivingCampaign` `/2` path for arbitrary statically typed Aether modules within the declared scalar/record boundary. It binds the exact module root and scenario plan to signed execution and effect policies, routes effects through a per-case durable sandbox broker, persists seeded case and effect evidence, rechecks raw files at local admission, and rejects unknown post-dispatch outcomes or hidden precondition filters. The original pure `/1` path retains its denying router and wire bytes. [Contract and limits](LIVING-EFFECT-CAMPAIGN.md).

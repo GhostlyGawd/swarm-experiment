@@ -11,7 +11,7 @@ import { GraphStore } from '../../src/tier1/store.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { typecheck } from '../../src/tier2/typecheck.ts';
 import { Runtime } from '../../src/tier3/runtime.ts';
-import { executableBundle, parseExecutableBundle, RUST_PROJECTION_CARGO } from '../../src/projection/executable.ts';
+import { executableBundle, parseExecutableBundle, projectTypeScriptV13, projectPythonV13, projectRustV13, RUST_PROJECTION_CARGO } from '../../src/projection/executable.ts';
 
 function fixture() {
   const symbols = new SymbolSpace('projection-contract-composites');
@@ -87,7 +87,7 @@ test('V13 rejects mutable and effectful contract callees, including transitive p
     assert.throws(() => executableBundle(effectfulFold, f.symbols, target), /synthesized pure callee/);
 });
 
-test('a valid pure closure predicate remains an explicit G1 projection gap', () => {
+test('V13 still rejects a valid pure closure predicate while V14 admits its exact root', () => {
   const symbols = new SymbolSpace('projection-contract-indirect-gap');
   const factory = symbols.define('factory'), entry = symbols.define('entry');
   const closure: Ty = { t: 'Fn', params: [], returns: b.Bool, capabilities: [] };
@@ -101,8 +101,14 @@ test('a valid pure closure predicate remains an explicit G1 projection gap', () 
   assert.equal(typecheck(module, { registry: new CapabilityRegistry() }).ok, true);
   const reference = new Runtime({ registry: new CapabilityRegistry() }).load(module).call(entry, []);
   assert.equal(reference.ok, true); if (reference.ok) assert.equal(reference.value, 1n);
-  for (const target of ['typescript', 'python', 'rust'] as const)
-    assert.throws(() => executableBundle(module, symbols, target), /contract profile/);
+  const legacy = { typescript: projectTypeScriptV13, python: projectPythonV13, rust: projectRustV13 };
+  const root = new GraphStore().intern(module);
+  for (const target of ['typescript', 'python', 'rust'] as const) {
+    assert.throws(() => legacy[target](module, symbols), /contract profile/);
+    const bundle = executableBundle(module, symbols, target);
+    assert.match(bundle.source, /@aether-projection\/14/);
+    assert.equal(new GraphStore().intern(parseExecutableBundle(bundle).module), root);
+  }
 });
 
 test('V13 carries typed contract helpers through an exact-address import closure', () => {
