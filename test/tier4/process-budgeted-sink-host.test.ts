@@ -13,6 +13,11 @@ test('V12 direct ProcessHost charges one witnessed signed sink commit across ret
   const fixture = await budgetedSinkHostFixture();
   let host: ProcessHost | null = null;
   try {
+    assert.doesNotThrow(() => fixture.bridge.assertSettlementEvidencePolicy(
+      fixture.authority.evidencePolicyDigest));
+    assert.throws(() => fixture.bridge.assertSettlementEvidencePolicy(
+      domainDigest('aether.attested-sink-budget-evidence-policy/1', 'other')),
+    /settlement evidence policy mismatch/);
     host = await ProcessHost.open(fixture.options);
     const tokens = (target: string) => host!.issueScopedTokens(fixture.entry, 60_000,
       new Map([[fixture.capability, ['account', target]]]));
@@ -38,9 +43,10 @@ test('V12 direct ProcessHost charges one witnessed signed sink commit across ret
     const complete = await host.call(fixture.entry, [{ tag: 'string', value: 'alice' }],
       { operationId: 'call:alice', tokens: tokens('alice') });
     assert.equal(complete.state, 'completed', JSON.stringify(complete));
-    if (complete.state === 'completed' && complete.execution.ok)
-      assert.deepEqual(encodeCanonical(complete.execution.value),
-        encodeCanonical({ tag: 'string', value: 'alice' }));
+    if (complete.state !== 'completed') throw new Error('budgeted sink call did not complete');
+    assert.equal(complete.execution.ok, true, JSON.stringify(complete));
+    if (complete.execution.ok) assert.deepEqual(encodeCanonical(complete.execution.value),
+      encodeCanonical({ tag: 'string', value: 'alice' }));
     assert.equal(fixture.ledger.snapshot('owner:v12-budget-host').spent.usdMicros, '7');
     assert.equal(fixture.ledger.snapshot('owner:v12-budget-host').inflight.usdMicros, '0');
     assert.equal(fixture.bridge.records().length, 1);

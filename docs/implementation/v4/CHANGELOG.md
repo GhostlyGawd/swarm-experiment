@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Witnessed budgeted sink through direct ProcessHost — 2026-09-24
+
+- Added opt-in V5 budget broker and direct ProcessHost config `/11`. An operator predeclares the exact signed target, effect request and reservation before host construction. The host checks the worker's actual request before accepting its proposed snapshot; broker, bridge, ledger and sink witness bind the same request and fixed charge. Signed noncommit permits refund, while unknown status keeps funds encumbered.
+- Complete bridge and ledger journals use separately held monotonic witness heads. The effect witness accepts journal `/5`, pins the bridge profile, and rejects a forged profile change. Direct host tests pass charge-once, retry/reopen, pre-reserve denial, signed-fence refund and sink-witness outage refusal. The ledger evidence-policy digest is checked at host admission.
+- This is a bounded same-UID fixed-charge profile. Deployed promotion, full effect path coverage, general metering, distinct-UID custody and independently validated witness transitions remain open. T2-04/T2-05 and the **20/62** task count are unchanged. [Decision and limits](decisions/D12-signed-sink-budget-evidence.md).
+
 ## Witnessed native fallback host transaction — 2026-09-24
 
 - Added opt-in ProcessHost config `/10` and witnessed host journal `/5` for the exact pure one-field Int fallback. The native operation binds the source snapshot/head, generation, arguments, checked record proof, compiler profile and operator-pinned executable digest; an intent is witnessed before launch. The host publishes the native candidate, receipt and state head together, and same-ID retry reads the exact terminal result.

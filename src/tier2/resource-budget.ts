@@ -352,6 +352,13 @@ export class ResourceBudgetLedger {
     if (!this.mirror) throw new Error('resource ledger lacks external monotonic journal witness');
     this.lock.run(() => { this.read(); }, 5_000);
   }
+  /** Bind a host-selected settlement policy to the ledger's immutable profile. */
+  assertSettlementEvidencePolicy(expected: Digest): void {
+    validateDigest(expected);
+    if (!this.options.revalidateSettlementOnRead
+      || this.options.settlementEvidencePolicyDigest !== expected)
+      throw new Error('resource ledger settlement evidence policy mismatch');
+  }
   snapshot(actor: string): { ledgerDigest: Digest; sequence: number; funded: ResourceAmounts; available: ResourceAmounts; reserved: ResourceAmounts; inflight: ResourceAmounts; spent: ResourceAmounts; refunded: ResourceAmounts; handles: readonly ResourceHandle[] } {
     return this.lock.run(() => {
       const { journal, fold } = this.read(); this.authorize(actor, 'inspect', null, false, this.profile.initialOwner);

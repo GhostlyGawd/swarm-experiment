@@ -249,6 +249,12 @@ export class ResourceBudgetBridge implements EffectBudget {
     ResourceBudgetLedger.prototype.assertWitnessed.call(this.options.ledger);
   }
 
+  /** The operator-selected sink evidence policy must be the policy embedded
+   * in the ledger identity, not only a label in the host configuration. */
+  assertSettlementEvidencePolicy(expected: Digest): void {
+    ResourceBudgetLedger.prototype.assertSettlementEvidencePolicy.call(this.options.ledger, expected);
+  }
+
   /** Terminal broker audit. This performs no debit or refund: it verifies exact
    * receipts already present in the ledger, then re-observes the signed sink
    * commit or noncommit fence. Unknown evidence leaves the result unavailable. */

@@ -182,7 +182,7 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
   const value = parse(bytes);
   const record = value as Record<string, unknown>;
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw new TypeError('invalid witness journal');
-  const expectedFormat = id.kind === 'effect' ? ['aether.effect-journal/2', 'aether.effect-journal/3', 'aether.effect-journal/4']
+  const expectedFormat = id.kind === 'effect' ? ['aether.effect-journal/2', 'aether.effect-journal/3', 'aether.effect-journal/4', 'aether.effect-journal/5']
     : id.kind === 'host' ? ['aether.process-host/4', 'aether.process-host/5']
       : id.kind === 'sink' ? 'aether.attested-sink-state/2'
         : id.kind === 'budget' ? (id.journalKind === 'ledger'
@@ -200,15 +200,18 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
     const body = { format: 'aether.effect-journal-witness/2', ...parts };
     if (record.revision !== revision || record.witnessDigest !== domainDigest(body.format, body)
       || record.clockDomain !== id.clockDomain) throw new TypeError('effect journal witness binding mismatch');
-    if (record.format === 'aether.effect-journal/3' || record.format === 'aether.effect-journal/4') {
+    if (record.format === 'aether.effect-journal/3' || record.format === 'aether.effect-journal/4'
+      || record.format === 'aether.effect-journal/5') {
       identifier(record.deploymentId);
       validateDigest(record.approvedAdapterArtifactDigest);
       validateSinkPublicAnchor(record.sinkAnchor);
       if (record.deploymentId !== id.catalogDeploymentId
         || (record.sinkAnchor as { repositoryId: string }).repositoryId !== id.repositoryId)
         throw new TypeError('attested effect journal identity mismatch');
-      if (record.format === 'aether.effect-journal/4')
+      if (record.format === 'aether.effect-journal/4' || record.format === 'aether.effect-journal/5')
         validateDigest(record.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
+      if (record.format === 'aether.effect-journal/5')
+        validateDigest(record.budgetBridgeProfileDigest, 'aether.resource-budget-bridge/1');
     }
   }
   if (id.kind === 'budget') {
@@ -346,19 +349,26 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
     return;
   }
   if (id.kind === 'effect') {
-    if ((prior.format === 'aether.effect-journal/3' || prior.format === 'aether.effect-journal/4')
+    if ((prior.format === 'aether.effect-journal/3' || prior.format === 'aether.effect-journal/4'
+      || prior.format === 'aether.effect-journal/5')
       && (!same(prior.sinkAnchor, next.sinkAnchor)
         || !same(prior.deploymentId, next.deploymentId)
         || !same(prior.approvedAdapterArtifactDigest, next.approvedAdapterArtifactDigest)))
       throw new Error('witnessed sink authority or artifact changed');
-    if (prior.format === 'aether.effect-journal/4'
+    if ((prior.format === 'aether.effect-journal/4' || prior.format === 'aether.effect-journal/5')
       && !same(prior.sinkStateWitnessDigest, next.sinkStateWitnessDigest))
       throw new Error('witnessed sink decision authority changed');
+    if (prior.format === 'aether.effect-journal/5'
+      && !same(prior.budgetBridgeProfileDigest, next.budgetBridgeProfileDigest))
+      throw new Error('witnessed budget bridge authority changed');
+    const budgeted = prior.format === 'aether.effect-journal/5';
     prefix('records', (oldRow, newRow) => {
       fixed(oldRow, newRow, ['sequence', 'requestDigest', 'adapterId', 'adapterSemanticsDigest']);
       forward(oldRow.state, newRow.state, {
-        requested: ['requested', 'reserved', 'rejected', 'aborted'],
-        reserved: ['reserved', 'prepared', 'aborted'],
+        requested: budgeted ? ['requested', 'reserved', 'rejected', 'aborted', 'indeterminate']
+          : ['requested', 'reserved', 'rejected', 'aborted'],
+        reserved: budgeted ? ['reserved', 'prepared', 'aborted', 'committed', 'indeterminate']
+          : ['reserved', 'prepared', 'aborted'],
         prepared: ['prepared', 'committed', 'indeterminate', 'rejected', 'aborted'],
         indeterminate: ['indeterminate', 'committed', 'aborted'],
         committed: ['committed'], rejected: ['rejected'], aborted: ['aborted'],

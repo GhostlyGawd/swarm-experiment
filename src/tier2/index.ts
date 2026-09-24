@@ -3,6 +3,8 @@ export { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2, type Gra
 export { DurableGrantEpochs, type GrantEpochOptions } from './grant-epochs.ts';
 export { ResourceBudgetLedger, RESOURCE_BUDGET_PROFILE, type ResourceAmounts, type ResourceBudgetProfile, type ResourceBinding, type ResourceHandleBody, type ResourceHandle, type ResourceOperation, type ResourceRequest, type ResourceReceipt, type ResourceAuthorization, type ResourceSettlement, type ResourceBudgetOptions, type ResourceBudgetFault } from './resource-budget.ts';
 export { ResourceBudgetBridge, decodeBudgetSettlementWitness, type ResourceBudgetGrant, type ResourceBudgetBridgeProfile, type ResourceBudgetBridgeOptions, type BudgetObservation, type BudgetSettlementWitness } from './resource-budget-bridge.ts';
+export { BudgetedSinkAuthority, budgetedSinkGrantRefV3,
+  type BudgetedSinkAuthorityOptions, type BudgetedSinkGrantRefV3Input } from './budgeted-sink-authority.ts';
 export { attestedSinkBudgetEvidencePolicyDigest, createAttestedSinkBudgetEvidence,
   type AttestedSinkBudgetEvidence, type AttestedSinkBudgetEvidenceOptions,
   type AttestedSinkBudgetEvidencePolicyOptions } from './attested-sink-budget-evidence.ts';
