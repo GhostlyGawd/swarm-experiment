@@ -9,13 +9,23 @@ import { decodeCanonical, decimal, encodeCanonical, exactObject, identifier, val
 import { domainDigest, validateDigest, type Digest } from './identity.ts';
 
 const FORMAT = 'aether.process-deployment-journal-witness/1' as const;
-const JOURNAL_FORMAT = 'aether.process-deployment/9' as const;
+const JOURNAL_FORMAT_V9 = 'aether.process-deployment/9' as const;
+const JOURNAL_FORMAT_V10 = 'aether.process-deployment/10' as const;
 const LIMITS = { maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024,
   maxObjects: 500_000, maxDepth: 128 } as const;
 const JOURNAL_FIELDS = ['format', 'witnessRevision', 'deploymentJournalWitnessDigest',
   'admissionProfile', 'capabilityProfile', 'effectSignerAnchorDigest', 'trustedClockAnchorDigest',
   'effectJournalWitnessCatalogDigest', 'hostJournalWitnessCatalogDigest', 'genesisManifest',
   'active', 'readiness', 'pendingProposal', 'invocations', 'allocations'] as const;
+const V10_SINK_FIELDS = ['sinkAnchorDigest', 'sinkDeploymentId',
+  'approvedAdapterArtifactDigest', 'sinkStateWitnessDigest'] as const;
+interface JournalIdentity {
+  readonly format: typeof JOURNAL_FORMAT_V9 | typeof JOURNAL_FORMAT_V10;
+  readonly sinkAnchorDigest?: Digest;
+  readonly sinkDeploymentId?: string;
+  readonly approvedAdapterArtifactDigest?: Digest;
+  readonly sinkStateWitnessDigest?: Digest;
+}
 
 export interface DeploymentJournalWitness {
   readonly format: typeof FORMAT;
@@ -27,7 +37,7 @@ export interface DeploymentJournalWitness {
 
 export interface DeploymentJournalHead {
   readonly revision: string;
-  /** Complete canonical /9 deployment journal as UTF-8 text; null at genesis only. */
+  /** Complete canonical /9 or /10 deployment journal as UTF-8 text; null at genesis only. */
   readonly journal: string | null;
 }
 
@@ -35,13 +45,15 @@ interface Source {
   readonly read: () => DeploymentJournalHead;
   readonly advance: (expectedRevision: string, journal: string) => DeploymentJournalHead;
   readonly digest: Digest;
+  readonly deploymentId: string;
   lastRevision: bigint;
   lastJournal: string | null;
+  lastIdentity: JournalIdentity | null;
 }
 const sources = new WeakMap<object, Source>();
 
 /** Checks the bounded envelope. ProcessDeployment validates its full semantics. */
-function assertJournal(journal: unknown, revision: string, witnessDigest: Digest): asserts journal is string {
+function assertJournal(journal: unknown, revision: string, source: Source): JournalIdentity {
   validString(journal);
   if (!journal.length) throw new TypeError('missing deployment witness journal');
   const bytes = Buffer.from(journal, 'utf8');
@@ -49,15 +61,17 @@ function assertJournal(journal: unknown, revision: string, witnessDigest: Digest
   const decoded = decodeCanonical(bytes, LIMITS);
   if (Buffer.from(encodeCanonical(decoded, LIMITS)).toString('utf8') !== journal)
     throw new TypeError('noncanonical deployment witness journal');
-  const record = exactObject(decoded, JOURNAL_FIELDS);
-  if (record.format !== JOURNAL_FORMAT) throw new TypeError('invalid deployment witness journal format');
+  const v10 = (decoded as { format?: unknown }).format === JOURNAL_FORMAT_V10;
+  const record = exactObject(decoded, v10 ? [...JOURNAL_FIELDS, ...V10_SINK_FIELDS] : JOURNAL_FIELDS);
+  if (record.format !== JOURNAL_FORMAT_V9 && record.format !== JOURNAL_FORMAT_V10)
+    throw new TypeError('invalid deployment witness journal format');
   decimal(record.witnessRevision);
   if (record.witnessRevision !== revision) throw new Error('deployment witness journal revision mismatch');
   validateDigest(record.deploymentJournalWitnessDigest, FORMAT);
-  if (record.deploymentJournalWitnessDigest !== witnessDigest)
+  if (record.deploymentJournalWitnessDigest !== source.digest)
     throw new Error('deployment witness journal identity mismatch');
   if (!['strict-lineage-v1', 'baseline-governor-v1'].includes(record.admissionProfile as string)
-    || record.capabilityProfile !== 'scoped-anchored-wasm-v9'
+    || record.capabilityProfile !== (v10 ? 'scoped-anchored-sink-v10' : 'scoped-anchored-wasm-v9')
     || !['ready', 'preparing', 'prepared'].includes(record.readiness as string)
     || (record.readiness === 'ready') !== (record.pendingProposal === null)
     || !Array.isArray(record.invocations) || !Array.isArray(record.allocations))
@@ -71,6 +85,29 @@ function assertJournal(journal: unknown, revision: string, witnessDigest: Digest
   validateDigest(active.manifest, 'aether.execution/1');
   validateDigest(active.artifactDigest, 'aether.process-artifact/1');
   decimal(active.generation);
+  if (v10) {
+    validateDigest(record.sinkAnchorDigest, 'aether.sink-anchor/1');
+    identifier(record.sinkDeploymentId);
+    if (record.sinkDeploymentId !== source.deploymentId)
+      throw new TypeError('deployment witness sink namespace mismatch');
+    validateDigest(record.approvedAdapterArtifactDigest);
+    if (!/^aether\.effect-adapter-artifact\/[1-9][0-9]*:b3:/.test(record.approvedAdapterArtifactDigest as string))
+      throw new TypeError('invalid deployment witness adapter artifact digest');
+    validateDigest(record.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
+  }
+  return { format: record.format as JournalIdentity['format'],
+    ...(v10 ? { sinkAnchorDigest: record.sinkAnchorDigest as Digest,
+      sinkDeploymentId: record.sinkDeploymentId as string,
+      approvedAdapterArtifactDigest: record.approvedAdapterArtifactDigest as Digest,
+      sinkStateWitnessDigest: record.sinkStateWitnessDigest as Digest } : {}) };
+}
+
+function assertStableIdentity(source: Source, identity: JournalIdentity | null): void {
+  if (source.lastRevision > 0n && identity && source.lastIdentity
+    && (identity.format === JOURNAL_FORMAT_V10 || source.lastIdentity.format === JOURNAL_FORMAT_V10)
+    && (identity.format !== source.lastIdentity.format
+      || V10_SINK_FIELDS.some(field => identity[field] !== source.lastIdentity![field])))
+    throw new Error('deployment witness sink identity changed');
 }
 
 export function createDeploymentJournalWitness(options: Readonly<{
@@ -89,7 +126,7 @@ export function createDeploymentJournalWitness(options: Readonly<{
     deploymentId: options.deploymentId };
   const witness = Object.freeze({ ...body, digest: domainDigest(FORMAT, body) });
   sources.set(witness, { read: options.read, advance: options.advance, digest: witness.digest,
-    lastRevision: -1n, lastJournal: null });
+    deploymentId: options.deploymentId, lastRevision: -1n, lastJournal: null, lastIdentity: null });
   readDeploymentJournalHead(witness);
   return witness;
 }
@@ -105,11 +142,13 @@ function checked(source: Source, value: DeploymentJournalHead): DeploymentJourna
   const revision = BigInt(head.revision as string);
   if ((revision === 0n) !== (head.journal === null))
     throw new TypeError('deployment witness genesis/journal mismatch');
-  if (revision !== 0n) assertJournal(head.journal, head.revision as string, source.digest);
+  const identity = revision === 0n ? null : assertJournal(head.journal, head.revision as string, source);
   if (revision < source.lastRevision || (revision === source.lastRevision && head.journal !== source.lastJournal))
     throw new Error('deployment witness rolled back or equivocated');
+  assertStableIdentity(source, identity);
   source.lastRevision = revision;
   source.lastJournal = head.journal as string | null;
+  source.lastIdentity = identity;
   return Object.freeze({ revision: head.revision as string, journal: head.journal as string | null });
 }
 
@@ -125,9 +164,10 @@ export function advanceDeploymentJournalHead(witness: DeploymentJournalWitness,
   decimal(expectedRevision);
   const source = sources.get(witness)!;
   const nextRevision = String(BigInt(expectedRevision) + 1n);
-  assertJournal(journal, nextRevision, source.digest);
+  const identity = assertJournal(journal, nextRevision, source);
   if (readDeploymentJournalHead(witness).revision !== expectedRevision)
     throw new Error('stale deployment witness revision');
+  assertStableIdentity(source, identity);
   const head = checked(source, source.advance(expectedRevision, journal));
   if (head.revision !== nextRevision || head.journal !== journal)
     throw new Error('deployment witness did not durably accept exact next journal');

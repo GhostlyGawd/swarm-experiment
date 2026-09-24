@@ -22,6 +22,18 @@ function journal(witness: DeploymentJournalWitness, revision: string, generation
     readiness: 'ready', pendingProposal: null, invocations: [], allocations: [],
   })).toString('utf8');
 }
+function sinkJournal(witness: DeploymentJournalWitness, revision: string,
+  overrides: Record<string, unknown> = {}): string {
+  const historical = JSON.parse(journal(witness, revision)) as Record<string, unknown>;
+  return Buffer.from(encodeCanonical({ ...historical,
+    format: 'aether.process-deployment/10', capabilityProfile: 'scoped-anchored-sink-v10',
+    sinkAnchorDigest: digest('aether.sink-anchor/1'),
+    sinkDeploymentId: witness.deploymentId,
+    approvedAdapterArtifactDigest: digest('aether.effect-adapter-artifact/2'),
+    sinkStateWitnessDigest: digest('aether.sink-state-witness/1'),
+    ...overrides,
+  })).toString('utf8');
+}
 function fixture() {
   let head: DeploymentJournalHead = { revision: '0', journal: null };
   let advances = 0;
@@ -133,4 +145,58 @@ test('deployment witness rejects malformed source heads', () => {
   assert.throws(() => readDeploymentJournalHead(f.witness), /object fields/);
   f.setHead(Object.defineProperty({ revision: '1' }, 'journal', { enumerable: true, get: () => journal(f.witness, '1') }) as DeploymentJournalHead);
   assert.throws(() => readDeploymentJournalHead(f.witness), /accessor/);
+});
+
+test('deployment witness admits exact /10 sink identity and retains canonical CAS bytes', () => {
+  const f = fixture();
+  const first = sinkJournal(f.witness, '1');
+  const second = sinkJournal(f.witness, '2', { readiness: 'ready' });
+  assert.deepEqual(advanceDeploymentJournalHead(f.witness, '0', first), { revision: '1', journal: first });
+  assert.deepEqual(advanceDeploymentJournalHead(f.witness, '1', second), { revision: '2', journal: second });
+  assert.deepEqual(readDeploymentJournalHead(f.witness), { revision: '2', journal: second });
+  assert.equal(f.advances(), 2);
+});
+
+test('deployment witness rejects malformed /10 sink fields and profile before CAS', () => {
+  const f = fixture();
+  const base = JSON.parse(sinkJournal(f.witness, '1')) as Record<string, unknown>;
+  const encode = (value: Record<string, unknown>) => Buffer.from(encodeCanonical(value)).toString('utf8');
+  const { sinkAnchorDigest: _omitted, ...missing } = base;
+  const cases = [
+    missing,
+    { ...base, extra: true },
+    { ...base, capabilityProfile: 'scoped-anchored-wasm-v9' },
+    { ...base, sinkAnchorDigest: digest('aether.other/1') },
+    { ...base, sinkDeploymentId: 'deployment:other' },
+    { ...base, sinkDeploymentId: '' },
+    { ...base, approvedAdapterArtifactDigest: digest('aether.other/1') },
+    { ...base, sinkStateWitnessDigest: digest('aether.other/1') },
+    { ...base, format: 'aether.process-deployment/9' },
+  ];
+  for (const candidate of cases) assert.throws(() => advanceDeploymentJournalHead(f.witness, '0', encode(candidate)));
+  assert.equal(f.advances(), 0);
+});
+
+test('deployment witness forbids sink identity drift and /9↔/10 switch before CAS', () => {
+  for (const [field, changed] of [
+    ['sinkAnchorDigest', domainDigest('aether.sink-anchor/1', 'different')],
+    ['sinkDeploymentId', 'deployment:other'],
+    ['approvedAdapterArtifactDigest', digest('aether.effect-adapter-artifact/3')],
+    ['sinkStateWitnessDigest', domainDigest('aether.sink-state-witness/1', 'different')],
+  ] as const) {
+    const f = fixture();
+    const first = sinkJournal(f.witness, '1');
+    advanceDeploymentJournalHead(f.witness, '0', first);
+    assert.throws(() => advanceDeploymentJournalHead(f.witness, '1',
+      sinkJournal(f.witness, '2', { [field]: changed })), /namespace mismatch|identity changed/);
+    assert.equal(f.advances(), 1);
+  }
+  const v9 = fixture();
+  advanceDeploymentJournalHead(v9.witness, '0', journal(v9.witness, '1'));
+  assert.throws(() => advanceDeploymentJournalHead(v9.witness, '1', sinkJournal(v9.witness, '2')), /identity changed/);
+  assert.equal(v9.advances(), 1);
+  const v10 = fixture();
+  advanceDeploymentJournalHead(v10.witness, '0', sinkJournal(v10.witness, '1'));
+  assert.throws(() => advanceDeploymentJournalHead(v10.witness, '1', journal(v10.witness, '2')), /identity changed/);
+  assert.equal(v10.advances(), 1);
 });
