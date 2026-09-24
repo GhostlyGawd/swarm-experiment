@@ -3,6 +3,7 @@
 ## Portable certificate check latency preflight — 2026-09-24
 
 - Added a versioned, raw-sample NFR-05 preflight for a complete seven-obligation portable AST certificate check. The clean `5ce3447` campaign measured 200 checks on Apple M4 Pro: 1,903.583 µs median, 2,203.166 µs maximum, all above the unchanged 50 µs bound. The independent verifier checks source pins, certificate and sample verdict. This bounded fixture does not qualify NFR-05 for release; it stays unmeasured in the default inventory. [Evidence and limits](evidence/nfr05-proof-check-5ce3447/REVIEW.md).
+- Strengthened the verifier to compare recorded Node/macOS/CPU/RAM identity with the exact-source environment. The clean `18efdf5` [second preflight](evidence/nfr05-proof-check-18efdf5/REVIEW.md) again misses: 1,790.375 µs median, 2,095.958 µs maximum, 200/200 above 50 µs. This remains bounded research evidence, not a release pass.
 
 ## Checked closure values in contract projection V15 — 2026-09-24
 

@@ -1,0 +1,375 @@
+{
+  "format": "aether.proof-check-latency-samples/1",
+  "certificate": {
+    "certificates": [
+      {
+        "obligationId": "aether.portable-obligation/1:b3:096f7dc8450d1056a3cf05ff82d069f54391a3748f8d4672a9e07d41b38e2545",
+        "proof": {
+          "caseSetDigest": "aether.portable-formula-cases/1:b3:d401d3ffcd19ac52fae424cf9611677008f682f4ae067e91296b2e92566c54a8",
+          "cases": [
+            {
+              "certificate": {
+                "claimDigest": "aether.linear-claim/1:b3:97bb69d82ca8ea91a3ed1d55318624c845f76765e912345bb146f05cba72dae2",
+                "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+                "format": "aether.linear-certificate/1",
+                "multipliers": [
+                  "0",
+                  "1",
+                  "0"
+                ]
+              },
+              "index": 0
+            },
+            {
+              "certificate": {
+                "claimDigest": "aether.linear-claim/1:b3:97bb69d82ca8ea91a3ed1d55318624c845f76765e912345bb146f05cba72dae2",
+                "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+                "format": "aether.linear-certificate/1",
+                "multipliers": [
+                  "0",
+                  "1",
+                  "0"
+                ]
+              },
+              "index": 1
+            }
+          ],
+          "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+          "format": "aether.portable-formula-proof/1",
+          "profileDigest": "aether.portable-formula-profile/1:b3:a790676b3353b3bb5b330a449ee4d7680239b411a69b75a89388d3b17df054b6"
+        }
+      },
+      {
+        "obligationId": "aether.portable-obligation/1:b3:04ed3cf76245270e921a31977083628b7768df8a6fc5ac758a76f9c33b2b2923",
+        "proof": {
+          "caseSetDigest": "aether.portable-formula-cases/1:b3:0848dcee3b74950329097ec066c6bf7424ba86f081baee64b7a5f39701b2f8f4",
+          "cases": [],
+          "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+          "format": "aether.portable-formula-proof/1",
+          "profileDigest": "aether.portable-formula-profile/1:b3:a790676b3353b3bb5b330a449ee4d7680239b411a69b75a89388d3b17df054b6"
+        }
+      },
+      {
+        "obligationId": "aether.portable-obligation/1:b3:3e74aa007cf39d2ac0ab3b3ae5619e62858a4a8c8c42c95277ea6413448db194",
+        "proof": {
+          "caseSetDigest": "aether.portable-formula-cases/1:b3:0848dcee3b74950329097ec066c6bf7424ba86f081baee64b7a5f39701b2f8f4",
+          "cases": [],
+          "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+          "format": "aether.portable-formula-proof/1",
+          "profileDigest": "aether.portable-formula-profile/1:b3:a790676b3353b3bb5b330a449ee4d7680239b411a69b75a89388d3b17df054b6"
+        }
+      },
+      {
+        "obligationId": "aether.portable-obligation/1:b3:86fe8d95299f86c23e272c7bd0a64012a19a335363ee1619dd395e8aea68d827",
+        "proof": {
+          "caseSetDigest": "aether.portable-formula-cases/1:b3:f3ecc3bcc5ee1d5988328f6c710e8ea57d1de28e2ace18a2e68ba90175761ddb",
+          "cases": [
+            {
+              "certificate": {
+                "claimDigest": "aether.linear-claim/1:b3:b2616495754c3bf9520872c2a8e7fa848fdc177dbcfaa9d125233cb5c666e1f8",
+                "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+                "format": "aether.linear-certificate/1",
+                "multipliers": [
+                  "1",
+                  "1",
+                  "0"
+                ]
+              },
+              "index": 0
+            }
+          ],
+          "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+          "format": "aether.portable-formula-proof/1",
+          "profileDigest": "aether.portable-formula-profile/1:b3:a790676b3353b3bb5b330a449ee4d7680239b411a69b75a89388d3b17df054b6"
+        }
+      },
+      {
+        "obligationId": "aether.portable-obligation/1:b3:dfc409b763693fd5cb8f498b15b01062909c0c8149a4fadc6840c55d97f1de09",
+        "proof": {
+          "caseSetDigest": "aether.portable-formula-cases/1:b3:9d6dea619d244ea1642ab9de868f4984312496690d740b607b5ef1f94ef2c923",
+          "cases": [
+            {
+              "certificate": {
+                "claimDigest": "aether.linear-claim/1:b3:c3223448c77326f0cc22b465d8350cf0bca628f0d068488ebf0a8095ca7f4137",
+                "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+                "format": "aether.linear-certificate/1",
+                "multipliers": [
+                  "0",
+                  "1",
+                  "0",
+                  "1",
+                  "0"
+                ]
+              },
+              "index": 0
+            },
+            {
+              "certificate": {
+                "claimDigest": "aether.linear-claim/1:b3:dc8b773446b8d1e8cddfba3f80ec75e540fb9bc1a95cf7c18b0202714fdbe547",
+                "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+                "format": "aether.linear-certificate/1",
+                "multipliers": [
+                  "0",
+                  "0",
+                  "1",
+                  "1",
+                  "0"
+                ]
+              },
+              "index": 1
+            }
+          ],
+          "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+          "format": "aether.portable-formula-proof/1",
+          "profileDigest": "aether.portable-formula-profile/1:b3:a790676b3353b3bb5b330a449ee4d7680239b411a69b75a89388d3b17df054b6"
+        }
+      },
+      {
+        "obligationId": "aether.portable-obligation/1:b3:0a711932e261bda18578d2001c15a44814d608f1e5a6e0080270ace76c5e10ae",
+        "proof": {
+          "caseSetDigest": "aether.portable-formula-cases/1:b3:0848dcee3b74950329097ec066c6bf7424ba86f081baee64b7a5f39701b2f8f4",
+          "cases": [],
+          "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+          "format": "aether.portable-formula-proof/1",
+          "profileDigest": "aether.portable-formula-profile/1:b3:a790676b3353b3bb5b330a449ee4d7680239b411a69b75a89388d3b17df054b6"
+        }
+      },
+      {
+        "obligationId": "aether.portable-obligation/1:b3:7c3cb3d0def8149e94e38f6f6fbb7973d4be4ad6687226a853a1789ae99b558d",
+        "proof": {
+          "caseSetDigest": "aether.portable-formula-cases/1:b3:0848dcee3b74950329097ec066c6bf7424ba86f081baee64b7a5f39701b2f8f4",
+          "cases": [],
+          "executionManifest": "aether.execution/1:b3:190ac68f65440fc31bfd654098792bc5e62baf26b133e63a21fc4bfc41eb7ecd",
+          "format": "aether.portable-formula-proof/1",
+          "profileDigest": "aether.portable-formula-profile/1:b3:a790676b3353b3bb5b330a449ee4d7680239b411a69b75a89388d3b17df054b6"
+        }
+      }
+    ],
+    "derivationProfileDigest": "aether.portable-derivation-profile/1:b3:b9ff83eea4213ff504b3d91be9cd2facaa363feec9878fbc6f546b9d8bd5cb36",
+    "format": "aether.portable-ast-proof/1",
+    "formulaProfileDigest": "aether.portable-formula-profile/1:b3:a790676b3353b3bb5b330a449ee4d7680239b411a69b75a89388d3b17df054b6",
+    "manifest": {
+      "astRoot": "ast:b3:f17dbf74867e16d5651207dd1042a5d590a089e20dcc84a55b268c55fe744b55",
+      "capabilityPolicyDigest": "aether.proof-check-latency-fixture/1:b3:5ae967d53a058db52c7d6fba0ec79dce6e936b004b65a40e5361ff0ca923418f",
+      "compilerDigest": "aether.proof-check-latency-fixture/1:b3:1a19431a65b14c47b0c2bf41ecc883a24f837baf6a0a633c87cb55fa85288f4f",
+      "dependencies": [
+        {
+          "declaration": "ast:b3:9343b9d87444eb15685803512604550513aa69b93dc6d34a3354067488c7947e",
+          "symbol": "sym:uouqzufb424old2qfmtyyn"
+        }
+      ],
+      "evidencePolicyDigest": "aether.proof-check-latency-fixture/1:b3:186f68a0793d2911f7a92f394cc386f7f6d852b9aebe0b0b6ce113dacec011f8",
+      "format": "aether.execution/1",
+      "semanticsVersion": "aether-reference/1",
+      "specRoot": "aether.specification/1:b3:c7693b5bac7828c53b06f27094cb8dcde3a63ee4c59db2139e13d4f5aa79b60b",
+      "target": {
+        "abiVersion": "scalar/1",
+        "artifactDigest": "aether.proof-check-latency-fixture/1:b3:0a649f2eeec61f81c336085f7941978f6458a446e79b80a25f0c35d3a8834dde",
+        "profileDigest": "aether.proof-check-latency-fixture/1:b3:056c611e1f5a5c84f0375337ed3277cd36b1963c6a960bd8d0a5820dbe5e6062"
+      }
+    },
+    "obligationSetDigest": "aether.portable-obligation-set/1:b3:f1bc15919c8c1f51416ce8001db451e3af224323e1678197a0598d8aeb2d177a"
+  },
+  "samplesNs": [
+    1908125,
+    2095958,
+    1916584,
+    1945500,
+    1877375,
+    1910666,
+    1995334,
+    1968500,
+    1890791,
+    1926708,
+    1900708,
+    1866084,
+    1881375,
+    1804791,
+    1842542,
+    1900209,
+    2001916,
+    1824875,
+    1810167,
+    1993583,
+    1889667,
+    1883625,
+    1836875,
+    1841917,
+    1865625,
+    1911875,
+    1933458,
+    1856792,
+    1838291,
+    1829792,
+    1826583,
+    1802333,
+    1807417,
+    1787542,
+    1805333,
+    1793000,
+    1800541,
+    1797584,
+    1798709,
+    1824167,
+    1770667,
+    1821084,
+    1777208,
+    1767917,
+    1795208,
+    1842708,
+    1846750,
+    1782042,
+    1767458,
+    1759292,
+    1805500,
+    1833375,
+    1781417,
+    1813000,
+    1795708,
+    1764875,
+    1754208,
+    1766125,
+    1761292,
+    1773084,
+    1793750,
+    1787958,
+    1783542,
+    1794875,
+    1766208,
+    1773958,
+    1782167,
+    1778750,
+    1836417,
+    1794417,
+    1754333,
+    1772541,
+    1773375,
+    1813292,
+    1813542,
+    1823917,
+    1810666,
+    1779875,
+    1767000,
+    1769875,
+    1817292,
+    1788417,
+    1830042,
+    1764250,
+    1758667,
+    1770083,
+    1784292,
+    1837458,
+    1812709,
+    1821125,
+    1771334,
+    1799791,
+    1790375,
+    1779000,
+    1788250,
+    1778041,
+    1790041,
+    1787625,
+    1813125,
+    1789417,
+    1754917,
+    1766208,
+    1889541,
+    1978083,
+    1881209,
+    1785042,
+    1763625,
+    1817209,
+    1754125,
+    1809416,
+    1758000,
+    1798375,
+    1818708,
+    1777709,
+    1775500,
+    1768000,
+    1787042,
+    1759125,
+    1759792,
+    1758417,
+    1721833,
+    1745416,
+    1761750,
+    1756667,
+    1777917,
+    1787333,
+    1743292,
+    1757625,
+    1747125,
+    1749375,
+    1755459,
+    1767416,
+    1794750,
+    1791666,
+    1766000,
+    1743958,
+    1758416,
+    1749958,
+    1812958,
+    1943583,
+    1793667,
+    1795375,
+    1763000,
+    1761792,
+    1938583,
+    1835000,
+    1994500,
+    1861667,
+    1841125,
+    1810000,
+    1764333,
+    1803667,
+    1967166,
+    1891958,
+    1785708,
+    1746875,
+    1754875,
+    1779875,
+    1763750,
+    1749292,
+    1783458,
+    1774291,
+    1748959,
+    1774250,
+    1829792,
+    1888750,
+    1817333,
+    1734042,
+    1731500,
+    1733791,
+    1776292,
+    1923500,
+    1973666,
+    1820042,
+    1797916,
+    1746875,
+    1742917,
+    1725334,
+    1783959,
+    1755750,
+    1746083,
+    1727791,
+    1780875,
+    2005000,
+    1754542,
+    1945333,
+    1781917,
+    1839875,
+    1754083,
+    1823917,
+    1754167,
+    1791625,
+    1740875,
+    1780333,
+    1889875,
+    1750166,
+    1716167,
+    1765166,
+    1814125,
+    1948708
+  ]
+}
