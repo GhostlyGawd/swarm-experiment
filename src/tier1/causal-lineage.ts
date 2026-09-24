@@ -235,6 +235,27 @@ export class CausalLineageLedger {
       if (!same(record.nodes, this.artifactClosure(record.manifest))) throw new TypeError('artifact AST causal closure mismatch');
       artifacts.add(record.id);
     }
+    // Signed lineage is durable audit history. Its AST roots must remain
+    // physically leased even when another root happens to keep the same bytes
+    // alive. Otherwise a lost audit lease would be hidden until a later sweep.
+    const leases = this.options.store.roots().leases;
+    const requireLease = (id: string, roots: readonly NodeRef[]): void => {
+      const expected = [...new Set(roots)].sort();
+      if (!expected.length) return;
+      const actual = leases[id];
+      if (!actual || !same([...new Set(actual)].sort(), expected))
+        throw new Error(`lineage audit AST lease missing or changed: ${id}`);
+      for (const root of expected) this.options.store.get(root);
+    };
+    for (const record of state.specs) {
+      const roots = record.body.requirements.flatMap(item =>
+        [...item.requires, ...item.modifies, ...item.ensures]);
+      requireLease(`lineage-spec:${specRevisionDigest(record)}`, roots);
+    }
+    for (const record of state.intents)
+      requireLease(`lineage-intent:${intentDigest(record)}`, [record.body.subject]);
+    for (const record of state.artifacts)
+      requireLease(`lineage-artifact:${record.id}`, this.artifactRoots(record.manifest));
     return state;
   }
   private specMap(state: State): Map<Digest, SignedSpecRevision> { return new Map(state.specs.map(record => [specRevisionDigest(record), record])); }

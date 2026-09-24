@@ -24,6 +24,8 @@ The opt-in [worker init/2](PROCESS-VIRTUAL-WORKER.md) validates Artifact/3 in bo
 
 [Artifact/4](ARTIFACT4-SUBJECT.md) binds a pure virtual-forward candidate's signed evidence target to an independently rebuilt V2 worker manifest, including the measured JS graph and static non-system native link closure. A combined 23/23 process campaign covers the new artifact, the prior Artifact/3 worker path, real worker snapshot import after restart, and V11 crash/fence cases. Artifact/4 remains a host-only validator: the child still accepts only Artifact/3, and no ProcessHost or ProcessDeployment path accepts Artifact/4. Dynamic native loads, raw system-cache member bytes and launch-time custody remain unproved. This does not close T1-05/G1 or G2.
 
+The [lineage audit lease check](LINEAGE-AUDIT-RETENTION.md) now refuses a missing spec, intent or admitted-artifact role pin before collection, even if other leases keep the same bytes alive. Signed audit history stays nonexpiring; this does not establish safe audit release or complete G2 lifecycle coverage.
+
 T1-02 now has a versioned [AE6 cold-bound wire](AGENT-IR-V6.md). It reconstructs complete declarations from checked 256-bit root references and one-literal edits. On the unchanged ledger fixture, four warm wires measure 5.629× cl100k and 5.694× o200k, with JSONL-framed messages also above 4×. Cold delivery measures 0.941× cl100k, and the complete changed session 1.141×. This passes one deterministic warm workload, while representative changed-workload compression, remaining semantic coverage and Q03 stay open; T1-02/G1 and G2 are not yet verified.
 
 ## Closure order

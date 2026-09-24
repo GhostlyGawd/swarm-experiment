@@ -63,6 +63,22 @@ test('every admitted artifact and shared child resolves to all signed causal lin
   assert.throws(() => reopened.assertCurrent(domainDigest('aether.execution/1', 'unknown')), /lacks signed intent/);
 });
 
+test('signed audit lineage refuses a missing physical spec, intent or artifact lease before collection', () => {
+  for (const kind of ['spec', 'intent', 'artifact'] as const) {
+    const f = setup(), admitted = f.artifact();
+    const id = kind === 'spec' ? f.initialSpec
+      : kind === 'intent' ? admitted.intent : admitted.admission;
+    const lease = `lineage-${kind}:${id}`;
+    assert.ok(f.store.roots().leases[lease], `fixture must have a ${kind} audit lease`);
+    f.store.release(lease);
+    // Other leases still keep these exact AST bytes available. The audit
+    // authority must detect the lost role pin itself, before any GC sweep.
+    assert.equal(f.store.get(admitted.root).kind, 'Module');
+    assert.throws(() => f.ledger.assertCurrent(admitted.manifestDigest), /lineage audit AST lease missing/);
+    assert.throws(() => new CausalLineageLedger(f.options), /lineage audit AST lease missing/);
+  }
+});
+
 test('malformed lineage authority cannot authorize through string substring membership', () => {
   const f = setup(), artifact = f.artifact();
   f.setAuthority({ policyEpoch: '0', eligibleAuthors: 'not-authorized-author' } as unknown as LineageAuthority);
