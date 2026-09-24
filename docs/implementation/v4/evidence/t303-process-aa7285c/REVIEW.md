@@ -43,6 +43,12 @@ are excluded. This rate is a complete bounded campaign rate, not the fast
 four-field JSON kernel rate; no inference to millions of distributed cases is
 supported.
 
+Each original case runs one fixed, ordered process/socket boundary schedule. The
+six executed cases therefore cover six such scheduled permutations; the
+2.0224 cases/s figure is also the rate for those six schedules. It does not
+measure the rate of generating independent in-memory input permutations, nor
+does six schedules establish broad fault-schedule coverage.
+
 Reproduce the exact-source audit:
 
 ```sh
