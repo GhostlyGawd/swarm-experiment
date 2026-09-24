@@ -1,0 +1,20 @@
+✔ V10 Deployment postcommit recovery across real controller SIGKILL (12678.777208ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":21808,"servicePids":[21540,21534,21537],"workerPids":[21631],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V10 Deployment pre-sink recovery across real controller SIGKILL (6934.731542ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":22400,"servicePids":[22200,22194,22197],"workerPids":[22291],"sinkRevision":"0","effectRevisionBefore":"0","effectRevisionAfter":"0"}
+✔ V10 Deployment signed-fence recovery across real controller SIGKILL (12323.167666ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":23258,"servicePids":[23012,23005,23008],"workerPids":[23100],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V11 Deployment v11-resource-postcommit recovery across real controller SIGKILL (13884.341292ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":23955,"servicePids":[23659,23653,23656],"workerPids":[23747],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V11 Deployment v11-revoked-postcommit recovery across real controller SIGKILL (9249.494917ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":26312,"servicePids":[24455,24448,24452],"workerPids":[24555],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V10 and V11 ProcessHost/Deployment pin sink outcomes and target grants across promotion and restart (108867.352042ms)
+✔ V9 protects complete host and broker history across real Wasm calls, promotion and reopen (5048.61125ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 109047.271375

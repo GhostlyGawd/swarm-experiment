@@ -1,0 +1,31 @@
+✔ strict process deployment carries scoped grants through the production host and sink (2043.497292ms)
+✔ process deployment factory serves a signed effect resource policy bound to the admitted artifact (1145.690208ms)
+✔ fresh production deployment serves exact loader-admitted adapter bytes under signed v2 policy (7233.376708ms)
+✔ default effectful deployment pins independent signer across real sink, candidate and restart (9577.812625ms)
+✔ explicit anchored-v4 compatibility reopens old adapter-policy bytes without silent upgrade (4614.102625ms)
+✔ anchored promotion binds signer identity and refuses key substitution before activation (16744.889ms)
+✔ F08 process deployment: rejected composition, approved migration/body change and rollback preserve real ledger state (4254.917125ms)
+✔ F08 process deployment: forged/stale approvals and changed schemas preserve serving state (1200.713875ms)
+✔ F08 process deployment: preparation freezes source calls and postcommit activation failure blocks old-root serving until recovery (1390.018292ms)
+✔ F08 process deployment: in-flight source writes drain before preparation and invalidate stale snapshot approval (1219.617333ms)
+✔ F08 process deployment: actual coordinator death before/after commit reloads artifacts and follows only durable decision (16262.227417ms)
+✔ F08 process deployment: receipt loss after inner durable commit recovers original invocation without another append (2915.841125ms)
+✔ F08 process deployment: outer intent without inner execution needs authorized abort, while committed receipt survives observer failure (1848.836708ms)
+✔ F08 review: invalid typed allocations and calls are rejected before outer intents and do not wedge the deployment (1813.326292ms)
+✔ F08 review: cached receipts and fresh intents recheck revocation after the awaited source snapshot (705.036875ms)
+✔ F08 review: recovery freezes strategy and rechecks permission after awaits and before receipt publication (790.175292ms)
+✔ asynchronous deployment recovery policy is denied before host recovery or receipt publication (568.507ms)
+✔ F08 review: repeated manifest activation rejects historical ABA handles without changing workers or serving generation (2542.313209ms)
+✔ deployment cached receipts retain historical capability authority when a later declaration weakens (953.374958ms)
+✔ deployment legacy profile adoption is explicit and preserves durable receipts (1103.486875ms)
+✔ fresh production deployment requires an independent signer anchor and preserves explicit legacy histories (456.817958ms)
+✔ fresh signed deployment refuses unsigned effect services before durable genesis (76.638416ms)
+✔ v2 capability history needs explicit legacy adoption and retains settled calls (1046.099708ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 80682.564083

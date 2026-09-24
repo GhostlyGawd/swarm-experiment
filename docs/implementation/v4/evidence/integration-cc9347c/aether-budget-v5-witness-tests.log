@@ -1,0 +1,13 @@
+✔ separate sink witness restores deleted/older local state and fails closed on outage or equivocation (2728.83175ms)
+✔ external budget heads restore old local copies and reject same-revision edits (4463.457417ms)
+✔ budget witness outage refuses read, reserve and fresh reopen (2640.996209ms)
+✔ SIGKILL after ledger or bridge witness CAS restores a reservation before retry (6570.201125ms)
+✔ SIGKILL after witnessed charge intent or ledger charge never bills twice (6983.499875ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20756.0315

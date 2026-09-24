@@ -1,0 +1,12 @@
+✔ signed sink commit keeps proved Tier 2 idle across host and fallback reopen (18931.959125ms)
+✔ separate controllers recover exact Tier 1 replay after SIGKILL between signed sink commit and fallback publication (15610.236416ms)
+✔ signed noncommit fence permits independently proved pure Tier 2 after reconciliation (20995.583375ms)
+✔ witness outage around Tier 1 dispatch cannot authorize pure Tier 2 (14153.436042ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 69853.987833

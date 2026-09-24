@@ -1,0 +1,10 @@
+✔ operator budget authority pins a real bridge and exact full requests before host config (141.09875ms)
+✔ budgeted grant reference v3 binds host, target, reservation and signed policy without host config (1.061083ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 237.487583
