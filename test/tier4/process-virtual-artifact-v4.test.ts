@@ -31,6 +31,7 @@ import { decodeProcessVirtualArtifactV4, encodeProcessVirtualArtifactV4,
   type ProcessWorkerBundleManifestV2 } from '../../src/tier4/process-virtual-artifact-v4.ts';
 import { verifyWorkerBundle } from '../../scripts/process-worker-bundle.ts';
 import { ProcessChannel, type ProcessChannelOptions } from '../../src/tier4/process-channel.ts';
+import { prepareProcessWorkerLaunchV1 } from '../../src/tier4/process-worker-launch-custody.ts';
 import { ProcessHost, type ProcessHostOptions } from '../../src/tier4/process-host.ts';
 import type { TopologyPlan } from '../../src/tier4/topology.ts';
 import { type ProcessVirtualWorkerTrustV1 } from '../../src/tier4/process-virtual-worker-contract.ts';
@@ -399,15 +400,14 @@ test('Artifact/4 packaged child independently rejects altered init/3 proof', asy
     executionManifest: executionManifestDigest(f.artifact!.candidateEvidence.manifest),
     ownershipEpoch: '1', maxFrameBytes: 8 * 1024 * 1024 };
   const parent = new ProcessAuthenticator(key, session, 'parent');
-  const child = spawn(process.execPath, [manifest.bundle.path], {
-    stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+  const child = prepareProcessWorkerLaunchV1(manifest.bundle).spawn({
     env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' },
   });
   try {
     const bootstrap = encodeCanonical({ key: key.toString('base64'), session });
     (child.stdio[3] as Writable).write(frame(bootstrap));
     const reply = responseFrame(child.stdout!);
-    child.stdin!.write(parent.encode({ kind: 'request', id: 'tampered-init',
+    (child.stdio.at(5) as Writable).write(parent.encode({ kind: 'request', id: 'tampered-init',
       method: 'init-virtual', payload: {
         format: 'aether.process-worker-init/3',
         artifact: { ...f.artifact!, descriptor: { ...f.artifact!.descriptor, sites: [] } },

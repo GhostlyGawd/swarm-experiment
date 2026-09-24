@@ -18,7 +18,7 @@ import { ProcessAuthenticator, processBoundaryId, validateProcessScope, fromWire
 import { decodeProcessExecution, encodeProcessExecution } from './process-execution-wire.ts';
 import { validateProcessVirtualArtifactV3, type ProcessVirtualArtifactV3 } from './process-virtual-artifact.ts';
 import { type ProcessVirtualArtifactV4 } from './process-virtual-artifact-v4-core.ts';
-import { validatePackagedProcessVirtualArtifactV4 } from './process-virtual-worker-v4.ts';
+import { assertProcessWorkerPipeCustodyV1, validatePackagedProcessVirtualArtifactV4 } from './process-virtual-worker-v4.ts';
 import { assertProcessVirtualWorkerBundleV1, openProcessVirtualWorkerLineageV1 } from './process-virtual-worker-contract.ts';
 
 const pause = new Int32Array(new SharedArrayBuffer(4));
@@ -89,7 +89,9 @@ function main(): void {
   const waitingCallbacks = new Set<string>();
   const receivedCallbacks = new Map<string, unknown>();
   const executions: { operationId: string; nextBoundary: number }[] = [];
-  const read = () => authenticator.decode(readFrame(0, session.maxFrameBytes));
+  const custodied = process.argv[3] === 'aether.process-worker-launch-custody/1';
+  const launchedPath = custodied ? process.argv[2]! : process.argv[1]!;
+  const read = () => authenticator.decode(readFrame(custodied ? 5 : 0, session.maxFrameBytes));
   const send = (body: unknown) => writeAll(authenticator.encode(body));
   const capture = (): RuntimeSnapshotV1 => {
     if (!runtime || !scope) throw new Error('worker is not initialized');
@@ -205,11 +207,13 @@ function main(): void {
       throw new RangeError('invalid virtual worker guard budget');
     const lineage = openProcessVirtualWorkerLineageV1(init.trust);
     const version = init.format === 'aether.process-worker-init/3' ? 4 : 3;
+    if (version === 4)
+      assertProcessWorkerPipeCustodyV1((init.artifact as ProcessVirtualArtifactV4).executableSubject.manifest.bundle);
     const artifact = version === 4
-      ? validatePackagedProcessVirtualArtifactV4(init.artifact, lineage, process.argv[1]!)
+      ? validatePackagedProcessVirtualArtifactV4(init.artifact, lineage, launchedPath)
       : validateProcessVirtualArtifactV3(init.artifact, lineage);
     if (version === 3)
-      assertProcessVirtualWorkerBundleV1(artifact as ProcessVirtualArtifactV3, process.argv[1]!);
+      assertProcessVirtualWorkerBundleV1(artifact as ProcessVirtualArtifactV3, launchedPath);
     const manifest = artifact.candidateEvidence.manifest;
     if (executionManifestDigest(manifest) !== session.executionManifest
       || init.ownershipEpoch !== session.ownershipEpoch)
@@ -268,10 +272,11 @@ function main(): void {
           if (virtualAdmission) {
             if (virtualAdmission.version === 3) {
               validateProcessVirtualArtifactV3(virtualAdmission.artifact, virtualAdmission.lineage);
-              assertProcessVirtualWorkerBundleV1(virtualAdmission.artifact, process.argv[1]!);
+              assertProcessVirtualWorkerBundleV1(virtualAdmission.artifact, launchedPath);
             } else {
+              assertProcessWorkerPipeCustodyV1(virtualAdmission.artifact.executableSubject.manifest.bundle);
               validatePackagedProcessVirtualArtifactV4(virtualAdmission.artifact,
-                virtualAdmission.lineage, process.argv[1]!);
+                virtualAdmission.lineage, launchedPath);
             }
           }
           const call = exactObject(message.payload, ['symbol', 'args', 'snapshot', 'operationId']);

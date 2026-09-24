@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import type { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +21,8 @@ import { validateProcessVirtualArtifactV3, type ProcessVirtualArtifactV3 } from 
 import { assertProcessVirtualArtifactV4Launch,
   type ProcessVirtualArtifactV4 } from './process-virtual-artifact-v4.ts';
 import { validatePackagedProcessVirtualArtifactV4 } from './process-virtual-worker-v4.ts';
+import { prepareProcessWorkerLaunchV1 } from './process-worker-launch-custody.ts';
+import type { MeasuredFileV2 } from './process-virtual-artifact-v4-core.ts';
 import { assertProcessVirtualWorkerBundleV1, openProcessVirtualWorkerLineageV1,
   type ProcessVirtualWorkerTrustV1 } from './process-virtual-worker-contract.ts';
 
@@ -126,6 +128,7 @@ export interface ProcessInitWire {
  */
 export class ProcessChannel {
   private readonly child: ChildProcess;
+  private readonly requestPipe: Writable;
   private readonly authenticator: ProcessAuthenticator;
   private readonly pending = new Map<string, Pending>();
   private readonly options: ProcessChannelOptions;
@@ -144,7 +147,7 @@ export class ProcessChannel {
   get alive(): boolean { return !this.isClosed && !this.child.killed; }
 
   private constructor(init: ProcessChannelInit, options: ProcessChannelOptions,
-    virtualWorkerPath?: string) {
+    virtualWorkerPath?: string, custodiedBundle?: MeasuredFileV2) {
     validateExecutionManifest(init.manifest);
     if (new GraphStore().intern(init.module) !== init.manifest.astRoot) throw new TypeError('worker module does not match execution manifest');
     this.options = options;
@@ -156,12 +159,20 @@ export class ProcessChannel {
     this.authenticator = new ProcessAuthenticator(key, session, 'parent');
     const worker = new URL(import.meta.url.endsWith('.ts') ? './process-worker.ts' : './process-worker.js', import.meta.url);
     this.workerPath = virtualWorkerPath ?? fileURLToPath(worker);
-    this.child = spawn(process.execPath, [...(this.workerPath.endsWith('.ts') ? ['--experimental-strip-types'] : []), this.workerPath], { stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'], env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' } });
+    const launchOptions: SpawnOptions = { stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+      env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' } };
+    this.child = custodiedBundle
+      ? prepareProcessWorkerLaunchV1(custodiedBundle).spawn(launchOptions)
+      : spawn(process.execPath,
+        [...(this.workerPath.endsWith('.ts') ? ['--experimental-strip-types'] : []), this.workerPath],
+        launchOptions);
     if (!this.child.pid) throw new ProcessChannelError('closed', 'worker could not start', false);
+    this.requestPipe = custodiedBundle
+      ? this.child.stdio.at(5) as Writable : this.child.stdin!;
     this.pid = this.child.pid;
     this.exitPromise = new Promise(resolve => this.child.once('exit', () => { this.exited = true; this.fail(new ProcessChannelError('eof', 'worker exited before completing pending operations', this.pending.size > 0)); resolve(); }));
     this.child.once('error', () => this.fail(new ProcessChannelError('eof', 'worker process failed', this.pending.size > 0)));
-    this.child.stdin!.on('error', () => this.fail(new ProcessChannelError('eof', 'worker input closed', this.pending.size > 0)));
+    this.requestPipe.on('error', () => this.fail(new ProcessChannelError('eof', 'worker input closed', this.pending.size > 0)));
     this.child.stdout!.on('data', (chunk: Buffer) => this.receive(chunk));
     this.child.stdout!.on('end', () => this.fail(new ProcessChannelError('eof', 'worker output closed', this.pending.size > 0)));
     // Never accumulate or print worker data on stderr; diagnostics travel in signed responses.
@@ -256,7 +267,8 @@ export class ProcessChannel {
       throw new TypeError('Artifact/4 target must be compiled locally');
     const channel = new ProcessChannel({ module, manifest: artifact.candidateEvidence.manifest,
       unit: safe.unit, includeSymbols, capabilities: [], heapId: safe.heapId,
-      ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, transport, path);
+      ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, transport, path,
+    artifact.executableSubject.manifest.bundle);
     channel.virtualAdmission = { version: 4, artifact, lineage };
     try {
       validatePackagedProcessVirtualArtifactV4(artifact, lineage, channel.workerPath);
@@ -323,7 +335,7 @@ export class ProcessChannel {
   }
   private send(body: unknown): void {
     if (this.closed) throw new ProcessChannelError('closed', 'worker channel is closed', true);
-    this.child.stdin!.write(this.authenticator.encode(body));
+    this.requestPipe.write(this.authenticator.encode(body));
   }
   private receive(chunk: Buffer): void {
     if (this.closed) return;

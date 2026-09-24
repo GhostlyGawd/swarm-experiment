@@ -37,7 +37,10 @@ separately packaged verifier tools remain future work. It refuses `DYLD_`
 runtime overrides.
 
 `assertProcessVirtualArtifactV4Launch` repeats full host admission and checks
-the selected worker path and bytes once before spawn. The parent then rechecks
+the selected worker path and bytes once before spawn. The versioned
+[launch custody V1](ARTIFACT4-LAUNCH-CUSTODY.md) then acquires exact signed JS
+bytes into memory and sends them over Node's anonymous ESM stdin pipe,
+closing the same-UID top-level JS pathname-swap window. The parent then rechecks
 the signed proof and current measured bytes after spawn and before each call,
 without rebuilding the graph again. The child opens operator-held signed
 lineage independently and uses the same proof core to validate source,
@@ -54,8 +57,9 @@ The child rehash cannot independently rebuild the input graph or resolve the
 native static-link closure; those are parent admission responsibilities. The
 static Mach-O closure does not cover `dlopen` outcomes, raw bytes of every
 system dyld-cache member, or launch-time custody after the last measurement.
-The checks before and after spawn reduce stale-file exposure but cannot prove
-the bytes loaded by the OS at the intervening instant. Per-call rehashing is
+The trusted parent hashes top-level JS before sending it to Node's stdin
+loader, but does not prove the bytes loaded for Node or native libraries by
+the OS. Per-call rehashing is
 also too expensive to qualify the v4 latency target; a separately measured
 custody and fast-path profile is still needed.
 ProcessHost config/16 pins the Artifact/4 and operator trust digest, verifies

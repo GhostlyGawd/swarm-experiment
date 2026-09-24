@@ -11,6 +11,14 @@ import { artifact4Same, artifact4SubjectDigest,
   type ProcessVirtualArtifactV4, type ProcessWorkerBundleManifestV2 } from './process-virtual-artifact-v4-core.ts';
 
 const MAX_FILE_BYTES = 512 * 1024 * 1024;
+/** Node reads the ESM from anonymous stdin and the parent sends the worker
+ * protocol on FD5. The child binds its launch arguments to signed Artifact/4. */
+export function assertProcessWorkerPipeCustodyV1(bundle: MeasuredFileV2): void {
+  if (process.argv[1] !== '-'
+    || process.argv[3] !== 'aether.process-worker-launch-custody/1'
+    || process.argv[2] !== bundle.path || process.argv[4] !== bundle.sha256)
+    throw new TypeError('Artifact/4 worker launch custody is missing');
+}
 function measure(path: string): MeasuredFileV2 {
   if (typeof path !== 'string' || !isAbsolute(path)) throw new TypeError('Artifact/4 requires an absolute measured file');
   const canonical = realpathSync(path), before = statSync(canonical);
