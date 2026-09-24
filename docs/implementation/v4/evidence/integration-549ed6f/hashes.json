@@ -1,0 +1,14 @@
+{
+  "REVIEW.md": "5cf0046e49f0ece2a17dea5dfe9d207d38aabca289ca5bdefb17b5e05b866091",
+  "bench/manifest.json": "baee9e66a15a321bda09fa10f42d9ddd5ca54b7fff8ac900f2bc73350c7eafe0",
+  "bench/samples.json": "7274a51950b3dd215cc29ae9155c5141cfda4e555130fa647b3a4005cd659ea8",
+  "bench-enforce.log": "070a187cb1b448b0a080bbf04f6ae1d447eb698149d6ac445007b65b74822bc6",
+  "bench-measure.log": "c2b5839755eacf9c2e9b0ccbd25bf8aae85b3bda43d89b56c54a1e300d33aeb1",
+  "bench-verify.log": "59cff425eb0a29fa20a9b3f1b5d6dc7b54c0bee3394e17eccfceebd5dc4595d7",
+  "build.log": "8363fdc26e2d313e30ef5063fc39a96098798d351fa3e2f8de82828d0efdbbfe",
+  "focused-test.log": "4474694a707e569355a47daa4d896345aee2d31885518743568e04bcac5443aa",
+  "full-test.log": "4a3bcfe18e4135d250d15e070efae0a6d3467598cafbd2cc5c7a85661ef8aa7c",
+  "roadmap-v4.log": "94196e972baa6f56bbf9c33bb5d11cb2bdbba77c9e1cba54413180d0ec122161",
+  "roadmap.log": "a24aba684dc7e3baac1ed86ac4d15756297bc8b23864844a02f0548f3a892b61",
+  "typecheck.log": "21d828da60cecb8e4fb3a7820562dfd40397af0d7a093ca0af4a92eb8591339a"
+}

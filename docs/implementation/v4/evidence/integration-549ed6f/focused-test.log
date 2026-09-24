@@ -1,0 +1,18 @@
+✔ portable certificate proves bounded alias success and exact distinct-reference classification (203.570417ms)
+✔ proof cannot authorize a changed selected declaration or a false alias contract (72.949875ms)
+✔ proof excludes arbitrary signed i64 and nonterminating or faulting syntax (66.2085ms)
+✔ portable range goals refuse a source edit that can overflow signed i64 (96.214583ms)
+✔ distinct postcondition admits right = old left + 1 and aborts on right = old left + 100 (1314.15025ms)
+✔ actual fallback AST lowers to native bodies and matches state, aliases and tiers (13667.360667ms)
+✔ native snapshot bridge rejects stale refs and malformed direct frames (946.272541ms)
+✔ checked record proof changes exact native artifact identity and preserves snapshot outcomes (3968.440625ms)
+✔ native lowering refuses stale manifests, unadmitted edits and unsupported effects (51.225ms)
+✔ exact native fallback consumes real ProcessHost state and matches durable tier decisions (3108.603375ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18790.55625

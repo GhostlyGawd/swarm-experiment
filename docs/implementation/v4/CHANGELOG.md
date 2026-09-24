@@ -6,6 +6,8 @@
 - Added proof-bearing native lowering that embeds the checked certificate and compiler-profile digests in executable bytes. A versioned native binding pins the actual ProcessHost source snapshot/head, generation, two tier symbols, checked proof and artifact hashes. A real host-state comparison matches native outcomes to durable worker results for alias and distinct inputs. Focused proof/native/host tests pass 10/10.
 - The binding is a checked admission subject, not a host publication. The versioned witnessed host transaction, combined native effects, full values and FR-3.7 ≤50 ns qualification remain open. T3-07 and 20/62 status do not change. [Decision and limits](decisions/D13-native-fallback-host-transaction.md).
 
+- [Exact-source checkpoint](evidence/integration-549ed6f/REVIEW.md) at `549ed6f`: 983/984 tests pass with one existing opt-in skip, 10/10 focused proof/native/host checks, and passing build/typecheck/roadmap checks. The benchmark remains ineligible at 1.861× warm-message compression with 17 required targets failed or unmeasured.
+
 ## Native snapshot bridge and signed fallback crash recovery — 2026-09-24
 
 - Added a real-controller SIGKILL test after a separately witnessed signed sink commit and before the fallback terminal receipt. A fresh controller reopens the same signed V8 host and proved Tier 2 profile, returns the original Tier 1 result, and observes one sink decision and no Tier 2 host operation.
