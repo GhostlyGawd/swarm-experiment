@@ -37,6 +37,9 @@ import { validateProcessCheckpointBinding, processCheckpointBindingDigest, proce
 import type { PackedLayout } from '../tier3/packed-heap.ts';
 import { PackedNativeProcessRunner, type PackedNativeRun } from './packed-native-process.ts';
 import { validateProcessArguments, validateProcessResult, validateProcessAllocation } from './process-type-validation.ts';
+import { assertProcessNativeFallbackBinding, createProcessNativeFallbackBinding, NATIVE_FALLBACK_COMPILER_PROFILE_DIGEST, type ProcessNativeFallbackBindingInput, type ProcessNativeFallbackBindingV1 } from './native-fallback-contract.ts';
+import { runProcessNativeFallback, validateProcessNativeFallbackOutcome, type ProcessNativeFallbackOutcomeV1, type ProcessNativeFallbackLowered } from './native-fallback-runner.ts';
+import { RECORD_FALLBACK_PROFILE_DIGEST, validateCheckedRecordFallbackProof, type CheckedRecordFallbackProof } from '../tier2/record-fallback-proof-checker.ts';
 
 export const PROCESS_INVOKE = capability('cap:process:invoke');
 export type ProcessInvocationGrant = CapabilityToken | ScopedGrantV2;
@@ -84,18 +87,38 @@ interface AllocationRecord {
   operationId: string; requestDigest: Digest; reference: LogicalRefV1; ty: Ty; fields: Readonly<Record<string, TaggedValueV1>>;
   requestedUnit: string | null; unit: string; beforeSnapshotDigest: Digest; afterSnapshotDigest: Digest; receiptDigest: Digest;
 }
+interface NativeFallbackRecord {
+  binding: ProcessNativeFallbackBindingV1;
+  before: RuntimeSnapshotV1;
+  state: 'requested' | 'running' | 'committed' | 'aborted';
+  result: ProcessNativeFallbackOutcomeV1 | null;
+  resultDigest: Digest | null;
+}
 interface StateHead {
   sequence: string; parent: Digest | null; generation: string; planDigest: Digest; snapshotDigest: Digest;
-  cause: { kind: 'initial' | 'allocation' | 'call' | 'migration' | 'abort' | 'checkpoint'; operationId: string; subjectDigest: Digest }; digest: Digest;
+  cause: { kind: 'initial' | 'allocation' | 'call' | 'migration' | 'abort' | 'checkpoint' | 'native-fallback'; operationId: string; subjectDigest: Digest }; digest: Digest;
 }
 interface HostJournal {
-  format: 'aether.process-host/1' | 'aether.process-host/2' | 'aether.process-host/3' | 'aether.process-host/4'; configuration: Digest; generation: string; plan: string;
+  format: 'aether.process-host/1' | 'aether.process-host/2' | 'aether.process-host/3' | 'aether.process-host/4' | 'aether.process-host/5'; configuration: Digest; generation: string; plan: string;
   witnessRevision?: string;
   snapshot: RuntimeSnapshotV1; calls: CallRecord[]; migrations: MigrationRecord[];
   allocations: AllocationRecord[];
   snapshots: Array<{ digest: Digest; snapshot: RuntimeSnapshotV1 }>;
   heads: StateHead[];
   checkpointLeases?: ProcessCheckpointLease[]; checkpointReceipts?: ProcessCheckpointReceipt[]; checkpointControls?: ProcessCheckpointControl[];
+  nativeFallbacks?: NativeFallbackRecord[];
+}
+export interface ProcessNativeFallbackTokens {
+  readonly tier1: readonly ProcessInvocationGrant[];
+  readonly tier2: readonly ProcessInvocationGrant[];
+}
+export interface ProcessHostNativeFallbackResult {
+  readonly operationId: string;
+  readonly generation: string;
+  readonly unit: string;
+  readonly binding: Digest;
+  readonly receipt: Digest;
+  readonly outcome: ProcessNativeFallbackOutcomeV1;
 }
 export type ProcessHostCallResult =
   | { state: 'completed'; operationId: string; generation: string; unit: string; execution: WireExecution }
@@ -126,7 +149,7 @@ export interface ProcessEffectContext {
   readonly clockDomain?: string;
   readonly grantRef?: string;
 }
-export type ProcessHostPhase = 'call-intent' | 'boundary' | 'effect-requested' | 'effect-recorded' | 'call-before-commit' | 'call-committed' | 'migration-requested' | 'migration-prepared' | 'migration-before-commit' | 'migration-committed' | 'migration-finalized' | 'checkpoint-started' | 'checkpoint-saved' | 'checkpoint-before-commit' | 'checkpoint-committed' | 'checkpoint-aborted' | 'checkpoint-control-before-commit' | 'checkpoint-control-committed';
+export type ProcessHostPhase = 'call-intent' | 'boundary' | 'effect-requested' | 'effect-recorded' | 'call-before-commit' | 'call-committed' | 'migration-requested' | 'migration-prepared' | 'migration-before-commit' | 'migration-committed' | 'migration-finalized' | 'checkpoint-started' | 'checkpoint-saved' | 'checkpoint-before-commit' | 'checkpoint-committed' | 'checkpoint-aborted' | 'checkpoint-control-before-commit' | 'checkpoint-control-committed' | 'native-fallback-intent' | 'native-fallback-running' | 'native-fallback-before-commit' | 'native-fallback-committed';
 export interface ProcessHostOptions {
   readonly directory: string;
   readonly module: Term;
@@ -150,6 +173,15 @@ export interface ProcessHostOptions {
   readonly effectJournalWitnessCatalog?: AnyEffectJournalWitnessCatalog;
   /** Operator-held complete host journal CAS for the opt-in V9 profile. */
   readonly hostJournalWitness?: HostJournalWitness;
+  /** Separate witnessed pure-record fallback host profile. Executable bytes are checked by the fixed runner. */
+  readonly nativeFallback?: Readonly<{
+    tier1: SymbolId;
+    tier2: SymbolId;
+    checkedProof: CheckedRecordFallbackProof;
+    executablePath: string;
+    expectedExecutableSha256: string;
+    lowered: ProcessNativeFallbackLowered;
+  }>;
   /** Operator-pinned sink subject and decision custody for the opt-in V10 host profile. */
   readonly attestedSinkAuthority?: AttestedSinkIdentityV1;
   readonly sinkStateWitness?: SinkStateWitnessV1;
@@ -247,6 +279,7 @@ export class ProcessHost {
   private constructor(options: ProcessHostOptions) {
     if (options.effectResourcePath && !options.scopedGrants || !!options.effectResourcePath !== !!options.effectResourcePolicyDigest) throw new TypeError('strict effect resource policy requires an exact policy digest');
     if (options.effectResourcePolicyDigest) validateDigest(options.effectResourcePolicyDigest, 'aether.effect-resource-policy/1');
+    const nativeProfile = options.nativeFallback !== undefined;
     const signed = options.signedEffectResourcePolicy !== undefined;
     const anchored = options.effectSignerAnchor !== undefined;
     const resourceScopedSink = options.anchoredEffectPolicyProfile === 'attested-sink-v9-resource-witness';
@@ -274,6 +307,10 @@ export class ProcessHost {
       if (options.hostJournalWitness.repositoryId !== options.effectSignerAnchor?.repositoryId
         || options.hostJournalWitness.deploymentId !== options.effectJournalWitnessCatalog?.deploymentId)
         throw new TypeError('host journal witness differs from signed repository/effect namespace');
+    } else if (nativeProfile) {
+      assertHostJournalWitness(options.hostJournalWitness);
+      if (!options.scopedGrants || options.hostJournalWitness.repositoryId !== options.scopedGrants.repositoryId)
+        throw new TypeError('native fallback host witness differs from scoped grant repository');
     } else if (options.hostJournalWitness !== undefined)
       throw new TypeError('host journal witness requires isolated Wasm V9 profile');
     if (witnessedSink) {
@@ -335,13 +372,45 @@ export class ProcessHost {
     if (signed && (!options.scopedGrants || options.effectResourcePath || options.effectResourcePolicyDigest)
       || !anchored && (signed !== (options.effectResourceSignerKey !== undefined)
         || signed !== (options.currentEffectPolicyEpoch !== undefined))) throw new TypeError('signed effect resource policy requires strict grants, signer key, and epoch source');
+    if (nativeProfile && (anchored || signed || options.anchoredEffectPolicyProfile !== undefined
+      || options.legacyAnchoredEffectPolicy !== undefined || options.effectRouterFactory !== undefined
+      || options.effectResourcePath !== undefined || options.effectResourcePolicyDigest !== undefined
+      || options.attestedSinkAuthority !== undefined || options.sinkStateWitness !== undefined))
+      throw new TypeError('native fallback profile requires an independent pure host');
     this.options = { ...options, plan: JSON.parse(planBytes(options.plan)) as TopologyPlan,
       initialSnapshot: options.initialSnapshot ? copy(options.initialSnapshot) : undefined,
+      nativeFallback: nativeProfile ? Object.freeze({ ...options.nativeFallback!,
+        lowered: freeze(copy(options.nativeFallback!.lowered)) }) : undefined,
       attestedSinkAuthority: witnessedSink ? freeze(copy(options.attestedSinkAuthority!)) : undefined };
     this.#hostJournalWitness = options.hostJournalWitness ?? null;
     this.module = decodeIR(encodeIR(options.module).text);
     this.manifest = decodeExecutionManifest(encodeExecutionManifest(options.manifest));
     if (new GraphStore().intern(this.module) !== this.manifest.astRoot) throw new TypeError('ProcessHost module/manifest mismatch');
+    if (nativeProfile) {
+      if (this.module.kind !== 'Module' || this.module.members.length !== 2
+        || this.module.members.some(member => member.kind !== 'FunctionDecl'
+          || member.purity !== 'pure' || member.capabilities.length))
+        throw new TypeError('native fallback requires an exact pure two-tier module');
+      if (options.nativeFallback!.tier1 === options.nativeFallback!.tier2
+        || !this.module.members.some(member => member.kind === 'FunctionDecl' && member.symbol === options.nativeFallback!.tier1)
+        || !this.module.members.some(member => member.kind === 'FunctionDecl' && member.symbol === options.nativeFallback!.tier2))
+        throw new TypeError('native fallback tier symbols differ from retained source');
+      validateCheckedRecordFallbackProof(options.nativeFallback!.checkedProof,
+        { module: this.module, manifest: this.manifest, tier2: options.nativeFallback!.tier2 });
+      if (!options.nativeFallback!.executablePath || typeof options.nativeFallback!.executablePath !== 'string')
+        throw new TypeError('native fallback executable locator required');
+      if (!/^[0-9a-f]{64}$/.test(options.nativeFallback!.expectedExecutableSha256))
+        throw new TypeError('native fallback requires an operator-pinned executable SHA-256');
+      const lowered = options.nativeFallback!.lowered;
+      if (lowered.format !== 'aether.proved-native-fallback-lowering/1'
+        || lowered.root !== this.manifest.astRoot
+        || lowered.manifestDigest !== executionManifestDigest(this.manifest)
+        || lowered.conservativeProofDigest !== options.nativeFallback!.checkedProof.certificateDigest
+        || lowered.proofProfileDigest !== RECORD_FALLBACK_PROFILE_DIGEST
+        || lowered.compilerProfileDigest !== NATIVE_FALLBACK_COMPILER_PROFILE_DIGEST
+        || !/^[0-9a-f]{64}$/.test(lowered.sourceSha256))
+        throw new TypeError('native fallback compiler/proof subject mismatch');
+    }
     if (anchored && [...walk(this.module)].some(node => node.kind === 'Invoke') && !signed)
       throw new TypeError('anchored effectful ProcessHost requires a signed effect policy');
     if (signed) {
@@ -372,7 +441,7 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest(anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+    this.configuration = domainDigest(nativeProfile ? 'aether.process-host-config/10' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
       ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/6' ? effectResourcePolicyDigestV6(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/5' ? effectResourcePolicyDigestV5(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4' ? effectResourcePolicyDigestV4(this.signedEffectResourcePolicy.body)
@@ -383,7 +452,14 @@ export class ProcessHost {
       ...(anchored ? { effectSignerAnchor: options.effectSignerAnchor!.digest } : {}),
       ...(clocked ? { trustedClockAnchor: options.trustedClockAnchor!.digest } : {}),
       ...(witnessed ? { effectJournalWitnessCatalog: options.effectJournalWitnessCatalog!.digest } : {}),
-      ...(hostWitnessed ? { hostJournalWitness: options.hostJournalWitness!.digest } : {}),
+      ...(hostWitnessed || nativeProfile ? { hostJournalWitness: options.hostJournalWitness!.digest } : {}),
+      ...(nativeProfile ? { nativeFallback: {
+        tier1: options.nativeFallback!.tier1, tier2: options.nativeFallback!.tier2,
+        proofDigest: options.nativeFallback!.checkedProof.certificateDigest,
+        compilerProfileDigest: NATIVE_FALLBACK_COMPILER_PROFILE_DIGEST,
+        expectedExecutableSha256: options.nativeFallback!.expectedExecutableSha256,
+        lowered: options.nativeFallback!.lowered,
+      } } : {}),
       ...(witnessedSink ? { sinkAnchorDigest: domainDigest('aether.sink-anchor/1', options.attestedSinkAuthority!.anchor),
         sinkDeploymentId: options.attestedSinkAuthority!.deploymentId,
         approvedAdapterArtifactDigest: options.attestedSinkAuthority!.approvedAdapterArtifactDigest,
@@ -404,9 +480,10 @@ export class ProcessHost {
           const snapshot: RuntimeSnapshotV1 = options.initialSnapshot ? copy(options.initialSnapshot) : { format: 'aether.state/1', executionManifest: executionManifestDigest(host.manifest), heapId: `heap-${randomUUID()}`, nextObjectId: '1', eventCursor: '0', records: [], ownership: [] };
           host.validateSnapshot(snapshot, generation, options.plan);
           journal = host.#hostJournalWitness
-            ? { format: 'aether.process-host/4', witnessRevision: '0', configuration: host.configuration, generation,
+            ? { format: options.nativeFallback ? 'aether.process-host/5' : 'aether.process-host/4', witnessRevision: '0', configuration: host.configuration, generation,
               plan: planBytes(options.plan), snapshot, calls: [], migrations: [], allocations: [], snapshots: [], heads: [],
-              checkpointLeases: [], checkpointReceipts: [], checkpointControls: [] }
+              checkpointLeases: [], checkpointReceipts: [], checkpointControls: [],
+              ...(options.nativeFallback ? { nativeFallbacks: [] } : {}) }
             : { format: 'aether.process-host/1', configuration: host.configuration, generation, plan: planBytes(options.plan), snapshot, calls: [], migrations: [], allocations: [], snapshots: [], heads: [] };
           if (host.#hostJournalWitness) host.#journalWitnessBases.set(journal, { revision: '0', journal: null });
           host.retain(journal, snapshot); host.appendHead(journal, { kind: 'initial', operationId: 'initial', subjectDigest: host.configuration }); host.persist(journal);
@@ -560,7 +637,10 @@ export class ProcessHost {
   }
   async snapshot(): Promise<RuntimeSnapshotV1> { return this.lock.runAsync(async () => copy(this.read().snapshot), this.options.lockWaitMs ?? 5000); }
   status(): { unresolved: string[]; migrations: Array<{ migrationId: string; state: MigrationRecord['state'] }> } {
-    const journal = this.read(); return { unresolved: journal.calls.filter(call => call.state === 'running' || call.state === 'indeterminate').map(call => call.operationId), migrations: journal.migrations.map(migration => ({ migrationId: migration.migrationId, state: migration.state })) };
+    const journal = this.read(); return { unresolved: [
+      ...journal.calls.filter(call => call.state === 'running' || call.state === 'indeterminate').map(call => call.operationId),
+      ...(journal.nativeFallbacks ?? []).filter(row => row.state === 'requested' || row.state === 'running').map(row => row.binding.operationId),
+    ], migrations: journal.migrations.map(migration => ({ migrationId: migration.migrationId, state: migration.state })) };
   }
   operationResult(operationId: string): ProcessHostCallResult | null {
     this.assertOpen(); identifier(operationId); const journal = this.read(), call = journal.calls.find(call => call.operationId === operationId);
@@ -577,6 +657,142 @@ export class ProcessHost {
     return Object.freeze({ ...body, safeToAbortBeforeEffects, possibleExternalCommit: !safeToAbortBeforeEffects,
       evidenceDigest: domainDigest('aether.process-effect-disposition/1', body) });
   }
+  private nativeBindingInput(operationId: string, unit: string, generation: string,
+    processHead: Digest, before: RuntimeSnapshotV1, left: LogicalRefV1, right: LogicalRefV1): ProcessNativeFallbackBindingInput {
+    const profile = this.options.nativeFallback;
+    if (!profile) throw new Error('native fallback host profile is not configured');
+    return { operationId, configuration: this.configuration, generation, unit, processHead,
+      context: { module: this.module, manifest: this.manifest, tier2: profile.tier2 },
+      tier1: profile.tier1, checkedProof: profile.checkedProof, snapshot: before,
+      left, right, sourceSha256: profile.lowered.sourceSha256,
+      executableSha256: profile.expectedExecutableSha256 };
+  }
+  private authorizeNativeFallback(journal: HostJournal, tokens: ProcessNativeFallbackTokens): string {
+    const profile = this.options.nativeFallback;
+    if (!profile || journal.format !== 'aether.process-host/5') throw new Error('native fallback profile required');
+    if (!tokens || !Array.isArray(tokens.tier1) || !Array.isArray(tokens.tier2))
+      throw new TypeError('native fallback requires separate current tier grants');
+    const plan = JSON.parse(journal.plan) as TopologyPlan;
+    const unit = this.unitIn(plan, profile.tier1);
+    if (!unit || this.unitIn(plan, profile.tier2) !== unit)
+      throw new Error('native fallback tiers must share one placement');
+    this.authorize(profile.tier1, unit, journal.generation, tokens.tier1);
+    this.authorize(profile.tier2, unit, journal.generation, tokens.tier2);
+    return unit;
+  }
+  private nativeResult(row: NativeFallbackRecord): ProcessHostNativeFallbackResult | null {
+    if (row.state !== 'committed' && row.state !== 'aborted') return null;
+    return freeze(copy({ operationId: row.binding.operationId, generation: row.binding.generation,
+      unit: row.binding.unit, binding: row.binding.id, receipt: row.resultDigest!, outcome: row.result! }));
+  }
+  nativeFallbackResult(operationId: string, tokens: ProcessNativeFallbackTokens): ProcessHostNativeFallbackResult | null {
+    this.assertOpen(); identifier(operationId);
+    const journal = this.read(); this.authorizeNativeFallback(journal, tokens);
+    const row = journal.nativeFallbacks?.find(item => item.binding.operationId === operationId);
+    this.authorizeNativeFallback(journal, tokens);
+    return row ? this.nativeResult(row) : null;
+  }
+  /** Native candidate is never exposed as host state until one witnessed journal CAS
+   * publishes its exact result, retained snapshot, and state head together. */
+  async callNativeFallback(left: LogicalRefV1, right: LogicalRefV1, options: {
+    operationId: string; tokens: ProcessNativeFallbackTokens;
+    expectedSnapshot?: Digest; expectedGeneration?: string;
+  }): Promise<ProcessHostNativeFallbackResult> {
+    identifier(options.operationId);
+    if (options.expectedSnapshot !== undefined) validateDigest(options.expectedSnapshot);
+    if (options.expectedGeneration !== undefined) decimal(options.expectedGeneration);
+    return this.lock.runAsync(async () => {
+      this.assertOpen(); const journal = this.read();
+      const unit = this.authorizeNativeFallback(journal, options.tokens);
+      const old = journal.nativeFallbacks!.find(row => row.binding.operationId === options.operationId);
+      if (old) {
+        if (!equal(old.binding.frame.left, left) || !equal(old.binding.frame.right, right)
+          || options.expectedSnapshot !== undefined && options.expectedSnapshot !== old.binding.frame.sourceSnapshot
+          || options.expectedGeneration !== undefined && options.expectedGeneration !== old.binding.generation)
+          throw new Error('native_fallback_identity_conflict');
+        const cached = this.nativeResult(old);
+        if (cached) { this.authorizeNativeFallback(journal, options.tokens); return cached; }
+        throw new Error('native_fallback_recovery_required');
+      }
+      this.assertReady(journal);
+      if (options.expectedGeneration !== undefined && options.expectedGeneration !== journal.generation
+        || options.expectedSnapshot !== undefined && options.expectedSnapshot !== runtimeSnapshotDigest(journal.snapshot))
+        throw new Error('stale_native_fallback_base');
+      if (journal.calls.some(call => call.operationId === options.operationId)
+        || journal.allocations.some(row => row.operationId === options.operationId)
+        || journal.migrations.some(row => row.migrationId === options.operationId)
+        || journal.checkpointLeases?.some(row => row.binding.operationId === options.operationId))
+        throw new Error('native fallback operation ID already used');
+      const profile = this.options.nativeFallback!;
+      const refs: TaggedValueV1[] = [{ tag: 'ref', value: left }, { tag: 'ref', value: right }];
+      validateProcessArguments(this.declarations.get(profile.tier1)!, refs, journal.snapshot);
+      validateProcessArguments(this.declarations.get(profile.tier2)!, refs, journal.snapshot);
+      const before = copy(journal.snapshot), processHead = journal.heads.at(-1)!.digest;
+      const bindingInput = this.nativeBindingInput(options.operationId, unit, journal.generation,
+        processHead, before, left, right);
+      const binding = createProcessNativeFallbackBinding(bindingInput);
+      const row: NativeFallbackRecord = { binding, before, state: 'requested', result: null, resultDigest: null };
+      journal.nativeFallbacks!.push(row); this.persist(journal);
+      this.phase('native-fallback-intent', options.operationId, journal.generation);
+      return this.runNativeFallback(journal, row, options.tokens, false);
+    }, this.options.lockWaitMs ?? 5000);
+  }
+  /** A crash after intent is safe to retry because the admitted program is
+   * pure and the previous process could not publish into the witnessed host. */
+  async recoverNativeFallback(operationId: string, options: { tokens: ProcessNativeFallbackTokens }): Promise<ProcessHostNativeFallbackResult> {
+    identifier(operationId);
+    this.requireRecoveryAuthorization(operationId, 'isolated-replay');
+    return this.lock.runAsync(async () => {
+      this.assertOpen(); const journal = this.read();
+      this.requireRecoveryAuthorization(operationId, 'isolated-replay');
+      this.authorizeNativeFallback(journal, options.tokens);
+      const row = journal.nativeFallbacks?.find(candidate => candidate.binding.operationId === operationId);
+      if (!row) throw new Error('unknown native fallback operation');
+      const cached = this.nativeResult(row);
+      if (cached) { this.authorizeNativeFallback(journal, options.tokens); return cached; }
+      if (journal.heads.at(-1)?.digest !== row.binding.processHead
+        || runtimeSnapshotDigest(journal.snapshot) !== runtimeSnapshotDigest(row.before)
+        || journal.generation !== row.binding.generation)
+        throw new Error('native fallback recovery base changed');
+      return this.runNativeFallback(journal, row, options.tokens, true);
+    }, this.options.lockWaitMs ?? 5000);
+  }
+  private async runNativeFallback(journal: HostJournal, row: NativeFallbackRecord,
+    tokens: ProcessNativeFallbackTokens, recovery: boolean): Promise<ProcessHostNativeFallbackResult> {
+    const profile = this.options.nativeFallback!;
+    if (recovery) this.requireRecoveryAuthorization(row.binding.operationId, 'isolated-replay');
+    this.authorizeNativeFallback(journal, tokens);
+    row.state = 'running'; this.persist(journal);
+    this.phase('native-fallback-running', row.binding.operationId, journal.generation);
+    const input = this.nativeBindingInput(row.binding.operationId, row.binding.unit,
+      row.binding.generation, row.binding.processHead, row.before,
+      row.binding.frame.left, row.binding.frame.right);
+    assertProcessNativeFallbackBinding(row.binding, input);
+    const outcome = await runProcessNativeFallback({ binding: row.binding, bindingInput: input,
+      executablePath: profile.executablePath, lowered: profile.lowered, grant2: true });
+    if (recovery) this.requireRecoveryAuthorization(row.binding.operationId, 'isolated-replay');
+    this.authorizeNativeFallback(journal, tokens);
+    if (journal.heads.at(-1)?.digest !== row.binding.processHead
+      || runtimeSnapshotDigest(journal.snapshot) !== runtimeSnapshotDigest(row.before)
+      || journal.generation !== row.binding.generation)
+      throw new Error('native fallback base changed before publication');
+    validateProcessNativeFallbackOutcome(row.binding, input, outcome, profile.lowered, { grant2: true });
+    if (outcome.state === 'aborted' && runtimeSnapshotDigest(outcome.after) !== runtimeSnapshotDigest(row.before))
+      throw new Error('aborted native fallback altered state');
+    if (outcome.state === 'completed') validateProcessResult(this.declarations.get(profile.tier1)!, outcome.value!, outcome.after);
+    this.validateSnapshot(outcome.after, journal.generation, JSON.parse(journal.plan) as TopologyPlan);
+    this.phase('native-fallback-before-commit', row.binding.operationId, journal.generation);
+    if (recovery) this.requireRecoveryAuthorization(row.binding.operationId, 'isolated-replay');
+    this.authorizeNativeFallback(journal, tokens);
+    row.result = copy(outcome); row.resultDigest = domainDigest('aether.process-native-fallback-outcome/1', row.result);
+    row.state = outcome.state === 'completed' ? 'committed' : 'aborted';
+    journal.snapshot = copy(outcome.after); this.retain(journal, journal.snapshot);
+    this.appendHead(journal, { kind: 'native-fallback', operationId: row.binding.operationId,
+      subjectDigest: row.resultDigest });
+    this.persist(journal);
+    this.phase('native-fallback-committed', row.binding.operationId, journal.generation);
+    return this.nativeResult(row)!;
+  }
   async allocateRecord(ty: Ty, fields: Readonly<Record<string, TaggedValueV1>>, options: { operationId: string; unit?: string }): Promise<LogicalRefV1> {
     identifier(options.operationId);
     ty = freeze(copy(ty)); fields = freeze(copy(fields)); options = Object.freeze({ operationId: options.operationId, ...(options.unit === undefined ? {} : { unit: options.unit }) });
@@ -585,7 +801,9 @@ export class ProcessHost {
       const digest = domainDigest('aether.process-allocation/1', { ty, fields, unit: options.unit ?? null });
       const old = journal.allocations.find(allocation => allocation.operationId === options.operationId);
       if (old) { if (old.requestDigest !== digest) throw new Error('allocation_identity_conflict'); return copy(old.reference); }
-      if (journal.calls.some(call => call.operationId === options.operationId)) throw new Error('operation ID already names a call');
+      if (journal.calls.some(call => call.operationId === options.operationId)
+        || journal.nativeFallbacks?.some(row => row.binding.operationId === options.operationId))
+        throw new Error('operation ID already names another transition');
       const plan = JSON.parse(journal.plan) as TopologyPlan, unit = options.unit ?? plan.units[0].id;
       if (!plan.units.some(candidate => candidate.id === unit)) throw new Error('allocation unit does not exist');
       validateProcessAllocation(ty, fields, journal.snapshot);
@@ -627,7 +845,9 @@ export class ProcessHost {
       if ((options.expectedGeneration !== undefined && journal.generation !== options.expectedGeneration)
         || (options.expectedSnapshot !== undefined && runtimeSnapshotDigest(journal.snapshot) !== options.expectedSnapshot))
         throw new Error('stale_process_fallback_base');
-      if (journal.allocations.some(allocation => allocation.operationId === options.operationId)) throw new Error('operation ID already names an allocation');
+      if (journal.allocations.some(allocation => allocation.operationId === options.operationId)
+        || journal.nativeFallbacks?.some(row => row.binding.operationId === options.operationId))
+        throw new Error('operation ID already names another transition');
       const scope = this.scope(journal, unit); args.forEach(value => decodeProcessValue(value, scope, journal.snapshot));
       validateProcessArguments(this.declarations.get(symbol)!, args, journal.snapshot);
       await this.ensureWorkers(journal);
@@ -703,6 +923,8 @@ export class ProcessHost {
         throw new Error(`migration ${old.state}; a new migration ID is required`);
       }
       this.assertReady(journal);
+      if (journal.nativeFallbacks?.some(row => row.binding.operationId === options.migrationId))
+        throw new Error('migration ID already names a native fallback');
       if (options.expectedGeneration !== undefined && options.expectedGeneration !== journal.generation) throw new Error('stale topology generation');
       const beforePlan = JSON.parse(journal.plan) as TopologyPlan;
       const source = this.unitIn(beforePlan, symbol);
@@ -757,7 +979,10 @@ export class ProcessHost {
       const prior = journal.checkpointLeases?.find(item => item.binding.operationId === options.operationId);
       if (prior) { if (prior.binding.baseCheckpoint !== checkpointDigest(base) || prior.binding.initialCheckpoint !== checkpointDigest(initial) || prior.binding.symbol !== options.symbol) throw new Error('checkpoint operation identity conflict'); this.checkpointAuthority('begin', prior.binding, tokens); return copy(prior.binding); }
       this.assertReady(journal);
-      if (journal.calls.some(item => item.operationId === options.operationId) || journal.allocations.some(item => item.operationId === options.operationId)) throw new Error('checkpoint operation ID already used');
+      if (journal.calls.some(item => item.operationId === options.operationId)
+        || journal.allocations.some(item => item.operationId === options.operationId)
+        || journal.nativeFallbacks?.some(row => row.binding.operationId === options.operationId))
+        throw new Error('checkpoint operation ID already used');
       if (journal.generation !== options.expectedGeneration || runtimeSnapshotDigest(journal.snapshot) !== options.expectedSnapshot) throw new Error('stale checkpoint ownership base');
       assertBaseProjection(base, journal.snapshot, journal.generation, unit); projectProcessCheckpoint(initial, journal.snapshot, journal.generation, unit);
       if (!['running', 'completed'].includes(initial.core.state)) throw new Error('checkpoint adoption requires a running or completed invocation');
@@ -862,7 +1087,8 @@ export class ProcessHost {
           const body: Omit<ProcessCheckpointControl, 'id'> = { format: 'aether.process-checkpoint-control/1', binding: bindingId, request: control, beforeCheckpoint: executionOrigin, afterCheckpoint, previous: latestControl?.id ?? null, effectAudit: audit, effectCount: effectAudit.length };
           const result = { ...body, id: checkpointControlDigest(body) };
           this.phase('checkpoint-control-before-commit', control.operationId, lease.binding.generation); assertAuthority();
-          if (journal.format !== 'aether.process-host/4') journal.format = 'aether.process-host/3';
+          if (journal.format !== 'aether.process-host/4' && journal.format !== 'aether.process-host/5')
+            journal.format = 'aether.process-host/3';
           (journal.checkpointControls ??= []).push(result); lease.latestCheckpoint = afterCheckpoint; lease.checkpoints.push(afterCheckpoint); this.persist(journal);
           this.phase('checkpoint-control-committed', control.operationId, lease.binding.generation); return freeze(copy(result));
         },
@@ -1443,6 +1669,8 @@ export class ProcessHost {
     if (snapshot.ownership.some(owner => !plan.units.some(unit => unit.id === owner.unit))) throw new Error('snapshot ownership references a removed unit');
   }
   private assertReady(journal: HostJournal): void {
+    if (journal.nativeFallbacks?.some(row => row.state === 'requested' || row.state === 'running'))
+      throw new Error('state domain blocked by an unresolved native fallback');
     if (journal.checkpointLeases?.some(lease => lease.state === 'active')) throw new Error('state domain held by an active resumable checkpoint lease');
     if (journal.calls.some(call => call.state === 'running' || call.state === 'indeterminate')) throw new Error('state domain blocked by an indeterminate operation');
     if (journal.migrations.some(migration => ['requested', 'prepared', 'committed'].includes(migration.state))) throw new Error('migration recovery must finish before another state transition');
@@ -1461,9 +1689,10 @@ export class ProcessHost {
     try {
       const prior = exactObject(decodeCanonical(Buffer.from(local)),
         ['format', 'witnessRevision', 'configuration', 'generation', 'plan', 'snapshot', 'calls', 'migrations',
-          'allocations', 'snapshots', 'heads', 'checkpointLeases', 'checkpointReceipts', 'checkpointControls']);
+          'allocations', 'snapshots', 'heads', 'checkpointLeases', 'checkpointReceipts', 'checkpointControls',
+          ...(this.options.nativeFallback ? ['nativeFallbacks'] : [])]);
       decimal(prior.witnessRevision);
-      return prior.format === 'aether.process-host/4' && prior.configuration === this.configuration
+      return prior.format === (this.options.nativeFallback ? 'aether.process-host/5' : 'aether.process-host/4') && prior.configuration === this.configuration
         && BigInt(prior.witnessRevision) < BigInt(revision);
     } catch { return false; }
   }
@@ -1476,7 +1705,8 @@ export class ProcessHost {
       const local = existsSync(this.file) ? readFileSync(this.file, 'utf8') : null;
       if (local !== null && local !== base.journal && !this.isPriorWitnessLocal(local, base.revision))
         throw new Error('local host journal diverges from operator witness');
-      if (journal.format !== 'aether.process-host/4') throw new TypeError('host witness requires journal format 4');
+      if (journal.format !== (this.options.nativeFallback ? 'aether.process-host/5' : 'aether.process-host/4'))
+        throw new TypeError('host witness requires its selected journal format');
       const nextRevision = String(BigInt(head.revision) + 1n);
       journal.witnessRevision = nextRevision;
       const encoded = Buffer.from(encodeCanonical(journal)).toString('utf8');
@@ -1498,8 +1728,9 @@ export class ProcessHost {
       if (Buffer.byteLength(head.journal) > 8 * 1024 * 1024) throw new RangeError('host witness journal size limit');
       const remote = exactObject(decodeCanonical(Buffer.from(head.journal)),
         ['format', 'witnessRevision', 'configuration', 'generation', 'plan', 'snapshot', 'calls', 'migrations',
-          'allocations', 'snapshots', 'heads', 'checkpointLeases', 'checkpointReceipts', 'checkpointControls']);
-      if (remote.format !== 'aether.process-host/4' || remote.configuration !== this.configuration
+          'allocations', 'snapshots', 'heads', 'checkpointLeases', 'checkpointReceipts', 'checkpointControls',
+          ...(this.options.nativeFallback ? ['nativeFallbacks'] : [])]);
+      if (remote.format !== (this.options.nativeFallback ? 'aether.process-host/5' : 'aether.process-host/4') || remote.configuration !== this.configuration
         || remote.witnessRevision !== head.revision)
         throw new Error('host witness journal identity/revision mismatch');
       if (existsSync(this.file)) {
@@ -1516,12 +1747,14 @@ export class ProcessHost {
     }
     const decoded = decodeCanonical(bytes);
     const keys = ['format', 'configuration', 'generation', 'plan', 'snapshot', 'calls', 'migrations', 'allocations', 'snapshots', 'heads'];
-    if (['aether.process-host/2', 'aether.process-host/3', 'aether.process-host/4'].includes((decoded as { format: string }).format)) keys.push('checkpointLeases', 'checkpointReceipts');
-    if (['aether.process-host/3', 'aether.process-host/4'].includes((decoded as { format?: string }).format!)) keys.push('checkpointControls');
-    if ((decoded as { format?: string }).format === 'aether.process-host/4') keys.push('witnessRevision');
+    if (['aether.process-host/2', 'aether.process-host/3', 'aether.process-host/4', 'aether.process-host/5'].includes((decoded as { format: string }).format)) keys.push('checkpointLeases', 'checkpointReceipts');
+    if (['aether.process-host/3', 'aether.process-host/4', 'aether.process-host/5'].includes((decoded as { format?: string }).format!)) keys.push('checkpointControls');
+    if (['aether.process-host/4', 'aether.process-host/5'].includes((decoded as { format?: string }).format!)) keys.push('witnessRevision');
+    if ((decoded as { format?: string }).format === 'aether.process-host/5') keys.push('nativeFallbacks');
     const journal = exactObject(decoded, keys) as unknown as HostJournal;
-    if (!['aether.process-host/1', 'aether.process-host/2', 'aether.process-host/3', 'aether.process-host/4'].includes(journal.format)
-      || journal.configuration !== this.configuration || (journal.format === 'aether.process-host/4') !== !!this.#hostJournalWitness)
+    if (!['aether.process-host/1', 'aether.process-host/2', 'aether.process-host/3', 'aether.process-host/4', 'aether.process-host/5'].includes(journal.format)
+      || journal.configuration !== this.configuration || (journal.format === 'aether.process-host/4' || journal.format === 'aether.process-host/5') !== !!this.#hostJournalWitness
+      || (journal.format === 'aether.process-host/5') !== !!this.options.nativeFallback)
       throw new Error('process journal configuration mismatch');
     if (this.#hostJournalWitness) {
       decimal(journal.witnessRevision);
@@ -1646,11 +1879,63 @@ export class ProcessHost {
       const expected: RuntimeSnapshotV1 = { ...before, nextObjectId: String(BigInt(before.nextObjectId) + 1n), records: [...before.records, { objectId: ref.objectId, fields: ty.fields.map(([name]) => [name, allocation.fields[name] ?? { tag: 'null' } as TaggedValueV1] as const).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0) }], ownership: [...before.ownership, { objectId: ref.objectId, unit: allocation.unit, epoch: ref.ownerEpoch }] };
       if (runtimeSnapshotDigest(expected) !== allocation.afterSnapshotDigest) throw new Error('allocation changed existing logical data');
     }
+    if (journal.format === 'aether.process-host/5') {
+      if (!Array.isArray(journal.nativeFallbacks) || !this.options.nativeFallback)
+        throw new Error('missing native fallback journal extension');
+      let unresolved = 0;
+      for (const row of journal.nativeFallbacks) {
+        exactObject(row, ['binding', 'before', 'state', 'result', 'resultDigest']);
+        const binding = row.binding;
+        if (operations.has(binding.operationId) || migrations.has(binding.operationId)
+          || !['requested', 'running', 'committed', 'aborted'].includes(row.state))
+          throw new Error('duplicate or invalid native fallback operation');
+        operations.add(binding.operationId);
+        const historicalPlan = generationPlans.get(binding.generation);
+        const baseHead = journal.heads.find(head => head.digest === binding.processHead);
+        if (!historicalPlan || !baseHead || baseHead.generation !== binding.generation
+          || baseHead.snapshotDigest !== runtimeSnapshotDigest(row.before)
+          || retained.get(baseHead.snapshotDigest) === undefined
+          || this.unitIn(historicalPlan, this.options.nativeFallback.tier1) !== binding.unit
+          || this.unitIn(historicalPlan, this.options.nativeFallback.tier2) !== binding.unit)
+          throw new Error('native fallback lacks an exact retained host base');
+        this.validateSnapshot(row.before, binding.generation, historicalPlan);
+        const input = this.nativeBindingInput(binding.operationId, binding.unit,
+          binding.generation, binding.processHead, row.before,
+          binding.frame.left, binding.frame.right);
+        assertProcessNativeFallbackBinding(binding, input);
+        const args: TaggedValueV1[] = [{ tag: 'ref', value: binding.frame.left },
+          { tag: 'ref', value: binding.frame.right }];
+        validateProcessArguments(this.declarations.get(this.options.nativeFallback.tier1)!, args, row.before);
+        validateProcessArguments(this.declarations.get(this.options.nativeFallback.tier2)!, args, row.before);
+        if (row.state === 'requested' || row.state === 'running') {
+          unresolved++;
+          if (row.result !== null || row.resultDigest !== null
+            || journal.heads.at(-1)?.digest !== binding.processHead
+            || runtimeSnapshotDigest(journal.snapshot) !== runtimeSnapshotDigest(row.before)
+            || journal.generation !== binding.generation)
+            throw new Error('unresolved native fallback changed authoritative state');
+        } else {
+          if (!row.result || row.resultDigest !== domainDigest('aether.process-native-fallback-outcome/1', row.result)
+            || row.state !== (row.result.state === 'completed' ? 'committed' : 'aborted')
+            || row.result.state === 'aborted' && runtimeSnapshotDigest(row.result.after) !== runtimeSnapshotDigest(row.before))
+            throw new Error('corrupt native fallback terminal result');
+          validateProcessNativeFallbackOutcome(binding, input, row.result,
+            this.options.nativeFallback.lowered, { grant2: true });
+          this.validateSnapshot(row.result.after, binding.generation, historicalPlan);
+          if (!retained.has(runtimeSnapshotDigest(row.result.after)))
+            throw new Error('native fallback result snapshot is not retained');
+        }
+      }
+      if (unresolved > 1 || unresolved && (journal.calls.some(call => call.state === 'running' || call.state === 'indeterminate')
+        || journal.migrations.some(migration => ['requested', 'prepared', 'committed'].includes(migration.state))
+        || journal.checkpointLeases?.some(lease => lease.state === 'active')))
+        throw new Error('native fallback does not exclusively own unresolved host state');
+    }
     if (journal.format === 'aether.process-host/4'
       && ![journal.checkpointLeases, journal.checkpointReceipts, journal.checkpointControls].every(Array.isArray))
       throw new Error('invalid witnessed checkpoint journal extension');
     if (journal.format === 'aether.process-host/2' || journal.format === 'aether.process-host/3'
-      || journal.format === 'aether.process-host/4'
+      || (journal.format === 'aether.process-host/4' || journal.format === 'aether.process-host/5')
         && !!(journal.checkpointLeases!.length || journal.checkpointReceipts!.length || journal.checkpointControls!.length)) {
       if (!Array.isArray(journal.checkpointLeases) || !Array.isArray(journal.checkpointReceipts)) throw new Error('invalid checkpoint journal extension');
       const bindings = new Set<string>(), receipts = new Set<string>(); let active = 0;
@@ -1680,7 +1965,7 @@ export class ProcessHost {
         if (!before || receipt.afterSnapshot !== runtimeSnapshotDigest(projectProcessCheckpoint(snapshot, before, lease.binding.generation, lease.binding.unit)) || receipt.eventHead !== snapshot.eventHead || receipt.eventCursor !== snapshot.eventCursor) throw new Error('checkpoint receipt lost its exact state/event binding'); receipts.add(id);
       }
       if (journal.checkpointLeases.some(lease => lease.state === 'committed' && !receipts.has(lease.receipt!))) throw new Error('checkpoint lease lacks publication receipt');
-      if ((journal.format === 'aether.process-host/3' || journal.format === 'aether.process-host/4') && !Array.isArray(journal.checkpointControls)) throw new Error('missing checkpoint control audit');
+      if ((journal.format === 'aether.process-host/3' || journal.format === 'aether.process-host/4' || journal.format === 'aether.process-host/5') && !Array.isArray(journal.checkpointControls)) throw new Error('missing checkpoint control audit');
       const controlIds = new Set<string>(), controlOperations = new Set<string>(), priorControl = new Map<string, Digest>(), auditedEvents = new Map<string, Map<number, Digest>>();
       for (const control of journal.checkpointControls ?? []) {
         exactObject(control, ['format', 'id', 'binding', 'request', 'beforeCheckpoint', 'afterCheckpoint', 'previous', 'effectAudit', 'effectCount']); validateCheckpointControlRequest(control.request);
@@ -1735,6 +2020,15 @@ export class ProcessHost {
         } else if (head.cause.kind === 'checkpoint') {
           const receipt = journal.checkpointReceipts?.find(receipt => receipt.id === head.cause.subjectDigest), lease = journal.checkpointLeases?.find(lease => lease.binding.operationId === head.cause.operationId);
           if (!receipt || !lease || receipt.binding !== lease.binding.id || lease.state !== 'committed' || previous.digest !== lease.binding.processHead || previous.snapshotDigest !== receipt.beforeSnapshot || head.snapshotDigest !== receipt.afterSnapshot || head.generation !== lease.binding.generation) throw new Error('state head does not match checkpoint receipt');
+        } else if (head.cause.kind === 'native-fallback') {
+          const row = journal.nativeFallbacks?.find(item => item.binding.operationId === head.cause.operationId);
+          if (!row || row.state !== 'committed' && row.state !== 'aborted'
+            || previous.digest !== row.binding.processHead
+            || previous.snapshotDigest !== runtimeSnapshotDigest(row.before)
+            || head.snapshotDigest !== runtimeSnapshotDigest(row.result!.after)
+            || head.generation !== row.binding.generation
+            || head.cause.subjectDigest !== row.resultDigest)
+            throw new Error('state head does not match native fallback receipt');
         } else if (head.cause.kind === 'migration') {
           const migration = journal.migrations.find(record => record.migrationId === head.cause.operationId);
           if (!migration || !['committed', 'finalized'].includes(migration.state) || migration.fromGeneration === migration.toGeneration || head.cause.subjectDigest !== migration.decisionDigest || head.snapshotDigest !== runtimeSnapshotDigest(migration.after!) || previous.snapshotDigest !== runtimeSnapshotDigest(migration.before) || head.generation !== migration.toGeneration || previous.generation !== migration.fromGeneration || head.planDigest !== domainDigest('aether.process-plan/1', migration.afterPlan) || previous.planDigest !== domainDigest('aether.process-plan/1', migration.beforePlan)) throw new Error('state head does not match migration decision');
@@ -1747,6 +2041,9 @@ export class ProcessHost {
     for (const call of journal.calls) if ((call.state === 'completed' || call.state === 'aborted') && !causes.has(JSON.stringify([call.state === 'completed' ? 'call' : 'abort', call.operationId]))) throw new Error('terminal call lacks a published state transition');
     for (const migration of journal.migrations) if (['committed', 'finalized'].includes(migration.state) && migration.toGeneration !== migration.fromGeneration && !causes.has(JSON.stringify(['migration', migration.migrationId]))) throw new Error('migration lacks a published state transition');
     for (const lease of journal.checkpointLeases ?? []) if (lease.state === 'committed' && !causes.has(JSON.stringify(['checkpoint', lease.binding.operationId]))) throw new Error('checkpoint lacks published state transition');
+    for (const row of journal.nativeFallbacks ?? []) if ((row.state === 'committed' || row.state === 'aborted')
+      && !causes.has(JSON.stringify(['native-fallback', row.binding.operationId])))
+      throw new Error('native fallback terminal result lacks a published state transition');
     if (this.#hostJournalWitness) for (const call of journal.calls) this.assertV4TerminalEffects(journal, call);
     if (witnessedRevision !== null) this.#journalWitnessBases.set(journal, { revision: witnessedRevision,
       journal: Buffer.from(bytes).toString('utf8') });
