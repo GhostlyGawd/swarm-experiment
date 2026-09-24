@@ -5,6 +5,8 @@ import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import * as b from '../../src/tier1/build.ts';
+import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { adapterGcFixture } from './semantic-gc-adapters-fixture.ts';
 import { domainDigest } from '../../src/fabric/identity.ts';
 import { effectResourcePolicyDigestV7, signEffectResourcePolicyV7,
@@ -99,6 +101,29 @@ test('exported, protected, fenced and retained sink consumers cannot retire', ()
       assert.equal(f.propose(), null);
     } finally { f.cleanup(); }
   }
+});
+test('V2 sink retirement includes retained dependency capabilities and still removes unrelated sinks', () => {
+  for (const [capability, expectedRemoved] of [['unused', null], ['live', 'b-unused']] as const) {
+    const f = fixture(); try {
+      const symbols = new SymbolSpace(`sink-retained-${capability}`), dep = symbols.define('dependency');
+      const module = b.module_({ symbol: symbols.define('module'), members: [b.fn({ symbol: symbols.define('entry'), returns: b.Unit, body: b.ret(b.unit()) })], symbolTable: symbols.table() });
+      const effect = capability === 'unused' ? f.f.unusedCap : f.f.liveCap;
+      const declaration = b.fn({ symbol: dep, returns: b.Unit, capabilities: [effect], body: b.block(b.exprStmt(b.invoke(effect)), b.ret(b.unit())) });
+      f.f.retentionLedger.retain({ kind: 'active-task', reference: 'sink-checkpoint', root: f.f.store.intern(module, { leaseId: 'sink-retained-module' }) });
+      f.f.retentionLedger.retain({ kind: 'replay', reference: 'sink-checkpoint', root: f.f.store.intern(declaration, { leaseId: 'sink-retained-dependency' }) });
+      const proposal = f.propose();
+      if (expectedRemoved === null) assert.equal(proposal, null);
+      else { assert.ok(proposal); assert.deepEqual(proposal.removed, [expectedRemoved]); verifySemanticSinkRetirementV2(f.context, proposal); }
+    } finally { f.cleanup(); }
+  }
+});
+test('V2 sink retirement rejects a retained dependency without its module', () => {
+  const f = fixture(); try {
+    const symbols = new SymbolSpace('sink-retained-lone'), dep = symbols.define('dependency');
+    const declaration = b.fn({ symbol: dep, returns: b.Unit, capabilities: [f.f.unusedCap], body: b.block(b.exprStmt(b.invoke(f.f.unusedCap)), b.ret(b.unit())) });
+    f.f.retentionLedger.retain({ kind: 'replay', reference: 'sink-lone', root: f.f.store.intern(declaration, { leaseId: 'sink-lone' }) });
+    assert.throws(() => f.propose(), /one complete module/);
+  } finally { f.cleanup(); }
 });
 
 test('changed retention and dishonest liveness or table/rule edits fail independent verification', () => {

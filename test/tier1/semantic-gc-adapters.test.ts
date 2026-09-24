@@ -14,6 +14,7 @@ import { domainDigest } from '../../src/fabric/identity.ts';
 import { encodeCanonical } from '../../src/fabric/encoding.ts';
 import type { NodeRef } from '../../src/tier1/ids.ts';
 import * as b from '../../src/tier1/build.ts';
+import { SymbolSpace } from '../../src/tier1/symbols.ts';
 const same = (a: unknown, b: unknown) => assert.deepEqual(encodeCanonical(a), encodeCanonical(b));
 const reseal = (value: AdapterRetirementProposal): AdapterRetirementProposal => { const { id, ...body } = value; void id; return { ...body, id: domainDigest('aether.semantic-adapter-retirement/1', body) }; };
 test('unused declarative registration retires with independent dispatch proof, unchanged AST and retained source bytes', async () => {
@@ -44,6 +45,48 @@ test('active tasks, replay and unstable replication keep every referenced adapte
       f.store.collectGarbage(); assert.ok(f.store.hydrate(f.root));
     } finally { f.cleanup(); }
   }
+});
+test('one retained executable reference combines its module and exact dependency declarations', () => {
+  for (const [capability, expectedRemoved] of [['unused', null], ['live', 'b-unused']] as const) {
+    const f = adapterGcFixture(); try {
+      const symbols = new SymbolSpace(`retained-${capability}`), dep = symbols.define('dependency');
+      const history = b.module_({ symbol: symbols.define('module'), members: [b.fn({ symbol: symbols.define('entry'), returns: b.Unit, body: b.ret(b.unit()) })], symbolTable: symbols.table() });
+      const effect = capability === 'unused' ? f.unusedCap : f.liveCap;
+      const declaration = b.fn({ symbol: dep, returns: b.Unit, capabilities: [effect], body: b.block(b.exprStmt(b.invoke(effect)), b.ret(b.unit())) });
+      const root = f.store.intern(history, { leaseId: 'retained-module' }), dependency = f.store.intern(declaration, { leaseId: 'retained-dependency' });
+      f.retentionLedger.retain({ kind: 'active-task', reference: 'checkpoint-one', root });
+      f.retentionLedger.retain({ kind: 'replay', reference: 'checkpoint-one', root: dependency });
+      const proposal = f.manager.propose();
+      if (expectedRemoved === null) assert.equal(proposal, null);
+      else { assert.ok(proposal); assert.deepEqual(proposal.removed, [expectedRemoved]); assert.ok(proposal.usedCapabilities.includes(f.liveCap)); f.manager.verify(proposal); }
+    } finally { f.cleanup(); }
+  }
+});
+test('retained executable dependencies without a module or with conflicting definitions fail closed', () => {
+  for (const conflict of [false, true]) {
+    const f = adapterGcFixture(); try {
+      const symbols = new SymbolSpace(`retained-conflict-${conflict}`), dep = symbols.define('dependency');
+      const original = b.fn({ symbol: dep, returns: b.Unit, body: b.ret(b.unit()) });
+      const changed = b.fn({ symbol: dep, returns: b.Unit, capabilities: [f.unusedCap], body: b.block(b.exprStmt(b.invoke(f.unusedCap)), b.ret(b.unit())) });
+      const dependency = f.store.intern(changed, { leaseId: 'retained-dependency' });
+      if (conflict) {
+        const module = b.module_({ symbol: symbols.define('module'), members: [original], symbolTable: symbols.table() });
+        f.retentionLedger.retain({ kind: 'replay', reference: 'checkpoint-conflict', root: f.store.intern(module, { leaseId: 'retained-module' }) });
+      }
+      f.retentionLedger.retain({ kind: 'replay', reference: 'checkpoint-conflict', root: dependency });
+      assert.throws(() => f.manager.propose(), conflict ? /conflicting retained dependency/ : /one complete module/);
+    } finally { f.cleanup(); }
+  }
+});
+test('retained module with a missing dependency callee refuses retirement', () => {
+  const f = adapterGcFixture(); try {
+    const symbols = new SymbolSpace('retained-missing-callee'), missing = symbols.define('missing');
+    const module = b.module_({ symbol: symbols.define('module'), members: [
+      b.fn({ symbol: symbols.define('entry'), returns: b.Unit, body: b.block(b.exprStmt(b.call(missing)), b.ret(b.unit())) }),
+    ], symbolTable: symbols.table() });
+    f.retentionLedger.retain({ kind: 'active-task', reference: 'missing-callee', root: f.store.intern(module, { leaseId: 'missing-callee' }) });
+    assert.throws(() => f.manager.propose(), /ill-typed retained executable closure|missing retained dependency callee/);
+  } finally { f.cleanup(); }
 });
 test('new retention before publication and unsigned candidate policy refuse advancement', () => {
   let retain = () => {}; const f = adapterGcFixture({ beforePublish: () => retain() }); try {

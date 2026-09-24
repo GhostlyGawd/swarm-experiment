@@ -19,6 +19,7 @@ import { capability, type CapabilityName, type NodeRef, type SymbolId } from './
 import type { SemanticGcPolicy, SemanticRetention, SemanticGarbageCollector } from './semantic-gc.ts';
 import { GraphStore } from './store.ts';
 import { SymbolSpace } from './symbols.ts';
+import { retainedExecutableCapabilities } from './semantic-gc-retained-closure.ts';
 
 export interface SinkRetirementSelectionV2 {
   readonly table: DeclarativeSinkTableV2;
@@ -151,18 +152,9 @@ function analyze(context: SemanticSinkRetirementContextV2, root: NodeRef,
       if (node.kind === 'Invoke') used.add(node.capability);
     }
   }
-  for (const pin of retained) {
-    exactObject(pin, ['kind', 'reference', 'root']); identifier(pin.reference);
-    if (!['audit', 'replay', 'active-task', 'unstable-replication'].includes(pin.kind))
-      throw new Error('unknown retention kind');
-    const retainedModule = closed(context, pin.root);
-    if (pin.kind === 'audit') continue;
-    // Old entry points and pending continuations may call any declaration.
-    for (const declaration of retainedModule.values()) {
-      declaration.capabilities.forEach(name => used.add(name));
-      for (const node of visit(declaration)) if (node.kind === 'Invoke') used.add(node.capability);
-    }
-  }
+  // Historical entry points and pending continuations may call any member of
+  // the exact module-plus-dependencies retained under the same reference.
+  for (const name of retainedExecutableCapabilities(context.store, context.registry, retained)) used.add(name);
   return { reachable: [...reachable].sort(), usedCapabilities: [...used].sort() };
 }
 function harness(body: RetirementBodyV2): { module: Term; specification: string; manifest: ExecutionManifestV1 } {

@@ -21,6 +21,7 @@ import { SymbolSpace } from './symbols.ts';
 import { capability, type CapabilityName, type NodeRef, type SymbolId } from './ids.ts';
 import { atomicWrite } from './persistence.ts';
 import { SemanticGarbageCollector, type SemanticGcPolicy, type SemanticRetention } from './semantic-gc.ts';
+import { retainedExecutableCapabilities } from './semantic-gc-retained-closure.ts';
 import * as b from './build.ts';
 
 export interface DeclarativeAdapterRegistration {
@@ -168,15 +169,7 @@ export class SemanticAdapterGarbageCollector {
       const declaration = declarations.get(symbol); if (!declaration) throw new Error('missing exported/protected/fenced declaration'); reachable.add(symbol);
       declaration.capabilities.forEach(cap => used.add(cap)); for (const node of walk(declaration)) { if (node.kind === 'Call') pending.push(node.callee); if (node.kind === 'Invoke') used.add(node.capability); }
     }
-    const retainedUse = new Set<CapabilityName>();
-    for (const pin of retained) {
-      exactObject(pin, ['kind', 'reference', 'root']); identifier(pin.reference); validateDigest(pin.root, 'ast'); if (!['audit', 'replay', 'active-task', 'unstable-replication'].includes(pin.kind)) throw new Error('unknown retention kind');
-      this.options.store.hydrate(pin.root); // Missing audit roots cannot be silently forgotten.
-      if (pin.kind === 'audit') continue;
-      // Historical entry points may differ: conservatively treat every retained
-      // function as live. Never infer task completion/causal stability from age.
-      for (const declaration of this.closed(pin.root).values()) { declaration.capabilities.forEach(cap => retainedUse.add(cap)); for (const node of walk(declaration)) if (node.kind === 'Invoke') retainedUse.add(node.capability); }
-    }
+    const retainedUse = retainedExecutableCapabilities(this.options.store, this.registry, retained);
     return { reachable: [...reachable].sort(), usedCapabilities: [...new Set([...used, ...retainedUse])].sort() };
   }
   private retentionSnapshot(): readonly SemanticRetention[] { return clone([...this.options.retentionLedger.retentions()].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))); }
