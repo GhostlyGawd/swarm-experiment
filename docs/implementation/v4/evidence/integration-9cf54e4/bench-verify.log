@@ -1,0 +1,29 @@
+
+> @ghostlygawd/aether@0.1.0 bench:v4:verify
+> node --experimental-strip-types bench/v4/verify.ts /tmp/aether-v4-budget-bench --exact-source
+
+{
+  "verified": true,
+  "subjectCommit": "9cf54e4c36794f55ee8cea3cdf1049e18a6bd3a0",
+  "sourceMatches": true,
+  "requiredFailures": [
+    "aggregate:warmMessage: fail",
+    "ledger-baseline/1:warmMessage: fail",
+    "ast.retrieval: not_measured",
+    "replication.convergence: not_measured",
+    "checkpoint.rollback: not_measured",
+    "fallback.dispatch: not_measured",
+    "certificate.check: not_measured",
+    "unikernel.boot: not_measured",
+    "state_lens.overhead: not_measured",
+    "smt.cutoff: not_measured",
+    "projection.throughput: not_measured",
+    "zk.verification: not_measured",
+    "multimodal.extraction: not_measured",
+    "mutation.safety: not_measured",
+    "graph.capacity: not_measured",
+    "execution.determinism: not_measured",
+    "capability.containment: not_measured"
+  ],
+  "releaseEligible": false
+}

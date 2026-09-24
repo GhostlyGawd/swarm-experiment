@@ -4,6 +4,7 @@
 
 - Added a helper that checks fixed-charge settlement against the exact signed `/2` sink witness head and full operator-pinned effect requests. It supplies bridge observations and ledger settlement verification. Its stable policy digest binds trust roots, charge and request inventory into opt-in ledger identity.
 - A real sink/broker test covers one charge after witnessed commit, cached/reopened idempotence, signed-fence refund, early and late witness outage, retained encumbrance and recovery. Focused helper, broker and historical bridge tests pass 18/18. This remains broker-level fixed-charge evidence; V11 host admission, measured usage, independent budget-journal custody and complete T2-04/T2-05 gates remain open. [Decision and limits](decisions/D12-signed-sink-budget-evidence.md).
+- [Exact-source checkpoint](evidence/integration-9cf54e4/REVIEW.md) at `9cf54e4`: 967/968 tests pass with one existing opt-in skip; build, typecheck and both roadmap checks pass. The release benchmark remains ineligible at 1.861× warm-message compression with 17 required targets failed or unmeasured. The next complete-task target is T3-07.
 
 ## Opt-in V11 resource-scoped sink profile — 2026-09-24
 
