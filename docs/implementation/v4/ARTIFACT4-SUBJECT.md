@@ -1,12 +1,15 @@
 # Artifact/4: measured process-worker closure
 
 Artifact/4 is a versioned process-worker admission subject for the pure D16
-virtual-forward rewrite. `ProcessChannel` admits it through explicit
-`startVirtualV4` and worker `init/3`. An opt-in `ProcessHost`
+virtual-forward rewrite. `ProcessChannel` admits the candidate through
+`startVirtualV4` and worker `init/3`, and the exact source through
+`startVirtualSourceV4` and worker `init/4`. An opt-in `ProcessHost`
 config/16 admits the same one-unit pure candidate and durable journal.
 An explicit `aether.process-host-virtual/2` selects host config/17 and the
 operator-held complete host-journal CAS witness. Config/16 retains its local
-journal identity and behavior.
+journal identity and behavior. `aether.process-host-virtual/3` selects
+config/18 for the exact signed source in the measured worker bundle, with
+its own independently selected complete host-journal witness.
 Legacy `ProcessDeployment` still does not register or promote Artifact/4. A
 separate `PureVirtualProcessDeployment` now drives one signed source to its
 exact Artifact/4 rewrite under a strict-lineage governor. It does not reinterpret
@@ -23,7 +26,7 @@ as authority and repairs a stale local mirror after a controller death between
 CAS and file write. It does not reuse the legacy `/9–12` deployment witness or
 Artifact/1–2 records. The live driver consumes that record, launches the
 candidate in witnessed ProcessHost config/17 during preparation, repeats the
-full signed proof and source snapshot check inside its synchronous commit
+full signed proof and witnessed source-head check inside its synchronous commit
 fence, and serves only the governor-committed generation. Its `/3` deployment
 journal retains the `/2` witnessed operation IDs and exact pending/settled
 receipts, and pins both plans, the source seed, sealer-key commitment and
@@ -31,6 +34,21 @@ operator-selected recovery-authority identity. An existing `/2` journal
 requires an explicit `/3` migration; it is never silently adopted. A
 same-ID retry across promotion checks current invocation authority and returns
 the original settled result without candidate execution.
+
+The governor migration plan `/2` names the exact config/18 source host,
+witness identity and revision, complete witness journal digest, source plan,
+signed source intent, snapshot/state head and full call history. Prepared
+record `/2` retains that source binding and the candidate seed. Prepared
+`/1` cannot reopen as this witnessed-source deployment. Actual source calls
+and recovery advance the witness; a clean config/18 reopen does not publish
+no-op revisions. The source-host writer ticket is held across the synchronous
+governor commit decision. An external source call completed after preparation
+changes the head and blocks commit; an unregistered source call also blocks
+serving. A source call starting during that ticket waits for the decision.
+The init/4 worker changes the measured bundle input closure. Older signed
+Artifact/4 subjects name different bundle bytes and require new signed
+candidate evidence before this source profile can run; there is no implicit
+artifact upgrade.
 
 ## Signed binding
 
@@ -86,15 +104,15 @@ every controller restart. Its directory contains `artifact4.json`, the
 recoverable `virtual-deployment.json` mirror, immutable `prepared/` records,
 and separate `source-host/` and `candidate-host/` journals.
 
-The driver freezes deployment calls while preparing, reads the live source
-snapshot, verifies the approved migration and no-effects plans, and starts the
+The driver freezes deployment calls while preparing, reads the witnessed
+source head, verifies the approved migration and no-effects plans, and starts the
 candidate without invoking its functions. The commit fence rereads the source
-snapshot and complete signed Artifact/4 closure under the held deployment
-gate. After the governor commit, activation closes the source host before the
+witness and complete signed Artifact/4 closure under the held deployment
+gate and source-host writer ticket. After the governor commit, activation closes the source host before the
 deployment witness publishes the candidate as ready. `open()` first asks the
 governor to reconcile an interrupted decision; a precommit death aborts the
 prepared candidate, while a postcommit death finishes activation. The
-candidate host and deployment journal are separate witnessed domains.
+source host, candidate host and deployment journal are separate witnessed domains.
 The serving gate asks the strict governor to recheck current signed lineage
 for the active manifest on token issuance, call, snapshot and recovery. A
 superseding signed source specification after open refuses these operations
@@ -158,13 +176,13 @@ same-schema migration guard. Legacy artifact registration/read and a legacy
 `ProcessHost` refuse the virtual-forward target profile; a legacy factory
 cannot inject `virtualArtifactV4` into `ProcessHost`. The new one-way pure
 deployment has a versioned registry and real governor driver. Process-external
-deployment and candidate-host witnesses were exercised with real controller
+source-host, deployment and candidate-host witnesses were exercised with real controller
 SIGKILL while prepared and after the governor commit. Reopening follows the
-governor decision; the old generation is never served after commit. The source
-host is still a local, unwitnessed pure ProcessHost, so independent custody of
-its pre-promotion state and rollback resistance remain unproved. Its original
-resumable executable identity is signed in source evidence but is not the
-Artifact/4 measured candidate bundle. The witness
+governor decision; the old generation is never served after commit through
+the deployment. The exact source runs in its own independently witnessed
+config/18 profile. Its original resumable executable identity is signed in
+source evidence; the measured worker bundle is bound through the signed
+Artifact/4 descendant and config/18. The witness
 service test runs under the same UID and does not prove separate operator
 custody. The path handles one D16 rewrite and does not support chained virtual
 promotions. There is no Artifact/4 effect-broker dispatch,

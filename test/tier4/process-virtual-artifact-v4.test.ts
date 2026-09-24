@@ -26,7 +26,7 @@ import { domainDigest, executionManifestDigest } from '../../src/fabric/identity
 import { createHostJournalWitnessCatalog } from '../../src/fabric/host-journal-witness.ts';
 import { createPureVirtualDeploymentWitnessV1 } from '../../src/tier4/process-virtual-deployment-journal.ts';
 import { approvePromotion, PromotionCoordinator, effectPlanDigest, evidenceBundleDigest, migrationPlanDigest,
-  promotionDigest, type PromotionBindingV1 } from '../../src/fabric/promotion.ts';
+  promotionDigest, type PromotionBindingV1, type PromotionInput } from '../../src/fabric/promotion.ts';
 import { RESUMABLE_PROFILE_DIGEST, virtualForwardResumableProfileDigest } from '../../src/tier3/resumable-program.ts';
 import { decodeProcessVirtualArtifactV4, encodeProcessVirtualArtifactV4,
   makeProcessVirtualArtifactV4, measureWorkerBundleSubjectV2,
@@ -42,8 +42,11 @@ import { openProcessVirtualWorkerLineageV1,
   type ProcessVirtualWorkerTrustV1 } from '../../src/tier4/process-virtual-worker-contract.ts';
 import { assertPureVirtualPlanV1, preparePureVirtualPromotionV1,
   PureVirtualPreparedStoreV1, pureVirtualPreparedDigestV1,
-  processVirtualEffectPlanV1, processVirtualMigrationPlanV1 } from '../../src/tier4/process-virtual-deployment-contract.ts';
-import { PureVirtualProcessDeployment } from '../../src/tier4/process-virtual-deployment.ts';
+  requireWitnessedPureVirtualPreparedV2,
+  processVirtualEffectPlanV1, processVirtualMigrationPlanV1,
+  processVirtualMigrationPlanV2 } from '../../src/tier4/process-virtual-deployment-contract.ts';
+import { PureVirtualProcessDeployment,
+  type PureVirtualProcessDeploymentOptions } from '../../src/tier4/process-virtual-deployment.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
 
@@ -180,6 +183,83 @@ async function killHostWitness(child: ChildProcess): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) return;
   const exited = new Promise<void>(resolveExit => child.once('exit', () => resolveExit()));
   child.kill('SIGKILL'); await exited;
+}
+
+function pureDeploymentHarness(f: ReturnType<typeof fixture>,
+  onPhase?: PureVirtualProcessDeploymentOptions['onPhase']) {
+  const artifact = f.artifact!;
+  const sourceManifest = executionManifestDigest(artifact.sourceEvidence.manifest);
+  const candidateManifest = executionManifestDigest(artifact.candidateEvidence.manifest);
+  const governorKeys = generateKeyPairSync('ed25519');
+  const coordinator = new PromotionCoordinator({ profile: 'strict-lineage-v1',
+    directory: join(f.directory, 'harness-governor'), repositoryId: f.trust.repositoryId,
+    genesisManifest: sourceManifest,
+    authority: () => ({ repositoryId: f.trust.repositoryId,
+      membershipEpoch: '1', policyEpoch: '0', eligibleGovernors: ['governor'] }),
+    governorKey: () => governorKeys.publicKey, clock: () => 100n,
+    lineage: f.lineage.admissionAdapter() });
+  const namespace = { authorityId: 'harness-operator',
+    repositoryId: f.trust.repositoryId, deploymentId: 'pure-harness' };
+  let deploymentHead: { revision: string; journal: string | null } = { revision: '0', journal: null };
+  const deploymentWitness = createPureVirtualDeploymentWitnessV1({ ...namespace,
+    read: () => deploymentHead, advance: (expected, journal) => {
+      if (deploymentHead.revision !== expected) throw new Error('deployment CAS conflict');
+      deploymentHead = { revision: String(BigInt(expected) + 1n), journal };
+      return deploymentHead;
+    } });
+  const hostHeads = new Map<string, { revision: string; journal: string | null }>();
+  const hostWitnesses = new Map<string, ReturnType<typeof createHostJournalWitness>>();
+  const hostCatalog = createHostJournalWitnessCatalog({ ...namespace, witnessFor: hostId => {
+    let witness = hostWitnesses.get(hostId);
+    if (witness) return witness;
+    hostHeads.set(hostId, { revision: '0', journal: null });
+    witness = createHostJournalWitness({ ...namespace, hostId,
+      read: () => hostHeads.get(hostId)!, advance: (expected, journal) => {
+        const head = hostHeads.get(hostId)!;
+        if (head.revision !== expected) throw new Error('host CAS conflict');
+        const next = { revision: String(BigInt(expected) + 1n), journal };
+        hostHeads.set(hostId, next); return next;
+      } });
+    hostWitnesses.set(hostId, witness); return witness;
+  } });
+  const candidatePlan = hostOptions(f).plan;
+  const sourcePlan: TopologyPlan = { ...candidatePlan,
+    units: [{ ...candidatePlan.units[0], members: f.source.members
+      .filter(member => member.kind === 'FunctionDecl').map(member => member.symbol) }] };
+  const sealer = new CapabilitySealer(new Uint8Array(32).fill(7), () => 100);
+  const options: PureVirtualProcessDeploymentOptions = {
+    directory: join(f.directory, 'harness-deployment'), coordinator,
+    artifact, trust: f.trust, sourcePlan, candidatePlan, sealer,
+    hostWitnessCatalog: hostCatalog, deploymentWitness,
+    authorizeRecovery: () => true, recoveryAuthorityId: 'pure-recovery', onPhase };
+  const sourceHostId = `source-${sourceManifest.split(':').at(-1)}`;
+  const sourceHostOptions = (): ProcessHostOptions => ({ directory: join(options.directory, 'source-host'),
+    module: f.source, manifest: artifact.sourceEvidence.manifest, plan: sourcePlan,
+    registry: new CapabilityRegistry(), sealer, initialGeneration: '0',
+    authorizeRecovery: () => true,
+    virtualArtifactV4: { format: 'aether.process-host-virtual/3', artifact, trust: f.trust },
+    hostJournalWitness: selectHostJournalWitness(hostCatalog, sourceHostId) });
+  const promotion = async (deployment: PureVirtualProcessDeployment,
+    expiresAt = '1000'): Promise<PromotionInput> => {
+    const sourceHead = await deployment.sourceHeadForPromotion();
+    const artifactDigest = processVirtualArtifactDigestV4(artifact);
+    const migrationPlan = processVirtualMigrationPlanV2(sourceHead, artifactDigest,
+      assertPureVirtualPlanV1(candidatePlan, artifact));
+    const effectPlan = processVirtualEffectPlanV1(artifactDigest,
+      domainDigest('aether.process-virtual-worker-trust/1', f.trust),
+      hostCatalog, deploymentWitness);
+    const proposal = { format: 'aether.promotion/1' as const,
+      repositoryId: f.trust.repositoryId, expectedParent: sourceManifest,
+      candidateManifest, evidenceBundleDigest: evidenceBundleDigest(artifact.candidateEvidence),
+      migrationPlanDigest: migrationPlanDigest(migrationPlan),
+      effectPlanDigest: effectPlanDigest(effectPlan), membershipEpoch: '1',
+      policyEpoch: '0', expiresAt };
+    return { proposal, approval: approvePromotion(proposal, 'governor', governorKeys.privateKey),
+      evidence: artifact.candidateEvidence, context: f.input.candidateContext,
+      migrationPlan, effectPlan };
+  };
+  return { options, coordinator, sourceHostOptions, hostHeads, hostWitnesses,
+    hostCatalog, deploymentWitness, sourceManifest, candidateManifest, promotion };
 }
 
 test('Artifact/4 signed target binds independently rebuilt V2 bundle and exact virtual proof', () => {
@@ -463,6 +543,140 @@ test('Artifact/4 ProcessHost config/16 dispatches and reopens exact durable pure
   } finally { await host?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });
 
+test('Artifact/4 ProcessHost config/18 witnesses exact signed source and real-worker state', async () => {
+  const f = fixture(manifest), artifact = f.artifact!;
+  const candidate = hostOptions(f);
+  let head: { revision: string; journal: string | null } = { revision: '0', journal: null };
+  let unavailable = false;
+  const witness = createHostJournalWitness({ authorityId: 'source-operator',
+    repositoryId: f.trust.repositoryId, deploymentId: 'pure-source-deployment',
+    hostId: 'source-genesis', read: () => {
+      if (unavailable) throw new Error('source witness unavailable');
+      return head;
+    },
+    advance: (expected, journal) => {
+      if (unavailable) throw new Error('source witness unavailable');
+      if (head.revision !== expected) throw new Error('source witness CAS conflict');
+      head = { revision: String(BigInt(expected) + 1n), journal }; return head;
+    } });
+  const sourcePlan: TopologyPlan = { ...candidate.plan,
+    units: [{ ...candidate.plan.units[0], members: f.source.members
+      .filter(member => member.kind === 'FunctionDecl').map(member => member.symbol) }] };
+  const options: ProcessHostOptions = { ...candidate,
+    directory: join(f.directory, 'witnessed-source'),
+    module: f.source, manifest: artifact.sourceEvidence.manifest,
+    plan: sourcePlan, initialGeneration: '0', hostJournalWitness: witness,
+    virtualArtifactV4: { format: 'aether.process-host-virtual/3', artifact, trust: f.trust } };
+  let host: ProcessHost | undefined;
+  try {
+    host = await ProcessHost.open(options);
+    const initialHead = head;
+    const localFile = join(options.directory, 'host.json');
+    const initialLocal = readFileSync(localFile, 'utf8');
+    assert.ok(host.workerPids.pure !== process.pid);
+    const result = await host.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: 'source-witness-call', tokens: host.issueTokens(f.entry) });
+    assert.equal(result.state, 'completed');
+    assert.equal(result.generation, '0');
+    assert.equal(JSON.parse(head.journal!).calls.length, 1);
+    assert.ok(BigInt(head.revision) > BigInt(initialHead.revision));
+    const committedHead = head;
+    const currentLocal = readFileSync(localFile, 'utf8');
+    writeFileSync(localFile, initialLocal);
+    assert.throws(() => host!.operationResult('source-witness-call'),
+      /local host journal diverges/);
+    writeFileSync(localFile, currentLocal);
+    unavailable = true;
+    assert.throws(() => host!.operationResult('source-witness-call'), /source witness unavailable/);
+    unavailable = false;
+    head = initialHead;
+    assert.throws(() => host!.operationResult('source-witness-call'), /rolled back/);
+    head = committedHead;
+    const forged = JSON.parse(committedHead.journal!);
+    forged.snapshot.eventCursor = String(BigInt(forged.snapshot.eventCursor) + 1n);
+    head = { revision: committedHead.revision,
+      journal: Buffer.from(encodeCanonical(forged)).toString('utf8') };
+    assert.throws(() => host!.operationResult('source-witness-call'), /equivocated/);
+    head = committedHead;
+    const snapshot = await host.snapshot();
+    const revisionBeforeReopen = head.revision;
+    await host.close(); host = undefined;
+    host = await ProcessHost.open(options);
+    assert.equal(head.revision, revisionBeforeReopen);
+    assert.deepEqual(await host.snapshot(), snapshot);
+    assert.deepEqual(await host.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: 'source-witness-call', tokens: host.issueTokens(f.entry) }), result);
+    await assert.rejects(ProcessHost.open({ ...options,
+      virtualArtifactV4: { ...options.virtualArtifactV4!,
+        format: 'aether.process-host-virtual/2' } }), /signed subject|configuration|profile/);
+  } finally { await host?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('Artifact/4 witnessed source survives real controller SIGKILL on each side of call commit', async () => {
+  const f = fixture(manifest), artifact = f.artifact!;
+  const socketDir = mkdtempSync('/tmp/a4src-');
+  const socketPath = join(socketDir, 'w.sock');
+  const keyPath = join(f.directory, 'source-key');
+  const configFile = join(f.directory, 'source-service.json');
+  const key = randomBytes(32);
+  const namespace = { authorityId: 'source-crash-operator',
+    repositoryId: f.trust.repositoryId, deploymentId: 'pure-source-crash' };
+  writeFileSync(keyPath, key, { mode: 0o600 });
+  writeFileSync(configFile, encodeCanonical({ socketPath,
+    storageDir: join(f.directory, 'operator-store'), keyFile: keyPath,
+    namespaces: [{ kind: 'host-scope', ...namespace }] }), { mode: 0o600 });
+  const candidate = hostOptions(f);
+  const sourcePlan: TopologyPlan = { ...candidate.plan,
+    units: [{ ...candidate.plan.units[0], members: f.source.members
+      .filter(member => member.kind === 'FunctionDecl').map(member => member.symbol) }] };
+  const hostId = 'source-genesis';
+  const selected = () => selectHostJournalWitness(createProcessWitnessClient({ socketPath, key })
+    .hostCatalog(namespace), hostId);
+  const options = (): ProcessHostOptions => ({ ...candidate,
+    directory: join(f.directory, 'source-process'), module: f.source,
+    manifest: artifact.sourceEvidence.manifest, plan: sourcePlan,
+    initialGeneration: '0', hostJournalWitness: selected(),
+    virtualArtifactV4: { format: 'aether.process-host-virtual/3',
+      artifact, trust: f.trust } });
+  let service: ChildProcess | undefined, host: ProcessHost | undefined;
+  const controller = fileURLToPath(new URL('./process-virtual-host-crash-controller.ts', import.meta.url));
+  const crash = (operationId: string, crashPhase: 'call-before-commit' | 'call-committed') => {
+    const controllerConfig = join(f.directory, `${operationId}.json`);
+    writeFileSync(controllerConfig, JSON.stringify({ directory: options().directory,
+      artifact, trust: f.trust, plan: sourcePlan, entry: f.entry,
+      source: true, operationId, crashPhase,
+      witness: { ...namespace, hostId, socketPath, keyPath } }));
+    const result = spawnSync(process.execPath,
+      ['--experimental-strip-types', controller, controllerConfig],
+      { cwd: process.cwd(), timeout: 60_000, encoding: 'utf8' });
+    assert.equal(result.signal, 'SIGKILL', result.stderr);
+  };
+  try {
+    service = await launchHostWitness(configFile);
+    crash('source-before-commit', 'call-before-commit');
+    host = await ProcessHost.open(options());
+    assert.equal(host.operationResult('source-before-commit')?.state, 'indeterminate');
+    const replayed = await host.recoverOperation('source-before-commit',
+      { strategy: 'isolated-replay' });
+    assert.equal(replayed.state, 'completed');
+    assert.deepEqual(await host.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: 'source-before-commit', tokens: host.issueTokens(f.entry) }), replayed);
+    await host.close(); host = undefined;
+    crash('source-after-commit', 'call-committed');
+    host = await ProcessHost.open(options());
+    const committed = host.operationResult('source-after-commit');
+    assert.equal(committed?.state, 'completed');
+    assert.deepEqual(await host.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: 'source-after-commit', tokens: host.issueTokens(f.entry) }), committed);
+    assert.deepEqual(host.sourceHeadForPromotion().operationIds,
+      ['source-before-commit', 'source-after-commit']);
+  } finally {
+    await host?.close(); if (service) await killHostWitness(service);
+    rmSync(socketDir, { recursive: true, force: true });
+    rmSync(f.directory, { recursive: true, force: true });
+  }
+});
+
 test('Artifact/4 ProcessHost reconciles a real controller SIGKILL before commit', async () => {
   const f = fixture(manifest);
   const options = hostOptions(f);
@@ -652,6 +866,8 @@ test('pure Artifact/4 governor contract binds source snapshot, plan, witnesses a
       sourceSnapshot: snapshot, sourceGeneration: '0', hostWitnessCatalog: hostCatalog,
       deploymentJournalWitness: deploymentWitness };
     const prepared = preparePureVirtualPromotionV1(input);
+    assert.throws(() => requireWitnessedPureVirtualPreparedV2(prepared),
+      /refuses prepared \/1 history/);
     assert.equal(prepared.artifactDigest, artifactDigest);
     assert.equal(prepared.executableSubjectDigest, artifact.executableSubject.digest);
     assert.equal(prepared.seed.executionManifest, candidateManifest);
@@ -793,11 +1009,12 @@ test('pure Artifact/4 governor deployment promotes a real host and pins same-ID 
     assert.equal(deployment.status().generation, '0');
     const sourceCommitted = readFileSync(sourceJournal, 'utf8');
     writeFileSync(sourceJournal, sourceInitial);
-    await assert.rejects(deployment.snapshot(), /receipt differs from active host/);
+    await assert.rejects(deployment.snapshot(), /receipt differs from active host|local host journal diverges/);
     writeFileSync(sourceJournal, sourceCommitted);
-    const snapshot = await deployment.snapshot();
+    const sourceHead = await deployment.sourceHeadForPromotion();
+    const snapshot = sourceHead.snapshot;
     const artifactDigest = processVirtualArtifactDigestV4(artifact);
-    const migrationPlan = processVirtualMigrationPlanV1(snapshot, artifactDigest,
+    const migrationPlan = processVirtualMigrationPlanV2(sourceHead, artifactDigest,
       assertPureVirtualPlanV1(candidatePlan, artifact));
     const trustDigest = domainDigest('aether.process-virtual-worker-trust/1', f.trust);
     const effectPlan = processVirtualEffectPlanV1(artifactDigest, trustDigest,
@@ -818,19 +1035,19 @@ test('pure Artifact/4 governor deployment promotes a real host and pins same-ID 
       const stale = { ...proposal, expiresAt: '900' };
       await assert.rejects(deployment.promote({ ...input, proposal: stale,
         approval: approvePromotion(stale, 'governor', governorKeys.privateKey) }),
-      /measured bundle|bundle\/input|bundle rebuild/i);
+      /measured bundle|bundle\/input|bundle rebuild|packaged worker measured file changed/i);
     } finally { writeFileSync(bundlePath, originalBundle); }
     assert.equal(deployment.status().generation, '0');
     const alteredPlan: TopologyPlan = { ...candidatePlan,
       units: [{ ...candidatePlan.units[0], memoryMb: 32 }] };
-    const alteredMigration = processVirtualMigrationPlanV1(snapshot, artifactDigest,
+    const alteredMigration = processVirtualMigrationPlanV2(sourceHead, artifactDigest,
       assertPureVirtualPlanV1(alteredPlan, artifact));
     const stale = { ...proposal, expiresAt: '800',
       migrationPlanDigest: migrationPlanDigest(alteredMigration) };
     await assert.rejects(deployment.promote({ ...input, proposal: stale,
       approval: approvePromotion(stale, 'governor', governorKeys.privateKey),
       migrationPlan: alteredMigration }),
-    /approved pure virtual migration\/effect plan changed/);
+    /approved pure virtual migration\/effect plan changed|approved witnessed source migration head changed/);
     assert.equal(deployment.status().generation, '0');
     const admitted = await deployment.promote(input);
     assert.equal(admitted.committedManifest, candidateManifest);
@@ -915,6 +1132,38 @@ test('pure Artifact/4 deployment refuses superseded source spec before any call 
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });
 
+test('pure Artifact/4 commit fence refuses a witnessed source call after prepare', async () => {
+  const f = fixture(manifest);
+  let race = false, raced = false;
+  let harness!: ReturnType<typeof pureDeploymentHarness>;
+  harness = pureDeploymentHarness(f, async phase => {
+    if (phase !== 'prepared' || !race) return;
+    let direct: ProcessHost | undefined;
+    try {
+      direct = await ProcessHost.open(harness.sourceHostOptions());
+      const result = await direct.call(f.entry, [{ tag: 'int', value: '3' }],
+        { operationId: 'outside-deployment-gate', tokens: direct.issueTokens(f.entry) });
+      assert.equal(result.state, 'completed'); raced = true;
+    } finally { await direct?.close(); }
+  });
+  let deployment: PureVirtualProcessDeployment | undefined;
+  try {
+    deployment = await PureVirtualProcessDeployment.open(harness.options);
+    const tokens = await deployment.issueTokens(f.entry);
+    const approved = await harness.promotion(deployment);
+    race = true;
+    await assert.rejects(deployment.promote(approved),
+      /witnessed source operation history differs|witnessed source migration head changed/);
+    assert.equal(raced, true);
+    assert.equal(harness.coordinator.state().committedManifest, harness.sourceManifest);
+    assert.equal(harness.coordinator.history().at(-1)?.phase, 'aborted');
+    assert.equal(deployment.status().servingReady, false);
+    await assert.rejects(deployment.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: 'after-outside-call', tokens }),
+    /unregistered operation ID/);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
 for (const crashPhase of ['prepared', 'before-activation'] as const) {
   test(`pure Artifact/4 deployment reconciles real controller SIGKILL at ${crashPhase}`, async () => {
     const f = fixture(manifest), artifact = f.artifact!;
@@ -960,9 +1209,10 @@ for (const crashPhase of ['prepared', 'before-activation'] as const) {
       const oldTokens = await deployment.issueTokens(f.entry);
       const sourceCall = await deployment.call(f.entry, [{ tag: 'int', value: '3' }],
         { operationId: 'before-promotion', tokens: oldTokens });
-      const snapshot = await deployment.snapshot();
+      const sourceHead = await deployment.sourceHeadForPromotion();
+      const snapshot = sourceHead.snapshot;
       const artifactDigest = processVirtualArtifactDigestV4(artifact);
-      const migrationPlan = processVirtualMigrationPlanV1(snapshot, artifactDigest,
+      const migrationPlan = processVirtualMigrationPlanV2(sourceHead, artifactDigest,
         assertPureVirtualPlanV1(candidatePlan, artifact));
       const trustDigest = domainDigest('aether.process-virtual-worker-trust/1', f.trust);
       const effectPlan = processVirtualEffectPlanV1(artifactDigest, trustDigest,
@@ -1002,8 +1252,8 @@ for (const crashPhase of ['prepared', 'before-activation'] as const) {
           { operationId: 'direct-wrapper-before-removal',
             tokens: await deployment.issueTokens(f.wrapper) });
         assert.equal(wrapperCall.state, 'completed');
-        const changedSnapshot = await deployment.snapshot();
-        const changedMigration = processVirtualMigrationPlanV1(changedSnapshot,
+        const changedHead = await deployment.sourceHeadForPromotion();
+        const changedMigration = processVirtualMigrationPlanV2(changedHead,
           artifactDigest, assertPureVirtualPlanV1(candidatePlan, artifact));
         const stranded = { ...proposal, expiresAt: '1001',
           migrationPlanDigest: migrationPlanDigest(changedMigration) };

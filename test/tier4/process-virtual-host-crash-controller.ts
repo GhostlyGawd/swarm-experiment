@@ -14,10 +14,12 @@ const config = JSON.parse(readFileSync(process.argv[2], 'utf8')) as {
   directory: string; artifact: ProcessVirtualArtifactV4;
   trust: ProcessVirtualWorkerTrustV1; plan: TopologyPlan; entry: SymbolId;
   operationId?: string; crashPhase?: 'call-before-commit' | 'call-committed';
+  source?: boolean;
   witness?: { socketPath: string; keyPath: string; authorityId: string;
     repositoryId: string; deploymentId: string; hostId: string };
 };
-const module = decodeIR(config.artifact.candidateIr);
+const module = decodeIR(config.source ? config.artifact.sourceIr
+  : config.artifact.candidateIr);
 const witness = config.witness ? selectHostJournalWitness(
   createProcessWitnessClient({ socketPath: config.witness.socketPath,
     key: readFileSync(config.witness.keyPath) }).hostCatalog({
@@ -25,12 +27,15 @@ const witness = config.witness ? selectHostJournalWitness(
       deploymentId: config.witness.deploymentId }),
   config.witness.hostId) : undefined;
 const host = await ProcessHost.open({ directory: config.directory, module,
-  manifest: config.artifact.candidateEvidence.manifest, plan: config.plan,
+  manifest: config.source ? config.artifact.sourceEvidence.manifest
+    : config.artifact.candidateEvidence.manifest, plan: config.plan,
   registry: new CapabilityRegistry(),
   sealer: new CapabilitySealer(new Uint8Array(32).fill(7), () => 100),
-  virtualArtifactV4: { format: witness ? 'aether.process-host-virtual/2' : 'aether.process-host-virtual/1',
+  virtualArtifactV4: { format: config.source ? 'aether.process-host-virtual/3'
+    : witness ? 'aether.process-host-virtual/2' : 'aether.process-host-virtual/1',
     artifact: config.artifact, trust: config.trust },
   hostJournalWitness: witness,
+  initialGeneration: config.source ? '0' : undefined,
   authorizeRecovery: () => true,
   onPhase: phase => {
     if (phase === (config.crashPhase ?? 'call-before-commit')) process.kill(process.pid, 'SIGKILL');

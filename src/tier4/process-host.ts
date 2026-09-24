@@ -133,6 +133,22 @@ export interface ProcessHostNativeFallbackResult {
 export type ProcessHostCallResult =
   | { state: 'completed'; operationId: string; generation: string; unit: string; execution: WireExecution }
   | { state: 'indeterminate' | 'aborted'; operationId: string; generation: string; unit: string; reason: string };
+export interface ProcessVirtualSourceHeadV1 {
+  readonly format: 'aether.process-virtual-source-head/1';
+  readonly hostConfiguration: Digest;
+  readonly hostWitnessDigest: Digest;
+  readonly witnessRevision: string;
+  readonly sourceManifest: Digest;
+  readonly sourceIntent: Digest;
+  readonly snapshotDigest: Digest;
+  readonly planDigest: Digest;
+  readonly stateHeadDigest: Digest;
+  readonly operationHistoryDigest: Digest;
+  readonly operationIds: readonly string[];
+  readonly witnessJournalDigest: Digest;
+  readonly digest: Digest;
+  readonly snapshot: RuntimeSnapshotV1;
+}
 /** This summary is reconstructed from the validated durable host journal. A
  * dispatching/indeterminate effect is treated as a possible external commit. */
 export interface ProcessOperationEffectDisposition {
@@ -172,9 +188,10 @@ export interface ProcessHostOptions {
   readonly plan: TopologyPlan;
   readonly registry: CapabilityRegistry;
   readonly sealer: CapabilitySealer;
-  /** Opt-in host-config/16 local or host-config/17 witnessed pure Artifact/4.
-   * Both require operator-held trust and one pure unit without a broker. */
-  readonly virtualArtifactV4?: Readonly<{ format: 'aether.process-host-virtual/1' | 'aether.process-host-virtual/2';
+  /** Opt-in host-config/16 candidate local, config/17 candidate witnessed,
+   * or config/18 exact-source witnessed pure Artifact/4. */
+  readonly virtualArtifactV4?: Readonly<{ format: 'aether.process-host-virtual/1'
+    | 'aether.process-host-virtual/2' | 'aether.process-host-virtual/3';
     artifact: ProcessVirtualArtifactV4; trust: ProcessVirtualWorkerTrustV1 }>;
   /** Explicit strict profile; its presence is committed into host identity. */
   readonly scopedGrants?: ScopedGrantAuthority;
@@ -312,11 +329,13 @@ export class ProcessHost {
 
   private constructor(options: ProcessHostOptions) {
     const virtual = options.virtualArtifactV4;
-    this.witnessedVirtualProfile = virtual?.format === 'aether.process-host-virtual/2';
+    this.witnessedVirtualProfile = virtual?.format === 'aether.process-host-virtual/2'
+      || virtual?.format === 'aether.process-host-virtual/3';
     if (this.witnessedVirtualProfile && options.hostJournalWitness === undefined)
       throw new TypeError('Artifact/4 witnessed host requires an operator witness');
     if (virtual) {
-      if (!['aether.process-host-virtual/1', 'aether.process-host-virtual/2'].includes(virtual.format)
+      if (!['aether.process-host-virtual/1', 'aether.process-host-virtual/2',
+        'aether.process-host-virtual/3'].includes(virtual.format)
         || options.plan.units.length !== 1
         || options.registry.names.length !== 1 || options.registry.names[0] !== PURE_COMPUTE
         || options.scopedGrants !== undefined || options.signedEffectResourcePolicy !== undefined
@@ -332,10 +351,12 @@ export class ProcessHost {
         throw new TypeError('Artifact/4 host requires one pure unit without effect or legacy profiles');
       const lineage = openProcessVirtualWorkerLineageV1(virtual.trust);
       const artifact = validateProcessVirtualArtifactV4(virtual.artifact, lineage);
-      if (encodeIR(options.module).text !== artifact.candidateIr
+      const sourceProfile = virtual.format === 'aether.process-host-virtual/3';
+      if (encodeIR(options.module).text !== (sourceProfile ? artifact.sourceIr : artifact.candidateIr)
         || executionManifestDigest(options.manifest)
-          !== executionManifestDigest(artifact.candidateEvidence.manifest))
-        throw new TypeError('Artifact/4 host module/manifest differs from signed candidate');
+          !== executionManifestDigest(sourceProfile ? artifact.sourceEvidence.manifest
+            : artifact.candidateEvidence.manifest))
+        throw new TypeError('Artifact/4 host module/manifest differs from signed subject');
       const members = options.module.kind === 'Module'
         ? options.module.members.filter(member => member.kind === 'FunctionDecl').map(member => member.symbol)
         : [];
@@ -571,7 +592,7 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest(this.witnessedVirtualProfile ? 'aether.process-host-config/17' : virtual ? 'aether.process-host-config/16' : this.activeReleaseProfile ? 'aether.process-host-config/15' : tableSink ? retainedCheckpoints ? 'aether.process-host-config/14' : 'aether.process-host-config/13' : retainedCheckpoints ? 'aether.process-host-config/12' : nativeProfile ? 'aether.process-host-config/10' : budgetedSink ? 'aether.process-host-config/11' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+    this.configuration = domainDigest(virtual?.format === 'aether.process-host-virtual/3' ? 'aether.process-host-config/18' : this.witnessedVirtualProfile ? 'aether.process-host-config/17' : virtual ? 'aether.process-host-config/16' : this.activeReleaseProfile ? 'aether.process-host-config/15' : tableSink ? retainedCheckpoints ? 'aether.process-host-config/14' : 'aether.process-host-config/13' : retainedCheckpoints ? 'aether.process-host-config/12' : nativeProfile ? 'aether.process-host-config/10' : budgetedSink ? 'aether.process-host-config/11' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
       ...(virtual ? { virtualArtifactDigest: processVirtualArtifactDigestV4(virtual.artifact),
         virtualTrustDigest: domainDigest('aether.process-host-virtual-trust/1', virtual.trust),
         ...(this.witnessedVirtualProfile ? { hostJournalWitness: options.hostJournalWitness!.digest } : {}) } : {}),
@@ -619,6 +640,8 @@ export class ProcessHost {
     try {
       await host.lock.runAsync(async () => {
         let journal: HostJournal;
+        const sourceWitnessed = options.virtualArtifactV4?.format === 'aether.process-host-virtual/3';
+        let recovered = false;
         if (existsSync(host.file) || host.#hostJournalWitness && readHostJournalHead(host.#hostJournalWitness).journal !== null) journal = host.read();
         else {
           const generation = options.initialGeneration ?? '1'; decimal(generation);
@@ -639,16 +662,26 @@ export class ProcessHost {
               ProcessHost.prototype.fallbackIdentity.call(host), host.module, host.manifest, lease.binding);
           ProcessHost.prototype.assertCheckpointSemanticRetention.call(host, lease.binding);
         }
-        for (const call of journal.calls) if (call.state === 'running') { call.state = 'indeterminate'; call.failure = 'coordinator restarted without a durable completed outcome'; }
+        for (const call of journal.calls) if (call.state === 'running') {
+          call.state = 'indeterminate'; call.failure = 'coordinator restarted without a durable completed outcome';
+          recovered = true;
+        }
         for (const migration of journal.migrations) {
-          if (migration.state === 'requested' || migration.state === 'prepared') { migration.state = 'aborted'; migration.failure = 'no durable migration commit; original generation remains authoritative'; }
+          if (migration.state === 'requested' || migration.state === 'prepared') {
+            migration.state = 'aborted'; migration.failure = 'no durable migration commit; original generation remains authoritative';
+            recovered = true;
+          }
           else if (migration.state === 'committed') {
             if (journal.generation !== migration.toGeneration || journal.plan !== migration.afterPlan || runtimeSnapshotDigest(journal.snapshot) !== runtimeSnapshotDigest(migration.after!)) throw new Error('migration decision/state mismatch');
           }
         }
-        host.persist(journal); host.preflightV4Host(journal); await host.ensureWorkers(journal);
-        for (const migration of journal.migrations) if (migration.state === 'committed') migration.state = 'finalized';
-        host.persist(journal);
+        if (!sourceWitnessed || recovered) host.persist(journal);
+        host.preflightV4Host(journal); await host.ensureWorkers(journal);
+        let finalized = false;
+        for (const migration of journal.migrations) if (migration.state === 'committed') {
+          migration.state = 'finalized'; finalized = true;
+        }
+        if (!sourceWitnessed || finalized) host.persist(journal);
       }, options.lockWaitMs ?? 5000);
       return host;
     } catch (error) { await host.close(); throw error; }
@@ -882,6 +915,61 @@ export class ProcessHost {
   snapshotForPromotionFence(): RuntimeSnapshotV1 {
     return this.lock.run(() => { const journal = this.read(); this.assertReady(journal);
       return copy(journal.snapshot); }, this.options.lockWaitMs ?? 5000);
+  }
+  /** One lock/read binds the independently witnessed exact source snapshot,
+   * current signed lineage, plan, state head and complete call inventory. */
+  sourceHeadForPromotion(): ProcessVirtualSourceHeadV1 {
+    this.assertSourceProfile();
+    return this.lock.run(() => this.sourceHeadFromJournal(this.read()),
+      this.options.lockWaitMs ?? 5000);
+  }
+  /** Hold the source-host writer ticket through the synchronous governor
+   * decision. An external source call that starts before this fence must
+   * finish before the head is read; one that starts after waits until commit. */
+  withSourceCommitFence<T>(decision: (head: ProcessVirtualSourceHeadV1) => T): T {
+    this.assertSourceProfile();
+    if (typeof decision !== 'function') throw new TypeError('source commit decision required');
+    return this.lock.run(() => {
+      const result = decision(this.sourceHeadFromJournal(this.read()));
+      if (result && typeof result === 'object' && 'then' in result)
+        throw new TypeError('source commit decision must be synchronous');
+      return result;
+    }, this.options.lockWaitMs ?? 5000);
+  }
+  private assertSourceProfile(): void {
+    this.assertOpen();
+    if (this.virtualProfile?.format !== 'aether.process-host-virtual/3'
+      || !this.#hostJournalWitness)
+      throw new Error('witnessed Artifact/4 source profile required');
+  }
+  private sourceHeadFromJournal(journal: HostJournal): ProcessVirtualSourceHeadV1 {
+    this.assertReady(journal);
+    if (journal.format !== 'aether.process-host/4'
+      || !journal.heads.length) throw new Error('source host lacks witnessed state head');
+    const revision = journal.witnessRevision;
+    if (revision === undefined) throw new Error('source host lacks witness revision');
+    const body = { format: 'aether.process-virtual-source-head/1' as const,
+      hostConfiguration: this.configuration,
+      hostWitnessDigest: this.#hostJournalWitness!.digest,
+      witnessRevision: revision,
+      sourceManifest: executionManifestDigest(this.manifest),
+      sourceIntent: this.virtualProfile!.artifact.lineageBinding.sourceIntent,
+      snapshotDigest: runtimeSnapshotDigest(journal.snapshot),
+      planDigest: domainDigest('aether.process-virtual-source-plan/1',
+        JSON.parse(journal.plan)),
+      stateHeadDigest: journal.heads.at(-1)!.digest,
+      operationHistoryDigest: domainDigest('aether.process-virtual-source-operations/1',
+        journal.calls),
+      operationIds: journal.calls.map(call => call.operationId),
+      witnessJournalDigest: domainDigest('aether.process-virtual-source-witness-journal/1',
+        journal),
+    };
+    return freeze(copy({ ...body, digest: domainDigest(body.format, body),
+      snapshot: journal.snapshot }));
+  }
+  sourceOperationIds(): readonly string[] {
+    this.assertSourceProfile();
+    return this.read().calls.map(call => call.operationId);
   }
   status(): { unresolved: string[]; migrations: Array<{ migrationId: string; state: MigrationRecord['state'] }> } {
     const journal = this.read(); return { unresolved: [
@@ -1873,11 +1961,15 @@ export class ProcessHost {
     const plan = JSON.parse(journal.plan) as TopologyPlan, channels = new Map<string, ProcessChannel>();
     try {
       for (const unit of plan.units) {
+        const virtualInit = this.virtualProfile ? { artifact: this.virtualProfile.artifact,
+          trust: this.virtualProfile.trust, unit: unit.id, heapId: journal.snapshot.heapId,
+          ownershipEpoch: journal.generation, snapshot: journal.snapshot } : null;
         const channel = this.virtualProfile
-          ? await ProcessChannel.startVirtualV4({ artifact: this.virtualProfile.artifact,
-            trust: this.virtualProfile.trust, unit: unit.id, heapId: journal.snapshot.heapId,
-            ownershipEpoch: journal.generation, snapshot: journal.snapshot },
-            { timeoutMs: this.options.timeoutMs ?? 5000 })
+          ? this.virtualProfile.format === 'aether.process-host-virtual/3'
+            ? await ProcessChannel.startVirtualSourceV4(virtualInit!,
+              { timeoutMs: this.options.timeoutMs ?? 5000 })
+            : await ProcessChannel.startVirtualV4(virtualInit!,
+              { timeoutMs: this.options.timeoutMs ?? 5000 })
           : await ProcessChannel.start({ module: this.module, manifest: this.manifest, unit: unit.id, includeSymbols: unit.members, capabilities: this.registry.names.map(name => this.registry.get(name)!), heapId: journal.snapshot.heapId, ownershipEpoch: journal.generation, snapshot: journal.snapshot }, { timeoutMs: this.options.timeoutMs ?? 5000, onCall: request => this.onCall(unit.id, request), onEffect: request => this.onEffect(unit.id, request) });
         channels.set(unit.id, channel);
       }

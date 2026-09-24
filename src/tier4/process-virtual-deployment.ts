@@ -11,22 +11,24 @@ import { decodeCanonical, encodeCanonical, identifier, validateTaggedValue,
   type TaggedValueV1 } from '../fabric/encoding.ts';
 import { domainDigest, executionManifestDigest, type Digest } from '../fabric/identity.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
-import { selectHostJournalWitness, assertHostJournalWitnessCatalog,
+import { selectHostJournalWitness, readHostJournalHead, assertHostJournalWitnessCatalog,
   type HostJournalWitnessCatalog } from '../fabric/host-journal-witness.ts';
 import { createPromotionHandle, PromotionCoordinator, type PreparedPromotionHandleV1,
   type PromotionBindingV1, type PromotionDriver,
   type PromotionInput, type ProductionAdmissionState } from '../fabric/promotion.ts';
 import { validateVettedEvidence, type VettedEvidence } from '../fabric/evidence.ts';
 import { runtimeSnapshotDigest, type RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
-import { ProcessHost, type ProcessHostCallResult, type ProcessHostOptions } from './process-host.ts';
+import { ProcessHost, type ProcessHostCallResult, type ProcessHostOptions,
+  type ProcessVirtualSourceHeadV1 } from './process-host.ts';
 import { validateProcessArguments } from './process-type-validation.ts';
 import { validateProcessVirtualArtifactV4, processVirtualArtifactDigestV4,
   type ProcessVirtualArtifactV4 } from './process-virtual-artifact-v4.ts';
 import { openProcessVirtualWorkerLineageV1,
   type ProcessVirtualWorkerTrustV1 } from './process-virtual-worker-contract.ts';
-import { assertPureVirtualPlanV1, preparePureVirtualPromotionV1,
-  pureVirtualPreparedDigestV1, PureVirtualPreparedStoreV1,
-  type PureVirtualPreparedV1 } from './process-virtual-deployment-contract.ts';
+import { assertPureVirtualPlanV1, preparePureVirtualPromotionV2,
+  requireWitnessedPureVirtualPreparedV2,
+  pureVirtualPreparedDigestV2, PureVirtualPreparedStoreV1,
+  type PureVirtualPreparedV2 } from './process-virtual-deployment-contract.ts';
 import { assertPureVirtualDeploymentWitnessV1, PureVirtualDeploymentJournalStoreV1,
   pureVirtualInvocationDigestV2, type PureVirtualDeploymentJournalV3,
   type PureVirtualDeploymentWitnessV1, type PureVirtualInvocationV2 } from './process-virtual-deployment-journal.ts';
@@ -67,7 +69,8 @@ export interface PureVirtualProcessDeploymentOptions {
   readonly timeoutMs?: number;
   readonly lockWaitMs?: number;
   readonly onPhase?: (phase: 'prepared' | 'before-activation' | 'activated' | 'aborted',
-    detail: { proposalDigest: Digest; workerPids: Readonly<Record<string, number>> }) => void;
+    detail: { proposalDigest: Digest; workerPids: Readonly<Record<string, number>> })
+    => void | Promise<void>;
   readonly onHostPhase?: ProcessHostOptions['onPhase'];
 }
 interface Lease { proposal: Digest; release(): void; done: Promise<void> }
@@ -251,7 +254,8 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
       : state.active.generation !== '1' || state.active.artifactDigest !== this.#artifactDigest)
       throw new Error('pure virtual deployment active artifact changed');
   }
-  async #hostFor(which: 'source' | 'candidate', prepared?: PureVirtualPreparedV1): Promise<ProcessHost> {
+  #sourceHostId(): string { return `source-${suffix(this.#sourceManifest)}`; }
+  async #hostFor(which: 'source' | 'candidate', prepared?: PureVirtualPreparedV2): Promise<ProcessHost> {
     const existing = this.#hosts.get(which); if (existing) return existing;
     const artifact = validateProcessVirtualArtifactV4(this.#options.artifact,
       openProcessVirtualWorkerLineageV1(this.#options.trust));
@@ -264,7 +268,11 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
         directory: join(this.#options.directory, 'source-host'),
         module: decodeIR(artifact.sourceIr), manifest: artifact.sourceEvidence.manifest,
         plan: this.#options.sourcePlan, initialGeneration: '0',
-        initialSnapshot: this.#options.sourceInitialSnapshot })
+        initialSnapshot: this.#options.sourceInitialSnapshot,
+        virtualArtifactV4: { format: 'aether.process-host-virtual/3',
+          artifact, trust: this.#options.trust },
+        hostJournalWitness: selectHostJournalWitness(this.#options.hostWitnessCatalog,
+          this.#sourceHostId()) })
       : (() => {
         if (!prepared) throw new Error('candidate host requires exact prepared seed');
         if (prepared.artifactDigest !== this.#artifactDigest
@@ -293,23 +301,52 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
       if (!proposal?.handle) throw new Error('active virtual candidate lacks governor prepared handle');
       host = await this.#hostFor('candidate', this.#preparedRecord(proposal.binding, proposal.handle));
     }
+    if (state.active.generation === '0') {
+      const known = new Set(state.invocations.filter(row => row.generation === '0')
+        .map(row => row.operationId));
+      if (host.sourceOperationIds().some(id => !known.has(id)))
+        throw new Error('witnessed source contains an unregistered operation ID');
+    }
     for (const row of state.invocations) if (row.generation === state.active.generation
       && row.phase === 'settled' && !same(host.operationResult(row.operationId), row.result))
       throw new Error('virtual deployment receipt differs from active host');
     return host;
   }
-  #preparedRecord(binding: PromotionBindingV1, handle: PreparedPromotionHandleV1): PureVirtualPreparedV1 {
+  #assertSourceInventory(head: ProcessVirtualSourceHeadV1,
+    state: PureVirtualDeploymentJournalV3): void {
+    const expected = state.invocations.filter(row => row.generation === '0')
+      .map(row => row.operationId).sort();
+    if (!same([...head.operationIds].sort(), expected))
+      throw new Error('witnessed source operation history differs from deployment registry');
+  }
+  #preparedRecord(binding: PromotionBindingV1, handle: PreparedPromotionHandleV1,
+    requireStableSource = true): PureVirtualPreparedV2 {
     if (handle.format !== 'aether.prepared-promotion/1' || handle.proposalDigest !== binding.proposalDigest
       || handle.targetManifest !== this.#candidateManifest || handle.generation !== binding.generation
       || handle.payload.tag !== 'string') throw new TypeError('virtual prepared handle mismatch');
     const digest = handle.payload.value as Digest;
-    const record = this.#prepared.read(binding.proposalDigest, digest);
+    const record = requireWitnessedPureVirtualPreparedV2(
+      this.#prepared.read(binding.proposalDigest, digest));
     if (!same(record.binding, binding) || record.artifactDigest !== this.#artifactDigest
       || record.trustDigest !== this.#trustDigest
       || record.hostWitnessCatalogDigest !== this.#options.hostWitnessCatalog.digest
       || record.deploymentJournalWitnessDigest !== this.#options.deploymentWitness.digest
-      || record.planDigest !== assertPureVirtualPlanV1(this.#options.candidatePlan, this.#options.artifact))
+      || record.planDigest !== assertPureVirtualPlanV1(this.#options.candidatePlan, this.#options.artifact)
+      || record.sourceHead.sourceManifest !== this.#sourceManifest
+      || record.sourceHead.sourceIntent !== this.#options.artifact.lineageBinding.sourceIntent
+      || record.sourceHead.planDigest !== this.#sourcePlanDigest)
       throw new TypeError('virtual prepared artifact, plan or authority changed');
+    if (requireStableSource) {
+      const witness = selectHostJournalWitness(this.#options.hostWitnessCatalog,
+        this.#sourceHostId());
+      const head = readHostJournalHead(witness);
+      if (witness.digest !== record.sourceHead.hostWitnessDigest
+        || head.revision !== record.sourceHead.witnessRevision || head.journal === null
+        || domainDigest('aether.process-virtual-source-witness-journal/1',
+          decodeCanonical(Buffer.from(head.journal, 'utf8'), LIMITS), LIMITS)
+          !== record.sourceHead.witnessJournalDigest)
+        throw new Error('historical witnessed source head changed after governor decision');
+    }
     return record;
   }
   #assertGovernorBinding(binding: PromotionBindingV1,
@@ -340,10 +377,31 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
     return this.#gate.runAsync(async () => { const state = this.#state(); this.#assertServing(state);
       return (await this.#activeHost(state)).snapshot(); }, this.#options.lockWaitMs ?? 5000);
   }
+  async sourceHeadForPromotion(): Promise<ProcessVirtualSourceHeadV1> {
+    return this.#gate.runAsync(async () => {
+      const state = this.#state(); this.#assertServing(state);
+      if (state.active.generation !== '0')
+        throw new Error('pure virtual source already promoted');
+      return (await this.#activeHost(state)).sourceHeadForPromotion();
+    }, this.#options.lockWaitMs ?? 5000);
+  }
   status(): Readonly<{ readiness: string; activeManifest: Digest; generation: string;
     servingReady: boolean; workerPids: Readonly<Record<string, number>> }> {
     const state = this.#state(); let ready = true;
-    try { this.#assertServing(state); } catch { ready = false; }
+    try {
+      this.#assertServing(state);
+      if (state.active.generation === '0') {
+        const host = this.#hosts.get('source');
+        const known = new Set(state.invocations.map(row => row.operationId));
+        if (host?.sourceOperationIds().some(id => !known.has(id)))
+          throw new Error('unregistered witnessed source operation');
+      } else {
+        const proposal = this.#options.coordinator.history().find(record =>
+          record.phase === 'active' && record.binding.generation === state.active.generation);
+        if (!proposal?.handle) throw new Error('candidate lacks governor handle');
+        this.#preparedRecord(proposal.binding, proposal.handle);
+      }
+    } catch { ready = false; }
     return { readiness: state.readiness, activeManifest: state.active.manifest,
       generation: state.active.generation, servingReady: ready,
       workerPids: this.#hosts.get(state.active.generation === '0' ? 'source' : 'candidate')?.workerPids ?? {} };
@@ -444,10 +502,13 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
       throw new Error('pure virtual promotion would strand a historical operation ID');
     const source = await this.#hostFor('source');
     if (source.status().unresolved.length) throw new Error('unresolved source host execution');
-    const sourceSnapshot = await source.snapshot();
-    const prepared = preparePureVirtualPromotionV1({ binding, evidence,
+    const sourceHead = source.sourceHeadForPromotion();
+    this.#assertSourceInventory(sourceHead, state);
+    const prepared = preparePureVirtualPromotionV2({ binding, evidence,
       artifact: this.#options.artifact, trust: this.#options.trust,
-      plan: this.#options.candidatePlan, sourceSnapshot, sourceGeneration: '0',
+      plan: this.#options.candidatePlan, sourceHead,
+      sourcePlanDigest: this.#sourcePlanDigest, sourceHostId: this.#sourceHostId(),
+      sourceGeneration: '0',
       hostWitnessCatalog: this.#options.hostWitnessCatalog,
       deploymentJournalWitness: this.#options.deploymentWitness });
     this.#vetted.set(binding.proposalDigest, evidence);
@@ -459,7 +520,7 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
     this.#write(state, { active: state.active, readiness: 'prepared',
       pendingProposal: binding.proposalDigest, preparedDigest: digest,
       invocations: state.invocations });
-    this.#options.onPhase?.('prepared', { proposalDigest: binding.proposalDigest,
+    await this.#options.onPhase?.('prepared', { proposalDigest: binding.proposalDigest,
       workerPids: candidateHost.workerPids });
     return createPromotionHandle(binding, { tag: 'string', value: digest });
   }
@@ -476,15 +537,18 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
     if (!vetted) throw new Error('pure virtual commit lacks vetted evidence');
     const source = this.#hosts.get('source');
     if (!source) throw new Error('pure virtual source host unavailable at commit');
-    const snapshot = source.snapshotForPromotionFence();
-    const prepared = preparePureVirtualPromotionV1({ binding, evidence: vetted,
-      artifact: this.#options.artifact, trust: this.#options.trust,
-      plan: this.#options.candidatePlan, sourceSnapshot: snapshot,
-      sourceGeneration: '0', hostWitnessCatalog: this.#options.hostWitnessCatalog,
-      deploymentJournalWitness: this.#options.deploymentWitness });
-    if (pureVirtualPreparedDigestV1(prepared) !== state.preparedDigest)
-      throw new Error('pure virtual source snapshot/authority changed before commit');
-    commit();
+    source.withSourceCommitFence(sourceHead => {
+      this.#assertSourceInventory(sourceHead, state);
+      const prepared = preparePureVirtualPromotionV2({ binding, evidence: vetted,
+        artifact: this.#options.artifact, trust: this.#options.trust,
+        plan: this.#options.candidatePlan, sourceHead,
+        sourcePlanDigest: this.#sourcePlanDigest, sourceHostId: this.#sourceHostId(),
+        sourceGeneration: '0', hostWitnessCatalog: this.#options.hostWitnessCatalog,
+        deploymentJournalWitness: this.#options.deploymentWitness });
+      if (pureVirtualPreparedDigestV2(prepared) !== state.preparedDigest)
+        throw new Error('pure virtual witnessed source head/history changed before commit');
+      commit();
+    });
   }
   async activate(binding: PromotionBindingV1, handle: PreparedPromotionHandleV1): Promise<void> {
     this.#assertGovernorBinding(binding, 'commit');
@@ -507,10 +571,10 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
       await this.#release(); return;
     }
     if (state.readiness !== 'prepared' || state.pendingProposal !== binding.proposalDigest
-      || state.preparedDigest !== pureVirtualPreparedDigestV1(prepared))
+      || state.preparedDigest !== pureVirtualPreparedDigestV2(prepared))
       throw new Error('pure virtual activation lacks exact prepared journal');
     const candidate = await this.#hostFor('candidate', prepared);
-    this.#options.onPhase?.('before-activation', { proposalDigest: binding.proposalDigest,
+    await this.#options.onPhase?.('before-activation', { proposalDigest: binding.proposalDigest,
       workerPids: candidate.workerPids });
     const source = this.#hosts.get('source');
     if (source) { await source.close(); this.#hosts.delete('source'); }
@@ -519,7 +583,7 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
       generation: '1', artifactDigest: this.#artifactDigest },
       readiness: 'ready', pendingProposal: null, preparedDigest: null,
       invocations: state.invocations });
-    this.#options.onPhase?.('activated', { proposalDigest: binding.proposalDigest,
+    await this.#options.onPhase?.('activated', { proposalDigest: binding.proposalDigest,
       workerPids: candidate.workerPids });
     await this.#release();
   }
@@ -531,14 +595,14 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
       throw new Error('committed virtual target cannot be aborted');
     if (state.pendingProposal !== null && state.pendingProposal !== binding.proposalDigest)
       throw new Error('cannot abort another virtual proposal');
-    if (handle) this.#preparedRecord(binding, handle);
+    if (handle) this.#preparedRecord(binding, handle, false);
     const candidate = this.#hosts.get('candidate');
     if (candidate) { await candidate.close(); this.#hosts.delete('candidate'); }
     if (state.readiness !== 'ready') this.#write(state, { active: state.active,
       readiness: 'ready', pendingProposal: null, preparedDigest: null,
       invocations: state.invocations });
     await this.#hostFor('source');
-    this.#options.onPhase?.('aborted', { proposalDigest: binding.proposalDigest,
+    await this.#options.onPhase?.('aborted', { proposalDigest: binding.proposalDigest,
       workerPids: this.#hosts.get('source')!.workerPids });
     await this.#release();
   }

@@ -200,13 +200,15 @@ function main(): void {
     const init = exactObject(payload, ['format', 'artifact', 'trust', 'unit', 'heapId',
       'ownershipEpoch', 'snapshot', 'maxGuardChecks']);
     if (init.format !== 'aether.process-worker-init/2'
-      && init.format !== 'aether.process-worker-init/3')
+      && init.format !== 'aether.process-worker-init/3'
+      && init.format !== 'aether.process-worker-init/4')
       throw new TypeError('unsupported process worker init version');
     if (init.maxGuardChecks !== null && (!Number.isSafeInteger(init.maxGuardChecks)
       || (init.maxGuardChecks as number) < 0 || (init.maxGuardChecks as number) > 1_000_000))
       throw new RangeError('invalid virtual worker guard budget');
     const lineage = openProcessVirtualWorkerLineageV1(init.trust);
-    const version = init.format === 'aether.process-worker-init/3' ? 4 : 3;
+    const sourceMode = init.format === 'aether.process-worker-init/4';
+    const version = init.format === 'aether.process-worker-init/2' ? 3 : 4;
     if (version === 4)
       assertProcessWorkerPipeCustodyV1((init.artifact as ProcessVirtualArtifactV4).executableSubject.manifest.bundle);
     const artifact = version === 4
@@ -214,14 +216,16 @@ function main(): void {
       : validateProcessVirtualArtifactV3(init.artifact, lineage);
     if (version === 3)
       assertProcessVirtualWorkerBundleV1(artifact as ProcessVirtualArtifactV3, launchedPath);
-    const manifest = artifact.candidateEvidence.manifest;
+    const manifest = sourceMode ? artifact.sourceEvidence.manifest
+      : artifact.candidateEvidence.manifest;
     if (executionManifestDigest(manifest) !== session.executionManifest
       || init.ownershipEpoch !== session.ownershipEpoch)
       throw new TypeError('virtual worker manifest or ownership differs from session');
-    const module = decodeIR(artifact.candidateIr), source = decodeIR(artifact.sourceIr);
+    const source = decodeIR(artifact.sourceIr);
+    const module = sourceMode ? source : decodeIR(artifact.candidateIr);
     if (module.kind !== 'Module' || source.kind !== 'Module'
       || new GraphStore().intern(module) !== manifest.astRoot)
-      throw new TypeError('virtual worker exact candidate root mismatch');
+      throw new TypeError('virtual worker exact selected root mismatch');
     const registry = new CapabilityRegistry();
     if (!typecheck(module, { registry }).ok) throw new TypeError('virtual worker module failed typechecking');
     const includeSymbols = module.members.filter(member => member.kind === 'FunctionDecl')
@@ -237,7 +241,7 @@ function main(): void {
         if (!executionGuard()) return false;
         return init.maxGuardChecks === null || virtualGuardCount++ < (init.maxGuardChecks as number);
       },
-      virtualForward: { source, descriptor: artifact.descriptor } });
+      ...(sourceMode ? {} : { virtualForward: { source, descriptor: artifact.descriptor } }) });
     scope = nextScope; runtime = nextRuntime;
     virtualAdmission = version === 4
       ? { version: 4, artifact: artifact as ProcessVirtualArtifactV4, lineage }

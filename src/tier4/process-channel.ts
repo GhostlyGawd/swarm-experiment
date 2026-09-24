@@ -242,6 +242,15 @@ export class ProcessChannel {
   }
   static async startVirtualV4(init: ProcessVirtualChannelInitV3,
     options: ProcessChannelOptions = {}): Promise<ProcessChannel> {
+    return this.startArtifactV4(init, options, 'candidate');
+  }
+  /** Versioned measured pure source worker for witnessed host config/18. */
+  static async startVirtualSourceV4(init: ProcessVirtualChannelInitV3,
+    options: ProcessChannelOptions = {}): Promise<ProcessChannel> {
+    return this.startArtifactV4(init, options, 'source');
+  }
+  private static async startArtifactV4(init: ProcessVirtualChannelInitV3,
+    options: ProcessChannelOptions, subject: 'source' | 'candidate'): Promise<ProcessChannel> {
     const transport = pureWorkerOptions(options, 'pure Artifact/4 worker');
     const limits = { maxFrameBytes: 16 * 1024 * 1024,
       maxDecompressedBytes: 16 * 1024 * 1024, maxObjects: 500_000, maxDepth: 128 };
@@ -259,13 +268,14 @@ export class ProcessChannel {
     // signed file set without recompiling the graph for every pure call.
     const path = safe.artifact.executableSubject.manifest.bundle.path;
     const artifact = assertProcessVirtualArtifactV4Launch(safe.artifact, lineage, path);
-    const module = decodeIR(artifact.candidateIr);
-    if (module.kind !== 'Module') throw new TypeError('Artifact/4 candidate is not a module');
+    const module = decodeIR(subject === 'source' ? artifact.sourceIr : artifact.candidateIr);
+    if (module.kind !== 'Module') throw new TypeError('Artifact/4 selected module is invalid');
     const includeSymbols = module.members.filter(member => member.kind === 'FunctionDecl')
       .map(member => member.symbol);
     if (!includeSymbols.includes(artifact.descriptor.target))
       throw new TypeError('Artifact/4 target must be compiled locally');
-    const channel = new ProcessChannel({ module, manifest: artifact.candidateEvidence.manifest,
+    const channel = new ProcessChannel({ module, manifest: subject === 'source'
+      ? artifact.sourceEvidence.manifest : artifact.candidateEvidence.manifest,
       unit: safe.unit, includeSymbols, capabilities: [], heapId: safe.heapId,
       ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, transport, path,
     artifact.executableSubject.manifest.bundle);
@@ -274,7 +284,8 @@ export class ProcessChannel {
       validatePackagedProcessVirtualArtifactV4(artifact, lineage, channel.workerPath);
       if (safe.snapshot) fromWireSnapshot(safe.snapshot, channel.scope);
       const ready = await channel.request('init-virtual', {
-        format: 'aether.process-worker-init/3', artifact, trust,
+        format: subject === 'source' ? 'aether.process-worker-init/4'
+          : 'aether.process-worker-init/3', artifact, trust,
         unit: safe.unit, heapId: safe.heapId, ownershipEpoch: safe.ownershipEpoch,
         snapshot: safe.snapshot ?? null, maxGuardChecks: safe.maxGuardChecks ?? null,
       });

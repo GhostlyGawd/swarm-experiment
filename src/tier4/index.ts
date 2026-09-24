@@ -15,7 +15,7 @@ export {
 } from './host.ts';
 export { ProcessChannel, ProcessChannelError, type ProcessChannelInit, type ProcessVirtualChannelInitV2, type ProcessChannelOptions, type ProcessCallRequest, type ProcessCallResult, type ProcessEffectRequest } from './process-channel.ts';
 export { type ProcessVirtualWorkerTrustV1 } from './process-virtual-worker-contract.ts';
-export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessOperationEffectDisposition, type ProcessEffectContext, type ProcessHostPhase, type ProcessCheckpointAccess, type ProcessInvocationGrant, type ProcessNativeFallbackTokens, type ProcessHostNativeFallbackResult } from './process-host.ts';
+export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessVirtualSourceHeadV1, type ProcessOperationEffectDisposition, type ProcessEffectContext, type ProcessHostPhase, type ProcessCheckpointAccess, type ProcessInvocationGrant, type ProcessNativeFallbackTokens, type ProcessHostNativeFallbackResult } from './process-host.ts';
 export { ProcessFallbackSupervisor, type ProcessFallbackOptions, type ProcessFallbackRepairEvent, type ProcessFallbackResult } from './process-fallback.ts';
 export { ProcessResumableSession, type ProcessResumableOptions, type ProcessResumableEffectsContext } from './process-resumable.ts';
 export { ProcessSemanticRetention } from './process-semantic-retention.ts';
@@ -30,9 +30,12 @@ export { makeProcessVirtualArtifactV3, validateProcessVirtualArtifactV3,
 export { PureVirtualProcessDeployment,
   type PureVirtualProcessDeploymentOptions } from './process-virtual-deployment.ts';
 export { assertPureVirtualPlanV1, processVirtualMigrationPlanV1,
+  processVirtualMigrationPlanV2, processVirtualSourceBindingV1,
   processVirtualEffectPlanV1, preparePureVirtualPromotionV1,
-  pureVirtualPreparedDigestV1, PureVirtualPreparedStoreV1,
-  type PureVirtualPreparedV1 } from './process-virtual-deployment-contract.ts';
+  preparePureVirtualPromotionV2, requireWitnessedPureVirtualPreparedV2,
+  pureVirtualPreparedDigestV1, pureVirtualPreparedDigestV2,
+  PureVirtualPreparedStoreV1, type PureVirtualPreparedV1,
+  type PureVirtualPreparedV2, type ProcessVirtualSourceBindingV1 } from './process-virtual-deployment-contract.ts';
 export { createPureVirtualDeploymentWitnessV1, readPureVirtualDeploymentHeadV1,
   PureVirtualDeploymentJournalStoreV1,
   type PureVirtualDeploymentJournalV2, type PureVirtualDeploymentJournalV3,

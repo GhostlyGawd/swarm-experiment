@@ -137,8 +137,12 @@ export function validatePureVirtualDeploymentJournalV1(value: unknown,
     throw new TypeError('invalid pure virtual preparation state');
   if (journal.pendingProposal !== null)
     validateDigest(journal.pendingProposal, 'aether.promotion/1');
-  if (journal.preparedDigest !== null)
-    validateDigest(journal.preparedDigest, 'aether.process-virtual-deployment-prepared/1');
+  if (journal.preparedDigest !== null) {
+    validateDigest(journal.preparedDigest);
+    if (!journal.preparedDigest.startsWith('aether.process-virtual-deployment-prepared/1:')
+      && !journal.preparedDigest.startsWith('aether.process-virtual-deployment-prepared/2:'))
+      throw new TypeError('unsupported pure virtual prepared version');
+  }
   if (journal.format === 'aether.process-virtual-deployment/3') {
     validateDigest(journal.sourcePlanDigest, 'aether.process-virtual-source-plan/1');
     validateDigest(journal.candidatePlanDigest, 'aether.process-virtual-plan/1');

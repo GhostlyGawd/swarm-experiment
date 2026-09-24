@@ -13,13 +13,15 @@ import { validateVettedEvidence, type VettedEvidence } from '../fabric/evidence.
 import { effectPlanDigest, evidenceBundleDigest, migrationPlanDigest, promotionDigest,
   type PromotionBindingV1 } from '../fabric/promotion.ts';
 import { runtimeSnapshotDigest, validateRuntimeSnapshot, type RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
-import { assertHostJournalWitnessCatalog, type HostJournalWitnessCatalog } from '../fabric/host-journal-witness.ts';
+import { assertHostJournalWitnessCatalog, readHostJournalHead, selectHostJournalWitness,
+  type HostJournalWitnessCatalog } from '../fabric/host-journal-witness.ts';
 import { assertPureVirtualDeploymentWitnessV1,
   type PureVirtualDeploymentWitnessV1 } from './process-virtual-deployment-journal.ts';
 import { validateProcessVirtualArtifactV4, processVirtualArtifactDigestV4,
   type ProcessVirtualArtifactV4 } from './process-virtual-artifact-v4.ts';
 import { openProcessVirtualWorkerLineageV1, type ProcessVirtualWorkerTrustV1 } from './process-virtual-worker-contract.ts';
 import type { TopologyPlan } from './topology.ts';
+import type { ProcessVirtualSourceHeadV1 } from './process-host.ts';
 
 const LIMITS = { maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024,
   maxObjects: 500_000, maxDepth: 128 };
@@ -92,6 +94,73 @@ export function processVirtualMigrationPlanV1(snapshot: RuntimeSnapshotV1,
   ] };
 }
 
+export type ProcessVirtualSourceBindingV1 = Omit<ProcessVirtualSourceHeadV1, 'snapshot'>;
+export function validateProcessVirtualSourceBindingV1(value: unknown):
+  ProcessVirtualSourceBindingV1 {
+  const row = exactObject(value, ['format', 'hostConfiguration', 'hostWitnessDigest',
+    'witnessRevision', 'sourceManifest', 'sourceIntent', 'snapshotDigest', 'planDigest',
+    'stateHeadDigest', 'operationHistoryDigest', 'operationIds',
+    'witnessJournalDigest', 'digest']);
+  if (row.format !== 'aether.process-virtual-source-head/1')
+    throw new TypeError('invalid witnessed pure source binding version');
+  for (const [field, domain] of [
+    ['hostConfiguration', 'aether.process-host-config/18'],
+    ['hostWitnessDigest', 'aether.process-host-journal-witness/1'],
+    ['sourceManifest', 'aether.execution/1'],
+    ['sourceIntent', 'aether.intent/1'],
+    ['snapshotDigest', 'aether.state/1'],
+    ['planDigest', 'aether.process-virtual-source-plan/1'],
+    ['stateHeadDigest', 'aether.process-state-head/1'],
+    ['operationHistoryDigest', 'aether.process-virtual-source-operations/1'],
+    ['witnessJournalDigest', 'aether.process-virtual-source-witness-journal/1'],
+    ['digest', 'aether.process-virtual-source-head/1'],
+  ] as const) validateDigest(row[field], domain);
+  if (typeof row.witnessRevision !== 'string'
+    || !/^(0|[1-9][0-9]*)$/.test(row.witnessRevision))
+    throw new TypeError('invalid witnessed pure source revision');
+  if (!Array.isArray(row.operationIds)
+    || new Set(row.operationIds).size !== row.operationIds.length)
+    throw new TypeError('invalid witnessed pure source operation IDs');
+  row.operationIds.forEach(identifier);
+  const { digest, ...body } = row;
+  if (digest !== domainDigest('aether.process-virtual-source-head/1', body, LIMITS))
+    throw new TypeError('witnessed pure source head digest changed');
+  return clone(value as ProcessVirtualSourceBindingV1);
+}
+export function processVirtualSourceBindingV1(head: ProcessVirtualSourceHeadV1):
+  ProcessVirtualSourceBindingV1 {
+  const row = exactObject(head, ['format', 'hostConfiguration', 'hostWitnessDigest',
+    'witnessRevision', 'sourceManifest', 'sourceIntent', 'snapshotDigest', 'planDigest',
+    'stateHeadDigest', 'operationHistoryDigest', 'operationIds',
+    'witnessJournalDigest', 'digest', 'snapshot']);
+  if (row.format !== 'aether.process-virtual-source-head/1')
+    throw new TypeError('invalid witnessed pure source head version');
+  validateRuntimeSnapshot(row.snapshot);
+  if (typeof row.witnessRevision !== 'string'
+    || !/^(0|[1-9][0-9]*)$/.test(row.witnessRevision)
+    || row.snapshotDigest !== runtimeSnapshotDigest(row.snapshot as RuntimeSnapshotV1)
+    || row.sourceManifest !== (row.snapshot as RuntimeSnapshotV1).executionManifest)
+    throw new TypeError('witnessed pure source snapshot/revision changed');
+  const { snapshot: _snapshot, digest: _digest, ...body } = head;
+  return validateProcessVirtualSourceBindingV1({ ...body, digest: row.digest });
+}
+
+export function processVirtualMigrationPlanV2(sourceHead: ProcessVirtualSourceHeadV1,
+  artifactDigest: Digest, candidatePlanDigest: Digest): TaggedValueV1 {
+  const source = processVirtualSourceBindingV1(sourceHead);
+  validateDigest(artifactDigest, 'aether.process-artifact/4');
+  validateDigest(candidatePlanDigest, 'aether.process-virtual-plan/1');
+  return { tag: 'sequence', items: [
+    { tag: 'string', value: 'aether.pure-virtual-migration/2' },
+    { tag: 'string', value: source.snapshotDigest },
+    { tag: 'string', value: artifactDigest },
+    { tag: 'string', value: candidatePlanDigest },
+    { tag: 'string', value: source.digest },
+    { tag: 'string', value: source.hostWitnessDigest },
+    { tag: 'string', value: source.operationHistoryDigest },
+  ] };
+}
+
 export function processVirtualEffectPlanV1(artifactDigest: Digest, trustDigest: Digest,
   hostCatalog: HostJournalWitnessCatalog,
   deploymentWitness: PureVirtualDeploymentWitnessV1): TaggedValueV1 {
@@ -126,6 +195,71 @@ export interface PureVirtualPreparedV1 {
   readonly sourceSchemaDigest: Digest;
   readonly candidateSchemaDigest: Digest;
   readonly seed: RuntimeSnapshotV1;
+}
+export interface PureVirtualPreparedV2 extends Omit<PureVirtualPreparedV1, 'format'> {
+  readonly format: 'aether.process-virtual-deployment-prepared/2';
+  readonly sourceHead: ProcessVirtualSourceBindingV1;
+}
+type AnyPureVirtualPrepared = PureVirtualPreparedV1 | PureVirtualPreparedV2;
+
+function migrationFromSourceBinding(source: ProcessVirtualSourceBindingV1,
+  artifactDigest: Digest, candidatePlanDigest: Digest): TaggedValueV1 {
+  return { tag: 'sequence', items: [
+    { tag: 'string', value: 'aether.pure-virtual-migration/2' },
+    { tag: 'string', value: source.snapshotDigest },
+    { tag: 'string', value: artifactDigest },
+    { tag: 'string', value: candidatePlanDigest },
+    { tag: 'string', value: source.digest },
+    { tag: 'string', value: source.hostWitnessDigest },
+    { tag: 'string', value: source.operationHistoryDigest },
+  ] };
+}
+
+function legacyValidationBinding(binding: PromotionBindingV1,
+  snapshotDigest: Digest, artifactDigest: Digest, planDigest: Digest): PromotionBindingV1 {
+  const legacyPlan: TaggedValueV1 = { tag: 'sequence', items: [
+    { tag: 'string', value: 'aether.pure-virtual-migration/1' },
+    { tag: 'string', value: snapshotDigest },
+    { tag: 'string', value: artifactDigest },
+    { tag: 'string', value: planDigest },
+  ] };
+  const proposal = { ...binding.proposal, migrationPlanDigest: migrationPlanDigest(legacyPlan) };
+  return { ...binding, proposal, proposalDigest: promotionDigest(proposal),
+    migrationPlan: legacyPlan };
+}
+
+export function validatePureVirtualPreparedV2(value: unknown): PureVirtualPreparedV2 {
+  encodeCanonical(value, LIMITS);
+  const row = exactObject(value, ['format', 'binding', 'sourceManifest',
+    'candidateManifest', 'artifactDigest', 'executableSubjectDigest', 'trustDigest',
+    'hostWitnessCatalogDigest', 'deploymentJournalWitnessDigest', 'planDigest',
+    'sourceSnapshotDigest', 'sourceSchemaDigest', 'candidateSchemaDigest', 'seed',
+    'sourceHead']);
+  if (row.format !== 'aether.process-virtual-deployment-prepared/2')
+    throw new TypeError('unsupported witnessed source prepared record');
+  const binding = row.binding as PromotionBindingV1;
+  const sourceHead = validateProcessVirtualSourceBindingV1(row.sourceHead);
+  if (binding?.format !== 'aether.promotion-binding/1'
+    || binding.proposalDigest !== promotionDigest(binding.proposal)
+    || !same(binding.migrationPlan, migrationFromSourceBinding(sourceHead,
+      row.artifactDigest as Digest, row.planDigest as Digest))
+    || binding.proposal.migrationPlanDigest !== migrationPlanDigest(binding.migrationPlan)
+    || binding.proposal.effectPlanDigest !== effectPlanDigest(binding.effectPlan)
+    || sourceHead.sourceManifest !== row.sourceManifest
+    || sourceHead.snapshotDigest !== row.sourceSnapshotDigest)
+    throw new TypeError('witnessed source governor/head binding changed');
+  const { sourceHead: _sourceHead, ...base } = row;
+  const surrogate = legacyValidationBinding(binding, row.sourceSnapshotDigest as Digest,
+    row.artifactDigest as Digest, row.planDigest as Digest);
+  validatePureVirtualPreparedV1({ ...base,
+    format: 'aether.process-virtual-deployment-prepared/1', binding: surrogate });
+  return clone(value as PureVirtualPreparedV2);
+}
+export function requireWitnessedPureVirtualPreparedV2(value: AnyPureVirtualPrepared):
+  PureVirtualPreparedV2 {
+  if (value.format !== 'aether.process-virtual-deployment-prepared/2')
+    throw new TypeError('witnessed source deployment refuses prepared /1 history');
+  return validatePureVirtualPreparedV2(value);
 }
 
 export function validatePureVirtualPreparedV1(value: unknown): PureVirtualPreparedV1 {
@@ -168,6 +302,10 @@ export function pureVirtualPreparedDigestV1(record: PureVirtualPreparedV1): Dige
   return domainDigest('aether.process-virtual-deployment-prepared/1',
     validatePureVirtualPreparedV1(record), LIMITS);
 }
+export function pureVirtualPreparedDigestV2(record: PureVirtualPreparedV2): Digest {
+  return domainDigest('aether.process-virtual-deployment-prepared/2',
+    validatePureVirtualPreparedV2(record), LIMITS);
+}
 
 /** The prepared record is immutable and content addressed. It is rechecked
  * against live Artifact/4, snapshot, plan and authority at the commit fence. */
@@ -178,9 +316,11 @@ export class PureVirtualPreparedStoreV1 {
     validateDigest(proposal, 'aether.promotion/1');
     return join(this.directory, `${proposal.split(':').at(-1)!}.json`);
   }
-  write(record: PureVirtualPreparedV1): Digest {
-    const checked = validatePureVirtualPreparedV1(record);
-    const digest = pureVirtualPreparedDigestV1(checked);
+  write(record: AnyPureVirtualPrepared): Digest {
+    const checked = record.format === 'aether.process-virtual-deployment-prepared/2'
+      ? validatePureVirtualPreparedV2(record) : validatePureVirtualPreparedV1(record);
+    const digest = checked.format === 'aether.process-virtual-deployment-prepared/2'
+      ? pureVirtualPreparedDigestV2(checked) : pureVirtualPreparedDigestV1(checked);
     ensureDurableDirectory(this.directory);
     const path = this.path(checked.binding.proposalDigest);
     if (existsSync(path)) {
@@ -192,14 +332,20 @@ export class PureVirtualPreparedStoreV1 {
     try { fsyncSync(fd); } finally { closeSync(fd); }
     return digest;
   }
-  read(proposal: Digest, expectedDigest: Digest): PureVirtualPreparedV1 {
-    validateDigest(expectedDigest, 'aether.process-virtual-deployment-prepared/1');
+  read(proposal: Digest, expectedDigest: Digest): AnyPureVirtualPrepared {
+    validateDigest(expectedDigest);
+    if (!expectedDigest.startsWith('aether.process-virtual-deployment-prepared/1:')
+      && !expectedDigest.startsWith('aether.process-virtual-deployment-prepared/2:'))
+      throw new TypeError('unsupported pure virtual prepared digest version');
     const path = this.path(proposal);
     if (statSync(path).size > LIMITS.maxFrameBytes)
       throw new RangeError('pure virtual prepared record exceeds bound');
-    const record = validatePureVirtualPreparedV1(decodeCanonical(readFileSync(path), LIMITS));
+    const raw = decodeCanonical(readFileSync(path), LIMITS) as unknown as AnyPureVirtualPrepared;
+    const record = raw.format === 'aether.process-virtual-deployment-prepared/2'
+      ? validatePureVirtualPreparedV2(raw) : validatePureVirtualPreparedV1(raw);
     if (record.binding.proposalDigest !== proposal
-      || pureVirtualPreparedDigestV1(record) !== expectedDigest)
+      || (record.format === 'aether.process-virtual-deployment-prepared/2'
+        ? pureVirtualPreparedDigestV2(record) : pureVirtualPreparedDigestV1(record)) !== expectedDigest)
       throw new TypeError('pure virtual prepared record changed');
     return record;
   }
@@ -288,4 +434,65 @@ export function preparePureVirtualPromotionV1(input: Readonly<{
     planDigest, sourceSnapshotDigest: runtimeSnapshotDigest(sourceSnapshot),
     sourceSchemaDigest, candidateSchemaDigest,
     seed: rebind(sourceSnapshot, candidateManifest, binding.generation, unit) });
+}
+
+/** Governor-facing V2 binds the exact independently witnessed source head.
+ * The V1 validator still performs the full signed Artifact/4/schema proof; a
+ * synthetic V1 plan is used only inside that local validator, never approved
+ * or persisted as the governor's V2 decision. */
+export function preparePureVirtualPromotionV2(input: Readonly<{
+  binding: PromotionBindingV1;
+  evidence: VettedEvidence;
+  artifact: ProcessVirtualArtifactV4;
+  trust: ProcessVirtualWorkerTrustV1;
+  plan: TopologyPlan;
+  sourceHead: ProcessVirtualSourceHeadV1;
+  sourcePlanDigest: Digest;
+  sourceHostId: string;
+  sourceGeneration: string;
+  hostWitnessCatalog: HostJournalWitnessCatalog;
+  deploymentJournalWitness: PureVirtualDeploymentWitnessV1;
+}>): PureVirtualPreparedV2 {
+  const source = processVirtualSourceBindingV1(input.sourceHead);
+  validateDigest(input.sourcePlanDigest, 'aether.process-virtual-source-plan/1');
+  if (source.planDigest !== input.sourcePlanDigest
+    || source.sourceIntent !== input.artifact.lineageBinding.sourceIntent
+    || source.sourceManifest !== executionManifestDigest(input.artifact.sourceEvidence.manifest))
+    throw new TypeError('witnessed source plan/lineage differs from signed Artifact/4');
+  const witness = selectHostJournalWitness(input.hostWitnessCatalog, input.sourceHostId);
+  const head = readHostJournalHead(witness);
+  if (witness.digest !== source.hostWitnessDigest || head.revision !== source.witnessRevision
+    || head.journal === null)
+    throw new TypeError('witnessed source authority/revision changed');
+  const remote = decodeCanonical(Buffer.from(head.journal, 'utf8'), LIMITS) as Record<string, unknown>;
+  const stateHeads = remote.heads as Array<{ digest: Digest }>;
+  if (remote.format !== 'aether.process-host/4'
+    || remote.configuration !== source.hostConfiguration
+    || domainDigest('aether.process-virtual-source-witness-journal/1', remote, LIMITS)
+      !== source.witnessJournalDigest
+    || runtimeSnapshotDigest(remote.snapshot as RuntimeSnapshotV1) !== source.snapshotDigest
+    || typeof remote.plan !== 'string'
+    || domainDigest('aether.process-virtual-source-plan/1', JSON.parse(remote.plan), LIMITS)
+      !== source.planDigest
+    || !Array.isArray(stateHeads) || stateHeads.at(-1)?.digest !== source.stateHeadDigest
+    || !Array.isArray(remote.calls)
+    || domainDigest('aether.process-virtual-source-operations/1', remote.calls, LIMITS)
+      !== source.operationHistoryDigest
+    || !same((remote.calls as Array<{ operationId: string }>).map(call => call.operationId),
+      source.operationIds))
+    throw new TypeError('witnessed source journal/head differs from approved source');
+  const artifactDigest = processVirtualArtifactDigestV4(input.artifact);
+  const candidatePlanDigest = assertPureVirtualPlanV1(input.plan, input.artifact);
+  const expected = processVirtualMigrationPlanV2(input.sourceHead, artifactDigest,
+    candidatePlanDigest);
+  if (!same(input.binding.migrationPlan, expected)
+    || input.binding.proposal.migrationPlanDigest !== migrationPlanDigest(expected))
+    throw new TypeError('approved witnessed source migration head changed');
+  const surrogate = legacyValidationBinding(input.binding, source.snapshotDigest,
+    artifactDigest, candidatePlanDigest);
+  const base = preparePureVirtualPromotionV1({ ...input,
+    binding: surrogate, sourceSnapshot: input.sourceHead.snapshot });
+  return validatePureVirtualPreparedV2({ ...base,
+    format: 'aether.process-virtual-deployment-prepared/2',
+    binding: input.binding, sourceHead: source });
 }
