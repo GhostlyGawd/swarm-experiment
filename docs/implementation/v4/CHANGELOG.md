@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Executable projection V10 and all-kind audit — 2026-09-23
+
+- Added `aether.executable-projection/10` for valid `old(…)` expressions around quantifier and Result binders. TS/Python/Rust source keeps outer values in the pre-state while local binders remain local. V9 source/runtime/dependency bytes matched the pre-V10 commit.
+- Added actual target-language and reference-runtime tests for nested old binders, plus a 45/45 AST-kind, 36-bundle exact-root round-trip audit and real execution of the five previously absent kinds. Unbound type variables fail explicitly.
+- T1-02 remains in progress. FR-1.2 itself requires ≥4× token compression; the comparable campaign still measures 0.483× cl100k / 0.489× o200k cold ratios. Representative kind coverage and the separate V9 token report do not satisfy that requirement, and no threshold changed.
+
 ## Executable projection V9 null-body support — 2026-09-23
 
 - Added `aether.executable-projection/9` for unsynthesized function declarations. TS/Python/Rust source and runtime explicitly trap on a call, while round-tripping `body: null`, exact contract and imported dependency identity. V8 source/runtime/dependency bytes matched the pre-V9 commit in all three targets.

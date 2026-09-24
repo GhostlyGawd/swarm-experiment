@@ -1,0 +1,59 @@
+[
+  {
+    "name": "local",
+    "target": "typescript",
+    "source": "148a22a773a04536af8a4d7af4ed8de03e21bfe9c5873d89b1eba25cf9c606ee",
+    "runtime": "262f8790aa479cad38063211baadaa6c9898bfe4368fd5c1f41800a5b86b856f",
+    "dependencies": []
+  },
+  {
+    "name": "local",
+    "target": "python",
+    "source": "53dc62b632fe34db4be263bbbd5fcd33a3789d5ecdd669bece068847b29b305e",
+    "runtime": "e8b22f88c49d1d91cc9136a26020f794fa88fec7b8c36a1abb3a16e6a6e2e199",
+    "dependencies": []
+  },
+  {
+    "name": "local",
+    "target": "rust",
+    "source": "87357bbf6400d77fc900e8cf8304f5f05a66974170bfd1e6d53a3ac5ea684e53",
+    "runtime": "3f3622a8848ccfc4d219a8ff98b3d2c5565aefd6711bd3108a4d5746ef947d2a",
+    "dependencies": []
+  },
+  {
+    "name": "linked",
+    "target": "typescript",
+    "source": "fdfc98fb4df20a2af5a8feb7fe3a3fac90ca16682d268c9e0000606f545fba2b",
+    "runtime": "262f8790aa479cad38063211baadaa6c9898bfe4368fd5c1f41800a5b86b856f",
+    "dependencies": [
+      [
+        "aether_9bf14c9c1f7def43dff26eb09b5e781f19a0185e4056cc7758109078cd68ad3d.ts",
+        "d77621c04724c388c75345f6b840e8f6429d8b37578d974ecface579b631143f"
+      ]
+    ]
+  },
+  {
+    "name": "linked",
+    "target": "python",
+    "source": "faef0ec4586b69e63009b01d0b7ea8bdeda33c236a211cf828f4c2f0238aa76a",
+    "runtime": "e8b22f88c49d1d91cc9136a26020f794fa88fec7b8c36a1abb3a16e6a6e2e199",
+    "dependencies": [
+      [
+        "aether_9bf14c9c1f7def43dff26eb09b5e781f19a0185e4056cc7758109078cd68ad3d.py",
+        "e9db4b178191766796aba174a95b1e2408a5c1bfbea509670585c1d03771cb59"
+      ]
+    ]
+  },
+  {
+    "name": "linked",
+    "target": "rust",
+    "source": "9aa3d66aa2934fb9600d6d4621c268522d75a9d48a5414fe10cdc9f224a1a6b7",
+    "runtime": "3f3622a8848ccfc4d219a8ff98b3d2c5565aefd6711bd3108a4d5746ef947d2a",
+    "dependencies": [
+      [
+        "aether_9bf14c9c1f7def43dff26eb09b5e781f19a0185e4056cc7758109078cd68ad3d.rs",
+        "ec48ad50d1f1496e3be0122c66a123656f0ecf6845adb902f359b1091b51a0c2"
+      ]
+    ]
+  }
+]

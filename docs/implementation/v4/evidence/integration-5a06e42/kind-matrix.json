@@ -1,0 +1,344 @@
+{
+  "format": "aether.projection-kind-matrix/1",
+  "sourceCommit": "5a06e42e15a2f69d3e6da825d35167d6229b194d",
+  "caseCount": 12,
+  "kindCount": 45,
+  "kinds": [
+    "Apply",
+    "Assert",
+    "Assign",
+    "Atomic",
+    "Await",
+    "Bin",
+    "Block",
+    "Call",
+    "Clause",
+    "Cond",
+    "Contract",
+    "ExprStmt",
+    "Field",
+    "FixedBin",
+    "ForAll",
+    "FunctionDecl",
+    "If",
+    "Import",
+    "IntCast",
+    "Invoke",
+    "Lambda",
+    "Let",
+    "Lit",
+    "MatchResult",
+    "Module",
+    "Old",
+    "Place",
+    "RecordLit",
+    "ResultRef",
+    "ResultValue",
+    "Return",
+    "SeqFold",
+    "SeqIndex",
+    "SeqLength",
+    "SeqLit",
+    "SeqMap",
+    "Spawn",
+    "StringOp",
+    "Surface",
+    "SymbolTable",
+    "TypeDecl",
+    "Un",
+    "Var",
+    "While",
+    "Yield"
+  ],
+  "missing": [],
+  "rows": [
+    {
+      "case": "scalar-math",
+      "target": "typescript",
+      "root": "ast:b3:0853be07294d280621ece1431932e001ed5c1cffbd911c7576a258971c22b337",
+      "sourceSha256": "7ae7fecf1361364f253e5f7e3fd9fa2b6b816c80f62e6cb40db655885e2f06a7",
+      "runtimeSha256": "924dc81b10149da3ac067ea31ce15eb69d426026564398538bea0c249218252c",
+      "dependencyCount": 0
+    },
+    {
+      "case": "scalar-math",
+      "target": "python",
+      "root": "ast:b3:0853be07294d280621ece1431932e001ed5c1cffbd911c7576a258971c22b337",
+      "sourceSha256": "de3aa396c9674c7826e5e653577b3f935037a139b525361d41588464b39254fd",
+      "runtimeSha256": "7fa20d7ab3f921a55ae9e8db128816eeab1588a97d85277dcc50a6564dee2b00",
+      "dependencyCount": 0
+    },
+    {
+      "case": "scalar-math",
+      "target": "rust",
+      "root": "ast:b3:0853be07294d280621ece1431932e001ed5c1cffbd911c7576a258971c22b337",
+      "sourceSha256": "f5b5da7d00a5602fc3f535eae8e4c67a0fef9f8e8cf1af043ae8e5aea7a28843",
+      "runtimeSha256": "42c0abe1a397adf5ae60c307868f29579fd854008991995dc8d2bd02ccda4212",
+      "dependencyCount": 0
+    },
+    {
+      "case": "loop-contract",
+      "target": "typescript",
+      "root": "ast:b3:feed0ad7a35a3a7cded01efe5855089e4968038a8cb0722100471598d0e75750",
+      "sourceSha256": "15c8021f3c5d8c5af9f3e3e7b49b1d2941217eaa76cd4aa1ead1773cd4aaa9a6",
+      "runtimeSha256": "924dc81b10149da3ac067ea31ce15eb69d426026564398538bea0c249218252c",
+      "dependencyCount": 0
+    },
+    {
+      "case": "loop-contract",
+      "target": "python",
+      "root": "ast:b3:feed0ad7a35a3a7cded01efe5855089e4968038a8cb0722100471598d0e75750",
+      "sourceSha256": "18cbd2313d2ce79aa7189529d63a2a3cf504cb3b018cbf3381c6e813047779a9",
+      "runtimeSha256": "7fa20d7ab3f921a55ae9e8db128816eeab1588a97d85277dcc50a6564dee2b00",
+      "dependencyCount": 0
+    },
+    {
+      "case": "loop-contract",
+      "target": "rust",
+      "root": "ast:b3:feed0ad7a35a3a7cded01efe5855089e4968038a8cb0722100471598d0e75750",
+      "sourceSha256": "46ec94e01e00d4d10081b5e9cca98a59572583c3f345266174c206319b534815",
+      "runtimeSha256": "42c0abe1a397adf5ae60c307868f29579fd854008991995dc8d2bd02ccda4212",
+      "dependencyCount": 0
+    },
+    {
+      "case": "external-effect",
+      "target": "typescript",
+      "root": "ast:b3:16da6e3e11ac5cd6e2803c772df48daec9aa4c083131af78692917b810f872ff",
+      "sourceSha256": "254fd15be68b99d93f4924b5a1f5dc6bfeb5b5f43583da50913797d66b122249",
+      "runtimeSha256": "924dc81b10149da3ac067ea31ce15eb69d426026564398538bea0c249218252c",
+      "dependencyCount": 0
+    },
+    {
+      "case": "external-effect",
+      "target": "python",
+      "root": "ast:b3:16da6e3e11ac5cd6e2803c772df48daec9aa4c083131af78692917b810f872ff",
+      "sourceSha256": "063883ac879f99c91982187ea00bd8070644204771162cb0cafa09ad5a2ee590",
+      "runtimeSha256": "7fa20d7ab3f921a55ae9e8db128816eeab1588a97d85277dcc50a6564dee2b00",
+      "dependencyCount": 0
+    },
+    {
+      "case": "external-effect",
+      "target": "rust",
+      "root": "ast:b3:16da6e3e11ac5cd6e2803c772df48daec9aa4c083131af78692917b810f872ff",
+      "sourceSha256": "ff3ed33d73aa324d16b761032bccfda32b9ec7d6599684d3f17918ced717e9ae",
+      "runtimeSha256": "42c0abe1a397adf5ae60c307868f29579fd854008991995dc8d2bd02ccda4212",
+      "dependencyCount": 0
+    },
+    {
+      "case": "fixed-lazy",
+      "target": "typescript",
+      "root": "ast:b3:f5e8e2427a0497e22d9b70679803276a34c9c78d017bce43b5d7ca874b5626e7",
+      "sourceSha256": "a681dc4bb24089a2db0f52e6d56a5258a22599941aedd610783f82e456df0eac",
+      "runtimeSha256": "924dc81b10149da3ac067ea31ce15eb69d426026564398538bea0c249218252c",
+      "dependencyCount": 0
+    },
+    {
+      "case": "fixed-lazy",
+      "target": "python",
+      "root": "ast:b3:f5e8e2427a0497e22d9b70679803276a34c9c78d017bce43b5d7ca874b5626e7",
+      "sourceSha256": "6f876bee2f54d2e407e68884bc6df94aaa9b4fb7b9b2f757a2a09c1789b17457",
+      "runtimeSha256": "7fa20d7ab3f921a55ae9e8db128816eeab1588a97d85277dcc50a6564dee2b00",
+      "dependencyCount": 0
+    },
+    {
+      "case": "fixed-lazy",
+      "target": "rust",
+      "root": "ast:b3:f5e8e2427a0497e22d9b70679803276a34c9c78d017bce43b5d7ca874b5626e7",
+      "sourceSha256": "3c594298daa09382e2554038fe8394cbc8cba0d2f914a8074002a3a37e2e25ec",
+      "runtimeSha256": "42c0abe1a397adf5ae60c307868f29579fd854008991995dc8d2bd02ccda4212",
+      "dependencyCount": 0
+    },
+    {
+      "case": "composite-alias-collections",
+      "target": "typescript",
+      "root": "ast:b3:0ebbbd5edbb4ad56f75f86626c6fdb455b27999dd84f30d90f9b42e1cf5ea282",
+      "sourceSha256": "1eda5e0400bc6c9438f9e667cf75ab14977b310b0424f7563bbba90d0665131d",
+      "runtimeSha256": "1704a8703e1221fe8253433eff89ed1c7acaf7aca5fff746235890dc7b94fb0d",
+      "dependencyCount": 0
+    },
+    {
+      "case": "composite-alias-collections",
+      "target": "python",
+      "root": "ast:b3:0ebbbd5edbb4ad56f75f86626c6fdb455b27999dd84f30d90f9b42e1cf5ea282",
+      "sourceSha256": "09ee15b14e234c1c52510a08eb6243f37de5a393689273abecf523d27ac49e84",
+      "runtimeSha256": "6ceff256c170c00c81046405df8e005105a5fcdfe9f3352059131bbfa0664c8e",
+      "dependencyCount": 0
+    },
+    {
+      "case": "composite-alias-collections",
+      "target": "rust",
+      "root": "ast:b3:0ebbbd5edbb4ad56f75f86626c6fdb455b27999dd84f30d90f9b42e1cf5ea282",
+      "sourceSha256": "57d4daf38f6c23c1374d1687fb894f147a29c7d85e36a6f3c691411b2cdffb8e",
+      "runtimeSha256": "881fdd4f91f160c0eeaada75065f97527107fa537aac40e5c42aac3f4b357d28",
+      "dependencyCount": 0
+    },
+    {
+      "case": "continuation-capture-task",
+      "target": "typescript",
+      "root": "ast:b3:529ea9d51e142d173d47c63f2f2d83d11c4b993c01699e68f5087bf6af3aecd3",
+      "sourceSha256": "23781e571a8d6af88c283bf08bbd203e374ef4ad1848574218a09ae3a6e02a8a",
+      "runtimeSha256": "29a2a28710432a88db2433f3df6e4e51a1f1be078c624198f83481d9c6f7bcd1",
+      "dependencyCount": 0
+    },
+    {
+      "case": "continuation-capture-task",
+      "target": "python",
+      "root": "ast:b3:529ea9d51e142d173d47c63f2f2d83d11c4b993c01699e68f5087bf6af3aecd3",
+      "sourceSha256": "df6de8cb726de148d208273ecf635846ee417d1708f3bf362a207228fad933be",
+      "runtimeSha256": "3c08ce88d0c576d4a3431411a691d1c719f19d780d562204fa534a7f2569a3e9",
+      "dependencyCount": 0
+    },
+    {
+      "case": "continuation-capture-task",
+      "target": "rust",
+      "root": "ast:b3:529ea9d51e142d173d47c63f2f2d83d11c4b993c01699e68f5087bf6af3aecd3",
+      "sourceSha256": "b2bb2927c9605b83976d1b75a6e1a627a19337d235a3523b11fa14ef81a6fedc",
+      "runtimeSha256": "ac083e1a049ef9f1fddf505ca4f3323443e8f8378dab118f857e8e6ed5bb0161",
+      "dependencyCount": 0
+    },
+    {
+      "case": "atomic-nested-return-fault",
+      "target": "typescript",
+      "root": "ast:b3:7880357881bb801f804b50e3f011e202197b9bf7809a1b99678ec5304fec721a",
+      "sourceSha256": "15242ee3aa7f0a24f14146af86dade7f1733469a81d36274de4868c0a46f647f",
+      "runtimeSha256": "6a6507f46806fa97e4353d08c1d0b08da46920966a65e19c6caa4341d1f40797",
+      "dependencyCount": 0
+    },
+    {
+      "case": "atomic-nested-return-fault",
+      "target": "python",
+      "root": "ast:b3:7880357881bb801f804b50e3f011e202197b9bf7809a1b99678ec5304fec721a",
+      "sourceSha256": "66d74d87a9300e09b292940ecb50ed5977a56ae6308eaeb26fbe5016e44a1d94",
+      "runtimeSha256": "787d5f5fb34e9c63368c0525d384ed61a1c957d8dac9e6f9e170751ba738ffad",
+      "dependencyCount": 0
+    },
+    {
+      "case": "atomic-nested-return-fault",
+      "target": "rust",
+      "root": "ast:b3:7880357881bb801f804b50e3f011e202197b9bf7809a1b99678ec5304fec721a",
+      "sourceSha256": "886ddc0640b5a481e1402e74cd26a9218c4fe3edc93be85adf3d66ccb3c11db0",
+      "runtimeSha256": "63eb3f266f04e22c5d5499135c8734d0348a0a69ee3c34eeb7a0577bc6cf6054",
+      "dependencyCount": 0
+    },
+    {
+      "case": "strings-linked-imports",
+      "target": "typescript",
+      "root": "ast:b3:baa0baae0491529161e589cd828ae0d7808bea895041838a7500a637172fd21f",
+      "sourceSha256": "d27db5fedc98e9cb3b9aaa961b6760dadddfe69f5c7fe78fc3e54b526d320493",
+      "runtimeSha256": "1c079e2d0dc8b83c840c832f2a249db3564296e3e1861b926abdf7815ae3ab1d",
+      "dependencyCount": 2
+    },
+    {
+      "case": "strings-linked-imports",
+      "target": "python",
+      "root": "ast:b3:baa0baae0491529161e589cd828ae0d7808bea895041838a7500a637172fd21f",
+      "sourceSha256": "5474eb691aefd331137f86ec698bbfb372aca17c41baa03b500d5f5accc8a83f",
+      "runtimeSha256": "988cc6041835bb7f311007104acd5e43b8c3dc8ee89b330206f2a4f04c96f914",
+      "dependencyCount": 2
+    },
+    {
+      "case": "strings-linked-imports",
+      "target": "rust",
+      "root": "ast:b3:baa0baae0491529161e589cd828ae0d7808bea895041838a7500a637172fd21f",
+      "sourceSha256": "49685666f685cb727231d297866e5d6ea9276d0961abf61543dd34f4f95f62b4",
+      "runtimeSha256": "0e132ec12fdbab5709dc000922f5a1ec0576e319d70c0c670bcbe8018653b96f",
+      "dependencyCount": 2
+    },
+    {
+      "case": "generics-nested-import",
+      "target": "typescript",
+      "root": "ast:b3:e9e49ad15ca18e7f7690df129dba49a27f30611eb0eef4e62c93c24315fdab95",
+      "sourceSha256": "7bf752c1b4d66d310f55ae60d8b1a38cca065b319385bf115bf42596c6155e20",
+      "runtimeSha256": "693f890cd9d2dc5cf98ae526e05e8afb785303e7478fb847fdba03c04f6dcd39",
+      "dependencyCount": 1
+    },
+    {
+      "case": "generics-nested-import",
+      "target": "python",
+      "root": "ast:b3:e9e49ad15ca18e7f7690df129dba49a27f30611eb0eef4e62c93c24315fdab95",
+      "sourceSha256": "184880dec4db1108a4f72215576dd026eabeea5b1e09579c7d93a9c715b76d84",
+      "runtimeSha256": "cdb83a46a41db4f0f6d2ccad0fd6e3a878ae3c6bb2fd1a7305842b2d4c6cc5db",
+      "dependencyCount": 1
+    },
+    {
+      "case": "generics-nested-import",
+      "target": "rust",
+      "root": "ast:b3:e9e49ad15ca18e7f7690df129dba49a27f30611eb0eef4e62c93c24315fdab95",
+      "sourceSha256": "0867e8b9031c8ecb2c6bb56fa7dd869713e7ec5952a2eff52cba5c01e9f9cb52",
+      "runtimeSha256": "6c3fdfda58265ef0981c7a1d6c635e5175d89081bf5268abf0ab2d405ad80029",
+      "dependencyCount": 1
+    },
+    {
+      "case": "generic-captured-continuations",
+      "target": "typescript",
+      "root": "ast:b3:4def1cd71ddea5aec5dd0fd8fd9ae8e786f06d6c2c5887844af50bac8981e74f",
+      "sourceSha256": "cc392b47ed519034e7ef1aad81c0eb371a6aaf356e44e1f0937f9ca0be55ed6c",
+      "runtimeSha256": "693f890cd9d2dc5cf98ae526e05e8afb785303e7478fb847fdba03c04f6dcd39",
+      "dependencyCount": 0
+    },
+    {
+      "case": "generic-captured-continuations",
+      "target": "python",
+      "root": "ast:b3:4def1cd71ddea5aec5dd0fd8fd9ae8e786f06d6c2c5887844af50bac8981e74f",
+      "sourceSha256": "1a5739b030146cd52865c56889498242609246b6c576e83608b102112779da3f",
+      "runtimeSha256": "cdb83a46a41db4f0f6d2ccad0fd6e3a878ae3c6bb2fd1a7305842b2d4c6cc5db",
+      "dependencyCount": 0
+    },
+    {
+      "case": "generic-captured-continuations",
+      "target": "rust",
+      "root": "ast:b3:4def1cd71ddea5aec5dd0fd8fd9ae8e786f06d6c2c5887844af50bac8981e74f",
+      "sourceSha256": "a72435dfa1af3c83e7832ff518acbdaee23ec21bb7ab418ce5f31a6406c21be6",
+      "runtimeSha256": "6c3fdfda58265ef0981c7a1d6c635e5175d89081bf5268abf0ab2d405ad80029",
+      "dependencyCount": 0
+    },
+    {
+      "case": "nested-exact-address-import",
+      "target": "typescript",
+      "root": "ast:b3:4dd7f06bc5f430c47558ec57148ce0c0284e34047fa6fbc832c7c0affe82ad87",
+      "sourceSha256": "52283dc827d3fa6450a3099c5a92df9f4969f8b8c67079b8eb9ef5214b4ad476",
+      "runtimeSha256": "693f890cd9d2dc5cf98ae526e05e8afb785303e7478fb847fdba03c04f6dcd39",
+      "dependencyCount": 1
+    },
+    {
+      "case": "nested-exact-address-import",
+      "target": "python",
+      "root": "ast:b3:4dd7f06bc5f430c47558ec57148ce0c0284e34047fa6fbc832c7c0affe82ad87",
+      "sourceSha256": "e67cea4da751487b74a1fb50fd932b2d56f1229be22a9bba7833cad06ecb8b6b",
+      "runtimeSha256": "cdb83a46a41db4f0f6d2ccad0fd6e3a878ae3c6bb2fd1a7305842b2d4c6cc5db",
+      "dependencyCount": 1
+    },
+    {
+      "case": "nested-exact-address-import",
+      "target": "rust",
+      "root": "ast:b3:4dd7f06bc5f430c47558ec57148ce0c0284e34047fa6fbc832c7c0affe82ad87",
+      "sourceSha256": "770f5170894c9fa57557b5fbbf9c9100a7193172bf4ca003c1126f897d0179d9",
+      "runtimeSha256": "6c3fdfda58265ef0981c7a1d6c635e5175d89081bf5268abf0ab2d405ad80029",
+      "dependencyCount": 1
+    },
+    {
+      "case": "scalar-five-kind-completion",
+      "target": "typescript",
+      "root": "ast:b3:405422003ae8cd3f63ee57e56a5a7f77768fdf030deb69d34a3bbf1aa0f1d2af",
+      "sourceSha256": "312945fefbe0df4ff6fc37a365b009d587dcc8529af63c8490fa04bd10d61318",
+      "runtimeSha256": "924dc81b10149da3ac067ea31ce15eb69d426026564398538bea0c249218252c",
+      "dependencyCount": 0
+    },
+    {
+      "case": "scalar-five-kind-completion",
+      "target": "python",
+      "root": "ast:b3:405422003ae8cd3f63ee57e56a5a7f77768fdf030deb69d34a3bbf1aa0f1d2af",
+      "sourceSha256": "062b2c91a3dbc71cc582f6b50489b92d24da7ca5b8062fc1f538335e57253d38",
+      "runtimeSha256": "7fa20d7ab3f921a55ae9e8db128816eeab1588a97d85277dcc50a6564dee2b00",
+      "dependencyCount": 0
+    },
+    {
+      "case": "scalar-five-kind-completion",
+      "target": "rust",
+      "root": "ast:b3:405422003ae8cd3f63ee57e56a5a7f77768fdf030deb69d34a3bbf1aa0f1d2af",
+      "sourceSha256": "3cfceb49691729eeeda29ea178125daf9861d773fa30adf25a56a1c264fbae12",
+      "runtimeSha256": "42c0abe1a397adf5ae60c307868f29579fd854008991995dc8d2bd02ccda4212",
+      "dependencyCount": 0
+    }
+  ]
+}
