@@ -15,8 +15,10 @@ import { decodeCanonical, exactObject, identifier, type TaggedValueV1 } from '..
 import { executionManifestDigest, validateExecutionManifest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import type { RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
 import { ProcessAuthenticator, processBoundaryId, validateProcessScope, fromWireSnapshot, toWireSnapshot, decodeProcessValue, encodeProcessValue, type ProcessScope, type ProcessSession } from './process-values.ts';
-import { decodeProcessExecution, encodeProcessExecution } from './process-channel.ts';
+import { decodeProcessExecution, encodeProcessExecution } from './process-execution-wire.ts';
 import { validateProcessVirtualArtifactV3, type ProcessVirtualArtifactV3 } from './process-virtual-artifact.ts';
+import { type ProcessVirtualArtifactV4 } from './process-virtual-artifact-v4-core.ts';
+import { validatePackagedProcessVirtualArtifactV4 } from './process-virtual-worker-v4.ts';
 import { assertProcessVirtualWorkerBundleV1, openProcessVirtualWorkerLineageV1 } from './process-virtual-worker-contract.ts';
 
 const pause = new Int32Array(new SharedArrayBuffer(4));
@@ -77,7 +79,8 @@ function main(): void {
     }
   };
   let runtime: ProductionRuntime | null = null;
-  let virtualAdmission: { artifact: ProcessVirtualArtifactV3; lineage: CausalLineageLedger } | null = null;
+  let virtualAdmission: { version: 3; artifact: ProcessVirtualArtifactV3; lineage: CausalLineageLedger }
+    | { version: 4; artifact: ProcessVirtualArtifactV4; lineage: CausalLineageLedger } | null = null;
   let virtualGuardCount = 0;
   let scope: ProcessScope | null = null;
   let previous: RuntimeSnapshotV1 | undefined;
@@ -194,14 +197,19 @@ function main(): void {
     if (runtime) throw new Error('worker is already initialized');
     const init = exactObject(payload, ['format', 'artifact', 'trust', 'unit', 'heapId',
       'ownershipEpoch', 'snapshot', 'maxGuardChecks']);
-    if (init.format !== 'aether.process-worker-init/2')
+    if (init.format !== 'aether.process-worker-init/2'
+      && init.format !== 'aether.process-worker-init/3')
       throw new TypeError('unsupported process worker init version');
     if (init.maxGuardChecks !== null && (!Number.isSafeInteger(init.maxGuardChecks)
       || (init.maxGuardChecks as number) < 0 || (init.maxGuardChecks as number) > 1_000_000))
       throw new RangeError('invalid virtual worker guard budget');
     const lineage = openProcessVirtualWorkerLineageV1(init.trust);
-    const artifact = validateProcessVirtualArtifactV3(init.artifact, lineage);
-    assertProcessVirtualWorkerBundleV1(artifact, process.argv[1]!);
+    const version = init.format === 'aether.process-worker-init/3' ? 4 : 3;
+    const artifact = version === 4
+      ? validatePackagedProcessVirtualArtifactV4(init.artifact, lineage, process.argv[1]!)
+      : validateProcessVirtualArtifactV3(init.artifact, lineage);
+    if (version === 3)
+      assertProcessVirtualWorkerBundleV1(artifact as ProcessVirtualArtifactV3, process.argv[1]!);
     const manifest = artifact.candidateEvidence.manifest;
     if (executionManifestDigest(manifest) !== session.executionManifest
       || init.ownershipEpoch !== session.ownershipEpoch)
@@ -227,7 +235,9 @@ function main(): void {
       },
       virtualForward: { source, descriptor: artifact.descriptor } });
     scope = nextScope; runtime = nextRuntime;
-    virtualAdmission = { artifact, lineage };
+    virtualAdmission = version === 4
+      ? { version: 4, artifact: artifact as ProcessVirtualArtifactV4, lineage }
+      : { version: 3, artifact: artifact as ProcessVirtualArtifactV3, lineage };
     try {
       if (init.snapshot !== null) restore(init.snapshot as RuntimeSnapshotV1);
     } catch (error) {
@@ -256,8 +266,13 @@ function main(): void {
           send({ kind: 'response', id: message.id, ok: true, value: null }); process.exit(0);
         } else if (message.method === 'call') {
           if (virtualAdmission) {
-            validateProcessVirtualArtifactV3(virtualAdmission.artifact, virtualAdmission.lineage);
-            assertProcessVirtualWorkerBundleV1(virtualAdmission.artifact, process.argv[1]!);
+            if (virtualAdmission.version === 3) {
+              validateProcessVirtualArtifactV3(virtualAdmission.artifact, virtualAdmission.lineage);
+              assertProcessVirtualWorkerBundleV1(virtualAdmission.artifact, process.argv[1]!);
+            } else {
+              validatePackagedProcessVirtualArtifactV4(virtualAdmission.artifact,
+                virtualAdmission.lineage, process.argv[1]!);
+            }
           }
           const call = exactObject(message.payload, ['symbol', 'args', 'snapshot', 'operationId']);
           identifier(call.symbol); identifier(call.operationId);

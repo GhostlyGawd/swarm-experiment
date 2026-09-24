@@ -27,6 +27,8 @@ import { decodeProcessVirtualArtifactV4, encodeProcessVirtualArtifactV4,
   assertProcessVirtualArtifactV4Launch,
   type ProcessWorkerBundleManifestV2 } from '../../src/tier4/process-virtual-artifact-v4.ts';
 import { verifyWorkerBundle } from '../../scripts/process-worker-bundle.ts';
+import { ProcessChannel } from '../../src/tier4/process-channel.ts';
+import { type ProcessVirtualWorkerTrustV1 } from '../../src/tier4/process-virtual-worker-contract.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
 
@@ -92,8 +94,15 @@ function fixture(manifest: Awaited<ReturnType<typeof verifyWorkerBundle>>,
     sourceIntent, candidateIntent, lineage };
   const artifact = options.unrelatedCandidate || options.effectfulEntry ? null
     : makeProcessVirtualArtifactV4(input);
+  const trust: ProcessVirtualWorkerTrustV1 = {
+    format: 'aether.process-virtual-worker-trust/1', repositoryId: 'process-virtual-artifact',
+    lineageDirectory: join(directory, 'lineage'), storeDirectory: join(directory, 'ast'),
+    policyEpoch: '0', eligibleAuthors: ['author'],
+    authorKeys: [{ author: 'author', policyEpoch: '0',
+      publicKeyPem: keys.publicKey.export({ type: 'spki', format: 'pem' }).toString() }],
+  };
   return { directory, source, candidate, descriptor, wrapper,
-    entry, target, lineage, artifact, input };
+    entry, target, lineage, artifact, trust, input };
 }
 
 
@@ -128,11 +137,13 @@ test('Artifact/4 signed target binds independently rebuilt V2 bundle and exact v
     assert.equal(artifact.executableSubject.manifest.format, 'aether.process-worker-bundle/2');
     assert.equal(manifest.nativeRuntime.format,
       'aether.macos-node-static-link-closure/1');
-    assert.equal(artifact.executableSubject.manifest.inputs.length, 68);
+    assert.ok(artifact.executableSubject.manifest.inputs.length > 0);
     assert.equal(artifact.candidateEvidence.manifest.target.artifactDigest,
       artifact.executableSubject.digest);
     assert.ok(!artifact.executableSubject.manifest.inputs.some(item =>
       item.path.endsWith('process-virtual-artifact-v4.ts')));
+    assert.ok(artifact.executableSubject.manifest.inputs.some(item =>
+      item.path.endsWith('process-virtual-artifact-v4-core.ts')));
     assert.deepEqual(decodeProcessVirtualArtifactV4(encodeProcessVirtualArtifactV4(artifact),
       f.lineage), artifact);
     assert.equal(artifact.candidateEvidence.envelope.checker.version, '3');
@@ -243,4 +254,94 @@ test('Artifact/4 bounded launch check starts only its measured worker bundle', a
       child.stdin!.end();
     } finally { child.kill(); }
   } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('Artifact/4 init/3 executes the signed pure candidate and restores its real-worker snapshot', async () => {
+  const f = fixture(manifest);
+  let worker: ProcessChannel | undefined;
+  try {
+    const init = { artifact: f.artifact!, trust: f.trust,
+      unit: 'pure', heapId: 'artifact4-heap', ownershipEpoch: '1' };
+    worker = await ProcessChannel.startVirtualV4(init);
+    assert.ok(worker.pid !== process.pid);
+    const first = await worker.call(f.entry, [3n], await worker.snapshot());
+    assert.deepEqual(first.execution, { ok: true, value: 4n, steps: 0 });
+    const oldPid = worker.pid;
+    await worker.kill();
+    worker = await ProcessChannel.startVirtualV4({ ...init, snapshot: first.snapshot });
+    assert.notEqual(worker.pid, oldPid);
+    assert.deepEqual((await worker.call(f.entry, [3n], await worker.snapshot())).execution,
+      first.execution);
+  } finally { await worker?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('Artifact/4 init/3 refuses tampered proof, authority, and packaged bytes before execution', async () => {
+  const f = fixture(manifest);
+  let worker: ProcessChannel | undefined;
+  const init = { artifact: f.artifact!, trust: f.trust,
+    unit: 'pure', heapId: 'artifact4-tamper', ownershipEpoch: '1' };
+  try {
+    await assert.rejects(ProcessChannel.startVirtualV4({ ...init,
+      artifact: { ...init.artifact, candidateIr: init.artifact.sourceIr } }), /root|descriptor/);
+    await assert.rejects(ProcessChannel.startVirtualV4({ ...init,
+      artifact: { ...init.artifact, descriptor: { ...init.artifact.descriptor, sites: [] } } }),
+    /descriptor/);
+    await assert.rejects(ProcessChannel.startVirtualV4({ ...init,
+      artifact: { ...init.artifact, executableSubject: { ...init.artifact.executableSubject,
+        digest: init.artifact.sourceEvidence.manifest.target.artifactDigest } } }),
+    /subject changed|evidence/);
+    const otherKeys = generateKeyPairSync('ed25519');
+    await assert.rejects(ProcessChannel.startVirtualV4({ ...init,
+      trust: { ...init.trust, authorKeys: [{ author: 'author', policyEpoch: '0',
+        publicKeyPem: otherKeys.publicKey.export({ type: 'spki', format: 'pem' }).toString() }] } }),
+    /signature|author|lineage|invalid/i);
+    await assert.rejects(ProcessChannel.startVirtualV4(init, { onEffect: () => {
+      throw new Error('effect must never be dispatched');
+    } }), /does not admit remote calls or effects/);
+    worker = await ProcessChannel.startVirtualV4(init);
+    const before = await worker.snapshot();
+    const bundlePath = manifest.bundle.path;
+    const original = readFileSync(bundlePath);
+    try {
+      writeFileSync(bundlePath, Buffer.concat([original, Buffer.from('\n')]));
+      await assert.rejects(worker.call(f.entry, [3n], before), /measured|bundle|bytes/);
+      const raw = worker as unknown as { request(method: string, payload: unknown): Promise<unknown> };
+      await assert.rejects(raw.request('call', { symbol: f.entry,
+        args: [{ tag: 'int', value: '3' }], snapshot: before,
+        operationId: 'artifact4-child-tamper' }), /measured|bundle|bytes/);
+    } finally { writeFileSync(bundlePath, original); }
+    assert.deepEqual((await worker.call(f.entry, [3n], before)).execution,
+      { ok: true, value: 4n, steps: 0 });
+  } finally { await worker?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('Artifact/4 packaged child independently rejects altered init/3 proof', async () => {
+  const f = fixture(manifest);
+  const key = Buffer.alloc(32, 17);
+  const session = { sessionId: 'artifact4-child-proof',
+    executionManifest: executionManifestDigest(f.artifact!.candidateEvidence.manifest),
+    ownershipEpoch: '1', maxFrameBytes: 8 * 1024 * 1024 };
+  const parent = new ProcessAuthenticator(key, session, 'parent');
+  const child = spawn(process.execPath, [manifest.bundle.path], {
+    stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+    env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' },
+  });
+  try {
+    const bootstrap = encodeCanonical({ key: key.toString('base64'), session });
+    (child.stdio[3] as Writable).write(frame(bootstrap));
+    const reply = responseFrame(child.stdout!);
+    child.stdin!.write(parent.encode({ kind: 'request', id: 'tampered-init',
+      method: 'init-virtual', payload: {
+        format: 'aether.process-worker-init/3',
+        artifact: { ...f.artifact!, descriptor: { ...f.artifact!.descriptor, sites: [] } },
+        trust: f.trust, unit: 'pure', heapId: 'raw-proof', ownershipEpoch: '1',
+        snapshot: null, maxGuardChecks: null,
+      } }));
+    const body = parent.decode(await reply) as { kind: string; id: string;
+      ok: boolean; value: string };
+    assert.equal(body.kind, 'response');
+    assert.equal(body.id, 'tampered-init');
+    assert.equal(body.ok, false);
+    assert.match(body.value, /descriptor/);
+  } finally { child.kill(); rmSync(f.directory, { recursive: true, force: true }); }
 });

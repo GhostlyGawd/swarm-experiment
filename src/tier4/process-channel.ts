@@ -15,7 +15,11 @@ import { decodeCanonical, encodeCanonical, exactObject, identifier, type TaggedV
 import { executionManifestDigest, validateExecutionManifest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import type { RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
 import { ProcessAuthenticator, fromWireSnapshot, encodeProcessValue, decodeProcessValue, type ProcessScope } from './process-values.ts';
+import { encodeProcessExecution, decodeProcessExecution } from './process-execution-wire.ts';
+export { encodeProcessExecution, decodeProcessExecution } from './process-execution-wire.ts';
 import { validateProcessVirtualArtifactV3, type ProcessVirtualArtifactV3 } from './process-virtual-artifact.ts';
+import { assertProcessVirtualArtifactV4Launch, validateProcessVirtualArtifactV4,
+  type ProcessVirtualArtifactV4 } from './process-virtual-artifact-v4.ts';
 import { assertProcessVirtualWorkerBundleV1, openProcessVirtualWorkerLineageV1,
   type ProcessVirtualWorkerTrustV1 } from './process-virtual-worker-contract.ts';
 
@@ -40,6 +44,17 @@ export interface ProcessVirtualChannelInitV2 {
   readonly ownershipEpoch: string;
   readonly snapshot?: RuntimeSnapshotV1;
   /** Optional host-owned restrictive guard budget for one-worker execution. */
+  readonly maxGuardChecks?: number;
+}
+/** One-unit pure Artifact/4 worker profile. Live deployment and effect
+ * callbacks require their own separately versioned admission. */
+export interface ProcessVirtualChannelInitV3 {
+  readonly artifact: ProcessVirtualArtifactV4;
+  readonly trust: ProcessVirtualWorkerTrustV1;
+  readonly unit: string;
+  readonly heapId: string;
+  readonly ownershipEpoch: string;
+  readonly snapshot?: RuntimeSnapshotV1;
   readonly maxGuardChecks?: number;
 }
 export interface ProcessCallResult {
@@ -93,24 +108,6 @@ export interface ProcessInitWire {
   readonly ownershipEpoch: string;
   readonly snapshot: RuntimeSnapshotV1 | null;
 }
-type WireExecution = { ok: true; value: TaggedValueV1; steps: number } | Extract<ExecutionResult, { ok: false }>;
-export function encodeProcessExecution(execution: ExecutionResult, scope: ProcessScope, snapshot: RuntimeSnapshotV1): WireExecution {
-  return execution.ok ? { ok: true, value: encodeProcessValue(execution.value, scope, snapshot), steps: execution.steps } : execution;
-}
-export function decodeProcessExecution(value: unknown, scope: ProcessScope, snapshot: RuntimeSnapshotV1): ExecutionResult {
-  if (!value || typeof value !== 'object' || !('ok' in value)) throw new TypeError('invalid process execution result');
-  const execution = exactObject(value, value.ok === true ? ['ok', 'value', 'steps'] : ['ok', 'fault', 'steps']);
-  if (!Number.isSafeInteger(execution.steps) || (execution.steps as number) < 0) throw new TypeError('invalid execution steps');
-  if (execution.ok === true) return { ok: true, value: decodeProcessValue(execution.value as TaggedValueV1, scope, snapshot), steps: execution.steps as number };
-  if (execution.ok !== false || !execution.fault || typeof execution.fault !== 'object') throw new TypeError('invalid process execution fault');
-  const fields = ['kind', 'message', 'label', 'step', 'bindings', ...('recoveryId' in execution.fault ? ['recoveryId'] : [])];
-  const fault = exactObject(execution.fault, fields);
-  if (!['precondition', 'postcondition', 'assertion', 'capability_denied', 'capability_revoked', 'division_by_zero', 'step_budget', 'unbound', 'type_error', 'effect_failed', 'effect_indeterminate'].includes(fault.kind as string)
-    || typeof fault.message !== 'string' || (fault.label !== null && typeof fault.label !== 'string') || !Number.isSafeInteger(fault.step) || (fault.step as number) < 0
-    || (fault.recoveryId !== undefined && typeof fault.recoveryId !== 'string')) throw new TypeError('invalid process fault fields');
-  if (!fault.bindings || typeof fault.bindings !== 'object' || Array.isArray(fault.bindings) || Object.values(fault.bindings).some(item => typeof item !== 'string')) throw new TypeError('invalid fault bindings');
-  return value as ExecutionResult;
-}
 
 /**
  * Async parent transport; each worker executes synchronous runtime code in its own OS process.
@@ -130,7 +127,8 @@ export class ProcessChannel {
   private exited = false;
   private readonly exitPromise: Promise<void>;
   private readonly callbacks = new Set<string>();
-  private virtualAdmission: { artifact: ProcessVirtualArtifactV3; lineage: CausalLineageLedger } | null = null;
+  private virtualAdmission: { version: 3; artifact: ProcessVirtualArtifactV3; lineage: CausalLineageLedger }
+    | { version: 4; artifact: ProcessVirtualArtifactV4; lineage: CausalLineageLedger } | null = null;
   private readonly workerPath: string;
   readonly pid: number;
   get isClosed(): boolean { return this.closed || this.exited || this.child.exitCode !== null || this.child.signalCode !== null; }
@@ -209,7 +207,7 @@ export class ProcessChannel {
       unit: safe.unit, includeSymbols, capabilities: [], heapId: safe.heapId,
       ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, options,
     artifact.executableSubject.bundle.path);
-    channel.virtualAdmission = { artifact, lineage };
+    channel.virtualAdmission = { version: 3, artifact, lineage };
     try {
       assertProcessVirtualWorkerBundleV1(artifact, channel.workerPath);
       if (safe.snapshot) fromWireSnapshot(safe.snapshot, channel.scope);
@@ -223,10 +221,57 @@ export class ProcessChannel {
       return channel;
     } catch (error) { await channel.kill(); throw error; }
   }
+  static async startVirtualV4(init: ProcessVirtualChannelInitV3,
+    options: ProcessChannelOptions = {}): Promise<ProcessChannel> {
+    if (options.onCall || options.onEffect)
+      throw new TypeError('pure Artifact/4 worker does not admit remote calls or effects');
+    const limits = { maxFrameBytes: 16 * 1024 * 1024,
+      maxDecompressedBytes: 16 * 1024 * 1024, maxObjects: 500_000, maxDepth: 128 };
+    const safe = decodeCanonical(encodeCanonical(init, limits), limits) as unknown as ProcessVirtualChannelInitV3;
+    const fields = ['artifact', 'trust', 'unit', 'heapId', 'ownershipEpoch'];
+    if (Object.hasOwn(safe, 'snapshot')) fields.push('snapshot');
+    if (Object.hasOwn(safe, 'maxGuardChecks')) fields.push('maxGuardChecks');
+    exactObject(safe, fields);
+    if (safe.maxGuardChecks !== undefined && (!Number.isSafeInteger(safe.maxGuardChecks)
+      || safe.maxGuardChecks < 0 || safe.maxGuardChecks > 1_000_000))
+      throw new RangeError('invalid Artifact/4 worker guard budget');
+    const trust = safe.trust as ProcessVirtualWorkerTrustV1;
+    const lineage = openProcessVirtualWorkerLineageV1(trust);
+    const artifact = validateProcessVirtualArtifactV4(safe.artifact, lineage);
+    const path = artifact.executableSubject.manifest.bundle.path;
+    assertProcessVirtualArtifactV4Launch(artifact, lineage, path);
+    const module = decodeIR(artifact.candidateIr);
+    if (module.kind !== 'Module') throw new TypeError('Artifact/4 candidate is not a module');
+    const includeSymbols = module.members.filter(member => member.kind === 'FunctionDecl')
+      .map(member => member.symbol);
+    if (!includeSymbols.includes(artifact.descriptor.target))
+      throw new TypeError('Artifact/4 target must be compiled locally');
+    const channel = new ProcessChannel({ module, manifest: artifact.candidateEvidence.manifest,
+      unit: safe.unit, includeSymbols, capabilities: [], heapId: safe.heapId,
+      ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, options, path);
+    channel.virtualAdmission = { version: 4, artifact, lineage };
+    try {
+      assertProcessVirtualArtifactV4Launch(artifact, lineage, channel.workerPath);
+      if (safe.snapshot) fromWireSnapshot(safe.snapshot, channel.scope);
+      const ready = await channel.request('init-virtual', {
+        format: 'aether.process-worker-init/3', artifact, trust,
+        unit: safe.unit, heapId: safe.heapId, ownershipEpoch: safe.ownershipEpoch,
+        snapshot: safe.snapshot ?? null, maxGuardChecks: safe.maxGuardChecks ?? null,
+      });
+      const message = exactObject(ready, ['pid']);
+      if (message.pid !== channel.pid) throw new TypeError('worker PID handshake mismatch');
+      return channel;
+    } catch (error) { await channel.kill(); throw error; }
+  }
   async call(symbol: SymbolId, args: readonly Value[], snapshot: RuntimeSnapshotV1, options: { operationId?: string; timeoutMs?: number } = {}): Promise<ProcessCallResult> {
     if (this.virtualAdmission) {
-      validateProcessVirtualArtifactV3(this.virtualAdmission.artifact, this.virtualAdmission.lineage);
-      assertProcessVirtualWorkerBundleV1(this.virtualAdmission.artifact, this.workerPath);
+      if (this.virtualAdmission.version === 3) {
+        validateProcessVirtualArtifactV3(this.virtualAdmission.artifact, this.virtualAdmission.lineage);
+        assertProcessVirtualWorkerBundleV1(this.virtualAdmission.artifact, this.workerPath);
+      } else {
+        assertProcessVirtualArtifactV4Launch(this.virtualAdmission.artifact,
+          this.virtualAdmission.lineage, this.workerPath);
+      }
     }
     fromWireSnapshot(snapshot, this.scope);
     const operationId = options.operationId ?? `${this.authenticator.session.sessionId}/call-${this.requestSequence + 1}`;
