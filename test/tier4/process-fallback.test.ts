@@ -68,6 +68,25 @@ test('both tiers fault before effects and yield deterministic Tier 3 abort', asy
   } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
 });
 
+test('a host write at the terminal decision boundary prevents a false safe-state abort', async () => {
+  const directory = temp(); let host: ProcessHost | undefined, interloper: Promise<unknown> | undefined;
+  const record = { t: 'Record' as const, name: typeName('type:test:terminal_abort_race'),
+    fields: [['value', b.Int] as const] };
+  const f = processFallbackFixture(directory, 'both-fault', phase => {
+    if (phase === 'before-final') interloper = host!.allocateRecord(record,
+      { value: { tag: 'int', value: '9' } }, { operationId: 'terminal-interloper' });
+  });
+  try {
+    const opened = await f.open(); host = opened.host;
+    const result = await opened.supervisor.call(arg, { operationId: 'terminal-race' });
+    await interloper;
+    assert.deepEqual(plain(result), { state: 'blocked', tier: 2, operationId: 'terminal-race',
+      code: 'state_changed', productionAuthorized: false });
+    assert.equal((await host.snapshot()).records.length, 1);
+    assert.equal(f.calls(), 0);
+  } finally { await host?.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('host expected heap CAS refuses a stale fallback base', async () => {
   const directory = temp(); let host: ProcessHost | undefined;
   const f = processFallbackFixture(directory, 'pre-effect-fault');

@@ -46,9 +46,10 @@ export type ProcessFallbackResult =
   | { readonly state: 'completed'; readonly tier: 1 | 2; readonly operationId: string; readonly value: TaggedValueV1; readonly productionAuthorized: false }
   | { readonly state: 'aborted'; readonly tier: 3; readonly operationId: string; readonly code: 'fallback_exhausted' | 'authority_denied'; readonly productionAuthorized: false }
   | { readonly state: 'blocked'; readonly tier: 1 | 2; readonly operationId: string; readonly code: 'effect_reconciliation_required' | 'state_changed' | 'recovery_required' | 'host_unavailable' | 'authority_denied_after_commit'; readonly productionAuthorized: false };
+type TerminalFallbackResult = Exclude<ProcessFallbackResult, { state: 'blocked' }>;
 interface Call {
   operationId: string; requestDigest: Digest; args: TaggedValueV1[];
-  beforeSnapshot: Digest; generation: string; result: ProcessFallbackResult | null;
+  beforeSnapshot: Digest; generation: string; result: TerminalFallbackResult | null;
 }
 interface Journal {
   format: 'aether.process-fallback-journal/1' | 'aether.process-fallback-journal/2'; profile: Digest;
@@ -169,13 +170,25 @@ export class ProcessFallbackSupervisor {
     const tokens = freeze(copy([...this.options.tokensFor(tier, this.symbols[tier - 1]) ]));
     this.options.host.authorizeInvocation(this.symbols[tier - 1], tokens); return tokens;
   }
-  private cached(call: Call): ProcessFallbackResult {
-    const result = call.result!;
+  private conflictingHostOutcome(call: Call,
+    result: TerminalFallbackResult): ProcessFallbackResult | null {
     for (const tier of [1, 2] as const) {
       const id = this.hostOperationId(call.operationId, tier), disposition = this.options.host.operationEffectDisposition(id);
       if (disposition?.possibleExternalCommit && (result.state !== 'completed' || result.tier !== tier))
         return this.blocked(call, tier, 'effect_reconciliation_required');
+      const hostResult = this.options.host.operationResult(id);
+      if (hostResult?.state === 'indeterminate')
+        return this.blocked(call, tier, 'recovery_required');
+      if (hostResult?.state === 'completed' && hostResult.execution.ok
+        && (result.state !== 'completed' || result.tier !== tier))
+        return this.blocked(call, tier, 'state_changed');
     }
+    return null;
+  }
+  private cached(call: Call): ProcessFallbackResult {
+    const result = call.result!;
+    const conflict = this.conflictingHostOutcome(call, result);
+    if (conflict) return conflict;
     // The root invocation authority is required even for an old Tier 2
     // receipt or a terminal abort; a cached result is not a grant.
     this.tokens(1);
@@ -196,8 +209,32 @@ export class ProcessFallbackSupervisor {
   private blocked(call: Call, tier: 1 | 2, code: Extract<ProcessFallbackResult, { state: 'blocked' }>['code']): ProcessFallbackResult {
     return { state: 'blocked', tier, operationId: call.operationId, code, productionAuthorized: false };
   }
-  private finish(journal: Journal, call: Call, result: Exclude<ProcessFallbackResult, { state: 'blocked' }>): ProcessFallbackResult {
-    this.options.fault?.('before-final'); call.result = result; this.write(journal); this.options.fault?.('final'); return freeze(copy(result));
+  private async finish(journal: Journal, call: Call, result: TerminalFallbackResult, sourceTier: 1 | 2): Promise<ProcessFallbackResult> {
+    this.options.fault?.('before-final');
+    const conflict = this.conflictingHostOutcome(call, result);
+    if (conflict) return freeze(conflict);
+    if (result.state === 'completed') {
+      const hostResult = this.options.host.operationResult(this.hostOperationId(call.operationId, result.tier));
+      if (!hostResult || hostResult.state !== 'completed' || !hostResult.execution.ok
+        || !same(hostResult.execution.value, result.value))
+        return freeze(this.blocked(call, result.tier, 'host_unavailable'));
+      // The host checks authority when publishing its own result. The
+      // supervisor must also check before publishing or delivering its cached
+      // receipt: authority may change after the host returned.
+      try {
+        this.tokens(1);
+        if (result.tier === 2) this.tokens(2);
+      } catch {
+        return freeze(this.blocked(call, result.tier, 'authority_denied_after_commit'));
+      }
+    } else if (this.options.host.generation !== call.generation
+      || runtimeSnapshotDigest(await this.options.host.snapshot()) !== call.beforeSnapshot) {
+      // A terminal trap may only describe the retained pre-invocation state.
+      // Another host writer between the last tier and this journal decision
+      // must leave the fallback unresolved instead of publishing a false abort.
+      return freeze(this.blocked(call, sourceTier, 'state_changed'));
+    }
+    call.result = result; this.write(journal); this.options.fault?.('final'); return freeze(copy(result));
   }
   private async stage(call: Call, tier: 1 | 2): Promise<{ result: ProcessHostCallResult; disposition: ProcessOperationEffectDisposition } | ProcessFallbackResult> {
     const host = this.options.host, id = this.hostOperationId(call.operationId, tier), symbol = this.symbols[tier - 1];
@@ -271,12 +308,12 @@ export class ProcessFallbackSupervisor {
       for (const tier of [1, 2] as const) {
         const outcome = await this.stage(call, tier);
         if ('state' in outcome) {
-          if (outcome.state === 'aborted') return this.finish(journal, call, outcome);
+          if (outcome.state === 'aborted') return this.finish(journal, call, outcome, tier);
           return freeze(copy(outcome));
         }
         const { result, disposition } = outcome;
         if (result.state === 'completed' && result.execution.ok) {
-          return this.finish(journal, call, { state: 'completed', tier, operationId: call.operationId, value: result.execution.value, productionAuthorized: false });
+          return this.finish(journal, call, { state: 'completed', tier, operationId: call.operationId, value: result.execution.value, productionAuthorized: false }, tier);
         }
         if (!disposition.safeToAbortBeforeEffects) return freeze(this.blocked(call, tier, 'effect_reconciliation_required'));
         if (runtimeSnapshotDigest(await this.options.host.snapshot()) !== call.beforeSnapshot || this.options.host.generation !== call.generation)
@@ -284,7 +321,7 @@ export class ProcessFallbackSupervisor {
         const fault = result.state === 'completed' && !result.execution.ok ? result.execution.fault.kind : 'interrupted_before_effects';
         this.repair(journal, call, tier, fault, disposition); this.options.fault?.(tier === 1 ? 'tier1-failed' : 'tier2-failed');
       }
-      return this.finish(journal, call, { state: 'aborted', tier: 3, operationId: call.operationId, code: 'fallback_exhausted', productionAuthorized: false });
+      return this.finish(journal, call, { state: 'aborted', tier: 3, operationId: call.operationId, code: 'fallback_exhausted', productionAuthorized: false }, 2);
     }, 5000);
   }
   pendingRepairs(): readonly ProcessFallbackRepairEvent[] {

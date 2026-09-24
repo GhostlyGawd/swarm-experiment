@@ -1,10 +1,16 @@
 # Implementation specification changelog
 
+## Signed sink fallback and terminal authority checks — 2026-09-24
+
+- Exercised V2 fallback against a witnessed V8 ProcessHost and separate signed `/2` sink/witness processes. A signed Tier 1 commit is returned once across reopen; a signed noncommit fence allows independently proved pure Tier 2; outage prevents fallback until witnessed status is available. The focused signed-sink and process-fallback tests pass 28/28.
+- The supervisor now rechecks authority after the host result and before its own receipt, refuses a terminal abort that conflicts with a later successful or unresolved host operation under the same tier identity, and checks the original host snapshot at terminal publication. Revocation, alias and concurrent-writer regressions pass.
+- These are bounded same-UID process results. Native active-frame lowering, portable native proof, distinct-UID custody, full combined crash recovery and the FR-3.7 ≤50 ns hard maximum remain open. The task count stays 20/62. [Research and limits](../../../roadmap/v4/research/process-fallback/README.md).
+
 ## Bounded signed sink budget settlement — 2026-09-24
 
 - Added a helper that checks fixed-charge settlement against the exact signed `/2` sink witness head and full operator-pinned effect requests. It supplies bridge observations and ledger settlement verification. Its stable policy digest binds trust roots, charge and request inventory into opt-in ledger identity.
 - A real sink/broker test covers one charge after witnessed commit, cached/reopened idempotence, signed-fence refund, early and late witness outage, retained encumbrance and recovery. Focused helper, broker and historical bridge tests pass 18/18. This remains broker-level fixed-charge evidence; V11 host admission, measured usage, independent budget-journal custody and complete T2-04/T2-05 gates remain open. [Decision and limits](decisions/D12-signed-sink-budget-evidence.md).
-- [Exact-source checkpoint](evidence/integration-9cf54e4/REVIEW.md) at `9cf54e4`: 967/968 tests pass with one existing opt-in skip; build, typecheck and both roadmap checks pass. The release benchmark remains ineligible at 1.861× warm-message compression with 17 required targets failed or unmeasured. The next complete-task target is T3-07.
+- [Exact-source checkpoint](evidence/integration-9cf54e4/REVIEW.md) at `9cf54e4`: 967/968 tests pass with one existing opt-in skip; build, typecheck and both roadmap checks pass. The release benchmark remains ineligible at 1.861× warm-message compression with 17 required targets failed or unmeasured. T3-07 is the next complete-task target; FR-3.7's in-frame 50 ns requirement remains part of that closure.
 
 ## Opt-in V11 resource-scoped sink profile — 2026-09-24
 

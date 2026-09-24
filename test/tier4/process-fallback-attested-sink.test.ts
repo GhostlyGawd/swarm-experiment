@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { checkConservativeFallbackProof } from '../../src/tier3/fallback-proof.ts';
+import { domainDigest } from '../../src/fabric/identity.ts';
 import { verifySinkReceipt } from '../../src/fabric/sink-receipt.ts';
 import type { ProcessHost } from '../../src/tier4/process-host.ts';
 import { attestedFallbackFixture } from './process-fallback-attested-sink-fixture.ts';
@@ -37,7 +38,10 @@ test('signed sink commit keeps proved Tier 2 idle across host and fallback reope
       value: { tag: 'int', value: '8' }, productionAuthorized: false });
     assert.equal(fixture.decisionCount(), 1);
     assertSignedDecision(fixture, 'committed');
-    assert.equal(opened.supervisor.pendingRepairs().length, 0, 'Tier 2 was never attempted');
+    const tier2Id = domainDigest('aether.process-fallback-tier/1', {
+      profile: opened.supervisor.profileDigest, operationId: 'signed-commit', tier: 2 });
+    assert.equal(host.operationResult(tier2Id), null, 'Tier 2 was never attempted');
+    assert.equal(opened.supervisor.pendingRepairs().length, 0);
     assert.deepEqual(plain(await opened.supervisor.call(args, { operationId: 'signed-commit' })), plain(result));
     assert.equal(fixture.decisionCount(), 1);
     await host.close(); host = null;
@@ -64,6 +68,11 @@ test('signed noncommit fence permits independently proved pure Tier 2 after reco
       value: { tag: 'int', value: '8' }, productionAuthorized: false });
     assert.equal(fixture.decisionCount(), 1, 'the only sink decision is the signed noncommit fence');
     assertSignedDecision(fixture, 'not_committed');
+    const tier2Id = domainDigest('aether.process-fallback-tier/1', {
+      profile: opened.supervisor.profileDigest, operationId: 'signed-fence', tier: 2 });
+    const conservative = host.operationResult(tier2Id);
+    assert.equal(conservative?.state, 'completed');
+    if (conservative?.state === 'completed') assert.equal(conservative.execution.ok, true);
     assert.equal(opened.supervisor.pendingRepairs().length, 1);
     assert.equal(fixture.request() !== null, true);
     assert.deepEqual(plain(await opened.supervisor.call(args, { operationId: 'signed-fence' })), plain(result));
