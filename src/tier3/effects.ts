@@ -2,7 +2,7 @@ import type { CapabilityName, NodeRef } from '../tier1/ids.ts';
 import { decodeExecutionManifest, encodeExecutionManifest, executionManifestDigest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import { encodeCanonical, validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { DurableEffectBroker, effectPayloadDigest, effectAdapterDigest, type EffectAdapter, type EffectOutcome, type EffectRequestV1, type ExecutionMode } from '../fabric/effects.ts';
-import { assertEffectJournalWitness, type EffectJournalWitness } from '../fabric/effect-journal-witness.ts';
+import { assertEffectJournalWitness, type AnyEffectJournalWitness } from '../fabric/effect-journal-witness.ts';
 import { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from '../tier2/adapter-artifact.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 import { isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
@@ -63,7 +63,7 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   #bound = false;
   #attested: Readonly<{ capability: CapabilityName; grantRef: string }> | null = null;
   #trustedClock: { anchor: TrustedClockAnchor; windows: readonly { issuedAt: number; expiresAt: number }[] } | null = null;
-  #trustedWitness: EffectJournalWitness | null = null;
+  #trustedWitness: AnyEffectJournalWitness | null = null;
   get mode(): ExecutionMode { return this.#options.broker.executionMode; }
 
   constructor(options: RuntimeEffectRouterOptions) {
@@ -110,7 +110,7 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     DurableEffectBroker.prototype.pinTrustedClock.call(this.#options.broker, anchor, checked);
     this.#trustedClock = { anchor, windows: Object.freeze(checked) };
   }
-  pinWitness(witness: EffectJournalWitness): void {
+  pinWitness(witness: AnyEffectJournalWitness): void {
     assertEffectJournalWitness(witness);
     if (!this.#attested || this.#sequence !== 0n || this.#trustedWitness)
       throw new TypeError('effect witness must bind one fresh attested router');
@@ -281,7 +281,7 @@ export function brokerPinTrustedClock(router: RuntimeEffectRouter, anchor: Trust
   if (!brokerRouters.has(router)) throw new TypeError('trusted clock requires a broker-backed router');
   BrokerEffectRouter.prototype.pinTrustedClock.call(router, anchor, windows);
 }
-export function brokerPinWitness(router: RuntimeEffectRouter, witness: EffectJournalWitness): void {
+export function brokerPinWitness(router: RuntimeEffectRouter, witness: AnyEffectJournalWitness): void {
   if (!brokerRouters.has(router)) throw new TypeError('effect witness requires a broker-backed router');
   BrokerEffectRouter.prototype.pinWitness.call(router, witness);
 }

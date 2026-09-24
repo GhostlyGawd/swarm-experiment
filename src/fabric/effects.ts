@@ -5,7 +5,7 @@ import { atomicWrite } from '../tier1/persistence.ts';
 import { decimal, decodeCanonical, encodeCanonical, encodingLimits, exactObject, identifier, validateTaggedValue, type EncodingLimits, type TaggedValueV1 } from './encoding.ts';
 import { domainDigest, validateDigest, type Digest } from './identity.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
-import { advanceWitnessHead, assertEffectJournalWitness, readWitnessHead, type EffectJournalWitness } from './effect-journal-witness.ts';
+import { advanceWitnessHead, assertEffectJournalWitness, readWitnessHead, type AnyEffectJournalWitness } from './effect-journal-witness.ts';
 
 export type ExecutionMode = 'live' | 'speculative' | 'shadow' | 'replay';
 export interface EffectRequestV1 {
@@ -103,7 +103,7 @@ export interface EffectBrokerOptions {
   readonly replayEvents?: readonly EffectEventV1[];
   /** Opt-in complete-journal CAS outside this directory. Provider custody is
    * a separate deployment obligation; a reloadable factory must not supply it. */
-  readonly witness?: EffectJournalWitness;
+  readonly witness?: AnyEffectJournalWitness;
   /** Fault-injection/observability hook; runs before a proposed journal replacement. */
   readonly beforePersist?: (event: EffectEventV1) => void;
   /** Immutable ticket slots prevent ABA lock reuse. Exhaustion fails closed;
@@ -166,7 +166,7 @@ export class DurableEffectBroker {
   private readonly trace: readonly EffectEventV1[];
   private readonly buffered: EffectRequestV1[] = [];
   private readonly bufferedHistory = new Map<string, Digest>();
-  readonly #witness: EffectJournalWitness | null;
+  readonly #witness: AnyEffectJournalWitness | null;
   #trustedClock: { anchor: TrustedClockAnchor; windows: readonly { issuedAt: number; expiresAt: number }[] } | null = null;
   get executionMode(): ExecutionMode { return this.mode; }
   /** Host-owned independent deadline source for a versioned isolated profile.
@@ -207,7 +207,7 @@ export class DurableEffectBroker {
   private locked<T>(run: () => T): T { return this.journalLock.run(run); }
   /** Called nonvirtually by a signed host before invoking or inspecting a
    * broker. The exact operator object is required, not a matching label. */
-  assertWitness(expected: EffectJournalWitness): void {
+  assertWitness(expected: AnyEffectJournalWitness): void {
     assertEffectJournalWitness(expected);
     if (this.#witness !== expected) throw new TypeError('effect broker witness differs from operator authority');
     if (Object.getPrototypeOf(this) !== DurableEffectBroker.prototype

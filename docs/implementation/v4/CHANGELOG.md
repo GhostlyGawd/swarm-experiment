@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## V11 contract calls and V9 complete journal witnesses — 2026-09-23
+
+- Added executable projection V11 for synthesized, closed, pure scalar helpers called directly inside contracts, including `old(Call(...))`, transitive helpers and exact-address imports. Actual TS/Python/Rust execution and exact-root round trips pass; older V2/V7/V10 fixture bytes are unchanged. Blockless bindings and the 4× token requirement remain open, so T1-02 and Q03 do not close.
+- Added opt-in V9 complete host and deployment journal witnesses with a namespaced V2 per-effect witness. A reviewed V8 host omission could discard the only local effect inventory while the broker still recorded a commit; a reviewed outer registry omission after promotion could permit operation-ID reuse. V9 binds full canonical journals to separate operator CAS heads and refuses those omissions before cached results or redispatch. The V2 effect identity prevents cross-deployment reuse of one operation head.
+- Direct and deployed real Wasm tests cover signed promotion, reopen, omission, stale/changed witness selection, lost CAS acknowledgment and historical profile refusal. Witness fixtures are in-memory and same-process; OS-separated custody, authenticated sink status, independent replay witnessing and full containment remain open. T2-04/NFR-16 and the verified-task count stay unchanged.
+
 ## AE5 exact-base warm-reference research — 2026-09-23
 
 - Added an opt-in root-bound reference for unchanged FunctionDecl members of a paid cold module. A fresh process reconstructs from the complete cold wire; changed declarations and stale/noncanonical references are refused.

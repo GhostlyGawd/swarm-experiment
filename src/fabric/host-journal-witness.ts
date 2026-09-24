@@ -12,6 +12,8 @@ export interface HostJournalWitness {
   readonly format: 'aether.process-host-journal-witness/1';
   readonly authorityId: string;
   readonly repositoryId: string;
+  /** Distinct operator-selected deployment namespace; prevents cross-deployment adoption. */
+  readonly deploymentId: string;
   /** Stable operator-chosen identity for this host journal. */
   readonly hostId: string;
   readonly digest: Digest;
@@ -71,7 +73,8 @@ export function selectHostJournalWitness(catalog: HostJournalWitnessCatalog, hos
   const source = catalogs.get(catalog)!;
   const witness = source.witnessFor(hostId);
   assertHostJournalWitness(witness);
-  if (witness.authorityId !== catalog.authorityId || witness.repositoryId !== catalog.repositoryId || witness.hostId !== hostId)
+  if (witness.authorityId !== catalog.authorityId || witness.repositoryId !== catalog.repositoryId
+    || witness.deploymentId !== catalog.deploymentId || witness.hostId !== hostId)
     throw new TypeError('host journal witness is outside operator catalog');
   const selected = source.selected.get(hostId);
   if (selected && selected !== witness) throw new Error('host journal witness swapped during catalog lifetime');
@@ -107,17 +110,19 @@ function assertJournal(journal: unknown, revision: string): asserts journal is s
 export function createHostJournalWitness(options: Readonly<{
   authorityId: string;
   repositoryId: string;
+  deploymentId: string;
   hostId: string;
   read: () => HostJournalHead;
   /** Atomic durable CAS; retain and return the exact next canonical journal. */
   advance: (expectedRevision: string, journal: string) => HostJournalHead;
 }>): HostJournalWitness {
   if (!options || typeof options !== 'object') throw new TypeError('host journal witness options required');
-  for (const id of [options.authorityId, options.repositoryId, options.hostId]) identifier(id);
+  for (const id of [options.authorityId, options.repositoryId, options.deploymentId, options.hostId]) identifier(id);
   if (typeof options.read !== 'function' || typeof options.advance !== 'function')
     throw new TypeError('external host journal witness callbacks required');
   const body = { format: 'aether.process-host-journal-witness/1' as const,
-    authorityId: options.authorityId, repositoryId: options.repositoryId, hostId: options.hostId };
+    authorityId: options.authorityId, repositoryId: options.repositoryId,
+    deploymentId: options.deploymentId, hostId: options.hostId };
   const witness = Object.freeze({ ...body, digest: domainDigest(body.format, body) });
   sources.set(witness, { read: options.read, advance: options.advance, lastRevision: -1n, lastJournal: null });
   readHostJournalHead(witness);
@@ -158,5 +163,8 @@ export function advanceHostJournalHead(witness: HostJournalWitness, expectedRevi
   const head = checked(source, source.advance(expectedRevision, journal));
   if (head.revision !== nextRevision || head.journal !== journal)
     throw new Error('host witness did not durably accept exact next journal');
+  const retained = readHostJournalHead(witness);
+  if (retained.revision !== nextRevision || retained.journal !== journal)
+    throw new Error('host witness did not retain exact next journal');
   return head;
 }

@@ -15,7 +15,7 @@ function journal(revision: string, generation = '1', format: 'aether.process-hos
 function fixture() {
   let head: HostJournalHead = { revision: '0', journal: null };
   let advances = 0;
-  const witness = createHostJournalWitness({ authorityId: 'operator:host', repositoryId: 'repo:test', hostId: 'host:stable',
+  const witness = createHostJournalWitness({ authorityId: 'operator:host', repositoryId: 'repo:test', deploymentId: 'deployment:one', hostId: 'host:stable',
     read: () => head,
     advance(expected, bytes) {
       advances++;
@@ -34,10 +34,10 @@ test('host witness pins operator, repository and stable host identity, with exac
   assert.deepEqual(advanceHostJournalHead(f.witness, '1', journal('2', '2')), { revision: '2', journal: journal('2', '2') });
   assert.equal(f.advances(), 2);
   assert.equal(f.witness.digest, domainDigest('aether.process-host-journal-witness/1', {
-    format: 'aether.process-host-journal-witness/1', authorityId: 'operator:host', repositoryId: 'repo:test', hostId: 'host:stable' }));
+    format: 'aether.process-host-journal-witness/1', authorityId: 'operator:host', repositoryId: 'repo:test', deploymentId: 'deployment:one', hostId: 'host:stable' }));
   assert.ok(Object.isFrozen(f.witness));
   assert.throws(() => assertHostJournalWitness({ ...f.witness }), /independently supplied/);
-  assert.throws(() => createHostJournalWitness({ authorityId: '', repositoryId: 'repo:test', hostId: 'host:stable',
+  assert.throws(() => createHostJournalWitness({ authorityId: '', repositoryId: 'repo:test', deploymentId: 'deployment:one', hostId: 'host:stable',
     read: () => f.head(), advance: () => f.head() }), /identifier/);
 });
 
@@ -77,7 +77,7 @@ test('host witness refuses malformed, noncanonical and oversized heads before ad
 test('host witness refuses false CAS acknowledgments and can reread after a lost response', () => {
   let head: HostJournalHead = { revision: '0', journal: null };
   let response: 'wrong-revision' | 'wrong-bytes' = 'wrong-revision';
-  const witness = createHostJournalWitness({ authorityId: 'operator', repositoryId: 'repo', hostId: 'host',
+  const witness = createHostJournalWitness({ authorityId: 'operator', repositoryId: 'repo', deploymentId: 'deployment:one', hostId: 'host',
     read: () => head,
     advance(expected, bytes) {
       const next = String(BigInt(expected) + 1n);
@@ -89,7 +89,13 @@ test('host witness refuses false CAS acknowledgments and can reread after a lost
   assert.throws(() => advanceHostJournalHead(witness, '0', journal('1')), /did not durably accept/);
   assert.throws(() => readHostJournalHead(witness), /rolled back/);
 
-  const recovered = createHostJournalWitness({ authorityId: 'operator', repositoryId: 'repo', hostId: 'host:second',
+  const unretained = createHostJournalWitness({ authorityId: 'operator', repositoryId: 'repo',
+    deploymentId: 'deployment:one', hostId: 'host:false-success',
+    read: () => ({ revision: '0', journal: null }),
+    advance: (_expected, bytes) => ({ revision: '1', journal: bytes }) });
+  assert.throws(() => advanceHostJournalHead(unretained, '0', journal('1')), /rolled back|did not retain/);
+
+  const recovered = createHostJournalWitness({ authorityId: 'operator', repositoryId: 'repo', deploymentId: 'deployment:one', hostId: 'host:second',
     read: () => head,
     advance(expected, bytes) {
       if (head.revision !== expected) throw new Error('provider CAS lost');
@@ -116,7 +122,7 @@ test('host witness rejects malformed source objects and accepts prior canonical 
 
 test('host catalog pins an operator namespace and one witness object per stable host', () => {
   const first = fixture();
-  const second = createHostJournalWitness({ authorityId: 'operator:host', repositoryId: 'repo:test', hostId: 'host:second',
+  const second = createHostJournalWitness({ authorityId: 'operator:host', repositoryId: 'repo:test', deploymentId: 'deployment:one', hostId: 'host:second',
     read: () => ({ revision: '0', journal: null }),
     advance: () => { throw new Error('unused'); } });
   const selected = new Map([['host:stable', first.witness], ['host:second', second]]);
@@ -128,8 +134,11 @@ test('host catalog pins an operator namespace and one witness object per stable 
   assert.equal(catalog.digest, domainDigest('aether.process-host-journal-witness-catalog/1', {
     format: 'aether.process-host-journal-witness-catalog/1', authorityId: 'operator:host',
     repositoryId: 'repo:test', deploymentId: 'deployment:one' }));
+  const differentDeployment = createHostJournalWitnessCatalog({ authorityId: 'operator:host', repositoryId: 'repo:test',
+    deploymentId: 'deployment:two', witnessFor: () => first.witness });
+  assert.throws(() => selectHostJournalWitness(differentDeployment, 'host:stable'), /outside operator catalog/);
   assert.throws(() => assertHostJournalWitnessCatalog({ ...catalog }), /independently supplied/);
-  selected.set('host:stable', createHostJournalWitness({ authorityId: 'operator:host', repositoryId: 'repo:test',
+  selected.set('host:stable', createHostJournalWitness({ authorityId: 'operator:host', repositoryId: 'repo:test', deploymentId: 'deployment:one',
     hostId: 'host:stable', read: () => ({ revision: '0', journal: null }), advance: () => { throw new Error('unused'); } }));
   assert.throws(() => selectHostJournalWitness(catalog, 'host:stable'), /swapped/);
   selected.set('host:second', first.witness);

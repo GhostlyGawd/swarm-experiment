@@ -11,7 +11,8 @@ import { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2 } from '.
 import { assertSignedEffectResourcePolicy, assertSignedEffectResourcePolicyV2, assertSignedEffectResourcePolicyV3, assertSignedEffectResourcePolicyV4, assertEffectResourceAdapter, assertEffectResourceAdapterV2, assertEffectResourceAdapterV3, assertEffectResourceAdapterV4, effectResourcePath as signedEffectResourcePath, effectResourcePathV2, effectResourcePathV3, effectResourcePathV4, effectResourcePolicyDigest, effectResourcePolicyDigestV2, effectResourcePolicyDigestV3, effectResourcePolicyDigestV4, type SignedEffectResourcePolicyV1, type SignedEffectResourcePolicyV2, type SignedEffectResourcePolicyV3, type SignedEffectResourcePolicyV4 } from '../tier2/effect-resource-policy.ts';
 import { assertEffectSignerAnchor, assertAnchoredEffectPolicy, type EffectSignerAnchor } from '../tier2/effect-signer-anchor.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
-import { assertEffectJournalWitnessCatalog, selectEffectJournalWitness, type EffectJournalWitnessCatalog } from '../fabric/effect-journal-witness.ts';
+import { assertEffectJournalWitnessCatalog, selectEffectJournalWitness, type AnyEffectJournalWitnessCatalog } from '../fabric/effect-journal-witness.ts';
+import { advanceHostJournalHead, assertHostJournalWitness, readHostJournalHead, type HostJournalWitness } from '../fabric/host-journal-witness.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { ProductionRuntime } from '../tier3/compile.ts';
 import { effectPayloadDigest, type EffectEventV1, type EffectRequestV1 } from '../fabric/effects.ts';
@@ -85,7 +86,8 @@ interface StateHead {
   cause: { kind: 'initial' | 'allocation' | 'call' | 'migration' | 'abort' | 'checkpoint'; operationId: string; subjectDigest: Digest }; digest: Digest;
 }
 interface HostJournal {
-  format: 'aether.process-host/1' | 'aether.process-host/2' | 'aether.process-host/3'; configuration: Digest; generation: string; plan: string;
+  format: 'aether.process-host/1' | 'aether.process-host/2' | 'aether.process-host/3' | 'aether.process-host/4'; configuration: Digest; generation: string; plan: string;
+  witnessRevision?: string;
   snapshot: RuntimeSnapshotV1; calls: CallRecord[]; migrations: MigrationRecord[];
   allocations: AllocationRecord[];
   snapshots: Array<{ digest: Digest; snapshot: RuntimeSnapshotV1 }>;
@@ -142,11 +144,13 @@ export interface ProcessHostOptions {
   /** Independently provisioned time/revision source; required by clocked Wasm V7. */
   readonly trustedClockAnchor?: TrustedClockAnchor;
   /** Operator-held per-operation witness selection for isolated Wasm V8. */
-  readonly effectJournalWitnessCatalog?: EffectJournalWitnessCatalog;
+  readonly effectJournalWitnessCatalog?: AnyEffectJournalWitnessCatalog;
+  /** Operator-held complete host journal CAS for the opt-in V9 profile. */
+  readonly hostJournalWitness?: HostJournalWitness;
   /** Explicitly reopen anchored V2 journals under their original host-config/2 identity. */
   readonly legacyAnchoredEffectPolicy?: 'anchored-v2';
   /** New isolated Wasm signed-policy profile with host-config/4 identity. */
-  readonly anchoredEffectPolicyProfile?: 'isolated-wasm-v4' | 'isolated-wasm-v5-clock' | 'isolated-wasm-v6-witnessed';
+  readonly anchoredEffectPolicyProfile?: 'isolated-wasm-v4' | 'isolated-wasm-v5-clock' | 'isolated-wasm-v6-witnessed' | 'isolated-wasm-v7-host-witness';
   /** Compatibility-only signer authority for explicitly selected old profiles. */
   readonly effectResourceSignerKey?: KeyObject | string;
   readonly currentEffectPolicyEpoch?: () => string;
@@ -223,6 +227,8 @@ export class ProcessHost {
   private readonly configuration: Digest;
   private readonly signedEffectResourcePolicy: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3 | SignedEffectResourcePolicyV4 | null;
   private readonly file: string;
+  readonly #hostJournalWitness: HostJournalWitness | null;
+  readonly #journalWitnessBases = new WeakMap<HostJournal, { revision: string; journal: string | null }>();
   private readonly lock: JournalLock;
   private readonly declarations = new Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>();
   private readonly edges: Map<SymbolId, Set<SymbolId>>;
@@ -237,20 +243,30 @@ export class ProcessHost {
     if (options.effectResourcePolicyDigest) validateDigest(options.effectResourcePolicyDigest, 'aether.effect-resource-policy/1');
     const signed = options.signedEffectResourcePolicy !== undefined;
     const anchored = options.effectSignerAnchor !== undefined;
-    const witnessedWasm = options.anchoredEffectPolicyProfile === 'isolated-wasm-v6-witnessed';
+    const hostWitnessedWasm = options.anchoredEffectPolicyProfile === 'isolated-wasm-v7-host-witness';
+    const witnessedWasm = hostWitnessedWasm || options.anchoredEffectPolicyProfile === 'isolated-wasm-v6-witnessed';
     const clockedWasm = witnessedWasm || options.anchoredEffectPolicyProfile === 'isolated-wasm-v5-clock';
     if (options.anchoredEffectPolicyProfile !== undefined &&
-        !['isolated-wasm-v4', 'isolated-wasm-v5-clock', 'isolated-wasm-v6-witnessed'].includes(options.anchoredEffectPolicyProfile))
+        !['isolated-wasm-v4', 'isolated-wasm-v5-clock', 'isolated-wasm-v6-witnessed', 'isolated-wasm-v7-host-witness'].includes(options.anchoredEffectPolicyProfile))
       throw new TypeError('invalid isolated Wasm anchored effect policy profile');
     if (clockedWasm) assertTrustedClockAnchor(options.trustedClockAnchor);
     else if (options.trustedClockAnchor !== undefined) throw new TypeError('trusted clock requires clocked Wasm profile');
     if (witnessedWasm) {
       assertEffectJournalWitnessCatalog(options.effectJournalWitnessCatalog);
       if (options.effectJournalWitnessCatalog.repositoryId !== options.effectSignerAnchor?.repositoryId
-        || options.effectJournalWitnessCatalog.clockDomain !== options.trustedClockAnchor?.clockDomain)
+        || options.effectJournalWitnessCatalog.clockDomain !== options.trustedClockAnchor?.clockDomain
+        || options.effectJournalWitnessCatalog.format !== (hostWitnessedWasm
+          ? 'aether.effect-journal-witness-catalog/2' : 'aether.effect-journal-witness-catalog/1'))
         throw new TypeError('effect witness catalog differs from signed repository/clock');
     } else if (options.effectJournalWitnessCatalog !== undefined)
       throw new TypeError('effect witness catalog requires witnessed Wasm profile');
+    if (hostWitnessedWasm) {
+      assertHostJournalWitness(options.hostJournalWitness);
+      if (options.hostJournalWitness.repositoryId !== options.effectSignerAnchor?.repositoryId
+        || options.hostJournalWitness.deploymentId !== options.effectJournalWitnessCatalog?.deploymentId)
+        throw new TypeError('host journal witness differs from signed repository/effect namespace');
+    } else if (options.hostJournalWitness !== undefined)
+      throw new TypeError('host journal witness requires isolated Wasm V9 profile');
     if (options.anchoredEffectPolicyProfile && (!anchored || options.legacyAnchoredEffectPolicy
       || options.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/4'))
       throw new TypeError('isolated Wasm policy requires an independent anchor and signed policy v4');
@@ -285,6 +301,7 @@ export class ProcessHost {
       || !anchored && (signed !== (options.effectResourceSignerKey !== undefined)
         || signed !== (options.currentEffectPolicyEpoch !== undefined))) throw new TypeError('signed effect resource policy requires strict grants, signer key, and epoch source');
     this.options = { ...options, plan: JSON.parse(planBytes(options.plan)) as TopologyPlan, initialSnapshot: options.initialSnapshot ? copy(options.initialSnapshot) : undefined };
+    this.#hostJournalWitness = options.hostJournalWitness ?? null;
     this.module = decodeIR(encodeIR(options.module).text);
     this.manifest = decodeExecutionManifest(encodeExecutionManifest(options.manifest));
     if (new GraphStore().intern(this.module) !== this.manifest.astRoot) throw new TypeError('ProcessHost module/manifest mismatch');
@@ -314,7 +331,7 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest(anchored ? witnessedWasm ? 'aether.process-host-config/6' : clockedWasm ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+    this.configuration = domainDigest(anchored ? hostWitnessedWasm ? 'aether.process-host-config/7' : witnessedWasm ? 'aether.process-host-config/6' : clockedWasm ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
       ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/4' ? effectResourcePolicyDigestV4(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/3' ? effectResourcePolicyDigestV3(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/2' ? effectResourcePolicyDigestV2(this.signedEffectResourcePolicy.body)
@@ -322,7 +339,8 @@ export class ProcessHost {
         effectResourcePolicySigner: this.signedEffectResourcePolicy?.signer ?? null } : {}),
       ...(anchored ? { effectSignerAnchor: options.effectSignerAnchor!.digest } : {}),
       ...(clockedWasm ? { trustedClockAnchor: options.trustedClockAnchor!.digest } : {}),
-      ...(witnessedWasm ? { effectJournalWitnessCatalog: options.effectJournalWitnessCatalog!.digest } : {}) });
+      ...(witnessedWasm ? { effectJournalWitnessCatalog: options.effectJournalWitnessCatalog!.digest } : {}),
+      ...(hostWitnessedWasm ? { hostJournalWitness: options.hostJournalWitness!.digest } : {}) });
     ensureDurableDirectory(options.directory);
     this.file = join(options.directory, 'host.json');
     this.lock = new JournalLock({ directory: join(options.directory, 'host-lock'), domain: 'aether.process-host-lock', busyError: 'process_host_busy: another state transition is active' });
@@ -333,12 +351,17 @@ export class ProcessHost {
     try {
       await host.lock.runAsync(async () => {
         let journal: HostJournal;
-        if (existsSync(host.file)) journal = host.read();
+        if (existsSync(host.file) || host.#hostJournalWitness && readHostJournalHead(host.#hostJournalWitness).journal !== null) journal = host.read();
         else {
           const generation = options.initialGeneration ?? '1'; decimal(generation);
           const snapshot: RuntimeSnapshotV1 = options.initialSnapshot ? copy(options.initialSnapshot) : { format: 'aether.state/1', executionManifest: executionManifestDigest(host.manifest), heapId: `heap-${randomUUID()}`, nextObjectId: '1', eventCursor: '0', records: [], ownership: [] };
           host.validateSnapshot(snapshot, generation, options.plan);
-          journal = { format: 'aether.process-host/1', configuration: host.configuration, generation, plan: planBytes(options.plan), snapshot, calls: [], migrations: [], allocations: [], snapshots: [], heads: [] };
+          journal = host.#hostJournalWitness
+            ? { format: 'aether.process-host/4', witnessRevision: '0', configuration: host.configuration, generation,
+              plan: planBytes(options.plan), snapshot, calls: [], migrations: [], allocations: [], snapshots: [], heads: [],
+              checkpointLeases: [], checkpointReceipts: [], checkpointControls: [] }
+            : { format: 'aether.process-host/1', configuration: host.configuration, generation, plan: planBytes(options.plan), snapshot, calls: [], migrations: [], allocations: [], snapshots: [], heads: [] };
+          if (host.#hostJournalWitness) host.#journalWitnessBases.set(journal, { revision: '0', journal: null });
           host.retain(journal, snapshot); host.appendHead(journal, { kind: 'initial', operationId: 'initial', subjectDigest: host.configuration }); host.persist(journal);
         }
         for (const call of journal.calls) if (call.state === 'running') { call.state = 'indeterminate'; call.failure = 'coordinator restarted without a durable completed outcome'; }
@@ -717,7 +740,8 @@ export class ProcessHost {
           const body: Omit<ProcessCheckpointControl, 'id'> = { format: 'aether.process-checkpoint-control/1', binding: bindingId, request: control, beforeCheckpoint: executionOrigin, afterCheckpoint, previous: latestControl?.id ?? null, effectAudit: audit, effectCount: effectAudit.length };
           const result = { ...body, id: checkpointControlDigest(body) };
           this.phase('checkpoint-control-before-commit', control.operationId, lease.binding.generation); assertAuthority();
-          journal.format = 'aether.process-host/3'; (journal.checkpointControls ??= []).push(result); lease.latestCheckpoint = afterCheckpoint; lease.checkpoints.push(afterCheckpoint); this.persist(journal);
+          if (journal.format !== 'aether.process-host/4') journal.format = 'aether.process-host/3';
+          (journal.checkpointControls ??= []).push(result); lease.latestCheckpoint = afterCheckpoint; lease.checkpoints.push(afterCheckpoint); this.persist(journal);
           this.phase('checkpoint-control-committed', control.operationId, lease.binding.generation); return freeze(copy(result));
         },
         binding: freeze(copy(lease.binding)), program, before, checkpoint: readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, program), assertAuthority, save,
@@ -1183,18 +1207,77 @@ export class ProcessHost {
     const head: StateHead = { sequence: String(journal.heads.length), parent: journal.heads.at(-1)?.digest ?? null, generation: journal.generation, planDigest: domainDigest('aether.process-plan/1', journal.plan), snapshotDigest: runtimeSnapshotDigest(journal.snapshot), cause, digest: '' };
     head.digest = stateHeadDigest(head); journal.heads.push(head);
   }
+  private isPriorWitnessLocal(local: string, revision: string): boolean {
+    try {
+      const prior = exactObject(decodeCanonical(Buffer.from(local)),
+        ['format', 'witnessRevision', 'configuration', 'generation', 'plan', 'snapshot', 'calls', 'migrations',
+          'allocations', 'snapshots', 'heads', 'checkpointLeases', 'checkpointReceipts', 'checkpointControls']);
+      decimal(prior.witnessRevision);
+      return prior.format === 'aether.process-host/4' && prior.configuration === this.configuration
+        && BigInt(prior.witnessRevision) < BigInt(revision);
+    } catch { return false; }
+  }
   private persist(journal: HostJournal): void {
-    const bytes = encodeCanonical(journal); atomicWrite(this.file, Buffer.from(bytes).toString('utf8'));
+    if (this.#hostJournalWitness) {
+      const head = readHostJournalHead(this.#hostJournalWitness);
+      const base = this.#journalWitnessBases.get(journal);
+      if (!base || head.revision !== base.revision || head.journal !== base.journal)
+        throw new Error('host journal differs from operator witness before publication');
+      const local = existsSync(this.file) ? readFileSync(this.file, 'utf8') : null;
+      if (local !== null && local !== base.journal && !this.isPriorWitnessLocal(local, base.revision))
+        throw new Error('local host journal diverges from operator witness');
+      if (journal.format !== 'aether.process-host/4') throw new TypeError('host witness requires journal format 4');
+      const nextRevision = String(BigInt(head.revision) + 1n);
+      journal.witnessRevision = nextRevision;
+      const encoded = Buffer.from(encodeCanonical(journal)).toString('utf8');
+      if (Buffer.byteLength(encoded) > 8 * 1024 * 1024) throw new RangeError('process journal size limit');
+      advanceHostJournalHead(this.#hostJournalWitness, head.revision, encoded);
+      this.#journalWitnessBases.set(journal, { revision: nextRevision, journal: encoded });
+      atomicWrite(this.file, encoded);
+    } else {
+      const bytes = encodeCanonical(journal); atomicWrite(this.file, Buffer.from(bytes).toString('utf8'));
+    }
     const fd = openSync(this.options.directory, 'r'); try { fsyncSync(fd); } finally { closeSync(fd); }
   }
   private read(): HostJournal {
-    if (statSync(this.file).size > 8 * 1024 * 1024) throw new Error('process journal size limit');
-    const decoded = decodeCanonical(readFileSync(this.file));
+    let bytes: Buffer;
+    let witnessedRevision: string | null = null;
+    if (this.#hostJournalWitness) {
+      const head = readHostJournalHead(this.#hostJournalWitness);
+      if (head.journal === null) throw new Error('host witness has no journal for existing local state');
+      if (Buffer.byteLength(head.journal) > 8 * 1024 * 1024) throw new RangeError('host witness journal size limit');
+      const remote = exactObject(decodeCanonical(Buffer.from(head.journal)),
+        ['format', 'witnessRevision', 'configuration', 'generation', 'plan', 'snapshot', 'calls', 'migrations',
+          'allocations', 'snapshots', 'heads', 'checkpointLeases', 'checkpointReceipts', 'checkpointControls']);
+      if (remote.format !== 'aether.process-host/4' || remote.configuration !== this.configuration
+        || remote.witnessRevision !== head.revision)
+        throw new Error('host witness journal identity/revision mismatch');
+      if (existsSync(this.file)) {
+        if (statSync(this.file).size > 8 * 1024 * 1024) throw new Error('process journal size limit');
+        const local = readFileSync(this.file, 'utf8');
+        if (local !== head.journal && !this.isPriorWitnessLocal(local, head.revision))
+          throw new Error('local host journal diverges from operator witness');
+      }
+      witnessedRevision = head.revision;
+      bytes = Buffer.from(head.journal);
+    } else {
+      if (statSync(this.file).size > 8 * 1024 * 1024) throw new Error('process journal size limit');
+      bytes = readFileSync(this.file);
+    }
+    const decoded = decodeCanonical(bytes);
     const keys = ['format', 'configuration', 'generation', 'plan', 'snapshot', 'calls', 'migrations', 'allocations', 'snapshots', 'heads'];
-    if (['aether.process-host/2', 'aether.process-host/3'].includes((decoded as { format: string }).format)) keys.push('checkpointLeases', 'checkpointReceipts');
-    if ((decoded as { format?: string }).format === 'aether.process-host/3') keys.push('checkpointControls');
+    if (['aether.process-host/2', 'aether.process-host/3', 'aether.process-host/4'].includes((decoded as { format: string }).format)) keys.push('checkpointLeases', 'checkpointReceipts');
+    if (['aether.process-host/3', 'aether.process-host/4'].includes((decoded as { format?: string }).format!)) keys.push('checkpointControls');
+    if ((decoded as { format?: string }).format === 'aether.process-host/4') keys.push('witnessRevision');
     const journal = exactObject(decoded, keys) as unknown as HostJournal;
-    if (!['aether.process-host/1', 'aether.process-host/2', 'aether.process-host/3'].includes(journal.format) || journal.configuration !== this.configuration) throw new Error('process journal configuration mismatch');
+    if (!['aether.process-host/1', 'aether.process-host/2', 'aether.process-host/3', 'aether.process-host/4'].includes(journal.format)
+      || journal.configuration !== this.configuration || (journal.format === 'aether.process-host/4') !== !!this.#hostJournalWitness)
+      throw new Error('process journal configuration mismatch');
+    if (this.#hostJournalWitness) {
+      decimal(journal.witnessRevision);
+      if (journal.witnessRevision !== readHostJournalHead(this.#hostJournalWitness).revision)
+        throw new Error('host journal revision differs from operator witness');
+    }
     decimal(journal.generation); if (typeof journal.plan !== 'string') throw new Error('invalid stored topology');
     const plan = JSON.parse(journal.plan) as TopologyPlan; this.validatePlan(plan); this.validateSnapshot(journal.snapshot, journal.generation, plan);
     if (![journal.calls, journal.migrations, journal.allocations, journal.snapshots, journal.heads].every(Array.isArray)) throw new Error('invalid process journal arrays');
@@ -1313,7 +1396,12 @@ export class ProcessHost {
       const expected: RuntimeSnapshotV1 = { ...before, nextObjectId: String(BigInt(before.nextObjectId) + 1n), records: [...before.records, { objectId: ref.objectId, fields: ty.fields.map(([name]) => [name, allocation.fields[name] ?? { tag: 'null' } as TaggedValueV1] as const).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0) }], ownership: [...before.ownership, { objectId: ref.objectId, unit: allocation.unit, epoch: ref.ownerEpoch }] };
       if (runtimeSnapshotDigest(expected) !== allocation.afterSnapshotDigest) throw new Error('allocation changed existing logical data');
     }
-    if (journal.format === 'aether.process-host/2' || journal.format === 'aether.process-host/3') {
+    if (journal.format === 'aether.process-host/4'
+      && ![journal.checkpointLeases, journal.checkpointReceipts, journal.checkpointControls].every(Array.isArray))
+      throw new Error('invalid witnessed checkpoint journal extension');
+    if (journal.format === 'aether.process-host/2' || journal.format === 'aether.process-host/3'
+      || journal.format === 'aether.process-host/4'
+        && !!(journal.checkpointLeases!.length || journal.checkpointReceipts!.length || journal.checkpointControls!.length)) {
       if (!Array.isArray(journal.checkpointLeases) || !Array.isArray(journal.checkpointReceipts)) throw new Error('invalid checkpoint journal extension');
       const bindings = new Set<string>(), receipts = new Set<string>(); let active = 0;
       const program = this.checkpointProgram();
@@ -1342,7 +1430,7 @@ export class ProcessHost {
         if (!before || receipt.afterSnapshot !== runtimeSnapshotDigest(projectProcessCheckpoint(snapshot, before, lease.binding.generation, lease.binding.unit)) || receipt.eventHead !== snapshot.eventHead || receipt.eventCursor !== snapshot.eventCursor) throw new Error('checkpoint receipt lost its exact state/event binding'); receipts.add(id);
       }
       if (journal.checkpointLeases.some(lease => lease.state === 'committed' && !receipts.has(lease.receipt!))) throw new Error('checkpoint lease lacks publication receipt');
-      if (journal.format === 'aether.process-host/3' && !Array.isArray(journal.checkpointControls)) throw new Error('missing checkpoint control audit');
+      if ((journal.format === 'aether.process-host/3' || journal.format === 'aether.process-host/4') && !Array.isArray(journal.checkpointControls)) throw new Error('missing checkpoint control audit');
       const controlIds = new Set<string>(), controlOperations = new Set<string>(), priorControl = new Map<string, Digest>(), auditedEvents = new Map<string, Map<number, Digest>>();
       for (const control of journal.checkpointControls ?? []) {
         exactObject(control, ['format', 'id', 'binding', 'request', 'beforeCheckpoint', 'afterCheckpoint', 'previous', 'effectAudit', 'effectCount']); validateCheckpointControlRequest(control.request);
@@ -1409,6 +1497,9 @@ export class ProcessHost {
     for (const call of journal.calls) if ((call.state === 'completed' || call.state === 'aborted') && !causes.has(JSON.stringify([call.state === 'completed' ? 'call' : 'abort', call.operationId]))) throw new Error('terminal call lacks a published state transition');
     for (const migration of journal.migrations) if (['committed', 'finalized'].includes(migration.state) && migration.toGeneration !== migration.fromGeneration && !causes.has(JSON.stringify(['migration', migration.migrationId]))) throw new Error('migration lacks a published state transition');
     for (const lease of journal.checkpointLeases ?? []) if (lease.state === 'committed' && !causes.has(JSON.stringify(['checkpoint', lease.binding.operationId]))) throw new Error('checkpoint lacks published state transition');
+    if (this.#hostJournalWitness) for (const call of journal.calls) this.assertV4TerminalEffects(journal, call);
+    if (witnessedRevision !== null) this.#journalWitnessBases.set(journal, { revision: witnessedRevision,
+      journal: Buffer.from(bytes).toString('utf8') });
     return journal;
   }
 }
