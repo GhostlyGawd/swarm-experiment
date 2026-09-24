@@ -356,7 +356,11 @@ function expectedReports(prepared: ReturnType<typeof prepare>): VerificationRepo
   });
 }
 function validResult(report: VerificationReport, policy: EvidencePolicy): void {
-  if (report.budgetExhausted || report.verdict === 'unproven' || report.verdict === 'refuted' || report.unprovenFormalContracts.length) throw new TypeError('verification refuted, incomplete or timed out');
+  if (report.budgetExhausted || report.verdict === 'unproven' || report.verdict === 'refuted' || report.unprovenFormalContracts.length) {
+    const failures = report.results.filter(result => result.verdict !== 'proved' && result.verdict !== 'delegated')
+      .slice(0, 3).map(result => `${result.obligation.kind}:${result.verdict}:${result.solver?.status ?? 'no-solver'}`);
+    throw new TypeError(`verification refuted, incomplete or timed out: ${report.symbol ?? 'unknown'}; verdict=${report.verdict}; budgetExhausted=${report.budgetExhausted}; unprovenFormal=${report.unprovenFormalContracts.length}; failures=${failures.join(',')}`);
+  }
   for (const result of report.results) {
     if (result.obligation.rigor === 'formal') {
       if (result.verdict !== 'proved' || result.solver?.status !== 'unsat' || result.solver.abstractedTerms !== 0) throw new TypeError('formal obligation lacks complete local solver evidence');
