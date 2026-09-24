@@ -1,0 +1,5 @@
+
+> @ghostlygawd/aether@0.1.0 build
+> tsc -p tsconfig.json && node scripts/copy-native-fallback-driver.mjs && node --experimental-strip-types scripts/process-worker-bundle.ts build
+
+{"format":"aether.process-worker-bundle/2","bundle":{"path":"/private/tmp/aether-t102-closure-readonly/dist/process-worker.bundle.mjs","bytes":767552,"sha256":"a0e89262be54e76592a736961029577bfc82e7f7d2e2048c0354bd927bc0bfbe"},"node":{"path":"/opt/homebrew/Cellar/node/26.7.0/bin/node","bytes":50320,"sha256":"1ef99ea25fe70c9b67e7efe768ef8ee22148d3cabc703db6131b57aeb617d040"},"nativeScope":"aether.macos-node-static-link-closure/1","nativeLibraries":25,"inputCount":70,"externalNodeImports":["node:child_process","node:crypto","node:fs","node:net","node:path","node:perf_hooks","node:util"],"toolVersion":"0.28.2"}
