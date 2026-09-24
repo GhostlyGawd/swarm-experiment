@@ -7,7 +7,9 @@
 import { createPublicKey, KeyObject } from 'node:crypto';
 import { decimal, identifier } from '../fabric/encoding.ts';
 import { domainDigest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
-import { assertSignedEffectResourcePolicyV2, assertSignedEffectResourcePolicyV3, assertSignedEffectResourcePolicyV4, type SignedEffectResourcePolicyV2, type SignedEffectResourcePolicyV3, type SignedEffectResourcePolicyV4 } from './effect-resource-policy.ts';
+import { assertSignedEffectResourcePolicyV2, assertSignedEffectResourcePolicyV3, assertSignedEffectResourcePolicyV4,
+  assertSignedEffectResourcePolicyV5, type SignedEffectResourcePolicyV2, type SignedEffectResourcePolicyV3,
+  type SignedEffectResourcePolicyV4, type SignedEffectResourcePolicyV5 } from './effect-resource-policy.ts';
 
 const created = new WeakSet<object>();
 
@@ -53,10 +55,11 @@ export function assertEffectSignerAnchor(value: unknown): asserts value is Effec
   if (anchor.format !== 'aether.effect-signer-anchor/1' || anchor.currentEpoch() === undefined) throw new TypeError('invalid effect signer anchor');
 }
 
-export function assertAnchoredEffectPolicy(anchor: EffectSignerAnchor, policy: SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3 | SignedEffectResourcePolicyV4,
-  manifest: ExecutionManifestV1, repositoryId: string, compatibility?: 'anchored-v2' | 'anchored-v4'): void {
+export function assertAnchoredEffectPolicy(anchor: EffectSignerAnchor, policy: SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3 | SignedEffectResourcePolicyV4 | SignedEffectResourcePolicyV5,
+  manifest: ExecutionManifestV1, repositoryId: string, compatibility?: 'anchored-v2' | 'anchored-v4' | 'anchored-v5'): void {
   assertEffectSignerAnchor(anchor);
-  if (compatibility !== undefined && compatibility !== 'anchored-v2' && compatibility !== 'anchored-v4') throw new TypeError('unsupported anchored effect policy compatibility');
+  if (compatibility !== undefined && compatibility !== 'anchored-v2' && compatibility !== 'anchored-v4'
+    && compatibility !== 'anchored-v5') throw new TypeError('unsupported anchored effect policy compatibility');
   if (repositoryId !== anchor.repositoryId || policy?.signer !== anchor.signer) throw new TypeError('effect policy signer/repository differs from independent anchor');
   if (compatibility === 'anchored-v2') {
     if (policy.format !== 'aether.signed-effect-resource-policy/2') throw new TypeError('legacy anchored policy requires v2');
@@ -64,6 +67,9 @@ export function assertAnchoredEffectPolicy(anchor: EffectSignerAnchor, policy: S
   } else if (compatibility === 'anchored-v4') {
     if (policy.format !== 'aether.signed-effect-resource-policy/4') throw new TypeError('isolated Wasm anchored policy requires v4');
     assertSignedEffectResourcePolicyV4(policy, manifest, anchor.repositoryId, anchor.currentEpoch(), anchor.publicKey);
+  } else if (compatibility === 'anchored-v5') {
+    if (policy.format !== 'aether.signed-effect-resource-policy/5') throw new TypeError('attested sink anchored policy requires v5');
+    assertSignedEffectResourcePolicyV5(policy, manifest, anchor.repositoryId, anchor.currentEpoch(), anchor.publicKey);
   } else {
     if (policy.format !== 'aether.signed-effect-resource-policy/3') throw new TypeError('anchored policy requires signed policy v3');
     assertSignedEffectResourcePolicyV3(policy, manifest, anchor.repositoryId, anchor.currentEpoch(), anchor.publicKey);
