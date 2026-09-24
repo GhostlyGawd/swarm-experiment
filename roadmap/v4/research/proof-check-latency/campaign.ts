@@ -11,13 +11,18 @@ import { fileURLToPath } from 'node:url';
 import * as b from '../../../../src/tier1/build.ts';
 import { SymbolSpace } from '../../../../src/tier1/symbols.ts';
 import { GraphStore } from '../../../../src/tier1/store.ts';
-import { domainDigest } from '../../../../src/fabric/identity.ts';
+import { domainDigest, executionManifestDigest } from '../../../../src/fabric/identity.ts';
+import { encodeCanonical } from '../../../../src/fabric/encoding.ts';
 import { checkPortableCertificate, encodePortableCertificate,
-  portableCertificateDigest, type PortableCertificateV1 } from '../../../../src/tier2/portable-proof-checker.ts';
+  portableCertificateDigest, portableObligationSetDigest,
+  type PortableCertificateV1 } from '../../../../src/tier2/portable-proof-checker.ts';
 import { generatePortableCertificate } from '../../../../src/tier2/portable-proof-producer.ts';
+import { derivePortableObligations } from '../../../../src/tier2/portable-obligations.ts';
+import { checkFormulaCertificate } from '../../../../src/tier2/portable-formula-checker.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const profilePath = join(root, 'roadmap/v4/research/proof-check-latency/profile.json');
+const stageProfilePath = join(root, 'roadmap/v4/research/proof-check-latency/stage-profile.json');
 const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
   format: string; specVersion: string; fixture: string; checker: string; warmupChecks: number;
   measuredChecks: number; hardMaximumNs: number; timingScope: string;
@@ -75,7 +80,8 @@ function capture(path: string): void {
     capture(relative(root, resolve(dirname(absolute), match[1])));
 }
 for (const path of ['roadmap/v4/research/proof-check-latency/campaign.ts',
-  'roadmap/v4/research/proof-check-latency/profile.json', 'package-lock.json']) capture(path);
+  'roadmap/v4/research/proof-check-latency/profile.json',
+  'roadmap/v4/research/proof-check-latency/stage-profile.json', 'package-lock.json']) capture(path);
 const sourceFiles = () => Object.fromEntries([...captured].sort().map(path =>
   [path, sha(readFileSync(join(root, path)))]));
 const stats = (samplesNs: readonly number[]) => {
@@ -153,8 +159,101 @@ function verify(output: string): void {
     ...observed, hardMaximumNs: profile.hardMaximumNs }));
 }
 
+const STAGE_NAMES = ['full', 'encode', 'executionDigest', 'derive',
+  'obligationDigest', 'formulaProofs', 'certificateDigest'] as const;
+type StageName = typeof STAGE_NAMES[number];
+const stageProfile = JSON.parse(readFileSync(stageProfilePath, 'utf8')) as {
+  format: string; specVersion: string; fixture: string;
+  warmupChecksPerStage: number; measuredChecksPerStage: number;
+  stages: readonly string[]; scope: string;
+};
+assert.deepEqual({ format: stageProfile.format, specVersion: stageProfile.specVersion,
+  fixture: stageProfile.fixture, warmupChecksPerStage: stageProfile.warmupChecksPerStage,
+  measuredChecksPerStage: stageProfile.measuredChecksPerStage, stages: stageProfile.stages },
+{ format: 'aether.proof-check-stage-profile/1', specVersion: '0.1.0',
+  fixture: 'portable-scalar-call-with-seven-obligations/1',
+  warmupChecksPerStage: 10, measuredChecksPerStage: 100, stages: STAGE_NAMES });
+function stageFunctions(f: ReturnType<typeof fixture>, certificate: PortableCertificateV1):
+  Record<StageName, () => unknown> {
+  const derived = derivePortableObligations(f.module, f.context);
+  return {
+    full: () => checkPortableCertificate(f.module, certificate, f.context),
+    encode: () => encodeCanonical(certificate),
+    executionDigest: () => executionManifestDigest(f.context.manifest),
+    derive: () => derivePortableObligations(f.module, f.context),
+    obligationDigest: () => portableObligationSetDigest(derived),
+    formulaProofs: () => derived.obligations.forEach((obligation, index) =>
+      checkFormulaCertificate(obligation.formula, certificate.certificates[index].proof,
+        derived.manifestDigest)),
+    certificateDigest: () => portableCertificateDigest(certificate),
+  };
+}
+function stageStatistics(samples: Record<StageName, readonly number[]>) {
+  return Object.fromEntries(STAGE_NAMES.map(name => {
+    const values = samples[name];
+    if (!Array.isArray(values) || values.length !== stageProfile.measuredChecksPerStage
+      || values.some(value => !Number.isSafeInteger(value) || value < 1))
+      throw new TypeError('invalid proof-check stage samples');
+    const sorted = [...values].sort((a, z) => a - z);
+    return [name, { minimumNs: sorted[0], medianNs: sorted[Math.floor(sorted.length / 2)],
+      p95Ns: sorted[Math.ceil(sorted.length * 0.95) - 1], maximumNs: sorted.at(-1)! }];
+  })) as Record<StageName, { minimumNs: number; medianNs: number; p95Ns: number; maximumNs: number }>;
+}
+function measureStages(output: string): void {
+  if (git('status', '--porcelain')) throw new Error('proof-check stage timing requires a clean source worktree');
+  if (existsSync(output)) throw new Error('proof-check stage evidence output already exists');
+  const f = fixture(), certificate = generatePortableCertificate(f.module, f.context);
+  if (!certificate || certificate.certificates.length !== 7)
+    throw new Error('declared seven-obligation stage fixture changed');
+  const functions = stageFunctions(f, certificate);
+  const stageSamples = {} as Record<StageName, number[]>;
+  for (const name of STAGE_NAMES) stageSamples[name] = [];
+  for (const name of STAGE_NAMES) {
+    for (let i = 0; i < stageProfile.warmupChecksPerStage; i++) functions[name]();
+    for (let i = 0; i < stageProfile.measuredChecksPerStage; i++) {
+      const start = process.hrtime.bigint(); functions[name]();
+      stageSamples[name].push(Number(process.hrtime.bigint() - start));
+    }
+  }
+  const samples = { format: 'aether.proof-check-stage-samples/1', certificate, stageSamples };
+  const report = { format: 'aether.proof-check-stage-report/1', subjectCommit: git('rev-parse', 'HEAD'),
+    sourceFiles: sourceFiles(), stageProfile, stageProfileSha256: sha(readFileSync(stageProfilePath)),
+    samplesSha256: sha(json(samples)), certificateDigest: portableCertificateDigest(certificate),
+    environment: environment(), statistics: stageStatistics(stageSamples) };
+  mkdirSync(output, { recursive: true });
+  writeFileSync(join(output, 'stage-samples.json'), json(samples));
+  writeFileSync(join(output, 'stage-report.json'), json(report));
+  console.log(json({ stageProfile: stageProfile.format, statistics: report.statistics }));
+}
+function verifyStages(output: string): void {
+  const reportBytes = readFileSync(join(output, 'stage-report.json'), 'utf8');
+  const samplesBytes = readFileSync(join(output, 'stage-samples.json'), 'utf8');
+  const report = JSON.parse(reportBytes), samples = JSON.parse(samplesBytes);
+  if (reportBytes !== json(report) || samplesBytes !== json(samples)
+    || report.format !== 'aether.proof-check-stage-report/1'
+    || samples.format !== 'aether.proof-check-stage-samples/1'
+    || report.subjectCommit !== git('rev-parse', 'HEAD')
+    || JSON.stringify(report.sourceFiles) !== JSON.stringify(sourceFiles())
+    || JSON.stringify(report.stageProfile) !== JSON.stringify(stageProfile)
+    || report.stageProfileSha256 !== sha(readFileSync(stageProfilePath))
+    || report.samplesSha256 !== sha(samplesBytes)
+    || JSON.stringify(report.environment) !== JSON.stringify(environment()))
+    throw new TypeError('proof-check stage evidence source, profile or hardware changed');
+  const f = fixture(), certificate = samples.certificate as PortableCertificateV1;
+  if (portableCertificateDigest(certificate) !== report.certificateDigest
+    || certificate.certificates.length !== 7)
+    throw new TypeError('proof-check stage certificate changed');
+  checkPortableCertificate(f.module, certificate, f.context);
+  if (JSON.stringify(stageStatistics(samples.stageSamples)) !== JSON.stringify(report.statistics))
+    throw new TypeError('proof-check stage statistics changed');
+  console.log(json({ verified: true, sourceMatches: true,
+    stageProfile: stageProfile.format, statistics: report.statistics }));
+}
+
 const [mode, supplied] = process.argv.slice(2);
-if (!supplied || !['--measure', '--verify'].includes(mode))
-  throw new Error('usage: campaign.ts --measure|--verify OUTPUT_DIRECTORY');
+if (!supplied || !['--measure', '--verify', '--stages', '--verify-stages'].includes(mode))
+  throw new Error('usage: campaign.ts --measure|--verify|--stages|--verify-stages OUTPUT_DIRECTORY');
 if (mode === '--measure') measure(resolve(supplied));
-else verify(resolve(supplied));
+else if (mode === '--verify') verify(resolve(supplied));
+else if (mode === '--stages') measureStages(resolve(supplied));
+else verifyStages(resolve(supplied));

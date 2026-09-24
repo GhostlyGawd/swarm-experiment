@@ -1,0 +1,9 @@
+{
+  "format": "aether.proof-check-stage-profile/1",
+  "specVersion": "0.1.0",
+  "fixture": "portable-scalar-call-with-seven-obligations/1",
+  "warmupChecksPerStage": 10,
+  "measuredChecksPerStage": 100,
+  "stages": ["full", "encode", "executionDigest", "derive", "obligationDigest", "formulaProofs", "certificateDigest"],
+  "scope": "Diagnostic stage timing; stages overlap and their durations must not be summed into a release verdict"
+}
