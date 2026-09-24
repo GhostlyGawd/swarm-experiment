@@ -9,6 +9,7 @@ export * from './attested-sink-adapter.ts';
 export * from './attested-sink-service.ts';
 export * from './host-journal-witness.ts';
 export * from './deployment-journal-witness.ts';
+export * from './budget-journal-witness.ts';
 export * from './witness-service.ts';
 export * from './replication.ts';
 export * from './evidence.ts';

@@ -6,6 +6,7 @@ import { encodeCanonical, type TaggedValueV1 } from '../../src/fabric/encoding.t
 import { DurableEffectBroker, effectPayloadDigest, effectRequestDigest, type EffectAdapter, type EffectBrokerOptions, type EffectEventV1, type EffectRequestV1, type ExecutionMode } from '../../src/fabric/effects.ts';
 import { ResourceBudgetLedger, RESOURCE_BUDGET_PROFILE, type ResourceAmounts, type ResourceBudgetOptions } from '../../src/tier2/resource-budget.ts';
 import { ResourceBudgetBridge, decodeBudgetSettlementWitness, type ResourceBudgetBridgeOptions, type ResourceBudgetBridgeProfile, type BudgetObservation } from '../../src/tier2/resource-budget-bridge.ts';
+import type { BudgetJournalWitness } from '../../src/fabric/budget-journal-witness.ts';
 
 export const amount = (value: number): ResourceAmounts => ({ usdMicros: String(value), tokens: String(value), nanoseconds: String(value), memoryBytes: String(value) });
 const same = (a: unknown, b: unknown): boolean => Buffer.from(encodeCanonical(a)).equals(Buffer.from(encodeCanonical(b)));
@@ -24,6 +25,8 @@ export interface FixtureOptions {
   bridgeFault?: ResourceBudgetBridgeOptions['fault']; ledgerFault?: ResourceBudgetOptions['fault']; brokerFault?: EffectBrokerOptions['beforePersist'];
   authorize?: EffectBrokerOptions['authorize']; bridgeAuthorize?: ResourceBudgetBridgeOptions['authorize'];
   afterSink?: () => void; afterPrepare?: () => void; unknown?: boolean;
+  ledgerWitness?: BudgetJournalWitness; bridgeWitness?: BudgetJournalWitness;
+  bridgeWitnessFault?: () => void;
 }
 export function openBridgeFixture(directory: string, options: FixtureOptions = {}) {
   mkdirSync(directory, { recursive: true }); const keyPath = join(directory, 'issuer.pem'), configPath = join(directory, 'profile.json');
@@ -42,6 +45,7 @@ export function openBridgeFixture(directory: string, options: FixtureOptions = {
     ({ tag: 'string', value: domainDigest('aether.budget-broker-noncommit/1', event) });
   const initialCount = existsSync(configPath) ? JSON.parse(readFileSync(configPath, 'utf8')).grants.length : options.grants ?? 1;
   const ledgerOptions: ResourceBudgetOptions = { directory: join(directory, 'ledger'), key, profile: { format: RESOURCE_BUDGET_PROFILE, ledgerId: 'bridge-budget', policyEpoch: '1', initialOwner: 'budget-service', initial: amount(initialCount * 10), maxOperations: 100 }, authorize: () => true, fault: options.ledgerFault,
+    journalWitness: options.ledgerWitness,
     verifySettlement: context => {
       try {
         const witness = decodeBudgetSettlementWitness(context.evidence), row = sink(witness.request), terminal = terminalBrokerNoncommit(witness.request);
@@ -66,7 +70,8 @@ export function openBridgeFixture(directory: string, options: FixtureOptions = {
     return row.state === 'committed' ? { state: 'committed', value: row.value!, charge: row.charge, evidence: innerEvidence(row) } : { state: 'not_committed', evidence: innerEvidence(row) };
   };
   const bridge = new ResourceBudgetBridge({ directory: join(directory, 'bridge'), profile, ledger, key, mode: () => broker.executionMode,
-    authorize: options.bridgeAuthorize ?? (() => true), observe, fault: options.bridgeFault });
+    authorize: options.bridgeAuthorize ?? (() => true), observe, fault: options.bridgeFault,
+    journalWitness: options.bridgeWitness, witnessFault: options.bridgeWitnessFault });
   const brokerOptions: EffectBrokerOptions = { directory: join(directory, 'broker'), mode: options.mode ?? 'live', clockDomain: 'test-clock/1', clock: () => 100n, budgets: bridge, authorize: options.authorize ?? (() => true), authorizeReconciliation: () => true, beforePersist: options.brokerFault };
   broker = new DurableEffectBroker(brokerOptions);
   const prepare: NonNullable<EffectAdapter['prepare']> = request => {

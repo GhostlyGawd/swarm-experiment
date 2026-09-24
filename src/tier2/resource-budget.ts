@@ -8,6 +8,8 @@ import { dirname, join, resolve } from 'node:path';
 import { JournalLock } from '../fabric/journal-lock.ts';
 import { decodeCanonical, decimal, encodeCanonical, exactObject, identifier, validateTaggedValue, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { domainDigest, validateDigest, type Digest } from '../fabric/identity.ts';
+import { assertBudgetJournalWitness, readBudgetJournalHead, type BudgetJournalWitness } from '../fabric/budget-journal-witness.ts';
+import { BudgetJournalMirror } from './budget-journal-mirror.ts';
 
 export const RESOURCE_BUDGET_PROFILE = 'aether.resource-budget/1' as const;
 /** Fixed indivisible units, with no implicit exchange rate or floating point.
@@ -44,7 +46,7 @@ export interface ResourceReceipt {
   readonly status: 'applied' | 'exhausted'; readonly handles: readonly ResourceHandle[];
   readonly charged: ResourceAmounts; readonly refunded: ResourceAmounts;
 }
-export type ResourceBudgetFault = 'after-genesis' | 'after-initial-journal' | 'after-initialization-seal' | 'before-write' | 'after-file-sync' | 'before-commit' | 'after-commit' | 'after-directory-sync';
+export type ResourceBudgetFault = 'after-genesis' | 'after-initial-journal' | 'after-initialization-seal' | 'before-write' | 'after-file-sync' | 'before-commit' | 'after-witness-commit' | 'after-commit' | 'after-directory-sync';
 export interface ResourceAuthorization {
   readonly ledgerDigest: Digest; readonly policyEpoch: string; readonly actor: string;
   readonly owner: string; readonly purpose: ResourceOperation['kind'] | 'inspect' | 'genesis';
@@ -69,6 +71,9 @@ export interface ResourceBudgetOptions {
   /** Operator-pinned identity of the exact evidence verifier configuration.
    * Required by historical revalidation and bound into the ledger digest. */
   readonly settlementEvidencePolicyDigest?: Digest;
+  /** Operator-held complete journal CAS. Optional to preserve the historical
+   * V1 profile; when selected it is bound into the ledger identity. */
+  readonly journalWitness?: BudgetJournalWitness;
   readonly fault?: (phase: ResourceBudgetFault) => void;
 }
 interface JournalRecord { readonly format: 'aether.resource-transition/1'; readonly sequence: number; readonly previous: Digest; readonly request: ResourceRequest; readonly receipt: ResourceReceipt; readonly signature: string }
@@ -77,6 +82,7 @@ interface Fold { live: Map<Digest, ResourceHandle>; spent: ResourceAmounts; refu
 const keys = ['usdMicros', 'tokens', 'nanoseconds', 'memoryBytes'] as const;
 const maximum = (1n << 128n) - 1n;
 const limits = { maxFrameBytes: 32 * 1024 * 1024, maxDecompressedBytes: 32 * 1024 * 1024, maxObjects: 1_000_000, maxIntegerDigits: 128 };
+const ledgerInstances = new WeakSet<object>();
 const zero = (): ResourceAmounts => ({ usdMicros: '0', tokens: '0', nanoseconds: '0', memoryBytes: '0' });
 const clone = <T>(value: T): T => decodeCanonical(encodeCanonical(value, limits), limits) as T;
 function freeze<T>(value: T): T { if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); } return value; }
@@ -104,6 +110,10 @@ function directory(path: string): void {
 function read<T>(path: string): T { if (statSync(path).size > limits.maxFrameBytes) throw new RangeError('oversized resource journal'); return decodeCanonical(readFileSync(path), limits) as T; }
 
 export class ResourceBudgetLedger {
+  static assertInstance(value: unknown): asserts value is ResourceBudgetLedger {
+    if (value === null || typeof value !== 'object' || !ledgerInstances.has(value))
+      throw new TypeError('branded resource budget ledger required');
+  }
   readonly ledgerDigest: Digest;
   readonly publicKey: string;
   private readonly options: ResourceBudgetOptions;
@@ -113,6 +123,7 @@ export class ResourceBudgetLedger {
   private readonly directory: string;
   private readonly file: string;
   private readonly lock: JournalLock;
+  private readonly mirror: BudgetJournalMirror | null;
   constructor(options: ResourceBudgetOptions) {
     if (options.revalidateSettlementOnRead !== undefined
       && typeof options.revalidateSettlementOnRead !== 'boolean')
@@ -125,6 +136,12 @@ export class ResourceBudgetLedger {
     if (this.profile.format !== RESOURCE_BUDGET_PROFILE) throw new TypeError('unsupported resource budget profile');
     identifier(this.profile.ledgerId); decimal(this.profile.policyEpoch); identifier(this.profile.initialOwner); amounts(this.profile.initial, true);
     if (!Number.isSafeInteger(this.profile.maxOperations) || this.profile.maxOperations < 1 || this.profile.maxOperations > 10_000) throw new RangeError('resource operation capacity');
+    if (options.journalWitness) {
+      assertBudgetJournalWitness(options.journalWitness);
+      if (options.journalWitness.journalKind !== 'ledger'
+        || options.journalWitness.journalId !== this.profile.ledgerId)
+        throw new TypeError('wrong resource ledger journal witness');
+    }
     this.key = typeof options.key === 'string' ? createPrivateKey(options.key) : options.key;
     if (this.key.type !== 'private' || this.key.asymmetricKeyType !== 'ed25519') throw new TypeError('Ed25519 ledger issuer key required');
     this.verificationKey = createPublicKey(this.key); this.publicKey = this.verificationKey.export({ type: 'spki', format: 'der' }).toString('base64');
@@ -133,11 +150,15 @@ export class ResourceBudgetLedger {
       publicKey: this.publicKey, authorityDirectory: this.directory,
       ...(options.revalidateSettlementOnRead
         ? { settlementEvidencePolicy: 'aether.resource-settlement-revalidation/1',
-          settlementEvidencePolicyDigest: options.settlementEvidencePolicyDigest } : {}) });
+          settlementEvidencePolicyDigest: options.settlementEvidencePolicyDigest } : {}),
+      ...(options.journalWitness ? { journalWitnessDigest: options.journalWitness.digest } : {}) });
     directory(join(this.directory, 'tickets'));
     this.file = join(this.directory, 'journal.json');
+    this.mirror = options.journalWitness ? new BudgetJournalMirror(this.file, options.journalWitness,
+      () => this.options.fault?.('after-witness-commit')) : null;
     this.lock = new JournalLock({ directory: join(this.directory, 'tickets'), maxTickets: 100_000, domain: 'aether.resource-budget-lock' });
     this.lock.run(() => this.initialize(), 5_000);
+    ledgerInstances.add(this);
   }
   private sign(domain: string, value: unknown): string { return sign(null, encodeCanonical({ domain, value }, limits), this.key).toString('base64'); }
   private verify(domain: string, value: unknown, signature: unknown): void {
@@ -146,19 +167,27 @@ export class ResourceBudgetLedger {
   }
   private initialize(): void {
     const genesisFile = join(this.directory, 'genesis.json'), sealFile = join(this.directory, 'initialized.json');
+    const witnessed = this.options.journalWitness
+      ? readBudgetJournalHead(this.options.journalWitness) : null;
     const body = { format: 'aether.resource-genesis/1', ledgerDigest: this.ledgerDigest, profile: this.profile, publicKey: this.publicKey };
     const genesis = { body, signature: this.sign('aether.resource-genesis-signature/1', body) };
     if (!existsSync(genesisFile)) {
-      if (existsSync(this.file) || existsSync(sealFile)) throw new Error('missing established resource genesis');
+      if (!witnessed || witnessed.revision === '0') {
+        if (existsSync(this.file) || existsSync(sealFile)) throw new Error('missing established resource genesis');
+      }
       this.publishOnce(genesisFile, genesis); this.options.fault?.('after-genesis');
     }
     if (!equal(read(genesisFile), genesis)) throw new Error('resource profile/key mismatch or corrupted genesis');
     if (!existsSync(this.file)) {
-      if (existsSync(sealFile)) throw new Error('missing established resource journal');
-      this.publishOnce(this.file, { format: 'aether.resource-journal/1', ledgerDigest: this.ledgerDigest, records: [] }); this.options.fault?.('after-initial-journal');
+      if (!witnessed || witnessed.revision === '0') {
+        if (existsSync(sealFile)) throw new Error('missing established resource journal');
+        this.publishOnce(this.file, { format: 'aether.resource-journal/1', ledgerDigest: this.ledgerDigest, records: [] }); this.options.fault?.('after-initial-journal');
+      }
     }
+    this.mirror?.initialize(Buffer.from(encodeCanonical({ format: 'aether.resource-journal/1',
+      ledgerDigest: this.ledgerDigest, records: [] }, limits)).toString('utf8'));
     const existing = this.read();
-    if (!existsSync(sealFile) && existing.journal.records.length) throw new Error('missing established resource initialization seal');
+    if (!existsSync(sealFile) && existing.journal.records.length && !this.mirror) throw new Error('missing established resource initialization seal');
     const seal = { format: 'aether.resource-initialization/1', ledgerDigest: this.ledgerDigest, genesisDigest: digest('aether.resource-genesis/1', genesis) };
     if (!existsSync(sealFile)) { this.publishOnce(sealFile, seal); this.options.fault?.('after-initialization-seal'); }
     else if (!equal(read(sealFile), seal)) throw new Error('resource initialization seal mismatch');
@@ -258,6 +287,7 @@ export class ResourceBudgetLedger {
     if (!equal(add(sum([...fold.live.values()].map(handle => handle.body.amounts)), fold.spent), this.profile.initial)) throw new Error('resource conservation violated');
   }
   private read(): { journal: Journal; fold: Fold } {
+    this.mirror?.read();
     const journal = read<Journal>(this.file); exactObject(journal, ['format', 'ledgerDigest', 'records']);
     if (journal.format !== 'aether.resource-journal/1' || journal.ledgerDigest !== this.ledgerDigest || !Array.isArray(journal.records) || journal.records.length > this.profile.maxOperations) throw new TypeError('invalid resource journal');
     const initial = this.initialHandle(), fold: Fold = { live: new Map([[initial.body.id, initial]]), spent: zero(), refunded: zero(), bindings: new Set(), receipts: new Map() };
@@ -283,7 +313,9 @@ export class ResourceBudgetLedger {
     try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
     try {
       this.options.fault?.('after-file-sync'); this.options.fault?.('before-commit'); beforeCommit();
-      renameSync(temp, this.file); this.options.fault?.('after-commit'); sync(this.directory); this.options.fault?.('after-directory-sync');
+      const local = (): void => { renameSync(temp, this.file); this.options.fault?.('after-commit'); sync(this.directory); this.options.fault?.('after-directory-sync'); };
+      if (this.mirror) this.mirror.advance(Buffer.from(bytes).toString('utf8'), local);
+      else local();
     } finally { if (existsSync(temp)) unlinkSync(temp); }
   }
   genesisHandle(actor: string): ResourceHandle {
@@ -302,6 +334,24 @@ export class ResourceBudgetLedger {
       this.publish({ ...journal, records: [...journal.records, record] }, () => this.authorizeOperation(detached, false, true)); return freeze(clone(receipt));
     }, 5_000);
   }
+  /** Read-only exact receipt check. Replays the whole signed journal, including
+   * any configured external head and historical settlement evidence. */
+  assertReceipt(input: ResourceRequest, expected: ResourceReceipt): void {
+    const request = freeze(clone(input)); this.validateRequest(request);
+    this.lock.run(() => {
+      const { fold } = this.read();
+      this.authorize(request.actor, 'inspect', null, false, request.actor);
+      const recorded = fold.receipts.get(request.operationId);
+      if (!recorded || recorded.request !== digest('aether.resource-operation/1', request)
+        || !equal(recorded.receipt, expected))
+        throw new Error('resource receipt absent or differs from witnessed ledger');
+    }, 5_000);
+  }
+  /** Admission check for profiles that require independent monotonic custody. */
+  assertWitnessed(): void {
+    if (!this.mirror) throw new Error('resource ledger lacks external monotonic journal witness');
+    this.lock.run(() => { this.read(); }, 5_000);
+  }
   snapshot(actor: string): { ledgerDigest: Digest; sequence: number; funded: ResourceAmounts; available: ResourceAmounts; reserved: ResourceAmounts; inflight: ResourceAmounts; spent: ResourceAmounts; refunded: ResourceAmounts; handles: readonly ResourceHandle[] } {
     return this.lock.run(() => {
       const { journal, fold } = this.read(); this.authorize(actor, 'inspect', null, false, this.profile.initialOwner);
@@ -311,3 +361,5 @@ export class ResourceBudgetLedger {
     }, 5_000);
   }
 }
+
+Object.freeze(ResourceBudgetLedger.prototype);

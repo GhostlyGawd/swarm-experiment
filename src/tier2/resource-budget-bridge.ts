@@ -8,7 +8,9 @@ import { decodeCanonical, encodeCanonical, exactObject, identifier, validateTagg
 import { domainDigest, validateDigest, type Digest } from '../fabric/identity.ts';
 import { effectRequestDigest, validateEffectRequest, type EffectBudget, type EffectRequestV1, type ExecutionMode } from '../fabric/effects.ts';
 import { JournalLock } from '../fabric/journal-lock.ts';
+import { assertBudgetJournalWitness, readBudgetJournalHead, type BudgetJournalWitness } from '../fabric/budget-journal-witness.ts';
 import { ResourceBudgetLedger, type ResourceAmounts, type ResourceHandle, type ResourceReceipt, type ResourceRequest } from './resource-budget.ts';
+import { BudgetJournalMirror } from './budget-journal-mirror.ts';
 
 export interface ResourceBudgetGrant {
   readonly id: string; readonly handle: ResourceHandle;
@@ -36,8 +38,13 @@ export interface ResourceBudgetBridgeOptions {
   readonly mode: () => ExecutionMode;
   readonly authorize: (request: EffectRequestV1, purpose: 'reserve' | 'consume' | 'release') => boolean;
   readonly observe: (request: EffectRequestV1) => BudgetObservation;
+  /** Optional operator-held CAS head of the complete signed bridge journal. */
+  readonly journalWitness?: BudgetJournalWitness;
+  /** Test/operator crash injection after external CAS but before local mirror. */
+  readonly witnessFault?: () => void;
   readonly fault?: (phase: 'after-intent' | 'after-ledger' | 'after-receipt', operation: 'reserve' | 'consume' | 'refund') => void;
 }
+const bridgeInstances = new WeakSet<object>();
 interface Row {
   request: EffectRequestV1; grantId: string; reserve: ResourceRequest; reserveReceipt: ResourceReceipt | null;
   settlement: ResourceRequest | null; settlementReceipt: ResourceReceipt | null;
@@ -67,6 +74,10 @@ export function decodeBudgetSettlementWitness(value: TaggedValueV1): BudgetSettl
 }
 
 export class ResourceBudgetBridge implements EffectBudget {
+  static assertInstance(value: unknown): asserts value is ResourceBudgetBridge {
+    if (value === null || typeof value !== 'object' || !bridgeInstances.has(value))
+      throw new TypeError('branded resource budget bridge required');
+  }
   readonly profileDigest: Digest;
   private readonly options: ResourceBudgetBridgeOptions;
   private readonly profile: ResourceBudgetBridgeProfile;
@@ -74,11 +85,19 @@ export class ResourceBudgetBridge implements EffectBudget {
   private readonly directory: string;
   private readonly file: string;
   private readonly lock: JournalLock;
+  private readonly mirror: BudgetJournalMirror | null;
   constructor(options: ResourceBudgetBridgeOptions) {
+    ResourceBudgetLedger.assertInstance(options.ledger);
     this.options = { ...options }; this.profile = frozen(clone(options.profile));
     exactObject(this.profile, ['format', 'bridgeId', 'actor', 'brokerAuthority', 'grants']);
     if (this.profile.format !== 'aether.resource-budget-bridge/1') throw new TypeError('unknown budget bridge profile');
     identifier(this.profile.bridgeId); identifier(this.profile.actor); identifier(this.profile.brokerAuthority);
+    if (options.journalWitness) {
+      assertBudgetJournalWitness(options.journalWitness);
+      if (options.journalWitness.journalKind !== 'bridge'
+        || options.journalWitness.journalId !== this.profile.bridgeId)
+        throw new TypeError('wrong budget bridge journal witness');
+    }
     if (!Array.isArray(this.profile.grants) || this.profile.grants.length < 1 || this.profile.grants.length > 256) throw new RangeError('bounded split budget grants required');
     const names = new Set<string>(), handles = new Set<string>();
     for (const grant of this.profile.grants) {
@@ -89,24 +108,40 @@ export class ResourceBudgetBridge implements EffectBudget {
     this.key = typeof options.key === 'string' ? createPrivateKey(options.key) : options.key;
     if (this.key.type !== 'private' || this.key.asymmetricKeyType !== 'ed25519') throw new TypeError('Ed25519 bridge journal key required');
     ensure(resolve(options.directory)); this.directory = realpathSync(resolve(options.directory)); this.file = join(this.directory, 'bridge.json');
-    this.profileDigest = domainDigest('aether.resource-budget-bridge/1', { profile: this.profile, ledger: options.ledger.ledgerDigest, authorityDirectory: this.directory, publicKey: createPublicKey(this.key).export({ type: 'spki', format: 'der' }).toString('base64') }, limits);
+    this.profileDigest = domainDigest('aether.resource-budget-bridge/1', { profile: this.profile, ledger: options.ledger.ledgerDigest, authorityDirectory: this.directory, publicKey: createPublicKey(this.key).export({ type: 'spki', format: 'der' }).toString('base64'),
+      ...(options.journalWitness ? { journalWitnessDigest: options.journalWitness.digest } : {}) }, limits);
+    this.mirror = options.journalWitness ? new BudgetJournalMirror(this.file, options.journalWitness,
+      options.witnessFault) : null;
     ensure(join(this.directory, 'tickets')); this.lock = new JournalLock({ directory: join(this.directory, 'tickets'), domain: 'aether.budget-bridge-lock' });
     this.lock.run(() => {
       const seal = join(this.directory, 'initialized.json');
-      if (!existsSync(this.file)) { if (existsSync(seal)) throw new Error('missing established budget bridge'); this.write({ format: 'aether.resource-budget-bridge-journal/1', profileDigest: this.profileDigest, records: [] }, true); }
+      const witnessed = options.journalWitness ? readBudgetJournalHead(options.journalWitness) : null;
+      if (!existsSync(this.file) && (!witnessed || witnessed.revision === '0')) {
+        if (existsSync(seal)) throw new Error('missing established budget bridge');
+        this.write({ format: 'aether.resource-budget-bridge-journal/1', profileDigest: this.profileDigest, records: [] }, true);
+      }
+      this.mirror?.initialize(Buffer.from(encodeCanonical({ body: { format: 'aether.resource-budget-bridge-journal/1',
+        profileDigest: this.profileDigest, records: [] }, signature: sign(null, encodeCanonical({ format: 'aether.resource-budget-bridge-journal/1',
+        profileDigest: this.profileDigest, records: [] }, limits), this.key).toString('base64') }, limits)).toString('utf8'));
       const body = this.read();
       if (!existsSync(seal)) {
-        if (body.records.length) throw new Error('missing established budget bridge seal');
+        if (body.records.length && !this.mirror) throw new Error('missing established budget bridge seal');
         const marker = join(this.directory, `.seal-${randomUUID()}`), fd = openSync(marker, 'wx', 0o600);
         try { writeFileSync(fd, encodeCanonical({ profileDigest: this.profileDigest })); fsyncSync(fd); } finally { closeSync(fd); }
         try { linkSync(marker, seal); sync(this.directory); } finally { unlinkSync(marker); }
       } else if (!equal(decodeCanonical(readFileSync(seal)), { profileDigest: this.profileDigest })) throw new Error('budget bridge initialization mismatch');
     }, 5_000);
+    bridgeInstances.add(this);
   }
   private write(body: Body, once = false): void {
     const encoded = encodeCanonical(body, limits), signed = { body, signature: sign(null, encoded, this.key).toString('base64') }, temp = join(this.directory, `.bridge-${randomUUID()}`), fd = openSync(temp, 'wx', 0o600);
-    try { writeFileSync(fd, encodeCanonical(signed, limits)); fsyncSync(fd); } finally { closeSync(fd); }
-    try { if (once) linkSync(temp, this.file); else renameSync(temp, this.file); sync(this.directory); } finally { if (existsSync(temp)) unlinkSync(temp); }
+    const bytes = encodeCanonical(signed, limits);
+    try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
+    try {
+      const local = (): void => { if (once) linkSync(temp, this.file); else renameSync(temp, this.file); sync(this.directory); };
+      if (this.mirror && !once) this.mirror.advance(Buffer.from(bytes).toString('utf8'), local);
+      else local();
+    } finally { if (existsSync(temp)) unlinkSync(temp); }
   }
   private reserveCommand(request: EffectRequestV1, grant: ResourceBudgetGrant): ResourceRequest {
     return { format: 'aether.resource-operation/1', operationId: this.operationId(request, 'reserve'), actor: this.profile.actor,
@@ -115,6 +150,7 @@ export class ResourceBudgetBridge implements EffectBudget {
   }
   private operationId(request: EffectRequestV1, phase: string): Digest { return domainDigest('aether.budget-bridge-operation/1', { bridge: this.profileDigest, request: effectRequestDigest(request), phase }); }
   private read(): Body {
+    this.mirror?.read();
     if (statSync(this.file).size > limits.maxFrameBytes) throw new RangeError('oversized budget bridge journal');
     const envelope = exactObject(decodeCanonical(readFileSync(this.file), limits), ['body', 'signature']), body = envelope.body as Body;
     if (typeof envelope.signature !== 'string' || !/^[A-Za-z0-9+/]{86}==$/.test(envelope.signature)) throw new Error('forged budget bridge journal');
@@ -195,6 +231,7 @@ export class ResourceBudgetBridge implements EffectBudget {
       }
       this.authorize(request, purpose);
       const receipt = this.options.ledger.apply(row.settlement);
+      if (receipt.status !== 'applied') throw new Error('budget settlement was not applied');
       if (row.settlementReceipt) { if (!equal(receipt, row.settlementReceipt)) throw new Error('ledger settlement receipt mismatch'); }
       else { this.options.fault?.('after-ledger', kind); row.settlementReceipt = receipt; this.write(body); this.options.fault?.('after-receipt', kind); }
       this.authorize(request, purpose);
@@ -203,4 +240,71 @@ export class ResourceBudgetBridge implements EffectBudget {
   /** Read-only audit view. Refunded handles belong to the host for explicit new
    * grant issuance; the original grant never silently refills. */
   records(): readonly Readonly<Row>[] { return this.lock.run(() => frozen(clone(this.read().records)), 5_000); }
+
+  /** Required by budgeted sink admission. Historical unmirrored bridge
+   * profiles remain usable outside that stronger profile. */
+  assertWitnessed(): void {
+    if (!this.mirror) throw new Error('resource bridge lacks external monotonic journal witness');
+    this.lock.run(() => { this.read(); }, 5_000);
+    ResourceBudgetLedger.prototype.assertWitnessed.call(this.options.ledger);
+  }
+
+  /** Terminal broker audit. This performs no debit or refund: it verifies exact
+   * receipts already present in the ledger, then re-observes the signed sink
+   * commit or noncommit fence. Unknown evidence leaves the result unavailable. */
+  assertSettled(input: EffectRequestV1,
+    disposition: 'committed' | 'not_committed', requireReservation = true): void {
+    validateEffectRequest(input);
+    if (typeof requireReservation !== 'boolean'
+      || disposition !== 'committed' && disposition !== 'not_committed')
+      throw new TypeError('invalid budget settlement audit');
+    const request = frozen(clone(input));
+    this.lock.run(() => {
+      const row = this.find(this.read(), request);
+      if (!row) {
+        if (requireReservation || disposition !== 'not_committed')
+          throw new Error('terminal effect has no budget reservation');
+        ResourceBudgetLedger.prototype.snapshot.call(this.options.ledger, this.profile.actor);
+        if (this.options.observe(request).state !== 'not_committed')
+          throw new Error('unreserved effect lacks signed noncommit fence');
+        return;
+      }
+      if (!row.reserveReceipt) throw new Error('budget reservation lacks a ledger receipt');
+      ResourceBudgetLedger.prototype.assertReceipt.call(this.options.ledger, row.reserve, row.reserveReceipt);
+      if (row.reserveReceipt.status === 'exhausted') {
+        if (requireReservation || disposition !== 'not_committed'
+          || row.settlement !== null || row.settlementReceipt !== null)
+          throw new Error('exhausted budget cannot settle an effect');
+        if (this.options.observe(request).state !== 'not_committed')
+          throw new Error('exhausted effect lacks signed noncommit fence');
+        return;
+      }
+      if (!row.settlement || !row.settlementReceipt || row.settlementReceipt.status !== 'applied')
+        throw new Error('applied budget reservation lacks terminal settlement');
+      if (row.settlement.operation.kind !== (disposition === 'committed' ? 'consume' : 'refund'))
+        throw new Error('budget settlement disposition mismatch');
+      ResourceBudgetLedger.prototype.assertReceipt.call(this.options.ledger,
+        row.settlement, row.settlementReceipt);
+      const evidence = row.settlement.operation.evidence;
+      if (evidence === null) throw new Error('terminal budget evidence absent');
+      const witnessed = decodeBudgetSettlementWitness(evidence);
+      if (!equal(witnessed.request, request) || witnessed.disposition !== disposition)
+        throw new Error('budget settlement request mismatch');
+      const observed = frozen(clone(this.options.observe(request)));
+      if (observed.state === 'unknown')
+        throw new Error('budget settlement indeterminate; funds remain encumbered');
+      if (disposition === 'committed') {
+        if (observed.state !== 'committed' || !equal(observed.value, witnessed.value)
+          || !equal(observed.charge, witnessed.charge)
+          || !equal(observed.evidence, witnessed.evidence))
+          throw new Error('witnessed budget charge differs from current sink');
+      } else if (observed.state !== 'not_committed'
+        || !equal(observed.evidence, witnessed.evidence))
+        throw new Error('witnessed budget refund differs from signed fence');
+    }, 5_000);
+  }
 }
+
+// Host admission invokes prototype methods nonvirtually. Freeze the method
+// table so an admitted bridge cannot gain caller-supplied behavior afterward.
+Object.freeze(ResourceBudgetBridge.prototype);

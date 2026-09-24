@@ -16,6 +16,7 @@ import { createHostJournalWitness, createHostJournalWitnessCatalog,
   type HostJournalWitnessCatalog } from './host-journal-witness.ts';
 import { createDeploymentJournalWitness, type DeploymentJournalWitness } from './deployment-journal-witness.ts';
 import { createSinkStateWitness, validateSinkStateJournalV2, type SinkStateWitnessV1 } from './sink-state-witness.ts';
+import { createBudgetJournalWitness, type BudgetJournalWitness, type BudgetJournalKind } from './budget-journal-witness.ts';
 import { JournalLock } from './journal-lock.ts';
 
 const FORMAT = 'aether.witness-service/1';
@@ -39,7 +40,9 @@ export type WitnessIdentity =
   | Readonly<{ kind: 'host'; authorityId: string; repositoryId: string; deploymentId: string; hostId: string }>
   | Readonly<{ kind: 'deployment'; authorityId: string; repositoryId: string; deploymentId: string }>
   | Readonly<{ kind: 'sink'; authorityId: string; repositoryId: string; sinkAuthorityId: string; sinkId: string;
-    sinkAnchorDigest: string; adapterArtifactDigest: string }>;
+    sinkAnchorDigest: string; adapterArtifactDigest: string }>
+  | Readonly<{ kind: 'budget'; authorityId: string; repositoryId: string; deploymentId: string;
+    journalKind: BudgetJournalKind; journalId: string }>;
 export type WitnessNamespace = Exclude<WitnessIdentity, { kind: 'sink' }>
   | Readonly<{ kind: 'effect-scope'; authorityId: string; repositoryId: string; catalogDeploymentId: string; clockDomain: string }>
   | Readonly<{ kind: 'host-scope'; authorityId: string; repositoryId: string; deploymentId: string }>
@@ -91,6 +94,13 @@ function identity(value: unknown): WitnessIdentity {
     for (const field of ['authorityId', 'repositoryId', 'sinkAuthorityId', 'sinkId']) identifier(record[field]);
     validateDigest(record.sinkAnchorDigest, 'aether.sink-anchor/1');
     validateSinkAdapterArtifactDigest(record.adapterArtifactDigest);
+    return record as unknown as WitnessIdentity;
+  }
+  if (record.kind === 'budget') {
+    exactObject(record, ['kind', 'authorityId', 'repositoryId', 'deploymentId', 'journalKind', 'journalId']);
+    for (const field of ['authorityId', 'repositoryId', 'deploymentId', 'journalId']) identifier(record[field]);
+    if (record.journalKind !== 'ledger' && record.journalKind !== 'bridge')
+      throw new TypeError('unsupported budget witness journal kind');
     return record as unknown as WitnessIdentity;
   }
   const fields = record.kind === 'effect'
@@ -175,11 +185,15 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
   const expectedFormat = id.kind === 'effect' ? ['aether.effect-journal/2', 'aether.effect-journal/3', 'aether.effect-journal/4']
     : id.kind === 'host' ? ['aether.process-host/4', 'aether.process-host/5']
       : id.kind === 'sink' ? 'aether.attested-sink-state/2'
+        : id.kind === 'budget' ? (id.journalKind === 'ledger'
+          ? 'aether.resource-journal/1' : 'aether.resource-budget-bridge-journal/1')
         : ['aether.process-deployment/9', 'aether.process-deployment/10', 'aether.process-deployment/11'];
   // The service owns transport, identity, CAS and durable custody. Runtime
   // wrappers validate the richer journal semantics before calling advance.
-  if (Array.isArray(expectedFormat) ? !expectedFormat.includes(record.format as string)
-    : record.format !== expectedFormat)
+  const journalFormat = id.kind === 'budget' && id.journalKind === 'bridge'
+    ? (record.body as Record<string, unknown> | undefined)?.format : record.format;
+  if (Array.isArray(expectedFormat) ? !expectedFormat.includes(journalFormat as string)
+    : journalFormat !== expectedFormat)
     throw new TypeError('invalid witness journal format');
   if (id.kind === 'effect') {
     const { kind: _kind, ...parts } = id;
@@ -196,6 +210,16 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
       if (record.format === 'aether.effect-journal/4')
         validateDigest(record.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
     }
+  }
+  if (id.kind === 'budget') {
+    const row = id.journalKind === 'ledger'
+      ? exactObject(record, ['format', 'ledgerDigest', 'records'])
+      : exactObject(exactObject(record, ['body', 'signature']).body,
+        ['format', 'profileDigest', 'records']);
+    if (id.journalKind === 'bridge' && typeof record.signature !== 'string')
+      throw new TypeError('unsigned bridge witness journal');
+    validateDigest(id.journalKind === 'ledger' ? row.ledgerDigest : row.profileDigest);
+    if (!Array.isArray(row.records)) throw new TypeError('invalid budget witness history');
   }
   if (id.kind === 'deployment') {
     const { kind: _kind, ...parts } = id;
@@ -258,7 +282,7 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
       }
     }
   }
-  if (id.kind !== 'effect' && record.witnessRevision !== revision)
+  if (id.kind !== 'effect' && id.kind !== 'budget' && record.witnessRevision !== revision)
     throw new TypeError('witness journal revision mismatch');
 }
 /** Prevent a key holder from pruning already witnessed operation inventory.
@@ -292,6 +316,35 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
     if (typeof oldState !== 'string' || typeof newState !== 'string'
       || !graph[oldState]?.includes(newState)) throw new Error('witnessed operation state regressed');
   };
+  if (id.kind === 'budget') {
+    const previous = id.journalKind === 'ledger' ? prior : prior.body as Record<string, unknown>;
+    const updated = id.journalKind === 'ledger' ? next : next.body as Record<string, unknown>;
+    if (!same(id.journalKind === 'ledger' ? previous.ledgerDigest : previous.profileDigest,
+      id.journalKind === 'ledger' ? updated.ledgerDigest : updated.profileDigest))
+      throw new Error('witnessed budget identity changed');
+    if (id.journalKind === 'ledger') {
+      prefix('records', (oldRow, newRow) => {
+        if (!same(oldRow, newRow)) throw new Error('witnessed resource transition changed');
+      });
+      if (array(next, 'records').length !== array(prior, 'records').length + 1)
+        throw new Error('resource witness advance must append one transition');
+    } else {
+      const oldRows = array(previous, 'records'), newRows = array(updated, 'records');
+      if (newRows.length < oldRows.length) throw new Error('witnessed budget grants removed');
+      oldRows.forEach((oldRowValue, index) => {
+        const oldRow = oldRowValue as Record<string, unknown>, newRow = newRows[index] as Record<string, unknown>;
+        fixed(oldRow, newRow, ['request', 'grantId', 'reserve']);
+        for (const field of ['reserveReceipt', 'settlement', 'settlementReceipt'])
+          if (oldRow[field] !== null && !same(oldRow[field], newRow[field]))
+            throw new Error('witnessed budget settlement history changed');
+        if (oldRow.settlement !== null && newRow.reserveReceipt === null)
+          throw new Error('witnessed budget reservation regressed');
+      });
+      if (newRows.length > oldRows.length + 1)
+        throw new Error('budget witness advance added multiple grants');
+    }
+    return;
+  }
   if (id.kind === 'effect') {
     if ((prior.format === 'aether.effect-journal/3' || prior.format === 'aether.effect-journal/4')
       && (!same(prior.sinkAnchor, next.sinkAnchor)
@@ -565,6 +618,8 @@ export function createProcessWitnessClient(options: WitnessClientOptions): {
   deploymentWitness(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string }>): DeploymentJournalWitness;
   sinkStateWitness(namespace: Readonly<{ authorityId: string; anchor: SinkPublicAnchorV1;
     adapterArtifactDigest: string }>): SinkStateWitnessV1;
+  budgetJournalWitness(namespace: Readonly<{ authorityId: string; repositoryId: string;
+    deploymentId: string; journalKind: BudgetJournalKind; journalId: string }>): BudgetJournalWitness;
 } {
   const key = assertKey(options.key);
   if (!path.isAbsolute(options.socketPath)) throw new TypeError('witness socket path must be absolute');
@@ -651,6 +706,12 @@ export function createProcessWitnessClient(options: WitnessClientOptions): {
         sinkAnchorDigest: domainDigest('aether.sink-anchor/1', namespace.anchor),
         adapterArtifactDigest: namespace.adapterArtifactDigest };
       return createSinkStateWitness({ ...namespace,
+        read: () => call(id, 'read', null, null),
+        advance: (revision, journal) => call(id, 'advance', revision, journal) });
+    },
+    budgetJournalWitness: namespace => {
+      const id = { kind: 'budget' as const, ...namespace };
+      return createBudgetJournalWitness({ ...namespace,
         read: () => call(id, 'read', null, null),
         advance: (revision, journal) => call(id, 'advance', revision, journal) });
     },
