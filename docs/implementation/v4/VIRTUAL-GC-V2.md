@@ -1,6 +1,6 @@
 # One-wrapper virtual forwarding promotion V2
 
-This is a bounded production admission profile for a pure, closed, one-argument
+This is a bounded local admission profile for a pure, closed, one-argument
 tail forwarder. It does not change the legacy semantic-GC promotion guard.
 That guard still rejects step-changing wrapper collapse. The V2 path uses the
 checked virtual-forward descriptor and the V3 evidence policy instead.
@@ -32,7 +32,11 @@ checked virtual-forward descriptor and the V3 evidence policy instead.
    persisted plan; a different ID fails before activation.
 
 The retention ledger is checked for the same repository, store, lineage,
-registry, and export/protection policy. The proposal's source and candidate
+registry, and export/protection policy. Constructor options and the trusted
+export/protection policy are copied so later caller mutation cannot redirect
+the store or remove an export fence. Recovery rechecks the current local head
+and generation even when the store reports an already finalized promotion;
+it refuses to confirm a candidate after another writer moved that head. The proposal's source and candidate
 remain physically pinned after promotion. Later retention records do not
 invalidate historical recovery, but they invalidate a new commit based on the
 old snapshot.
@@ -42,6 +46,10 @@ Active-task and replication authorities may use other collector directories;
 this local test does not establish complete G2 retention-race coverage or
 safe migration of old tasks. Those paths need one shared retention authority
 and their own crash/concurrency evidence before broader promotion.
+The coordinator and public AST store do not share one lock after activation.
+A later independent writer can still change the local head; callers must not
+equate the coordinator's serving manifest with an externally mutable store head
+without a serving-time head check or exclusive write authority.
 
 ## Boundary and remaining work
 
@@ -52,6 +60,9 @@ resumable compiler and DurableGraphStore head. There is no descriptor-bearing
 artifact envelope for ProcessHost or the effect broker yet, so this profile
 does not authorize either. It also does not establish general semantic GC,
 multi-wrapper rewriting, process deployment, or the full V4-T1-05 gate.
+The signed target artifact digest is not yet tied to emitted resumable bytes;
+this local profile cannot be promoted to a fetched executable artifact by
+relabeling that digest.
 
 Focused verification:
 
@@ -62,5 +73,6 @@ npm run build
 ```
 
 The focused test covers signed promotion, exact dependency/profile checks,
-descriptor and plan substitution, source revocation, retention changes, a
-postcommit crash with exact-ID recovery, and retained predecessor AST roots.
+descriptor and plan substitution, source revocation, retention changes, caller
+options mutation, a postcommit crash with exact-ID recovery, wrong-head retry
+refusal, and retained predecessor AST roots.

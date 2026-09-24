@@ -80,8 +80,9 @@ function fixture() {
   const policy = { epoch: 'exports-v2', exports: [entry], protectedSymbols: [target] };
   const retentionLedger = new SemanticGarbageCollector({ directory: join(directory, 'gc'),
     repositoryId, store, lineage, registry, policy });
-  const gc = new SemanticVirtualGcPromotionV2({ directory: join(directory, 'virtual'),
-    repositoryId, store, lineage, registry, policy, retentionLedger });
+  const virtualOptions = { directory: join(directory, 'virtual'),
+    repositoryId, store, lineage, registry, policy, retentionLedger };
+  const gc = new SemanticVirtualGcPromotionV2(virtualOptions);
   const proposal = gc.propose(sourceArtifact.evidence.manifest,
     candidateArtifact.evidence.manifest, specification, wrapper, target);
   const governorAuthority = { repositoryId, membershipEpoch: '1', policyEpoch: '1',
@@ -102,7 +103,7 @@ function fixture() {
       context: candidateContext, evidence: candidateArtifact.evidence, migrationPlan, effectPlan };
   };
   return { directory, store, lineage, authority, author, source, candidate, descriptor, sourceArtifact,
-    candidateArtifact, policy, retentionLedger, gc, proposal, input, coordinator,
+    candidateArtifact, policy, retentionLedger, virtualOptions, gc, proposal, input, coordinator,
     coordinatorOptions, entry, wrapper, target,
     cleanup: () => rmSync(directory, { recursive: true, force: true }) };
 }
@@ -190,6 +191,65 @@ test('V2 committed decision recovers only with its exact persisted proposal', as
       lineage: reopenedLineage.admissionAdapter() });
     await reopenedGc.recover(f.proposal.id, reopenedCoordinator);
     assert.equal(f.coordinator.servingManifest(), f.candidateArtifact.manifestDigest);
+  } finally { f.cleanup(); }
+});
+
+test('V2 ignores a caller-owned store pointer swapped after construction', async () => {
+  const f = fixture();
+  try {
+    const other = new DurableGraphStore({ directory: join(f.directory, 'other-ast') });
+    other.importArchive(f.store.exportArchive([f.descriptor.sourceRoot, f.descriptor.candidateRoot]),
+      { leaseId: 'other-draft' });
+    other.commit('production', f.descriptor.sourceRoot, null);
+    f.virtualOptions.store = other;
+    await f.gc.promote(f.proposal.id, f.input(), f.coordinator);
+    assert.equal(f.store.head('production')?.root, f.descriptor.candidateRoot);
+    assert.equal(other.head('production')?.root, f.descriptor.sourceRoot);
+  } finally { f.cleanup(); }
+});
+
+test('V2 keeps its original export fence when caller-owned policy arrays change', () => {
+  const f = fixture();
+  try {
+    const policy = { epoch: 'protected-wrapper', exports: [f.entry, f.wrapper],
+      protectedSymbols: [f.target] };
+    const registry = new CapabilityRegistry();
+    const retentionLedger = new SemanticGarbageCollector({ directory: join(f.directory, 'protected-gc'),
+      repositoryId: 'virtual-gc-v2', store: f.store, lineage: f.lineage, registry, policy });
+    const options = { directory: join(f.directory, 'protected-virtual'),
+      repositoryId: 'virtual-gc-v2', store: f.store, lineage: f.lineage, registry,
+      policy, retentionLedger };
+    const protectedGc = new SemanticVirtualGcPromotionV2(options);
+    policy.exports.splice(1, 1);
+    assert.throws(() => protectedGc.propose(f.proposal.sourceManifest,
+      f.proposal.candidateManifest, f.proposal.specification, f.wrapper, f.target),
+    /exported|protection policy/);
+  } finally { f.cleanup(); }
+});
+
+test('V2 recovery refuses a finalized retry after another writer moved the local head', async () => {
+  const f = fixture();
+  try {
+    const original = f.store.finishPromotion.bind(f.store);
+    let interrupted = false;
+    (f.store as any).finishPromotion = (...args: Parameters<typeof f.store.finishPromotion>) => {
+      const result = original(...args);
+      if (!interrupted && args[1].kind === 'commit') {
+        interrupted = true;
+        throw new Error('interrupted after AST head commit');
+      }
+      return result;
+    };
+    await assert.rejects(f.gc.promote(f.proposal.id, f.input(), f.coordinator),
+      /interrupted after AST head commit/);
+    (f.store as any).finishPromotion = original;
+    const candidateHead = f.store.head('production')!;
+    assert.equal(candidateHead.root, f.descriptor.candidateRoot);
+    f.store.commit('production', f.descriptor.sourceRoot, candidateHead);
+    const reopened = new PromotionCoordinator(f.coordinatorOptions);
+    await assert.rejects(f.gc.recover(f.proposal.id, reopened), /local head changed/);
+    assert.equal(reopened.state().activationPending, true);
+    assert.equal(f.store.head('production')!.root, f.descriptor.sourceRoot);
   } finally { f.cleanup(); }
 });
 

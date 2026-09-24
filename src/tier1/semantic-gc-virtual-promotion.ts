@@ -138,7 +138,10 @@ export class SemanticVirtualGcPromotionV2 {
     identifier(options.repositoryId);
     policyDigest(options.repositoryId, options.policy);
     options.retentionLedger.assertRetentionAuthority(options);
-    this.options = options;
+    // The caller's options object is not an authority after construction.
+    // Swapping its store would otherwise move the local head while the signed
+    // lineage and retention fence still protect the original store.
+    this.options = Object.freeze({ ...options, policy: clone(options.policy) });
     mkdirSync(options.directory, { recursive: true });
   }
   private path(id: Digest): string {
@@ -146,6 +149,7 @@ export class SemanticVirtualGcPromotionV2 {
     return join(this.options.directory, `${id.split(':').at(-1)}.json`);
   }
   private check(input: VirtualGcPromotionProposalV2, current: boolean): void {
+    this.options.retentionLedger.assertRetentionAuthority(this.options);
     const proposal = clone(input);
     exactObject(proposal, ['format', 'repositoryId', 'sourceManifest', 'sourceManifestDigest',
       'candidateManifest', 'candidateManifestDigest', 'descriptor', 'specification',
@@ -311,8 +315,13 @@ export class SemanticVirtualGcPromotionV2 {
       activate: async (binding, handle) => {
         if (handle.payload.tag !== 'int') throw new Error('virtual GC head generation absent');
         const proposal = this.binding(id, binding, false);
+        const expectedGeneration = Number(handle.payload.value) + 1;
         store.finishPromotion(binding.proposalDigest, { kind: 'commit', name: headName,
           expected: { root: proposal.descriptor.sourceRoot, generation: Number(handle.payload.value) } });
+        const head = store.head(headName);
+        if (!head || head.root !== proposal.descriptor.candidateRoot
+          || head.generation !== expectedGeneration)
+          throw new Error('virtual GC local head changed after committed promotion');
       },
       abort: async binding => {
         if (store.roots().promotions[binding.proposalDigest])
