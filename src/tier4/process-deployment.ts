@@ -16,7 +16,8 @@ import { createPromotionHandle, evidenceBundleDigest, type PromotionAdmissionPro
 import { ProcessHost, type ProcessHostCallResult, type ProcessHostOptions, type ProcessInvocationGrant } from './process-host.ts';
 import { brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerMode } from '../tier3/effects.ts';
 import { assertEffectResourceAdapterV4, assertEffectResourceAdapterV5,
-  assertEffectResourceSinkContextV5 } from '../tier2/effect-resource-policy.ts';
+  assertEffectResourceAdapterV6, assertEffectResourceSinkContextV5,
+  assertEffectResourceSinkContextV6 } from '../tier2/effect-resource-policy.ts';
 import type { ScopedGrantV2 } from '../tier2/scoped-grants.ts';
 import { assertEffectSignerAnchor, assertAnchoredEffectPolicy, type EffectSignerAnchor } from '../tier2/effect-signer-anchor.ts';
 import { assertBeforeDeadline, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
@@ -53,21 +54,25 @@ export interface ProcessArtifactV1 {
   readonly schemaDigest: Digest;
 }
 export type ProcessHostServices = Pick<ProcessHostOptions, 'sealer' | 'scopedGrants' | 'effectResourcePath' | 'effectResourcePolicyDigest' | 'signedEffectResourcePolicy' | 'effectResourceSignerKey' | 'currentEffectPolicyEpoch' | 'revocations' | 'effectRouterFactory' | 'authorizeRecovery' | 'timeoutMs' | 'lockWaitMs' | 'maxWorkers' | 'onPhase'>;
-export type CapabilityDeploymentProfile = 'scoped-anchored-sink-v10' | 'scoped-anchored-wasm-v9' | 'scoped-anchored-wasm-v8' | 'scoped-anchored-wasm-v7' | 'scoped-anchored-wasm-v6' | 'scoped-anchored-v5' | 'scoped-anchored-v4' | 'scoped-artifact-v4' | 'scoped-signed-v3' | 'scoped-v2' | 'legacy-sealed-v1';
-const sinkProfile = (profile: CapabilityDeploymentProfile): boolean => profile === 'scoped-anchored-sink-v10';
+export type CapabilityDeploymentProfile = 'scoped-anchored-sink-v11' | 'scoped-anchored-sink-v10' | 'scoped-anchored-wasm-v9' | 'scoped-anchored-wasm-v8' | 'scoped-anchored-wasm-v7' | 'scoped-anchored-wasm-v6' | 'scoped-anchored-v5' | 'scoped-anchored-v4' | 'scoped-artifact-v4' | 'scoped-signed-v3' | 'scoped-v2' | 'legacy-sealed-v1';
+const resourceSinkProfile = (profile: CapabilityDeploymentProfile): boolean => profile === 'scoped-anchored-sink-v11';
+const sinkProfile = (profile: CapabilityDeploymentProfile): boolean => resourceSinkProfile(profile)
+  || profile === 'scoped-anchored-sink-v10';
 const hostWitnessedProfile = (profile: CapabilityDeploymentProfile): boolean => sinkProfile(profile) || profile === 'scoped-anchored-wasm-v9';
 const witnessedProfile = (profile: CapabilityDeploymentProfile): boolean => hostWitnessedProfile(profile) || profile === 'scoped-anchored-wasm-v8';
 const clockedProfile = (profile: CapabilityDeploymentProfile): boolean => witnessedProfile(profile) || profile === 'scoped-anchored-wasm-v7';
 const wasmProfile = (profile: CapabilityDeploymentProfile): boolean => !sinkProfile(profile) && (clockedProfile(profile) || profile === 'scoped-anchored-wasm-v6');
 const anchoredProfile = (profile: CapabilityDeploymentProfile): boolean => sinkProfile(profile) || wasmProfile(profile) || profile === 'scoped-anchored-v5' || profile === 'scoped-anchored-v4';
-const preparedFormat = (profile: CapabilityDeploymentProfile) => sinkProfile(profile) ? 'aether.process-deployment-prepared/8' as const
+const preparedFormat = (profile: CapabilityDeploymentProfile) => resourceSinkProfile(profile) ? 'aether.process-deployment-prepared/9' as const
+  : sinkProfile(profile) ? 'aether.process-deployment-prepared/8' as const
   : hostWitnessedProfile(profile) ? 'aether.process-deployment-prepared/7' as const
   : witnessedProfile(profile) ? 'aether.process-deployment-prepared/6' as const
   : clockedProfile(profile) ? 'aether.process-deployment-prepared/5' as const
   : profile === 'scoped-anchored-wasm-v6' ? 'aether.process-deployment-prepared/4' as const
   : profile === 'scoped-anchored-v5' ? 'aether.process-deployment-prepared/3' as const
     : profile === 'scoped-anchored-v4' ? 'aether.process-deployment-prepared/2' as const : 'aether.process-deployment-prepared/1' as const;
-const stateFormat = (profile: CapabilityDeploymentProfile) => sinkProfile(profile) ? 'aether.process-deployment/10' as const
+const stateFormat = (profile: CapabilityDeploymentProfile) => resourceSinkProfile(profile) ? 'aether.process-deployment/11' as const
+  : sinkProfile(profile) ? 'aether.process-deployment/10' as const
   : hostWitnessedProfile(profile) ? 'aether.process-deployment/9' as const
   : witnessedProfile(profile) ? 'aether.process-deployment/8' as const
   : clockedProfile(profile) ? 'aether.process-deployment/7' as const
@@ -109,7 +114,7 @@ interface DeploymentReference {
   readonly generation: string;
 }
 interface DeploymentState {
-  readonly format: 'aether.process-deployment/3' | 'aether.process-deployment/4' | 'aether.process-deployment/5' | 'aether.process-deployment/6' | 'aether.process-deployment/7' | 'aether.process-deployment/8' | 'aether.process-deployment/9' | 'aether.process-deployment/10';
+  readonly format: 'aether.process-deployment/3' | 'aether.process-deployment/4' | 'aether.process-deployment/5' | 'aether.process-deployment/6' | 'aether.process-deployment/7' | 'aether.process-deployment/8' | 'aether.process-deployment/9' | 'aether.process-deployment/10' | 'aether.process-deployment/11';
   readonly admissionProfile: PromotionAdmissionProfile;
   readonly capabilityProfile: CapabilityDeploymentProfile;
   readonly effectSignerAnchorDigest?: Digest;
@@ -148,7 +153,7 @@ interface DeploymentInvocation {
   readonly receiptDigest: Digest | null;
 }
 interface PreparedRecord {
-  readonly format: 'aether.process-deployment-prepared/1' | 'aether.process-deployment-prepared/2' | 'aether.process-deployment-prepared/3' | 'aether.process-deployment-prepared/4' | 'aether.process-deployment-prepared/5' | 'aether.process-deployment-prepared/6' | 'aether.process-deployment-prepared/7' | 'aether.process-deployment-prepared/8';
+  readonly format: 'aether.process-deployment-prepared/1' | 'aether.process-deployment-prepared/2' | 'aether.process-deployment-prepared/3' | 'aether.process-deployment-prepared/4' | 'aether.process-deployment-prepared/5' | 'aether.process-deployment-prepared/6' | 'aether.process-deployment-prepared/7' | 'aether.process-deployment-prepared/8' | 'aether.process-deployment-prepared/9';
   readonly effectSignerAnchorDigest?: Digest;
   readonly trustedClockAnchorDigest?: Digest;
   readonly effectJournalWitnessCatalogDigest?: Digest;
@@ -286,6 +291,33 @@ export function processHostWitnessedSinkEffectPlan(factoryId: string, capability
     { tag: 'string', value: sinkStateWitnessDigest },
   ] };
 }
+export function processResourceScopedSinkEffectPlan(factoryId: string, capabilityPolicyDigest: Digest,
+  signerAnchorDigest: Digest, clockAnchorDigest: Digest, effectWitnessCatalogDigest: Digest,
+  hostWitnessCatalogDigest: Digest, deploymentWitnessDigest: Digest, sinkAnchorDigest: Digest,
+  sinkDeploymentId: string, approvedAdapterArtifactDigest: Digest,
+  sinkStateWitnessDigest: Digest): TaggedValueV1 {
+  identifier(factoryId); identifier(sinkDeploymentId);
+  validateDigest(capabilityPolicyDigest, 'aether.effect-resource-policy/6');
+  validateDigest(signerAnchorDigest, 'aether.effect-signer-anchor/1');
+  validateDigest(clockAnchorDigest, 'aether.trusted-clock-anchor/1');
+  validateDigest(effectWitnessCatalogDigest, 'aether.effect-journal-witness-catalog/2');
+  validateDigest(hostWitnessCatalogDigest, 'aether.process-host-journal-witness-catalog/1');
+  validateDigest(deploymentWitnessDigest, 'aether.process-deployment-journal-witness/1');
+  validateDigest(sinkAnchorDigest, 'aether.sink-anchor/1');
+  validateSinkAdapterArtifactDigest(approvedAdapterArtifactDigest);
+  validateDigest(sinkStateWitnessDigest, 'aether.sink-state-witness/1');
+  return { tag: 'sequence', items: [
+    { tag: 'string', value: 'aether.process-effect-factory/9' },
+    { tag: 'string', value: factoryId }, { tag: 'string', value: capabilityPolicyDigest },
+    { tag: 'string', value: signerAnchorDigest }, { tag: 'string', value: clockAnchorDigest },
+    { tag: 'string', value: effectWitnessCatalogDigest },
+    { tag: 'string', value: hostWitnessCatalogDigest },
+    { tag: 'string', value: deploymentWitnessDigest }, { tag: 'string', value: sinkAnchorDigest },
+    { tag: 'string', value: sinkDeploymentId },
+    { tag: 'string', value: approvedAdapterArtifactDigest },
+    { tag: 'string', value: sinkStateWitnessDigest },
+  ] };
+}
 function schemaDigest(module: Term): Digest {
   const signatures: unknown[] = [], types = new Map<string, Ty>();
   const add = (ty: Ty): void => {
@@ -368,7 +400,7 @@ export class ProcessDeployment implements PromotionDriver {
     this.capabilityProfile = options.capabilityProfile ?? 'scoped-anchored-v5';
     this.options = { ...options, attestedSinkAuthority: sinkProfile(this.capabilityProfile)
       && options.attestedSinkAuthority ? freeze(copy(options.attestedSinkAuthority)) : undefined };
-    if (!['scoped-anchored-sink-v10', 'scoped-anchored-wasm-v9', 'scoped-anchored-wasm-v8', 'scoped-anchored-wasm-v7', 'scoped-anchored-wasm-v6', 'scoped-anchored-v5', 'scoped-anchored-v4', 'scoped-artifact-v4', 'scoped-signed-v3', 'scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
+    if (!['scoped-anchored-sink-v11', 'scoped-anchored-sink-v10', 'scoped-anchored-wasm-v9', 'scoped-anchored-wasm-v8', 'scoped-anchored-wasm-v7', 'scoped-anchored-wasm-v6', 'scoped-anchored-v5', 'scoped-anchored-v4', 'scoped-artifact-v4', 'scoped-signed-v3', 'scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
       || options.legacyCapabilityMigration !== undefined && !['adopt-legacy-sealed-v1', 'adopt-scoped-v2'].includes(options.legacyCapabilityMigration)) throw new TypeError('invalid capability deployment profile/migration');
     if (anchoredProfile(this.capabilityProfile)) assertEffectSignerAnchor(options.effectSignerAnchor);
     else if (options.effectSignerAnchor !== undefined) throw new TypeError('independent effect signer anchor requires anchored deployment profile');
@@ -719,7 +751,8 @@ export class ProcessDeployment implements PromotionDriver {
       ...(sinkProfile(this.capabilityProfile) ? { attestedSinkAuthority: this.options.attestedSinkAuthority!,
         sinkStateWitness: this.options.sinkStateWitness! } : {}),
       ...(this.capabilityProfile === 'scoped-anchored-v4' ? { legacyAnchoredEffectPolicy: 'anchored-v2' as const } : {}),
-      ...(sinkProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'attested-sink-v8-host-witness' as const }
+      ...(resourceSinkProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'attested-sink-v9-resource-witness' as const }
+        : sinkProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'attested-sink-v8-host-witness' as const }
         : hostWitnessedProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'isolated-wasm-v7-host-witness' as const }
         : witnessedProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'isolated-wasm-v6-witnessed' as const }
         : clockedProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'isolated-wasm-v5-clock' as const }
@@ -773,8 +806,10 @@ export class ProcessDeployment implements PromotionDriver {
       throw new Error('isolated Wasm deployment profile requires a signed read-only adapter policy v4');
     }
     if (sinkProfile(this.capabilityProfile)
-      && (!invoked.size || services.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/5'))
-      throw new Error('attested sink deployment requires signed external write policy v5');
+      && (!invoked.size || services.signedEffectResourcePolicy?.format !==
+        (resourceSinkProfile(this.capabilityProfile)
+          ? 'aether.signed-effect-resource-policy/6' : 'aether.signed-effect-resource-policy/5')))
+      throw new Error('attested sink deployment requires its versioned signed write policy');
     if ((this.capabilityProfile === 'scoped-artifact-v4' || this.capabilityProfile === 'scoped-anchored-v4') && invoked.size > 0
       && services.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/2') {
       throw new Error('artifact deployment profile requires signed code-provenance policy v2');
@@ -807,10 +842,12 @@ export class ProcessDeployment implements PromotionDriver {
       if (services.scopedGrants?.repositoryId !== anchor.repositoryId) throw new TypeError('effect grant repository differs from independent signer anchor');
       if (services.signedEffectResourcePolicy) {
         if (sinkProfile(this.capabilityProfile)) {
-          if (services.signedEffectResourcePolicy.format !== 'aether.signed-effect-resource-policy/5')
-            throw new TypeError('attested sink deployment requires policy v5');
+          if (services.signedEffectResourcePolicy.format !== (resourceSinkProfile(this.capabilityProfile)
+            ? 'aether.signed-effect-resource-policy/6' : 'aether.signed-effect-resource-policy/5'))
+            throw new TypeError('attested sink deployment requires its signed policy version');
           assertAnchoredEffectPolicy(anchor, services.signedEffectResourcePolicy, manifest,
-            services.scopedGrants!.repositoryId, 'anchored-v5');
+            services.scopedGrants!.repositoryId, resourceSinkProfile(this.capabilityProfile)
+              ? 'anchored-v6' : 'anchored-v5');
         } else if (wasmProfile(this.capabilityProfile)) {
           if (services.signedEffectResourcePolicy.format !== 'aether.signed-effect-resource-policy/4') throw new TypeError('isolated Wasm deployment requires policy v4');
           assertAnchoredEffectPolicy(anchor, services.signedEffectResourcePolicy, manifest, services.scopedGrants!.repositoryId, 'anchored-v4');
@@ -856,8 +893,13 @@ export class ProcessDeployment implements PromotionDriver {
     }
     if (sinkProfile(this.capabilityProfile)) {
       const policy = services.signedEffectResourcePolicy;
-      if (policy?.format !== 'aether.signed-effect-resource-policy/5' || !services.effectRouterFactory)
+      if ((policy?.format !== 'aether.signed-effect-resource-policy/5'
+          && policy?.format !== 'aether.signed-effect-resource-policy/6') || !services.effectRouterFactory)
         throw new TypeError('attested sink deployment requires broker adapter factory');
+      const resourceScoped = resourceSinkProfile(this.capabilityProfile);
+      if (resourceScoped && (policy.format !== 'aether.signed-effect-resource-policy/6'
+        || policy.body.rules.some(rule => rule.argument === null)))
+        throw new TypeError('resource-scoped sink deployment requires signed argument selectors');
       const declarations = new Map([...walk(module)].filter(node => node.kind === 'FunctionDecl').map(node => [node.symbol, node]));
       const manifestDigest = executionManifestDigest(manifest);
       const snapshot: RuntimeSnapshotV1 = { format: 'aether.state/1', executionManifest: manifestDigest,
@@ -870,7 +912,10 @@ export class ProcessDeployment implements PromotionDriver {
         if (!unit) throw new TypeError('signed sink rule has no executable placement');
         const operationId = domainDigest('aether.deployment-sink-preflight/1', {
           manifest: manifestDigest, capability: rule.capability });
-        const grantRef = domainDigest('aether.deployment-sink-preflight-grant/1', {
+        const grantRef = resourceScoped ? domainDigest('aether.deployment-sink-preflight-grant/2', {
+          operationId, capability: rule.capability, policyEpoch: policy.body.policyEpoch,
+          signedPrefix: rule.prefix, selectorIndex: rule.argument,
+        }) : domainDigest('aether.deployment-sink-preflight-grant/1', {
           operationId, capability: rule.capability });
         const router = services.effectRouterFactory(freeze({ operationId, rootOperationId: operationId,
           unit: unit.id, generation: '0', manifest: copy(manifest), capability: rule.capability,
@@ -878,16 +923,23 @@ export class ProcessDeployment implements PromotionDriver {
           deadline: rule.deadline, clockDomain: rule.clockDomain, grantRef }));
         if (brokerMode(router) !== 'live') throw new TypeError('sink preflight router mode mismatch');
         brokerBind(router, manifest.astRoot as NodeRef);
-        assertEffectResourceSinkContextV5(policy, rule.capability, {
+        const sinkContext = {
           deploymentId: authority.deploymentId,
           sinkAnchorDigest: domainDigest('aether.sink-anchor/1', authority.anchor),
           sinkStateWitnessDigest: sinkWitness.digest,
           approvedAdapterArtifactDigest: authority.approvedAdapterArtifactDigest,
-        });
-        assertEffectResourceAdapterV5(policy, rule.capability, {
+        };
+        const adapter = {
           ...brokerAdapterIdentity(router, rule.capability),
           artifactDigest: authority.approvedAdapterArtifactDigest,
-        });
+        };
+        if (resourceScoped && policy.format === 'aether.signed-effect-resource-policy/6') {
+          assertEffectResourceSinkContextV6(policy, rule.capability, sinkContext);
+          assertEffectResourceAdapterV6(policy, rule.capability, adapter);
+        } else if (policy.format === 'aether.signed-effect-resource-policy/5') {
+          assertEffectResourceSinkContextV5(policy, rule.capability, sinkContext);
+          assertEffectResourceAdapterV5(policy, rule.capability, adapter);
+        } else throw new TypeError('signed sink profile mismatch');
         brokerAttestContext(router, { executionId: operationId, manifestDigest, mode: 'live',
           policyEpoch: policy.body.policyEpoch, deadline: rule.deadline, clockDomain: rule.clockDomain,
           capability: rule.capability, grantRef });
@@ -968,7 +1020,13 @@ export class ProcessDeployment implements PromotionDriver {
         if(!before||!after||historical.manifest.capabilityPolicyDigest!==current.manifest.capabilityPolicyDigest||before.capabilities.some(cap=>!after.capabilities.includes(cap)))throw new Error('historical invocation requires authority unavailable in the current declaration/policy; durable receipt retained without redispatch');
         this.assertServing();
         host.authorizeInvocation(symbol, options.tokens);
+        const historicalHost = resourceSinkProfile(this.capabilityProfile)
+          ? await this.hostFor(old.deployment) : null;
+        if (historicalHost) host.assertCachedEffectGrants(old.operationId, symbol,
+          options.tokens, historicalHost);
         await this.assertWitnessedInvocationReceipt(old);
+        if (historicalHost) host.assertCachedEffectGrants(old.operationId, symbol,
+          options.tokens, historicalHost);
         return copy(old.result ?? { state: 'indeterminate', operationId: old.operationId, generation: old.deployment.generation, unit: old.unit, reason: 'durable invocation has no completed receipt; recover original deployment' });
       }
       if (state.invocations.some(invocation => invocation.phase === 'pending')) throw new Error('unresolved deployment invocation blocks new execution');
@@ -1079,7 +1137,15 @@ export class ProcessDeployment implements PromotionDriver {
     if (sourceHost.status().unresolved.length || state.invocations.some(invocation => invocation.phase === 'pending') || state.allocations.some(allocation => allocation.result === null)) throw new Error('unresolved source execution prevents deployment');
     const snapshot = await sourceHost.snapshot(), artifactDigest = processArtifactDigest(candidate);
     if (!equal(binding.migrationPlan, processMigrationPlan(snapshot, artifactDigest))) throw new Error('approved migration source snapshot/artifact is stale');
-    const expectedEffectPlan = sinkProfile(this.capabilityProfile)
+    const expectedEffectPlan = resourceSinkProfile(this.capabilityProfile)
+      ? processResourceScopedSinkEffectPlan(candidate.factoryId,
+        candidate.manifest.capabilityPolicyDigest,
+        this.options.effectSignerAnchor!.digest, this.options.trustedClockAnchor!.digest,
+        this.options.effectJournalWitnessCatalog!.digest, this.options.hostJournalWitnessCatalog!.digest,
+        this.options.deploymentJournalWitness!.digest, this.sinkBinding().sinkAnchorDigest,
+        this.sinkBinding().sinkDeploymentId, this.sinkBinding().approvedAdapterArtifactDigest,
+        this.sinkBinding().sinkStateWitnessDigest)
+      : sinkProfile(this.capabilityProfile)
       ? processHostWitnessedSinkEffectPlan(candidate.factoryId, candidate.manifest.capabilityPolicyDigest,
         this.options.effectSignerAnchor!.digest, this.options.trustedClockAnchor!.digest,
         this.options.effectJournalWitnessCatalog!.digest, this.options.hostJournalWitnessCatalog!.digest,

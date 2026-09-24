@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Opt-in V11 resource-scoped sink profile — 2026-09-24
+
+- Added signed external sink policy `/6`, host configuration `/9`, deployment state `/11`, prepared `/9` and effect plan `/9`. One bounded tagged string argument selects a signed target path segment. The concrete path is checked against the original scoped grant before the proposed worker snapshot or effect intent is published and again before dispatch. Grant reference `/2` binds its path digest into the broker's signed request. V5/V10 sink-wide and earlier bytes remain explicit.
+- Added fresh-controller V11 postcommit recovery with the exact retained target and one sink decision, including recovery after the original grant was revoked. An adversarial review found that cached V11 results could bypass target scope. Direct, deployed and cross-generation cached paths now recheck every retained effect target against the caller's current-generation grant before returning a result; an Alice grant cannot read Bob's saved result.
+- The profile still selects only one string segment and does not prove a third-party sink's resource semantics or measured adapter executable, distinct-UID custody, complete budget settlement, or atomic revocation/result publication. V4-T2-04, NFR-16 and the 20/62 task count remain open. [Decision and limits](decisions/D11-resource-scoped-sink-profile.md).
+
 ## Opt-in authenticated sink receipt and V3 broker — 2026-09-23
 
 - Added a domain-separated Ed25519 sink receipt bound to the exact effect request, deployment, approved adapter artifact, grant/policy context and committed value or durable noncommit fence. A trusted wrapper and separate sink fixture verify and retain signed decisions; cross-deployment reuse of one logical effect ID conflicts rather than committing twice.

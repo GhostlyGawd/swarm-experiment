@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import * as b from '../../src/tier1/build.ts';
-import { capability } from '../../src/tier1/ids.ts';
+import { capability, typeName } from '../../src/tier1/ids.ts';
+import type { Ty } from '../../src/tier1/ast.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import { CapabilityRegistry, CapabilitySealer } from '../../src/tier2/ocap.ts';
@@ -15,7 +16,9 @@ import { ScopedGrantAuthority } from '../../src/tier2/scoped-grants.ts';
 import { createEffectSignerAnchor } from '../../src/tier2/effect-signer-anchor.ts';
 import { createTrustedClockAnchor } from '../../src/tier2/trusted-clock-anchor.ts';
 import { effectResourcePolicyDigestV5, signEffectResourcePolicyV5,
-  type EffectResourcePolicyBodyV5, type SignedEffectResourcePolicyV5 } from '../../src/tier2/effect-resource-policy.ts';
+  effectResourcePolicyDigestV6, signEffectResourcePolicyV6,
+  type EffectResourcePolicyBodyV5, type SignedEffectResourcePolicyV5,
+  type EffectResourcePolicyBodyV6, type SignedEffectResourcePolicyV6 } from '../../src/tier2/effect-resource-policy.ts';
 import { DEFAULT_EVIDENCE_POLICY_V2, mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
 import { encodeCanonical } from '../../src/fabric/encoding.ts';
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
@@ -23,7 +26,7 @@ import { DurableEffectBroker, effectAdapterDigest } from '../../src/fabric/effec
 import { createAttestedSinkClient } from '../../src/fabric/attested-sink-service.ts';
 import { createAttestedSinkAdapter } from '../../src/fabric/attested-sink-adapter.ts';
 import { createProcessWitnessClient } from '../../src/fabric/witness-service.ts';
-import { selectEffectJournalWitness } from '../../src/fabric/effect-journal-witness.ts';
+import { readWitnessHead, selectEffectJournalWitness } from '../../src/fabric/effect-journal-witness.ts';
 import { selectHostJournalWitness } from '../../src/fabric/host-journal-witness.ts';
 import { PromotionCoordinator, approvePromotion, evidenceBundleDigest,
   migrationPlanDigest, effectPlanDigest, type PromotionInput } from '../../src/fabric/promotion.ts';
@@ -31,6 +34,7 @@ import type { SinkPublicAnchorV1 } from '../../src/fabric/sink-receipt.ts';
 import { BrokerEffectRouter } from '../../src/tier3/effects.ts';
 import { ProcessHost, PROCESS_INVOKE, type ProcessHostOptions } from '../../src/tier4/process-host.ts';
 import { ProcessDeployment, processMigrationPlan, processHostWitnessedSinkEffectPlan,
+  processResourceScopedSinkEffectPlan,
   type ProcessDeploymentOptions } from '../../src/tier4/process-deployment.ts';
 import type { TopologyPlan } from '../../src/tier4/topology.ts';
 
@@ -54,23 +58,35 @@ async function kill(child: ChildProcess | null): Promise<void> {
   }
 }
 
-test('V10 ProcessHost and Deployment pin witnessed sink outcomes across workers, promotion and restart', async () => {
+test('V10 and V11 ProcessHost/Deployment pin sink outcomes and target grants across promotion and restart', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'aether-attested-host-'));
   let sink: ChildProcess | null = null, witnessProcess: ChildProcess | null = null,
     operatorWitnessProcess: ChildProcess | null = null,
-    host: ProcessHost | null = null, deployment: ProcessDeployment | null = null;
+    host: ProcessHost | null = null, resourceHost: ProcessHost | null = null,
+    deployment: ProcessDeployment | null = null, resourceDeployment: ProcessDeployment | null = null;
   try {
     const repositoryId = 'repo:host-sink', deploymentId = 'deployment:host-sink', clockDomain = 'clock:host-sink';
-    const symbols = new SymbolSpace('attested-sink-host'), entry = symbols.define('entry'), valueSymbol = symbols.define('value');
+    const symbols = new SymbolSpace('attested-sink-host'), entry = symbols.define('entry'),
+      valueSymbol = symbols.define('value'), mutatingEntry = symbols.define('mutatingEntry'),
+      counterSymbol = symbols.define('counter'), targetSymbol = symbols.define('target');
     const CAP = capability('cap:test:attested_sink'), registry = new CapabilityRegistry();
     registry.define({ name: CAP, domain: 'test', operation: 'attested_sink', arity: 1,
       description: 'append to witnessed sink', effectful: true });
+    const counterType: Ty = { t: 'Record', name: typeName('type:test:target_counter'),
+      fields: [['count', b.Int]] };
     const module = b.module_({ symbol: symbols.define('module'), symbolTable: symbols.table(), members: [
       b.fn({ symbol: entry, params: [b.param(valueSymbol, b.Str)], returns: b.Str,
         capabilities: [CAP], purity: 'effectful', contract: b.contract({}),
         body: b.block(b.exprStmt(b.invoke(CAP, b.v(valueSymbol))), b.ret(b.v(valueSymbol))) }),
+      b.fn({ symbol: mutatingEntry,
+        params: [b.param(counterSymbol, counterType), b.param(targetSymbol, b.Str)],
+        returns: b.Str, capabilities: [CAP], purity: 'effectful',
+        contract: b.contract({ modifies: [b.place(counterSymbol, 'count')] }),
+        body: b.block(b.assign(b.place(counterSymbol, 'count'),
+          b.add(b.field(b.v(counterSymbol), 'count'), b.int(1))),
+        b.exprStmt(b.invoke(CAP, b.v(targetSymbol))), b.ret(b.v(targetSymbol))) }),
     ] });
-    const plan: TopologyPlan = { shape: 'containers', units: [{ id: 'worker', members: [entry],
+    const plan: TopologyPlan = { shape: 'containers', units: [{ id: 'worker', members: [entry, mutatingEntry],
       capabilities: [CAP], placement: 'container', memoryMb: 16 }], crossEdges: [],
       transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
     const sinkKeys = generateKeyPairSync('ed25519'), policyKeys = generateKeyPairSync('ed25519');
@@ -99,7 +115,9 @@ test('V10 ProcessHost and Deployment pin witnessed sink outcomes across workers,
         { kind: 'effect-scope', authorityId: 'operator:effects', repositoryId,
           catalogDeploymentId: deploymentId, clockDomain },
         { kind: 'host-scope', authorityId: 'operator:host-catalog', repositoryId, deploymentId },
+        { kind: 'host-scope', authorityId: 'operator:resource-host-catalog', repositoryId, deploymentId },
         { kind: 'deployment', authorityId: 'operator:deployment', repositoryId, deploymentId },
+        { kind: 'deployment', authorityId: 'operator:resource-deployment', repositoryId, deploymentId },
       ] }), { mode: 0o600 });
     writeFileSync(sinkConfig, encodeCanonical({ format: 'aether.attested-sink-config/2',
       socketPath: sinkSocket, storageDir: join(directory, 'sink-store'), authKeyFile: sinkKeyFile,
@@ -145,9 +163,13 @@ test('V10 ProcessHost and Deployment pin witnessed sink outcomes across workers,
       repositoryId, deploymentId, clockDomain });
     const hostCatalog = operatorClient.hostCatalog({ authorityId: 'operator:host-catalog',
       repositoryId, deploymentId });
+    const resourceHostCatalog = operatorClient.hostCatalog({
+      authorityId: 'operator:resource-host-catalog', repositoryId, deploymentId });
     const hostWitness = selectHostJournalWitness(hostCatalog, 'host:direct');
     const deploymentWitness = operatorClient.deploymentWitness({ authorityId: 'operator:deployment',
       repositoryId, deploymentId });
+    const resourceDeploymentWitness = operatorClient.deploymentWitness({
+      authorityId: 'operator:resource-deployment', repositoryId, deploymentId });
     let replaceSinkWitness = false;
     const factory: NonNullable<ProcessHostOptions['effectRouterFactory']> = effect => {
       const effectWitness = selectEffectJournalWitness(catalog, effect.operationId);
@@ -339,8 +361,207 @@ test('V10 ProcessHost and Deployment pin witnessed sink outcomes across workers,
     assert.deepEqual(await deployment.call(entry, [{ tag: 'string', value: 'promoted' }],
       { operationId: 'deployed:promoted', tokens: deployedTokens() }), promoted);
     assert.equal(JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 3);
+
+    const scopedPolicy: EffectResourcePolicyBodyV6 = { ...policy,
+      format: 'aether.effect-resource-policy/6', rules: [{ ...policy.rules[0],
+        prefix: ['account'], argument: 0 }] };
+    const scopedContext: EvidenceContext = { ...context,
+      capabilityPolicyDigest: effectResourcePolicyDigestV6(scopedPolicy) };
+    const scopedEvidence = mintLocalEvidence(scopedContext), scopedManifest = scopedEvidence.manifest;
+    const scopedSigned = signEffectResourcePolicyV6(scopedPolicy, signed.signer, policyKeys.privateKey);
+    const scopedOptions: ProcessHostOptions = { ...options,
+      directory: join(directory, 'resource-host'), manifest: scopedManifest,
+      hostJournalWitness: selectHostJournalWitness(resourceHostCatalog, 'host:resource'),
+      anchoredEffectPolicyProfile: 'attested-sink-v9-resource-witness',
+      signedEffectResourcePolicy: scopedSigned };
+    resourceHost = await ProcessHost.open(scopedOptions);
+    const targetTokens = (target: string) => resourceHost!.issueScopedTokens(entry, 60_000,
+      new Map([[CAP, ['account', target]]]));
+    for (const target of ['alice', 'bob']) {
+      const completed = await resourceHost.call(entry, [{ tag: 'string', value: target }],
+        { operationId: `resource:${target}`, tokens: targetTokens(target) });
+      assert.equal(completed.state, 'completed', target);
+    }
+    await assert.rejects(resourceHost.call(entry, [{ tag: 'string', value: 'bob' }],
+      { operationId: 'resource:bob', tokens: targetTokens('alice') }),
+    /authority_denied: cached effect target/);
+    assert.equal(JSON.parse(readFileSync(join(scopedOptions.directory, 'host.json'), 'utf8')).configuration.split(':')[0],
+      'aether.process-host-config/9');
+    assert.equal(JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 5);
+    const scopedHostJournal = JSON.parse(readFileSync(join(scopedOptions.directory, 'host.json'), 'utf8'));
+    const aliceEffectId = scopedHostJournal.calls.find((call: { operationId: string }) =>
+      call.operationId === 'resource:alice').effects[0].id as string;
+    const aliceEffectJournal = JSON.parse(readWitnessHead(
+      selectEffectJournalWitness(catalog, aliceEffectId)).journal!);
+    assert.match(aliceEffectJournal.records[0].request.capabilityGrantRef,
+      /^aether\.process-effect-grant-ref\/2:b3:/);
+    const bobEffectId = scopedHostJournal.calls.find((call: { operationId: string }) =>
+      call.operationId === 'resource:bob').effects[0].id as string;
+    const bobEffectJournal = JSON.parse(readWitnessHead(
+      selectEffectJournalWitness(catalog, bobEffectId)).journal!);
+    assert.notEqual(aliceEffectJournal.records[0].request.capabilityGrantRef,
+      bobEffectJournal.records[0].request.capabilityGrantRef,
+      'the signed grant reference binds the concrete target path');
+    let mismatched: Awaited<ReturnType<ProcessHost['call']>> | null = null;
+    try { mismatched = await resourceHost.call(entry, [{ tag: 'string', value: 'bob' }],
+      { operationId: 'resource:wrong-target', tokens: targetTokens('alice') }); }
+    catch { /* A pre-dispatch authority error may reject the whole call. */ }
+    if (mismatched && mismatched.state === 'completed')
+      assert.equal(mismatched.execution.ok, false, 'wrong target must be a failed execution');
+    const deniedCall = JSON.parse(readFileSync(join(scopedOptions.directory, 'host.json'), 'utf8'))
+      .calls.find((call: { operationId: string }) => call.operationId === 'resource:wrong-target');
+    assert.equal(deniedCall.effects.length, 0, 'wrong target is denied before an effect intent');
+    assert.equal(JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 5,
+      'an Alice-only grant cannot write Bob');
+    const broadTokens = resourceHost.issueScopedTokens(entry, 60_000,
+      new Map([[CAP, ['account']]]));
+    const invalidTarget = await resourceHost.call(entry, [{ tag: 'string', value: '../bad' }],
+      { operationId: 'resource:invalid', tokens: broadTokens });
+    assert.equal(invalidTarget.state, 'completed');
+    if (invalidTarget.state === 'completed') assert.equal(invalidTarget.execution.ok, false);
+    assert.equal(JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 5);
+    const counterRef = await resourceHost.allocateRecord(counterType,
+      { count: { tag: 'int', value: '0' } }, { operationId: 'resource:counter' });
+    const deniedMutation = await resourceHost.call(mutatingEntry,
+      [{ tag: 'ref', value: counterRef }, { tag: 'string', value: 'bob' }],
+      { operationId: 'resource:denied-mutation', tokens: resourceHost.issueScopedTokens(mutatingEntry,
+        60_000, new Map([[CAP, ['account', 'alice']]])) });
+    if (deniedMutation.state === 'completed') assert.equal(deniedMutation.execution.ok, false);
+    const counter = (await resourceHost.snapshot()).records.find(row => row.objectId === counterRef.objectId);
+    const count = counter?.fields.find(([name]) => name === 'count')?.[1];
+    assert.equal(count?.tag, 'int');
+    if (count?.tag === 'int') assert.equal(count.value, '0',
+      'denied dynamic target must not adopt the worker mutation before the effect');
+    assert.equal(JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 5);
+
+    const resourceCoordinator = new PromotionCoordinator({ profile: 'baseline-governor-v1',
+      directory: join(directory, 'resource-coordinator'), repositoryId,
+      genesisManifest: executionManifestDigest(scopedManifest),
+      authority: () => ({ repositoryId, membershipEpoch: '1', policyEpoch: '1',
+        eligibleGovernors: ['governor'] }), governorKey: () => governor.publicKey,
+      clock: () => 100n });
+    const resourceFactoryId = 'resource-sink-services/1';
+    let candidateResourceSigned: SignedEffectResourcePolicyV6 | null = null;
+    const resourceDeploymentOptions: ProcessDeploymentOptions = {
+      directory: join(directory, 'resource-deployment'), coordinator: resourceCoordinator,
+      capabilityProfile: 'scoped-anchored-sink-v11', effectSignerAnchor: signer,
+      trustedClockAnchor: clock, effectJournalWitnessCatalog: catalog,
+      hostJournalWitnessCatalog: resourceHostCatalog,
+      deploymentJournalWitness: resourceDeploymentWitness,
+      attestedSinkAuthority: options.attestedSinkAuthority, sinkStateWitness,
+      factories: new Map([[resourceFactoryId, artifact => ({ sealer: options.sealer,
+        scopedGrants: grants, signedEffectResourcePolicy:
+          artifact.manifest.capabilityPolicyDigest === scopedManifest.capabilityPolicyDigest
+            ? scopedSigned : candidateResourceSigned!,
+        effectRouterFactory: factory, authorizeRecovery: () => true })]]),
+      genesis: { context: scopedContext, evidence: scopedEvidence, plan,
+        factoryId: resourceFactoryId },
+    };
+    resourceDeployment = await ProcessDeployment.open(resourceDeploymentOptions);
+    assert.equal(resourceDeployment.status().capabilityProfile, 'scoped-anchored-sink-v11');
+    assert.equal(JSON.parse(readFileSync(join(resourceDeploymentOptions.directory, 'deployment.json'), 'utf8')).format,
+      'aether.process-deployment/11');
+    assert.equal(JSON.parse(readFileSync(join(resourceDeploymentOptions.directory, 'deployments',
+      'genesis', 'prepared.json'), 'utf8')).format, 'aether.process-deployment-prepared/9');
+    const deployedTargetTokens = (target: string) => resourceDeployment!.issueScopedTokens(entry,
+      60_000, new Map([[CAP, ['account', target]]]));
+    for (const target of ['alice', 'bob']) {
+      const completed = await resourceDeployment.call(entry, [{ tag: 'string', value: target }],
+        { operationId: `deployed-resource:${target}`, tokens: deployedTargetTokens(target) });
+      assert.equal(completed.state, 'completed', target);
+    }
+    await assert.rejects(resourceDeployment.call(entry, [{ tag: 'string', value: 'bob' }],
+      { operationId: 'deployed-resource:bob', tokens: deployedTargetTokens('alice') }),
+    /authority_denied: cached effect target/);
+    assert.equal(JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 7);
+    const wrongTarget = await resourceDeployment.call(entry, [{ tag: 'string', value: 'bob' }],
+      { operationId: 'deployed-resource:wrong', tokens: deployedTargetTokens('alice') });
+    assert.equal(wrongTarget.state, 'completed');
+    if (wrongTarget.state === 'completed') assert.equal(wrongTarget.execution.ok, false);
+    assert.equal(JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 7,
+      'a deployed Alice-only grant cannot write Bob');
+    const resourceDeploymentFile = join(resourceDeploymentOptions.directory, 'deployment.json');
+    const priorResourceRegistry = readFileSync(resourceDeploymentFile);
+    const candidateScopedPolicy: EffectResourcePolicyBodyV6 = { ...scopedPolicy,
+      astRoot: new GraphStore().intern(candidateModule) };
+    candidateResourceSigned = signEffectResourcePolicyV6(candidateScopedPolicy,
+      scopedSigned.signer, policyKeys.privateKey);
+    const candidateScopedContext: EvidenceContext = { ...scopedContext,
+      module: candidateModule,
+      capabilityPolicyDigest: effectResourcePolicyDigestV6(candidateScopedPolicy) };
+    const candidateScopedEvidence = mintLocalEvidence(candidateScopedContext);
+    const resourceArtifact = resourceDeployment.registerArtifact({ context: candidateScopedContext,
+      evidence: candidateScopedEvidence, plan, factoryId: resourceFactoryId });
+    const resourceMigrationPlan = processMigrationPlan(await resourceDeployment.snapshot(), resourceArtifact);
+    const resourceEffectPlan = processResourceScopedSinkEffectPlan(resourceFactoryId,
+      candidateScopedEvidence.manifest.capabilityPolicyDigest, signer.digest, clock.digest,
+      catalog.digest, resourceHostCatalog.digest, resourceDeploymentWitness.digest,
+      domainDigest('aether.sink-anchor/1', anchor), deploymentId, adapterArtifactDigest,
+      sinkStateWitness.digest);
+    const resourceProposal = { format: 'aether.promotion/1' as const, repositoryId,
+      expectedParent: resourceCoordinator.state().committedManifest,
+      candidateManifest: executionManifestDigest(candidateScopedEvidence.manifest),
+      evidenceBundleDigest: evidenceBundleDigest(candidateScopedEvidence),
+      migrationPlanDigest: migrationPlanDigest(resourceMigrationPlan),
+      effectPlanDigest: effectPlanDigest(resourceEffectPlan), membershipEpoch: '1',
+      policyEpoch: '1', expiresAt: '1000' };
+    const resourcePromotion: PromotionInput = { proposal: resourceProposal,
+      approval: approvePromotion(resourceProposal, 'governor', governor.privateKey),
+      evidence: candidateScopedEvidence, context: candidateScopedContext,
+      migrationPlan: resourceMigrationPlan, effectPlan: resourceEffectPlan };
+    await resourceDeployment.promote(resourcePromotion);
+    assert.equal(resourceDeployment.status().generation, '1');
+    const carol = await resourceDeployment.call(entry, [{ tag: 'string', value: 'carol' }],
+      { operationId: 'deployed-resource:carol', tokens: deployedTargetTokens('carol') });
+    assert.equal(carol.state, 'completed');
+    assert.equal(JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 8);
+    const reboundContext: EvidenceContext = { ...candidateScopedContext,
+      target: { ...candidateScopedContext.target,
+        artifactDigest: digest('resource-scoped-target-rebound') } };
+    const reboundEvidence = mintLocalEvidence(reboundContext);
+    const reboundArtifact = resourceDeployment.registerArtifact({ context: reboundContext,
+      evidence: reboundEvidence, plan, factoryId: resourceFactoryId });
+    const reboundMigrationPlan = processMigrationPlan(await resourceDeployment.snapshot(), reboundArtifact);
+    const reboundEffectPlan = processResourceScopedSinkEffectPlan(resourceFactoryId,
+      reboundEvidence.manifest.capabilityPolicyDigest, signer.digest, clock.digest,
+      catalog.digest, resourceHostCatalog.digest, resourceDeploymentWitness.digest,
+      domainDigest('aether.sink-anchor/1', anchor), deploymentId, adapterArtifactDigest,
+      sinkStateWitness.digest);
+    const reboundProposal = { format: 'aether.promotion/1' as const, repositoryId,
+      expectedParent: resourceCoordinator.state().committedManifest,
+      candidateManifest: executionManifestDigest(reboundEvidence.manifest),
+      evidenceBundleDigest: evidenceBundleDigest(reboundEvidence),
+      migrationPlanDigest: migrationPlanDigest(reboundMigrationPlan),
+      effectPlanDigest: effectPlanDigest(reboundEffectPlan), membershipEpoch: '1',
+      policyEpoch: '1', expiresAt: '1000' };
+    await resourceDeployment.promote({ proposal: reboundProposal,
+      approval: approvePromotion(reboundProposal, 'governor', governor.privateKey),
+      evidence: reboundEvidence, context: reboundContext,
+      migrationPlan: reboundMigrationPlan, effectPlan: reboundEffectPlan });
+    assert.equal(resourceDeployment.status().generation, '2');
+    assert.deepEqual(await resourceDeployment.call(entry, [{ tag: 'string', value: 'carol' }],
+      { operationId: 'deployed-resource:carol', tokens: deployedTargetTokens('carol') }), carol);
+    await assert.rejects(resourceDeployment.call(entry, [{ tag: 'string', value: 'carol' }],
+      { operationId: 'deployed-resource:carol', tokens: deployedTargetTokens('alice') }),
+    /authority_denied: cached effect target/);
+    assert.equal(JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 8,
+      'cross-generation cached receipts cannot redispatch the sink');
+    await resourceDeployment.close(); resourceDeployment = null;
+    writeFileSync(resourceDeploymentFile, priorResourceRegistry);
+    await assert.rejects(ProcessDeployment.open({ ...resourceDeploymentOptions,
+      capabilityProfile: 'scoped-anchored-sink-v10', genesis: undefined }),
+    /diverges from operator witness|invalid deployment readiness\/profile/);
+    resourceDeployment = await ProcessDeployment.open({ ...resourceDeploymentOptions, genesis: undefined });
+    assert.equal(resourceDeployment.status().generation, '2');
+    assert.deepEqual(await resourceDeployment.call(entry, [{ tag: 'string', value: 'carol' }],
+      { operationId: 'deployed-resource:carol', tokens: deployedTargetTokens('carol') }), carol);
+    await assert.rejects(resourceDeployment.call(entry, [{ tag: 'string', value: 'carol' }],
+      { operationId: 'deployed-resource:carol', tokens: deployedTargetTokens('alice') }),
+    /authority_denied: cached effect target/);
+    assert.equal(JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 8);
   } finally {
-    await deployment?.close(); await host?.close(); await kill(sink);
+    await resourceDeployment?.close(); await deployment?.close();
+    await resourceHost?.close(); await host?.close(); await kill(sink);
     await kill(witnessProcess); await kill(operatorWitnessProcess);
     rmSync(directory, { recursive: true, force: true });
   }
