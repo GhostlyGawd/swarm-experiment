@@ -10,6 +10,8 @@ export { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFI
 export { buildVirtualForwardCandidate, deriveVirtualForwardDescriptor, checkVirtualForwardDescriptor,
   VIRTUAL_FORWARD_DESCRIPTOR_FORMAT, VIRTUAL_FORWARD_EVENT_SCRIPT,
   type VirtualForwardDescriptor, type VirtualForwardBinding, type VirtualForwardSite } from './semantic-gc-virtual-forward.ts';
+export { SemanticVirtualGcPromotionV2, type VirtualGcPromotionProposalV2,
+  type VirtualGcPromotionOptionsV2 } from './semantic-gc-virtual-promotion.ts';
 export { SemanticAdapterGarbageCollector, declarativeAdapterTableDigest, type DeclarativeAdapterRegistration, type DeclarativeAdapterTable, type AdapterRetirementProposal, type SemanticAdapterGcOptions } from './semantic-gc-adapters.ts';
 export { proposeSemanticSinkRetirementV2, verifySemanticSinkRetirementV2,
   type SinkRetirementSelectionV2, type SemanticSinkRetirementContextV2,

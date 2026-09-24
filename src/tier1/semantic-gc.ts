@@ -158,6 +158,19 @@ export class SemanticGarbageCollector {
     if (this.files(directory).length >= this.maxRecords) throw new Error('semantic GC journal capacity reached'); write(path, value);
   }
   private retentionLease(record: SemanticRetention): string { return `semantic-gc-retention:${domainDigest('aether.semantic-retention/1', { configuration: this.configuration, ...record })}`; }
+  /** Identity check for a separate admission profile that uses this ledger's
+   * lock as its retention commit fence. The fence must guard the same store. */
+  assertRetentionAuthority(context: { readonly repositoryId: string; readonly store: DurableGraphStore;
+    readonly lineage: CausalLineageLedger; readonly policy: SemanticGcPolicy;
+    readonly registry: CapabilityRegistry }): void {
+    const descriptors = (registry: CapabilityRegistry) =>
+      [...registry.names].sort().map(name => registry.get(name));
+    if (this.options.repositoryId !== context.repositoryId
+      || this.options.store !== context.store || this.options.lineage !== context.lineage
+      || !same(this.policy, context.policy)
+      || !same(descriptors(this.registry), descriptors(context.registry)))
+      throw new Error('semantic GC retention authority belongs to another repository, store, lineage, or policy');
+  }
   /** Monotone pins. This profile never infers replay completion, task quiescence,
    * audit expiration or replica causal stability from elapsed time. */
   retain(record: SemanticRetention): void {
