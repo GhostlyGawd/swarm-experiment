@@ -1,0 +1,10 @@
+{
+  "format": "aether.proof-check-latency-profile/1",
+  "specVersion": "0.1.0",
+  "fixture": "portable-scalar-call-with-seven-obligations/1",
+  "checker": "checkPortableCertificate",
+  "warmupChecks": 20,
+  "measuredChecks": 200,
+  "hardMaximumNs": 50000,
+  "timingScope": "One complete portable AST certificate bundle check, including independent obligation derivation and every formula proof"
+}
