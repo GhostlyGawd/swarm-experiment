@@ -1,0 +1,11 @@
+{
+  "format": "aether.living-process-broker-profile/1",
+  "seed": "20260924/process-broker",
+  "casesPerCandidate": 3,
+  "candidates": ["stable-effect-id", "attempt-derived-effect-id"],
+  "transport": "Independent child process and real 127.0.0.1 TCP sockets; incomplete and malformed frames close or fail before effect dispatch",
+  "crash": "SIGKILL the first worker in broker beforePersist(committed), after durable sink write; explicitly recover dead journal owner and reconcile in a new worker",
+  "replay": "Run every terminal event through isolated broker replay with live policy and adapter callbacks forbidden",
+  "minimumBoundaryPermutationsPerSecond": 2000000,
+  "qualification": "Complete process/socket campaign throughput is reported and compared with the unchanged R04 target; this bounded campaign has no host-level partition, arbitrary effectful candidate admission, or distributed production deployment"
+}
