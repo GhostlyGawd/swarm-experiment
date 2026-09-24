@@ -14,6 +14,7 @@ import { effectResourcePolicyDigestV5, signEffectResourcePolicyV5,
   type EffectResourcePolicyBodyV5 } from '../../src/tier2/effect-resource-policy.ts';
 import { DEFAULT_EVIDENCE_POLICY_V2, mintLocalEvidence,
   type EvidenceContext } from '../../src/fabric/evidence.ts';
+import { encodeCanonical } from '../../src/fabric/encoding.ts';
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
 import { DurableEffectBroker, effectAdapterDigest } from '../../src/fabric/effects.ts';
 import { createAttestedSinkClient } from '../../src/fabric/attested-sink-service.ts';
@@ -47,7 +48,8 @@ interface Fixture {
 
 const fixture = JSON.parse(readFileSync(process.argv[2]!, 'utf8')) as Fixture;
 const mode = process.argv[3];
-assert.ok(mode === 'crash' || mode === 'recover');
+assert.ok(['crash', 'recover', 'crash-pre-sink', 'recover-abort',
+  'crash-before-sink-entry', 'recover-fenced'].includes(mode ?? ''));
 const f = fixture;
 const symbols = new SymbolSpace('attested-sink-controller-crash');
 const entry = symbols.define('entry'), valueSymbol = symbols.define('value');
@@ -79,7 +81,10 @@ const sinkClient = createAttestedSinkClient({ socketPath: f.sinkSocket,
   adapterArtifactDigest: f.adapterArtifactDigest, repositoryId: f.repositoryId,
   deploymentId: f.deploymentId, timeoutMs: 10_000 });
 const sinkAdapter = createAttestedSinkAdapter({ id: 'adapter:controller-crash-sink',
-  client: sinkClient, repositoryId: f.repositoryId, deploymentId: f.deploymentId,
+  client: mode === 'crash-before-sink-entry' ? {
+    execute: () => { process.kill(process.pid, 'SIGKILL'); throw new Error('expected SIGKILL before sink entry'); },
+    status: request => sinkClient.status(request),
+  } : sinkClient, repositoryId: f.repositoryId, deploymentId: f.deploymentId,
   approvedAdapterArtifactDigest: f.adapterArtifactDigest, anchor: f.anchor });
 const policy: EffectResourcePolicyBodyV5 = { format: 'aether.effect-resource-policy/5',
   repositoryId: f.repositoryId, astRoot: new GraphStore().intern(module), policyEpoch: '0', rules: [{
@@ -124,6 +129,10 @@ const options: ProcessDeploymentOptions = {
     approvedAdapterArtifactDigest: f.adapterArtifactDigest, anchor: f.anchor }, sinkStateWitness,
   factories: new Map([[factoryId, () => ({ sealer, scopedGrants: grants,
     signedEffectResourcePolicy: signed, authorizeRecovery: () => true,
+    onPhase: phase => {
+      if (mode === 'crash-pre-sink' && phase === 'effect-requested')
+        process.kill(process.pid, 'SIGKILL');
+    },
     effectRouterFactory: effect => {
       const witness = selectEffectJournalWitness(effectCatalog, effect.operationId);
       const broker = new DurableEffectBroker({ directory: join(f.directory, 'effects',
@@ -139,30 +148,51 @@ const options: ProcessDeploymentOptions = {
         adapters: new Map([[CAP, sinkAdapter]]), grantRef: effect.grantRef!,
         grant: () => { throw new Error('factory grant callback forbidden'); } });
     } })]]),
-  ...(mode === 'crash' ? { genesis: { context, evidence, plan, factoryId } } : {}),
+  ...(['crash', 'crash-pre-sink', 'crash-before-sink-entry'].includes(mode ?? '')
+    ? { genesis: { context, evidence, plan, factoryId } } : {}),
 };
 let deployment: ProcessDeployment | null = null;
 try {
   deployment = await ProcessDeployment.open(options);
   const tokens = () => deployment!.issueScopedTokens(entry, 60_000, new Map([[CAP, ['sink']] ]));
-  if (mode === 'crash') {
+  if (['crash', 'crash-pre-sink', 'crash-before-sink-entry'].includes(mode ?? '')) {
     process.stdout.write(JSON.stringify({ event: 'worker-ready', controllerPid: process.pid,
       workerPids: deployment.status().workerPids }) + '\n');
     await deployment.call(entry, [{ tag: 'string', value: 'append-once' }],
       { operationId: 'v10-crash', tokens: tokens() });
-    throw new Error('expected SIGKILL after sink commit');
+    throw new Error('expected controller SIGKILL at the selected effect boundary');
   }
-  await assert.rejects(deployment.recoverOperation('v10-crash',
-    { strategy: 'abort-before-effects' }), /cannot abort committed or indeterminate external effects/);
-  const recovered = await deployment.recoverOperation('v10-crash', { strategy: 'isolated-replay' });
-  assert.equal(recovered.state, 'completed', JSON.stringify(recovered));
-  assert.equal(recovered.execution.ok, true);
-  if (recovered.execution.value.tag !== 'string') throw new Error('recovered the wrong value type');
-  assert.equal(recovered.execution.value.value, 'append-once');
-  const cached = await deployment.call(entry, [{ tag: 'string', value: 'append-once' }],
-    { operationId: 'v10-crash', tokens: tokens() });
-  assert.deepEqual(cached, recovered);
-  process.stdout.write(JSON.stringify({ pid: process.pid, recovered, cached }) + '\n');
+  if (mode === 'recover-abort') {
+    const recovered = await deployment.recoverOperation('v10-crash',
+      { strategy: 'abort-before-effects' });
+    assert.equal(recovered.state, 'aborted', JSON.stringify(recovered));
+    const cached = await deployment.call(entry, [{ tag: 'string', value: 'append-once' }],
+      { operationId: 'v10-crash', tokens: tokens() });
+    assert.deepEqual(encodeCanonical(cached), encodeCanonical(recovered));
+    process.stdout.write(JSON.stringify({ pid: process.pid, recovered, cached }) + '\n');
+  } else if (mode === 'recover-fenced') {
+    await assert.rejects(deployment.recoverOperation('v10-crash',
+      { strategy: 'abort-before-effects' }), /cannot abort committed or indeterminate external effects/);
+    const recovered = await deployment.recoverOperation('v10-crash', { strategy: 'isolated-replay' });
+    assert.equal(recovered.state, 'completed', JSON.stringify(recovered));
+    assert.equal(recovered.execution.ok, false);
+    const cached = await deployment.call(entry, [{ tag: 'string', value: 'append-once' }],
+      { operationId: 'v10-crash', tokens: tokens() });
+    assert.deepEqual(cached, recovered);
+    process.stdout.write(JSON.stringify({ pid: process.pid, recovered, cached }) + '\n');
+  } else {
+    await assert.rejects(deployment.recoverOperation('v10-crash',
+      { strategy: 'abort-before-effects' }), /cannot abort committed or indeterminate external effects/);
+    const recovered = await deployment.recoverOperation('v10-crash', { strategy: 'isolated-replay' });
+    assert.equal(recovered.state, 'completed', JSON.stringify(recovered));
+    assert.equal(recovered.execution.ok, true);
+    if (recovered.execution.value.tag !== 'string') throw new Error('recovered the wrong value type');
+    assert.equal(recovered.execution.value.value, 'append-once');
+    const cached = await deployment.call(entry, [{ tag: 'string', value: 'append-once' }],
+      { operationId: 'v10-crash', tokens: tokens() });
+    assert.deepEqual(cached, recovered);
+    process.stdout.write(JSON.stringify({ pid: process.pid, recovered, cached }) + '\n');
+  }
 } finally {
   await deployment?.close();
 }
