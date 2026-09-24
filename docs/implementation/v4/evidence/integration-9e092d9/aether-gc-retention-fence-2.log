@@ -1,0 +1,17 @@
+✔ unused declarative registration retires with independent dispatch proof, unchanged AST and retained source bytes (3903.635916ms)
+✔ exported, protected and signed-fenced adapter consumers cannot be retired (3794.862833ms)
+✔ active tasks, replay and unstable replication keep every referenced adapter; audit retains history without activating dead code (6241.354ms)
+✔ new retention before publication and unsigned candidate policy refuse advancement (2626.313875ms)
+✔ retention publication fence serializes a task pin from another process (1350.244791ms)
+✔ altered mapping, incomplete certificate and rehashed dishonest liveness fail independent validation (1665.333084ms)
+✔ unresolved/dynamic retained execution and eager lifecycle registration fail closed (964.134292ms)
+✔ consumer validates with proof search physically replaced by a throwing stub (1557.161958ms)
+✔ signed registry corruption and established state deletion cannot reset retired mappings (1750.209791ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23970.967584

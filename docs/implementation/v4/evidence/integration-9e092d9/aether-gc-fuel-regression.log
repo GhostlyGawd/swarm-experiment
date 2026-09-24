@@ -1,0 +1,46 @@
+✔ semantic GC proposes real dead declaration removal and pure wrapper collapse with portable equivalence and unchanged exports/effects/contracts (2110.925292ms)
+✔ semantic GC requires signed exact lineage and governor promotion; rollback is a newly authorized reverse operation (5978.585084ms)
+✔ semantic GC retains audit/replay/active-task/unstable-replication roots while sweeping actual unprotected garbage (3015.234666ms)
+✔ semantic GC refuses relabeled unsafe rewrites and incomplete portable certificates (1993.282292ms)
+✔ semantic GC retains signed formal fence symbols/nonempty contracts and accepts only valid fence schemas (1960.247541ms)
+✔ semantic GC derives portable Boolean equivalence instead of relying only on integer test examples (1708.943458ms)
+✔ semantic GC refuses unsupported nonlinear equivalence without changing the production head (1375.43075ms)
+✔ semantic GC revocation during prepared promotion aborts the staged target; no commit is guessed (2638.932875ms)
+✔ semantic GC activation recovery follows the committed governor decision and remains idempotent (2807.232583ms)
+✔ semantic GC explicit background scheduling emits a durable candidate and stops without production publication (1785.873834ms)
+✔ branch profile prunes symbolic/literal unreachable arms, preserves selected scopes/effects and removes newly unreachable declarations from the candidate (3010.907458ms)
+✔ legacy forwarder profile keeps branch syntax and cannot reopen a new branch-profile journal (1929.023166ms)
+✔ legacy forwarder and flattened-branch proposals remain readable but cannot start new promotions (4618.187833ms)
+✔ historical branch flattening changes a finite-step sink outcome and is barred from new promotion (2293.623833ms)
+✔ fuel-preserving branch profile removes cold If calls but keeps exact reference-runtime effects and quota faults (2825.235875ms)
+✔ fuel-preserving Cond profile removes the cold effect expression without moving its guard or chosen arm (2228.572542ms)
+✔ branch profile handles Cond expressions and definitely initialized local bindings without flattening blocks (1830.453375ms)
+✔ branch pruning does not erase a condition call or its effects even when the callee always returns true (2041.8085ms)
+✔ branch pruning does not treat an entry precondition or an earlier assigned value as a permanent branch fact (1580.810084ms)
+✔ dead-branch cleanup and inverse rollback require fresh signed F08 authority and retain condition certificates through GC (9335.306ms)
+✔ branch proofs preserve contract and loop annotation identities while pruning a stable condition inside a loop (1685.295333ms)
+✔ portable branch proof does not claim a partial division condition is universally total from an entry precondition (1543.007083ms)
+✔ branch admission rejects missing/swapped certificates, invalid source sites, wrong-arm code and relabeled condition claims (2988.2285ms)
+✔ branch analysis does not assume a local declared in only one syntactic arm is definitely bound (1482.78775ms)
+✔ persisted branch witnesses are checked with the portable proof producer replaced by a throwing stub (2193.355833ms)
+✔ scalar shim profile retires a non-forwarding arithmetic adapter with a portable total-equivalence certificate (2131.802292ms)
+✔ scalar shim comparison handles Boolean conditional adapters that the uniform-branch profile cannot simplify (1752.360625ms)
+✔ scalar shim redirection evaluates every original argument once and in order even when parameters are reused or unused (2127.967334ms)
+✔ scalar shim retirement is opt-in; the branch-only profile retains non-forwarding adapters (1472.160292ms)
+✔ legacy scalar shim proof remains readable but a new quota-changing promotion is refused before preparation (2533.929708ms)
+✔ scalar shim comparison refuses unequal, nonempty-frame and call-bearing implementations (5956.230375ms)
+✔ V2 call-bearing scalar shim proves a closed helper expansion before redirecting live callers (2531.316375ms)
+✔ V2 call-bearing shim keeps a helper with runtime contract checks or partial arithmetic (2611.340209ms)
+✔ V2 call-bearing shim refuses to erase an evaluated partial helper argument (1499.206708ms)
+✔ scalar shim retirement preserves exports, explicit protection and signed fences even for equivalent bodies (4425.565958ms)
+✔ transparent forwarding and general scalar shim proofs compose without target cycles (1675.148ms)
+✔ scalar shim admission rejects missing proofs, changed declaration identity and alternate result code (1372.615375ms)
+✔ scalar shim certificates remain independently checkable with proof search disabled (1253.16275ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 98432.213209

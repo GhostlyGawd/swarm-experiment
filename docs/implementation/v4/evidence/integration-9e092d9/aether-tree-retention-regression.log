@@ -1,0 +1,27 @@
+✔ Tree-CRDT refuses an imported content frame before it can become durable when its AST is absent (911.35925ms)
+✔ Tree-CRDT reopens a historically published frame lacking a lease by rebuilding current epoch roots before GC (968.711833ms)
+✔ Tree-CRDT reopen fails closed on a durable frame whose required AST content is missing (995.445791ms)
+✔ Tree-CRDT SIGKILL after inbound frame publication leaves its AST pinned for direct GC and reopened materialization (1147.943709ms)
+✔ Tree-CRDT materializes actual CAS roots; shared content has independent occurrences and concurrent edits converge (5318.793917ms)
+✔ Tree-CRDT suppresses concurrent cycles deterministically and trash deletion remains restorable until certified collection (2332.566542ms)
+✔ Tree-CRDT unanimous signed checkpoint reindexes and collects live tombstones without obsolete edit resurrection (4679.445833ms)
+✔ Tree-CRDT invalid grouped roles, duplicate scalar children and invalid literal types stay candidates (1570.11475ms)
+✔ checkpoint ACK validates full audit closure, canonical cut, exact projection, floor, roster and signatures before writing authority (2169.341417ms)
+✔ actual SIGKILL at after-fence preserves durable fencing or certified epoch; same certificate retry is idempotent (2632.926542ms)
+✔ actual SIGKILL at checkpoint-prepared preserves durable fencing or certified epoch; same certificate retry is idempotent (3329.969042ms)
+✔ actual SIGKILL at checkpoint-committed preserves durable fencing or certified epoch; same certificate retry is idempotent (3274.944708ms)
+✔ actual SIGKILL at checkpoint-collected preserves durable fencing or certified epoch; same certificate retry is idempotent (3360.040541ms)
+✔ late equivocation and predecessors recompute the candidate deterministically after duplicate and reversed delivery (2181.162667ms)
+✔ grouped While children remain distinct and converged semantic failures do not publish a production root (4823.807958ms)
+✔ repeated certified epochs preserve live identity and clocks while stale archived restores cannot resurrect collected occurrences (3793.749625ms)
+✔ missing causal predecessors prevent checkpoint certification and durable fence receipts resist metadata rollback (869.192667ms)
+✔ known post-fence signed extras prevent fresh certification while historical certified cuts remain arrival independent (1409.56925ms)
+✔ honest partitioned inserts beyond the occurrence bound converge deterministically and leave deletion/checkpoint repair available (4640.388459ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 50547.92225
