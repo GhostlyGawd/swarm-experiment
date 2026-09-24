@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Signed living boundary pipeline and throughput decision record — 2026-09-24
+
+- Added versioned `aether.living-boundary-pipeline/1` for the V4 signed candidate: immutable generation, every original/retry/duplicate Aether execution, both recovery calls, raw per-attempt/publication timing, complete recount and offline tamper audit. The one failed partition attempt remains visible when its retry succeeds; zero filters are required. It does not grant deployment authority. [Contract](LIVING-PIPELINE-V1.md).
+- [Clean-source stage campaign](evidence/t303-pipeline-faf2172/REVIEW.md) at `faf2172`: 15 rich signed cases generated at **95,389.5/s**, 17 actual candidate attempts at **1.3735/s**, 15 worker pipeline cases at **1.1177/s**, and complete witnessed external campaign at **1.0741/s**. The unchanged four-field R04 JSON kernel passes five trials at **2.682–3.076M/s**; 100 direct serial file-plus-directory fsync samples have a **2.792 ms** minimum. [D21](decisions/D21-living-campaign-throughput-boundary.md) records the owner decision needed to resolve the exact 2M/s qualification workload, without changing the target. T3-03/G2 remains failed, G1 remains incomplete, and the tracker stays **20/62**.
+
 ## Clean combined verification checkpoint — 2026-09-24
 
 - At clean `244684b`, the serial full suite passed **1,199/1,201** with zero failures and two existing skips; build, typecheck, v4 roadmap and independently rebuilt worker-bundle checks passed. The exact-source default release inventory verifies a **5.6290×** warm ledger fixture pass but remains ineligible with 15 required NFR targets unmeasured; cold and changed-session diagnostic ratios miss. The tracker stays **20/62**. [Raw evidence and scope](evidence/integration-244684b/REVIEW.md).

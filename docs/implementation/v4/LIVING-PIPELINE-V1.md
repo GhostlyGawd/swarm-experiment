@@ -15,7 +15,9 @@ execution, recounts failed and filtered attempts, and checks declared coverage.
 It publishes an immutable `/1` report with separate generation, candidate
 execution, recovery, observation-publication and pipeline wall times. The
 offline auditor reopens every record and rederives counts, digests, coverage and
-rate arithmetic. The report always says `productionAuthorized: false`. It is
+rate arithmetic. `complete` means the accounting set is complete after explicit
+recovery; it does not mean every attempt passed or that T3-03/G1 is qualified.
+The report always says `productionAuthorized: false`. It is
 not a proof of external deployment, an admission receipt, or a performance
 qualification by itself.
 

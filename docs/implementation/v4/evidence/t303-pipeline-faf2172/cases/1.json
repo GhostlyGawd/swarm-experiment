@@ -1,0 +1,60 @@
+{
+  "input": {
+    "format": "aether.living-case/1",
+    "manifestDigest": "aether.living-effect-campaign/4:b3:b38591d8616f3810c99fac1d231a4b523a9ed3e9fd4fb2ff1c6443dfd44512e6",
+    "ordinal": 1,
+    "scenario": "two-writers",
+    "schedule": [
+      "a",
+      "b",
+      "a",
+      "b"
+    ],
+    "seed": "20260924-integrated/two-writers/1",
+    "variables": {}
+  },
+  "result": {
+    "caseDigest": "aether.living-case/1:b3:5c1832a344ce8ef2c5423a331891435f8f1189b7f13886678e8a3cbd49ebc279",
+    "passed": true,
+    "failure": null,
+    "filtered": false,
+    "calls": 5,
+    "steps": 28,
+    "evaluatedOperations": 5,
+    "allocatedBytes": 0,
+    "peakAllocatedBytes": 0,
+    "allocationChecksum": 0,
+    "networkFrames": 0,
+    "deliveredFrames": 0,
+    "rejectedFrames": 0,
+    "droppedFrames": 0,
+    "coverage": [
+      "candidate-call",
+      "effect:broker-journal",
+      "runtime:assign",
+      "runtime:call",
+      "runtime:return",
+      "scheduler:switched",
+      "step:$checks/final-value",
+      "step:a/read",
+      "step:a/write",
+      "step:b/read",
+      "step:b/write"
+    ],
+    "trace": [
+      "a/read",
+      "b/read",
+      "a/write",
+      "b/write",
+      "$checks/final-value"
+    ],
+    "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+    "externalEffects": {
+      "journalDigest": "aether.living-external-journal/4:b3:fe1f7b002864826fad1c0f976e45d368837853c5927d00c3f26ec5b1fe5a4718",
+      "receiptDigest": "aether.living-external-receipts/4:b3:46d759a41a9cf0da1ba5cebd71ae60c7dbc15f2bab27b1724ae4b72af6ce26b3",
+      "eventCount": 0,
+      "committedReceipts": 0,
+      "indeterminate": 0
+    }
+  }
+}

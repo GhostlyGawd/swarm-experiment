@@ -1,0 +1,612 @@
+{
+  "format": "aether.living-durability-probe/1",
+  "warmups": 10,
+  "samples": 100,
+  "bytesPerRecord": 256,
+  "raw": [
+    {
+      "ordinal": 0,
+      "fileFsyncNs": "3667667",
+      "directoryFsyncNs": "6708",
+      "totalNs": "3999208"
+    },
+    {
+      "ordinal": 1,
+      "fileFsyncNs": "3750167",
+      "directoryFsyncNs": "7542",
+      "totalNs": "4035667"
+    },
+    {
+      "ordinal": 2,
+      "fileFsyncNs": "2681792",
+      "directoryFsyncNs": "8083",
+      "totalNs": "3070834"
+    },
+    {
+      "ordinal": 3,
+      "fileFsyncNs": "2591167",
+      "directoryFsyncNs": "6500",
+      "totalNs": "2983750"
+    },
+    {
+      "ordinal": 4,
+      "fileFsyncNs": "3526750",
+      "directoryFsyncNs": "6792",
+      "totalNs": "3869125"
+    },
+    {
+      "ordinal": 5,
+      "fileFsyncNs": "3614583",
+      "directoryFsyncNs": "8709",
+      "totalNs": "4056417"
+    },
+    {
+      "ordinal": 6,
+      "fileFsyncNs": "3622292",
+      "directoryFsyncNs": "6750",
+      "totalNs": "3927959"
+    },
+    {
+      "ordinal": 7,
+      "fileFsyncNs": "2811125",
+      "directoryFsyncNs": "6834",
+      "totalNs": "3109500"
+    },
+    {
+      "ordinal": 8,
+      "fileFsyncNs": "2590167",
+      "directoryFsyncNs": "11042",
+      "totalNs": "2917292"
+    },
+    {
+      "ordinal": 9,
+      "fileFsyncNs": "2692083",
+      "directoryFsyncNs": "7709",
+      "totalNs": "3040792"
+    },
+    {
+      "ordinal": 10,
+      "fileFsyncNs": "2649667",
+      "directoryFsyncNs": "7125",
+      "totalNs": "2945541"
+    },
+    {
+      "ordinal": 11,
+      "fileFsyncNs": "3642875",
+      "directoryFsyncNs": "6458",
+      "totalNs": "3970000"
+    },
+    {
+      "ordinal": 12,
+      "fileFsyncNs": "3757041",
+      "directoryFsyncNs": "6292",
+      "totalNs": "4096875"
+    },
+    {
+      "ordinal": 13,
+      "fileFsyncNs": "3533583",
+      "directoryFsyncNs": "6667",
+      "totalNs": "3865875"
+    },
+    {
+      "ordinal": 14,
+      "fileFsyncNs": "3739625",
+      "directoryFsyncNs": "7458",
+      "totalNs": "4026958"
+    },
+    {
+      "ordinal": 15,
+      "fileFsyncNs": "3629667",
+      "directoryFsyncNs": "10375",
+      "totalNs": "4016625"
+    },
+    {
+      "ordinal": 16,
+      "fileFsyncNs": "3615125",
+      "directoryFsyncNs": "3034500",
+      "totalNs": "6972917"
+    },
+    {
+      "ordinal": 17,
+      "fileFsyncNs": "3662792",
+      "directoryFsyncNs": "3024791",
+      "totalNs": "7014375"
+    },
+    {
+      "ordinal": 18,
+      "fileFsyncNs": "4566167",
+      "directoryFsyncNs": "3932917",
+      "totalNs": "8947917"
+    },
+    {
+      "ordinal": 19,
+      "fileFsyncNs": "3768875",
+      "directoryFsyncNs": "3026583",
+      "totalNs": "7090666"
+    },
+    {
+      "ordinal": 20,
+      "fileFsyncNs": "3644542",
+      "directoryFsyncNs": "3944875",
+      "totalNs": "7900333"
+    },
+    {
+      "ordinal": 21,
+      "fileFsyncNs": "3848250",
+      "directoryFsyncNs": "3828083",
+      "totalNs": "8003625"
+    },
+    {
+      "ordinal": 22,
+      "fileFsyncNs": "3685542",
+      "directoryFsyncNs": "3018083",
+      "totalNs": "7011208"
+    },
+    {
+      "ordinal": 23,
+      "fileFsyncNs": "3558917",
+      "directoryFsyncNs": "3835250",
+      "totalNs": "7940625"
+    },
+    {
+      "ordinal": 24,
+      "fileFsyncNs": "3614166",
+      "directoryFsyncNs": "8459",
+      "totalNs": "4068750"
+    },
+    {
+      "ordinal": 25,
+      "fileFsyncNs": "3599792",
+      "directoryFsyncNs": "10125",
+      "totalNs": "4080458"
+    },
+    {
+      "ordinal": 26,
+      "fileFsyncNs": "2552291",
+      "directoryFsyncNs": "7125",
+      "totalNs": "2924666"
+    },
+    {
+      "ordinal": 27,
+      "fileFsyncNs": "3617167",
+      "directoryFsyncNs": "10375",
+      "totalNs": "4034500"
+    },
+    {
+      "ordinal": 28,
+      "fileFsyncNs": "3652417",
+      "directoryFsyncNs": "7708",
+      "totalNs": "3914375"
+    },
+    {
+      "ordinal": 29,
+      "fileFsyncNs": "3763208",
+      "directoryFsyncNs": "15750",
+      "totalNs": "4065125"
+    },
+    {
+      "ordinal": 30,
+      "fileFsyncNs": "3608458",
+      "directoryFsyncNs": "6208",
+      "totalNs": "3918042"
+    },
+    {
+      "ordinal": 31,
+      "fileFsyncNs": "3683875",
+      "directoryFsyncNs": "5458",
+      "totalNs": "4004792"
+    },
+    {
+      "ordinal": 32,
+      "fileFsyncNs": "3690917",
+      "directoryFsyncNs": "6375",
+      "totalNs": "4029333"
+    },
+    {
+      "ordinal": 33,
+      "fileFsyncNs": "2731542",
+      "directoryFsyncNs": "7334",
+      "totalNs": "3017958"
+    },
+    {
+      "ordinal": 34,
+      "fileFsyncNs": "3687416",
+      "directoryFsyncNs": "18167",
+      "totalNs": "3998750"
+    },
+    {
+      "ordinal": 35,
+      "fileFsyncNs": "2735583",
+      "directoryFsyncNs": "6291",
+      "totalNs": "3015459"
+    },
+    {
+      "ordinal": 36,
+      "fileFsyncNs": "2752583",
+      "directoryFsyncNs": "3417",
+      "totalNs": "2984708"
+    },
+    {
+      "ordinal": 37,
+      "fileFsyncNs": "4517417",
+      "directoryFsyncNs": "5458",
+      "totalNs": "4813084"
+    },
+    {
+      "ordinal": 38,
+      "fileFsyncNs": "3797792",
+      "directoryFsyncNs": "6041",
+      "totalNs": "4136042"
+    },
+    {
+      "ordinal": 39,
+      "fileFsyncNs": "3729500",
+      "directoryFsyncNs": "7250",
+      "totalNs": "4062125"
+    },
+    {
+      "ordinal": 40,
+      "fileFsyncNs": "2577542",
+      "directoryFsyncNs": "6875",
+      "totalNs": "2973291"
+    },
+    {
+      "ordinal": 41,
+      "fileFsyncNs": "3655000",
+      "directoryFsyncNs": "6167",
+      "totalNs": "3916333"
+    },
+    {
+      "ordinal": 42,
+      "fileFsyncNs": "2888500",
+      "directoryFsyncNs": "8750",
+      "totalNs": "3138042"
+    },
+    {
+      "ordinal": 43,
+      "fileFsyncNs": "3644083",
+      "directoryFsyncNs": "4500",
+      "totalNs": "3887416"
+    },
+    {
+      "ordinal": 44,
+      "fileFsyncNs": "3724375",
+      "directoryFsyncNs": "8958",
+      "totalNs": "4068000"
+    },
+    {
+      "ordinal": 45,
+      "fileFsyncNs": "3560000",
+      "directoryFsyncNs": "5834",
+      "totalNs": "3982209"
+    },
+    {
+      "ordinal": 46,
+      "fileFsyncNs": "3682750",
+      "directoryFsyncNs": "5625",
+      "totalNs": "3962334"
+    },
+    {
+      "ordinal": 47,
+      "fileFsyncNs": "3639083",
+      "directoryFsyncNs": "5708",
+      "totalNs": "3951750"
+    },
+    {
+      "ordinal": 48,
+      "fileFsyncNs": "3719458",
+      "directoryFsyncNs": "4334",
+      "totalNs": "4028625"
+    },
+    {
+      "ordinal": 49,
+      "fileFsyncNs": "3717042",
+      "directoryFsyncNs": "19958",
+      "totalNs": "3964250"
+    },
+    {
+      "ordinal": 50,
+      "fileFsyncNs": "2811625",
+      "directoryFsyncNs": "6750",
+      "totalNs": "3059541"
+    },
+    {
+      "ordinal": 51,
+      "fileFsyncNs": "3727750",
+      "directoryFsyncNs": "6708",
+      "totalNs": "4056625"
+    },
+    {
+      "ordinal": 52,
+      "fileFsyncNs": "3640709",
+      "directoryFsyncNs": "10500",
+      "totalNs": "3955500"
+    },
+    {
+      "ordinal": 53,
+      "fileFsyncNs": "3499791",
+      "directoryFsyncNs": "3915958",
+      "totalNs": "7909625"
+    },
+    {
+      "ordinal": 54,
+      "fileFsyncNs": "3642625",
+      "directoryFsyncNs": "3019541",
+      "totalNs": "7009833"
+    },
+    {
+      "ordinal": 55,
+      "fileFsyncNs": "3733000",
+      "directoryFsyncNs": "5625",
+      "totalNs": "4058417"
+    },
+    {
+      "ordinal": 56,
+      "fileFsyncNs": "3685750",
+      "directoryFsyncNs": "6750",
+      "totalNs": "4067708"
+    },
+    {
+      "ordinal": 57,
+      "fileFsyncNs": "3477542",
+      "directoryFsyncNs": "16459",
+      "totalNs": "3894917"
+    },
+    {
+      "ordinal": 58,
+      "fileFsyncNs": "3623416",
+      "directoryFsyncNs": "4708",
+      "totalNs": "3964083"
+    },
+    {
+      "ordinal": 59,
+      "fileFsyncNs": "3728917",
+      "directoryFsyncNs": "8417",
+      "totalNs": "4053792"
+    },
+    {
+      "ordinal": 60,
+      "fileFsyncNs": "2713041",
+      "directoryFsyncNs": "4875",
+      "totalNs": "2968792"
+    },
+    {
+      "ordinal": 61,
+      "fileFsyncNs": "2705709",
+      "directoryFsyncNs": "4333",
+      "totalNs": "2973291"
+    },
+    {
+      "ordinal": 62,
+      "fileFsyncNs": "3723292",
+      "directoryFsyncNs": "4542",
+      "totalNs": "3956125"
+    },
+    {
+      "ordinal": 63,
+      "fileFsyncNs": "3943834",
+      "directoryFsyncNs": "10083",
+      "totalNs": "4305291"
+    },
+    {
+      "ordinal": 64,
+      "fileFsyncNs": "2485500",
+      "directoryFsyncNs": "6916",
+      "totalNs": "2792292"
+    },
+    {
+      "ordinal": 65,
+      "fileFsyncNs": "2745041",
+      "directoryFsyncNs": "5375",
+      "totalNs": "2975458"
+    },
+    {
+      "ordinal": 66,
+      "fileFsyncNs": "3593708",
+      "directoryFsyncNs": "9375",
+      "totalNs": "3949791"
+    },
+    {
+      "ordinal": 67,
+      "fileFsyncNs": "3756292",
+      "directoryFsyncNs": "4667",
+      "totalNs": "4016959"
+    },
+    {
+      "ordinal": 68,
+      "fileFsyncNs": "2678875",
+      "directoryFsyncNs": "5750",
+      "totalNs": "3004417"
+    },
+    {
+      "ordinal": 69,
+      "fileFsyncNs": "2758875",
+      "directoryFsyncNs": "9334",
+      "totalNs": "3068209"
+    },
+    {
+      "ordinal": 70,
+      "fileFsyncNs": "3602834",
+      "directoryFsyncNs": "4791",
+      "totalNs": "3916625"
+    },
+    {
+      "ordinal": 71,
+      "fileFsyncNs": "3782625",
+      "directoryFsyncNs": "5583",
+      "totalNs": "4086834"
+    },
+    {
+      "ordinal": 72,
+      "fileFsyncNs": "2623250",
+      "directoryFsyncNs": "5750",
+      "totalNs": "2945084"
+    },
+    {
+      "ordinal": 73,
+      "fileFsyncNs": "2596959",
+      "directoryFsyncNs": "5458",
+      "totalNs": "3002708"
+    },
+    {
+      "ordinal": 74,
+      "fileFsyncNs": "3683875",
+      "directoryFsyncNs": "6209",
+      "totalNs": "3934667"
+    },
+    {
+      "ordinal": 75,
+      "fileFsyncNs": "2684833",
+      "directoryFsyncNs": "6416",
+      "totalNs": "3020917"
+    },
+    {
+      "ordinal": 76,
+      "fileFsyncNs": "3701958",
+      "directoryFsyncNs": "6333",
+      "totalNs": "4050708"
+    },
+    {
+      "ordinal": 77,
+      "fileFsyncNs": "3571083",
+      "directoryFsyncNs": "15083",
+      "totalNs": "3948208"
+    },
+    {
+      "ordinal": 78,
+      "fileFsyncNs": "2615000",
+      "directoryFsyncNs": "5833",
+      "totalNs": "3027583"
+    },
+    {
+      "ordinal": 79,
+      "fileFsyncNs": "3672875",
+      "directoryFsyncNs": "7208",
+      "totalNs": "4051625"
+    },
+    {
+      "ordinal": 80,
+      "fileFsyncNs": "3617458",
+      "directoryFsyncNs": "4708",
+      "totalNs": "3934583"
+    },
+    {
+      "ordinal": 81,
+      "fileFsyncNs": "2666583",
+      "directoryFsyncNs": "4541",
+      "totalNs": "2951542"
+    },
+    {
+      "ordinal": 82,
+      "fileFsyncNs": "2804333",
+      "directoryFsyncNs": "5375",
+      "totalNs": "3048666"
+    },
+    {
+      "ordinal": 83,
+      "fileFsyncNs": "3645292",
+      "directoryFsyncNs": "13625",
+      "totalNs": "3926417"
+    },
+    {
+      "ordinal": 84,
+      "fileFsyncNs": "3835958",
+      "directoryFsyncNs": "6375",
+      "totalNs": "4093000"
+    },
+    {
+      "ordinal": 85,
+      "fileFsyncNs": "3581458",
+      "directoryFsyncNs": "7000",
+      "totalNs": "3952459"
+    },
+    {
+      "ordinal": 86,
+      "fileFsyncNs": "3665167",
+      "directoryFsyncNs": "3926334",
+      "totalNs": "7938834"
+    },
+    {
+      "ordinal": 87,
+      "fileFsyncNs": "2829583",
+      "directoryFsyncNs": "6084",
+      "totalNs": "3064291"
+    },
+    {
+      "ordinal": 88,
+      "fileFsyncNs": "2712583",
+      "directoryFsyncNs": "4125",
+      "totalNs": "3015750"
+    },
+    {
+      "ordinal": 89,
+      "fileFsyncNs": "3671500",
+      "directoryFsyncNs": "7541",
+      "totalNs": "3963667"
+    },
+    {
+      "ordinal": 90,
+      "fileFsyncNs": "2730541",
+      "directoryFsyncNs": "5125",
+      "totalNs": "3003000"
+    },
+    {
+      "ordinal": 91,
+      "fileFsyncNs": "2983209",
+      "directoryFsyncNs": "6541",
+      "totalNs": "3253625"
+    },
+    {
+      "ordinal": 92,
+      "fileFsyncNs": "2477667",
+      "directoryFsyncNs": "6625",
+      "totalNs": "2826541"
+    },
+    {
+      "ordinal": 93,
+      "fileFsyncNs": "3560166",
+      "directoryFsyncNs": "9958",
+      "totalNs": "3967750"
+    },
+    {
+      "ordinal": 94,
+      "fileFsyncNs": "2615042",
+      "directoryFsyncNs": "8875",
+      "totalNs": "2970583"
+    },
+    {
+      "ordinal": 95,
+      "fileFsyncNs": "3627416",
+      "directoryFsyncNs": "6000",
+      "totalNs": "3970292"
+    },
+    {
+      "ordinal": 96,
+      "fileFsyncNs": "3773792",
+      "directoryFsyncNs": "42875",
+      "totalNs": "4117125"
+    },
+    {
+      "ordinal": 97,
+      "fileFsyncNs": "3481791",
+      "directoryFsyncNs": "6167",
+      "totalNs": "3876167"
+    },
+    {
+      "ordinal": 98,
+      "fileFsyncNs": "3672167",
+      "directoryFsyncNs": "7916",
+      "totalNs": "4075958"
+    },
+    {
+      "ordinal": 99,
+      "fileFsyncNs": "2550375",
+      "directoryFsyncNs": "3890833",
+      "totalNs": "6827583"
+    }
+  ],
+  "minimumNs": "2792292",
+  "medianNs": "3959229",
+  "maximumNs": "8947917",
+  "serialRecordsPerSecond": 242.39018498731716
+}
