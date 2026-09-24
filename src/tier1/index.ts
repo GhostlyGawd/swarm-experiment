@@ -7,6 +7,9 @@ export { DurableGraphStore, type DurableGraphStoreOptions, type DurableStoreLimi
 export { CausalLineageLedger, LineageAdmissionError, signSpecRevision, signIntent, specRevisionDigest, intentDigest, fenceRequirement, validateStrictLineageAdmission, type CausalLineageOptions, type LineageAuthority, type SpecReference, type FenceRequirement, type SpecRevisionBody, type SignedSpecRevision, type IntentBody, type SignedIntent, type ArtifactLineageRecord, type LineageInvalidation, type StrictLineageAdmission } from './causal-lineage.ts';
 export { CognitiveBlackboard, type BlackboardItem, type BlackboardAcl, type BlackboardPolicy, type BlackboardEntry, type BlackboardView, type CognitiveBlackboardOptions } from './cognitive-blackboard.ts';
 export { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, SEMANTIC_GC_CALL_SHIM_PROFILE, SEMANTIC_GC_FUEL_PROFILE, type SemanticGcProfile, type SemanticGcOptions, type SemanticGcPolicy, type SemanticGcProposal, type SemanticRetention, type SemanticRetentionKind } from './semantic-gc.ts';
+export { deriveVirtualForwardDescriptor, checkVirtualForwardDescriptor,
+  VIRTUAL_FORWARD_DESCRIPTOR_FORMAT, VIRTUAL_FORWARD_EVENT_SCRIPT,
+  type VirtualForwardDescriptor, type VirtualForwardBinding, type VirtualForwardSite } from './semantic-gc-virtual-forward.ts';
 export { SemanticAdapterGarbageCollector, declarativeAdapterTableDigest, type DeclarativeAdapterRegistration, type DeclarativeAdapterTable, type AdapterRetirementProposal, type SemanticAdapterGcOptions } from './semantic-gc-adapters.ts';
 export { proposeSemanticSinkRetirementV2, verifySemanticSinkRetirementV2,
   type SinkRetirementSelectionV2, type SemanticSinkRetirementContextV2,

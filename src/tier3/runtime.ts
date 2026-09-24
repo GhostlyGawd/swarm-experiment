@@ -25,6 +25,7 @@ import type { BinOp, Term, Ty } from '../tier1/ast.ts';
 import type { CapabilityName, SymbolId } from '../tier1/ids.ts';
 import type { SymbolSpace } from '../tier1/symbols.ts';
 import { GraphStore } from '../tier1/store.ts';
+import { checkVirtualForwardDescriptor, type VirtualForwardBinding, type VirtualForwardDescriptor } from '../tier1/semantic-gc-virtual-forward.ts';
 import { CapabilityEnvelope, type CapabilityRegistry, type RevocationList } from '../tier2/ocap.ts';
 import { underlying } from '../tier2/typecheck.ts';
 import { formatValue, isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
@@ -129,6 +130,12 @@ export interface RuntimeOptions {
   readonly onStep?: (event: TraceEvent) => void;
   /** Scope name used when consulting the revocation list. */
   readonly scope?: string;
+  /** Exact-source, checked reference-runtime profile for one retired pure
+   * forwarder. A caller cannot opt in with an unverified event script. */
+  readonly virtualForward?: {
+    readonly source: Extract<Term, { kind: 'Module' }>;
+    readonly descriptor: VirtualForwardDescriptor;
+  };
 }
 
 interface Frame {
@@ -153,6 +160,7 @@ class ReturnSignal {
 export class Runtime {
   private readonly opts: RuntimeOptions;
   private readonly functions = new Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>();
+  private readonly virtualForwardSites = new WeakMap<object, VirtualForwardBinding>();
   private heap = new Map<number, Map<string, Value>>();
   private nextAddr = 1;
   private journal: Delta[] = [];
@@ -172,12 +180,25 @@ export class Runtime {
 
   /** Make a module's functions callable. */
   load(term: Term): this {
-    this.opts.effectRouter?.bind(new GraphStore().intern(term));
+    let loaded = term;
+    if (this.opts.virtualForward) {
+      if (term.kind !== 'Module') throw new TypeError('virtual forward profile requires a complete candidate module');
+      // Validate plain AST input before cloning it, then bind the verified
+      // sites in a private snapshot. A later caller mutation of either input
+      // module must not change an already loaded virtual frame or call site.
+      checkVirtualForwardDescriptor(this.opts.virtualForward.descriptor, this.opts.virtualForward.source, term);
+      const source = structuredClone(this.opts.virtualForward.source);
+      loaded = structuredClone(term);
+      if (loaded.kind !== 'Module') throw new TypeError('virtual forward candidate changed during loading');
+      const bindings = checkVirtualForwardDescriptor(this.opts.virtualForward.descriptor, source, loaded);
+      for (const binding of bindings) this.virtualForwardSites.set(binding.candidateCall, binding);
+    }
+    this.opts.effectRouter?.bind(new GraphStore().intern(loaded));
     const collect = (node: Term): void => {
       if (node.kind === 'FunctionDecl') this.functions.set(node.symbol, node);
       if (node.kind === 'Module') for (const member of node.members) collect(member);
     };
-    collect(term);
+    collect(loaded);
     return this;
   }
 
@@ -449,6 +470,48 @@ export class Runtime {
       }
       this.emit('return', 'Return', formatValue(returned, this.heap));
       return returned;
+    } finally {
+      this.frames.pop();
+    }
+  }
+
+  /** Execute the original forwarder's observable transitions while the
+   * current module contains only the direct target call. This is deliberately
+   * a reference-runtime profile; compiled and resumable lowering need their
+   * own checked bindings before GC promotion may admit the rewrite. */
+  private enterVirtualForward(binding: VirtualForwardBinding, args: readonly Value[]): Value {
+    const wrapper = binding.wrapper;
+    const parameter = wrapper.params[0];
+    const scope: Scope = new Map([[parameter.symbol, args[0] ?? null]]);
+    const preHeap = new Map<number, Map<string, Value>>();
+    for (const [addr, record] of this.heap) preHeap.set(addr, new Map(record));
+    const frame: Frame = {
+      decl: wrapper,
+      scopes: [scope],
+      envelope: CapabilityEnvelope.of(),
+      preHeap,
+      preScope: new Map(scope),
+    };
+    this.frames.push(frame);
+    this.emit('call', 'FunctionDecl', `${this.name(wrapper.symbol)}(${args.map((a) => formatValue(a, this.heap)).join(', ')})`);
+    try {
+      // The independently checked wrapper grammar is exactly
+      // Block(Return(Call(target, Var(parameter)))). Each tick retains its
+      // original position relative to the target and the step-budget fault.
+      this.tick(); // Block
+      this.tick(); // Return
+      this.tick(); // Call
+      const callee = this.functions.get(binding.target);
+      if (!callee) throw new AetherFault(this.fault('unbound', `${this.name(binding.target)} is not loaded`, null));
+      for (const cap of callee.capabilities) {
+        if (frame.envelope.has(cap)) continue;
+        throw new AetherFault(this.fault('capability_denied',
+          `${this.name(binding.target)} needs ${cap}, which ${this.name(wrapper.symbol)} does not hold`, cap));
+      }
+      this.tick(); // Var
+      const value = this.enter(callee, [this.lookup(parameter.symbol, frame)]);
+      this.emit('return', 'Return', formatValue(value, this.heap));
+      return value;
     } finally {
       this.frames.pop();
     }
@@ -810,6 +873,14 @@ export class Runtime {
         return task.run();
       }
       case 'Call': {
+        const virtual = this.virtualForwardSites.get(expr);
+        if (virtual) {
+          // The caller's Call tick happened above. The archived wrapper has
+          // no capability demand; source arguments are evaluated once, before
+          // the wrapper call event and its four body transitions.
+          const args = expr.args.map((a) => this.eval(a, frame, result, old));
+          return this.enterVirtualForward(virtual, args);
+        }
         const callee = this.functions.get(expr.callee);
         if (!callee) {
           throw new AetherFault(this.fault('unbound', `${this.name(expr.callee)} is not loaded`, null));
