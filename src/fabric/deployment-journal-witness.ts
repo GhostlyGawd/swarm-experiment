@@ -11,16 +11,17 @@ import { domainDigest, validateDigest, type Digest } from './identity.ts';
 const FORMAT = 'aether.process-deployment-journal-witness/1' as const;
 const JOURNAL_FORMAT_V9 = 'aether.process-deployment/9' as const;
 const JOURNAL_FORMAT_V10 = 'aether.process-deployment/10' as const;
+const JOURNAL_FORMAT_V11 = 'aether.process-deployment/11' as const;
 const LIMITS = { maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024,
   maxObjects: 500_000, maxDepth: 128 } as const;
 const JOURNAL_FIELDS = ['format', 'witnessRevision', 'deploymentJournalWitnessDigest',
   'admissionProfile', 'capabilityProfile', 'effectSignerAnchorDigest', 'trustedClockAnchorDigest',
   'effectJournalWitnessCatalogDigest', 'hostJournalWitnessCatalogDigest', 'genesisManifest',
   'active', 'readiness', 'pendingProposal', 'invocations', 'allocations'] as const;
-const V10_SINK_FIELDS = ['sinkAnchorDigest', 'sinkDeploymentId',
+const SINK_FIELDS = ['sinkAnchorDigest', 'sinkDeploymentId',
   'approvedAdapterArtifactDigest', 'sinkStateWitnessDigest'] as const;
 interface JournalIdentity {
-  readonly format: typeof JOURNAL_FORMAT_V9 | typeof JOURNAL_FORMAT_V10;
+  readonly format: typeof JOURNAL_FORMAT_V9 | typeof JOURNAL_FORMAT_V10 | typeof JOURNAL_FORMAT_V11;
   readonly sinkAnchorDigest?: Digest;
   readonly sinkDeploymentId?: string;
   readonly approvedAdapterArtifactDigest?: Digest;
@@ -37,7 +38,7 @@ export interface DeploymentJournalWitness {
 
 export interface DeploymentJournalHead {
   readonly revision: string;
-  /** Complete canonical /9 or /10 deployment journal as UTF-8 text; null at genesis only. */
+  /** Complete canonical /9, /10 or /11 deployment journal as UTF-8 text; null at genesis only. */
   readonly journal: string | null;
 }
 
@@ -61,9 +62,11 @@ function assertJournal(journal: unknown, revision: string, source: Source): Jour
   const decoded = decodeCanonical(bytes, LIMITS);
   if (Buffer.from(encodeCanonical(decoded, LIMITS)).toString('utf8') !== journal)
     throw new TypeError('noncanonical deployment witness journal');
-  const v10 = (decoded as { format?: unknown }).format === JOURNAL_FORMAT_V10;
-  const record = exactObject(decoded, v10 ? [...JOURNAL_FIELDS, ...V10_SINK_FIELDS] : JOURNAL_FIELDS);
-  if (record.format !== JOURNAL_FORMAT_V9 && record.format !== JOURNAL_FORMAT_V10)
+  const format = (decoded as { format?: unknown }).format;
+  const sinkJournal = format === JOURNAL_FORMAT_V10 || format === JOURNAL_FORMAT_V11;
+  const record = exactObject(decoded, sinkJournal ? [...JOURNAL_FIELDS, ...SINK_FIELDS] : JOURNAL_FIELDS);
+  if (record.format !== JOURNAL_FORMAT_V9 && record.format !== JOURNAL_FORMAT_V10
+    && record.format !== JOURNAL_FORMAT_V11)
     throw new TypeError('invalid deployment witness journal format');
   decimal(record.witnessRevision);
   if (record.witnessRevision !== revision) throw new Error('deployment witness journal revision mismatch');
@@ -71,7 +74,8 @@ function assertJournal(journal: unknown, revision: string, source: Source): Jour
   if (record.deploymentJournalWitnessDigest !== source.digest)
     throw new Error('deployment witness journal identity mismatch');
   if (!['strict-lineage-v1', 'baseline-governor-v1'].includes(record.admissionProfile as string)
-    || record.capabilityProfile !== (v10 ? 'scoped-anchored-sink-v10' : 'scoped-anchored-wasm-v9')
+    || record.capabilityProfile !== (format === JOURNAL_FORMAT_V11 ? 'scoped-anchored-sink-v11'
+      : format === JOURNAL_FORMAT_V10 ? 'scoped-anchored-sink-v10' : 'scoped-anchored-wasm-v9')
     || !['ready', 'preparing', 'prepared'].includes(record.readiness as string)
     || (record.readiness === 'ready') !== (record.pendingProposal === null)
     || !Array.isArray(record.invocations) || !Array.isArray(record.allocations))
@@ -85,7 +89,7 @@ function assertJournal(journal: unknown, revision: string, source: Source): Jour
   validateDigest(active.manifest, 'aether.execution/1');
   validateDigest(active.artifactDigest, 'aether.process-artifact/1');
   decimal(active.generation);
-  if (v10) {
+  if (sinkJournal) {
     validateDigest(record.sinkAnchorDigest, 'aether.sink-anchor/1');
     identifier(record.sinkDeploymentId);
     if (record.sinkDeploymentId !== source.deploymentId)
@@ -96,7 +100,7 @@ function assertJournal(journal: unknown, revision: string, source: Source): Jour
     validateDigest(record.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
   }
   return { format: record.format as JournalIdentity['format'],
-    ...(v10 ? { sinkAnchorDigest: record.sinkAnchorDigest as Digest,
+    ...(sinkJournal ? { sinkAnchorDigest: record.sinkAnchorDigest as Digest,
       sinkDeploymentId: record.sinkDeploymentId as string,
       approvedAdapterArtifactDigest: record.approvedAdapterArtifactDigest as Digest,
       sinkStateWitnessDigest: record.sinkStateWitnessDigest as Digest } : {}) };
@@ -104,9 +108,9 @@ function assertJournal(journal: unknown, revision: string, source: Source): Jour
 
 function assertStableIdentity(source: Source, identity: JournalIdentity | null): void {
   if (source.lastRevision > 0n && identity && source.lastIdentity
-    && (identity.format === JOURNAL_FORMAT_V10 || source.lastIdentity.format === JOURNAL_FORMAT_V10)
+    && (identity.format !== JOURNAL_FORMAT_V9 || source.lastIdentity.format !== JOURNAL_FORMAT_V9)
     && (identity.format !== source.lastIdentity.format
-      || V10_SINK_FIELDS.some(field => identity[field] !== source.lastIdentity![field])))
+      || SINK_FIELDS.some(field => identity[field] !== source.lastIdentity![field])))
     throw new Error('deployment witness sink identity changed');
 }
 

@@ -34,6 +34,14 @@ function sinkJournal(witness: DeploymentJournalWitness, revision: string,
     ...overrides,
   })).toString('utf8');
 }
+function resourceSinkJournal(witness: DeploymentJournalWitness, revision: string,
+  overrides: Record<string, unknown> = {}): string {
+  const v10 = JSON.parse(sinkJournal(witness, revision)) as Record<string, unknown>;
+  return Buffer.from(encodeCanonical({ ...v10,
+    format: 'aether.process-deployment/11', capabilityProfile: 'scoped-anchored-sink-v11',
+    ...overrides,
+  })).toString('utf8');
+}
 function fixture() {
   let head: DeploymentJournalHead = { revision: '0', journal: null };
   let advances = 0;
@@ -199,4 +207,60 @@ test('deployment witness forbids sink identity drift and /9↔/10 switch before 
   advanceDeploymentJournalHead(v10.witness, '0', sinkJournal(v10.witness, '1'));
   assert.throws(() => advanceDeploymentJournalHead(v10.witness, '1', journal(v10.witness, '2')), /identity changed/);
   assert.equal(v10.advances(), 1);
+});
+
+test('deployment witness admits exact /11 resource-scoped sink journal and durable CAS bytes', () => {
+  const f = fixture();
+  const first = resourceSinkJournal(f.witness, '1');
+  const second = resourceSinkJournal(f.witness, '2', {
+    active: { id: 'genesis', manifest: digest('aether.execution/1'),
+      artifactDigest: digest('aether.process-artifact/1'), generation: '1' },
+  });
+  assert.deepEqual(advanceDeploymentJournalHead(f.witness, '0', first), { revision: '1', journal: first });
+  assert.deepEqual(advanceDeploymentJournalHead(f.witness, '1', second), { revision: '2', journal: second });
+  assert.deepEqual(readDeploymentJournalHead(f.witness), { revision: '2', journal: second });
+  assert.equal(f.advances(), 2);
+});
+
+test('deployment witness rejects malformed /11 sink fields, namespace, and profile before CAS', () => {
+  const f = fixture();
+  const base = JSON.parse(resourceSinkJournal(f.witness, '1')) as Record<string, unknown>;
+  const encode = (value: Record<string, unknown>) => Buffer.from(encodeCanonical(value)).toString('utf8');
+  const { sinkStateWitnessDigest: _omitted, ...missing } = base;
+  for (const candidate of [
+    missing,
+    { ...base, extra: true },
+    { ...base, capabilityProfile: 'scoped-anchored-sink-v10' },
+    { ...base, sinkAnchorDigest: digest('aether.other/1') },
+    { ...base, sinkDeploymentId: 'deployment:other' },
+    { ...base, approvedAdapterArtifactDigest: digest('aether.other/1') },
+    { ...base, sinkStateWitnessDigest: digest('aether.other/1') },
+  ]) assert.throws(() => advanceDeploymentJournalHead(f.witness, '0', encode(candidate)));
+  assert.equal(f.advances(), 0);
+});
+
+test('deployment witness prevents /11 sink identity changes and cross-version adoption before CAS', () => {
+  for (const [field, changed] of [
+    ['sinkAnchorDigest', domainDigest('aether.sink-anchor/1', 'other')],
+    ['sinkDeploymentId', 'deployment:other'],
+    ['approvedAdapterArtifactDigest', digest('aether.effect-adapter-artifact/3')],
+    ['sinkStateWitnessDigest', domainDigest('aether.sink-state-witness/1', 'other')],
+  ] as const) {
+    const f = fixture();
+    advanceDeploymentJournalHead(f.witness, '0', resourceSinkJournal(f.witness, '1'));
+    assert.throws(() => advanceDeploymentJournalHead(f.witness, '1',
+      resourceSinkJournal(f.witness, '2', { [field]: changed })), /namespace mismatch|identity changed/);
+    assert.equal(f.advances(), 1);
+  }
+  for (const [first, next] of [
+    [journal, resourceSinkJournal],
+    [sinkJournal, resourceSinkJournal],
+    [resourceSinkJournal, sinkJournal],
+    [resourceSinkJournal, journal],
+  ] as const) {
+    const f = fixture();
+    advanceDeploymentJournalHead(f.witness, '0', first(f.witness, '1'));
+    assert.throws(() => advanceDeploymentJournalHead(f.witness, '1', next(f.witness, '2')), /identity changed/);
+    assert.equal(f.advances(), 1);
+  }
 });
