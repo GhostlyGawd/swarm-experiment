@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## AE5 exact-base warm-reference research — 2026-09-23
+
+- Added an opt-in root-bound reference for unchanged FunctionDecl members of a paid cold module. A fresh process reconstructs from the complete cold wire; changed declarations and stale/noncanonical references are refused.
+- At clean source `b799b38`, actual-token ledger warm ratios are 4.716× cl100k and 4.903× o200k for four declarations. Cold ratios are 0.941×/0.952× and complete changed-session ratios are 1.110×/1.125×. This is a warm-only research pass, not FR-1.2, Q03, T1-02 or release qualification. The full source suite passed 877/878 tests with one existing opt-in skip.
+- The 20/62 verified task count stays unchanged. Further density work must improve changed messages and the paid cold boundary; complete task closure takes priority over accumulating partial probes.
+
 ## Executable projection V10 and all-kind audit — 2026-09-23
 
 - Added `aether.executable-projection/10` for valid `old(…)` expressions around quantifier and Result binders. TS/Python/Rust source keeps outer values in the pre-state while local binders remain local. V9 source/runtime/dependency bytes matched the pre-V10 commit.

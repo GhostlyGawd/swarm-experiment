@@ -1,0 +1,112 @@
+{
+  "format": "aether.agent-ir5-warm-campaign/1",
+  "recordedAt": "2026-09-24T00:35:25.652Z",
+  "commit": "b799b3884c3543bd12810084a59344aa72e3731c",
+  "sourceHashes": {
+    "roadmap/v4/research/agent-ir5/measure.ts": "3fd0f34051ed2cd199ebe67b0c18350d51920b9e2084175d6940390bb8a3083c",
+    "src/tier1/agent-ir-v5.ts": "89c6eab89c9ab0d3ae78d31b55ec085f416540ae45175e505083d9875d5a002e",
+    "src/tier1/agent-ir-v2.ts": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671",
+    "src/tier1/agent-ir.ts": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b",
+    "src/tier1/store.ts": "b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3",
+    "bench/v4/tokens.ts": "368245b33d554fe217610d957a212d51bddbee556b53220f349ef36c1c44171e",
+    "src/examples/ledger.ts": "ef3ee4a64ab5227a6c4a4d135afe227583bcef0b313f50d30f5eee5de63362cd",
+    "src/util/tokens.ts": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9",
+    "package-lock.json": "5c681465706b3f7b5316290d26e3e2612d733b43260994cb3339e7b422a174dc"
+  },
+  "baseline": "bench/v4/tokens.ts ledger-baseline/1 unchanged",
+  "tokenizerPackage": "js-tiktoken@1.0.21",
+  "baseRoot": "ast:b3:722b9744f7520a7fb78c0afbbed88d16434c47d75af3211d7618dadebfb8dcca",
+  "workload": "ledger-baseline/1",
+  "references": 4,
+  "messagesSha256": "27cf4b47410edb868ed1bec51abc6fae7a17fbfddceffbe61e89a53cb188f395",
+  "rows": [
+    {
+      "tokenizer": "cl100k_base",
+      "warm": [
+        {
+          "id": "transfer",
+          "index": 2,
+          "root": "ast:b3:b2363eb9f5e1cbafca79f1aa068a129dfb335ff9fe89c0e9ddd2112853e0108c",
+          "baselineTokens": 226,
+          "candidateTokens": 37
+        },
+        {
+          "id": "feeFor",
+          "index": 3,
+          "root": "ast:b3:acb6c66296333833329f9a6ca98ad2d08a79c12d10c5933211539010339d9336",
+          "baselineTokens": 120,
+          "candidateTokens": 37
+        },
+        {
+          "id": "accrue",
+          "index": 4,
+          "root": "ast:b3:beee73a94530799d98e2ee4ce09ee4b3ec0a2d29b1d6ea1723209100270ad014",
+          "baselineTokens": 166,
+          "candidateTokens": 37
+        },
+        {
+          "id": "settle",
+          "index": 5,
+          "root": "ast:b3:45552a4099af75064a6ad01e0494ac445dd659048a08e38074ef270734609f4c",
+          "baselineTokens": 186,
+          "candidateTokens": 37
+        }
+      ],
+      "baselineWarm": 698,
+      "candidateWarm": 148,
+      "warmRatio": 4.716216216216216,
+      "warmFourfold": true,
+      "baselineCold": 878,
+      "candidateCold": 933,
+      "coldRatio": 0.9410503751339764,
+      "baselineSession": 1361,
+      "candidateSession": 1226,
+      "sessionRatio": 1.1101141924959217
+    },
+    {
+      "tokenizer": "o200k_base",
+      "warm": [
+        {
+          "id": "transfer",
+          "index": 2,
+          "root": "ast:b3:b2363eb9f5e1cbafca79f1aa068a129dfb335ff9fe89c0e9ddd2112853e0108c",
+          "baselineTokens": 228,
+          "candidateTokens": 36
+        },
+        {
+          "id": "feeFor",
+          "index": 3,
+          "root": "ast:b3:acb6c66296333833329f9a6ca98ad2d08a79c12d10c5933211539010339d9336",
+          "baselineTokens": 123,
+          "candidateTokens": 36
+        },
+        {
+          "id": "accrue",
+          "index": 4,
+          "root": "ast:b3:beee73a94530799d98e2ee4ce09ee4b3ec0a2d29b1d6ea1723209100270ad014",
+          "baselineTokens": 168,
+          "candidateTokens": 36
+        },
+        {
+          "id": "settle",
+          "index": 5,
+          "root": "ast:b3:45552a4099af75064a6ad01e0494ac445dd659048a08e38074ef270734609f4c",
+          "baselineTokens": 187,
+          "candidateTokens": 36
+        }
+      ],
+      "baselineWarm": 706,
+      "candidateWarm": 144,
+      "warmRatio": 4.902777777777778,
+      "warmFourfold": true,
+      "baselineCold": 886,
+      "candidateCold": 931,
+      "coldRatio": 0.9516648764769066,
+      "baselineSession": 1377,
+      "candidateSession": 1224,
+      "sessionRatio": 1.125
+    }
+  ],
+  "requiredWarmThreshold": 4,
+  "scope": "Research-only AE5R warm unchanged declarations. Full cold and changed-session costs retained; no Q03 or FR-1.2 completion claim."
+}
