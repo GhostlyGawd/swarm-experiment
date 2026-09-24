@@ -9,6 +9,17 @@ operator-held complete host-journal CAS witness. Config/16 retains its local
 journal identity and behavior.
 `ProcessDeployment` still does not register or promote Artifact/4.
 
+The separate pure promotion contract validates a governor binding against
+the exact signed source/candidate evidence, rebuilt worker subject, archived
+wrapper, live source snapshot/generation, complete one-unit no-effects plan,
+operator lineage trust, and independently held host/deployment witnesses. Its
+prepared record is content addressed, preserves logical references while
+rebinding their ownership epoch, and has an immutable local file schema. A
+separate `/1` virtual deployment journal uses an operator-supplied monotone CAS
+as authority and repairs a stale local mirror after a controller death between
+CAS and file write. It does not reuse the legacy `/9–12` deployment witness or
+Artifact/1–2 records.
+
 ## Signed binding
 
 The candidate V3 evidence manifest sets `target.artifactDigest` to the
@@ -98,10 +109,11 @@ worker bundle bytes. These are separate tested commits, as the record states.
 same-schema migration guard. Legacy artifact registration/read and a legacy
 `ProcessHost` refuse the virtual-forward target profile; a legacy factory
 cannot inject `virtualArtifactV4` into `ProcessHost`. A production Artifact/4
-deployment needs a new versioned
-registry/prepared/state record, governor plan binding to the exact signed
-candidate, a virtual wrapper schema/ABI contract, and controller-crash recovery
-across the promotion commit. There is no Artifact/4 effect-broker dispatch,
+deployment still needs registry and governor driver wiring the versioned
+prepared/state records to actual ProcessHost creation, a commit fence that
+repeats the exact admission check, and real controller SIGKILL recovery on
+both sides of the governor commit. The contract and journal tests do not
+establish live promotion. There is no Artifact/4 effect-broker dispatch,
 integrated checkpoint recovery, or signed GC promotion. This slice does not
 close V4-T1-05 or a release target.
 

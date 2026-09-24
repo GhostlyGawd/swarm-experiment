@@ -21,8 +21,12 @@ import { CausalLineageLedger, signIntent, signSpecRevision } from '../../src/tie
 import { buildVirtualForwardCandidate } from '../../src/tier1/semantic-gc-virtual-forward.ts';
 import { CapabilityRegistry, CapabilitySealer } from '../../src/tier2/ocap.ts';
 import { createEvidenceManifest, DEFAULT_EVIDENCE_POLICY_V2, DEFAULT_EVIDENCE_POLICY_V3,
-  mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
+  mintLocalEvidence, validateEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
+import { createHostJournalWitnessCatalog } from '../../src/fabric/host-journal-witness.ts';
+import { createPureVirtualDeploymentWitnessV1 } from '../../src/tier4/process-virtual-deployment-journal.ts';
+import { effectPlanDigest, evidenceBundleDigest, migrationPlanDigest,
+  promotionDigest, type PromotionBindingV1 } from '../../src/fabric/promotion.ts';
 import { RESUMABLE_PROFILE_DIGEST, virtualForwardResumableProfileDigest } from '../../src/tier3/resumable-program.ts';
 import { decodeProcessVirtualArtifactV4, encodeProcessVirtualArtifactV4,
   makeProcessVirtualArtifactV4, measureWorkerBundleSubjectV2,
@@ -35,6 +39,9 @@ import { prepareProcessWorkerLaunchV1 } from '../../src/tier4/process-worker-lau
 import { ProcessHost, type ProcessHostOptions } from '../../src/tier4/process-host.ts';
 import type { TopologyPlan } from '../../src/tier4/topology.ts';
 import { type ProcessVirtualWorkerTrustV1 } from '../../src/tier4/process-virtual-worker-contract.ts';
+import { assertPureVirtualPlanV1, preparePureVirtualPromotionV1,
+  PureVirtualPreparedStoreV1, pureVirtualPreparedDigestV1,
+  processVirtualEffectPlanV1, processVirtualMigrationPlanV1 } from '../../src/tier4/process-virtual-deployment-contract.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
 
@@ -602,4 +609,76 @@ test('Artifact/4 ProcessHost refuses effect services and stale signed lineage be
     await host.close(); host = undefined;
     await assert.rejects(ProcessHost.open(options), /InvalidatedSpec|stale|current/i);
   } finally { await host?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('pure Artifact/4 governor contract binds source snapshot, plan, witnesses and exact evidence', () => {
+  const f = fixture(manifest), artifact = f.artifact!;
+  try {
+    const plan = hostOptions(f).plan;
+    const sourceManifest = executionManifestDigest(artifact.sourceEvidence.manifest);
+    const candidateManifest = executionManifestDigest(artifact.candidateEvidence.manifest);
+    const snapshot = { format: 'aether.state/1' as const,
+      executionManifest: sourceManifest, heapId: 'pure-heap', nextObjectId: '2',
+      records: [{ objectId: '1', fields: [['peer', { tag: 'ref' as const,
+        value: { heapId: 'pure-heap', objectId: '1', ownerEpoch: '0' } }] as const] }],
+      ownership: [{ objectId: '1', unit: 'old-pure', epoch: '0' }], eventCursor: '0' };
+    const deploymentWitness = createPureVirtualDeploymentWitnessV1({ authorityId: 'operator',
+      repositoryId: f.trust.repositoryId, deploymentId: 'virtual-deployment',
+      read: () => ({ revision: '0', journal: null }),
+      advance: () => { throw new Error('unexpected witness write'); } });
+    const hostCatalog = createHostJournalWitnessCatalog({ authorityId: 'operator',
+      repositoryId: f.trust.repositoryId, deploymentId: 'virtual-deployment',
+      witnessFor: () => { throw new Error('host witness selected only by deployment driver'); } });
+    const artifactDigest = processVirtualArtifactDigestV4(artifact);
+    const trustDigest = domainDigest('aether.process-virtual-worker-trust/1', f.trust);
+    const migrationPlan = processVirtualMigrationPlanV1(snapshot, artifactDigest,
+      assertPureVirtualPlanV1(plan, artifact));
+    const effectPlan = processVirtualEffectPlanV1(artifactDigest, trustDigest,
+      hostCatalog, deploymentWitness);
+    const proposal = { format: 'aether.promotion/1' as const, repositoryId: f.trust.repositoryId,
+      expectedParent: sourceManifest, candidateManifest,
+      evidenceBundleDigest: evidenceBundleDigest(artifact.candidateEvidence),
+      migrationPlanDigest: migrationPlanDigest(migrationPlan),
+      effectPlanDigest: effectPlanDigest(effectPlan), membershipEpoch: '1',
+      policyEpoch: '0', expiresAt: '1000' };
+    const binding: PromotionBindingV1 = { format: 'aether.promotion-binding/1',
+      proposalDigest: promotionDigest(proposal), proposal,
+      manifest: artifact.candidateEvidence.manifest, generation: '1',
+      migrationPlan, effectPlan };
+    const vetted = validateEvidence(artifact.candidateEvidence, f.input.candidateContext);
+    const input = { binding, evidence: vetted, artifact, trust: f.trust, plan,
+      sourceSnapshot: snapshot, sourceGeneration: '0', hostWitnessCatalog: hostCatalog,
+      deploymentJournalWitness: deploymentWitness };
+    const prepared = preparePureVirtualPromotionV1(input);
+    assert.equal(prepared.artifactDigest, artifactDigest);
+    assert.equal(prepared.executableSubjectDigest, artifact.executableSubject.digest);
+    assert.equal(prepared.seed.executionManifest, candidateManifest);
+    assert.equal(prepared.seed.records.length, 1);
+    assert.equal(prepared.seed.ownership[0].unit, 'pure');
+    assert.equal(prepared.seed.ownership[0].epoch, '1');
+    assert.equal((prepared.seed.records[0].fields[0][1] as { tag: 'ref';
+      value: { ownerEpoch: string } }).value.ownerEpoch, '1');
+    assert.equal(prepared.sourceSchemaDigest, prepared.candidateSchemaDigest);
+    const preparedStore = new PureVirtualPreparedStoreV1(join(f.directory, 'prepared'));
+    const preparedDigest = preparedStore.write(prepared);
+    assert.equal(preparedDigest, pureVirtualPreparedDigestV1(prepared));
+    assert.deepEqual(preparedStore.read(binding.proposalDigest, preparedDigest), prepared);
+    const preparedPath = join(f.directory, 'prepared', `${binding.proposalDigest.split(':').at(-1)}.json`);
+    const damaged = JSON.parse(readFileSync(preparedPath, 'utf8'));
+    writeFileSync(preparedPath, JSON.stringify({ ...damaged,
+      executableSubjectDigest: domainDigest('aether.measured-executable-subject/2', 'swapped') }));
+    assert.throws(() => preparedStore.read(binding.proposalDigest, preparedDigest),
+      /prepared record changed/);
+    assert.throws(() => assertPureVirtualPlanV1({ ...plan, crossEdges: [{ from: f.entry,
+      to: f.target, fromUnit: 'pure', toUnit: 'other', callsPerSecond: 1,
+      payloadBytes: 1, latencyMsPerSecond: 1 }] }, artifact), /one unit without cross edges/);
+    assert.throws(() => preparePureVirtualPromotionV1({ ...input,
+      binding: { ...binding, proposal: { ...proposal, expectedParent: candidateManifest } } }),
+    /source\/candidate binding changed/);
+    f.lineage.publishSpec(signSpecRevision({ repositoryId: f.trust.repositoryId,
+      id: 'behavior', revision: 2, previous: f.revision, parents: [],
+      text: 'Changed deployment promise.', requirements: [], author: 'author',
+      policyEpoch: '0', nonce: 'pure-deployment-revocation' }, f.keys.privateKey));
+    assert.throws(() => preparePureVirtualPromotionV1(input), /InvalidatedSpec|stale|current/i);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
 });
