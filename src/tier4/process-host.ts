@@ -760,16 +760,19 @@ export class ProcessHost {
   private async runNativeFallback(journal: HostJournal, row: NativeFallbackRecord,
     tokens: ProcessNativeFallbackTokens, recovery: boolean): Promise<ProcessHostNativeFallbackResult> {
     const profile = this.options.nativeFallback!;
+    this.assertOpen();
     if (recovery) this.requireRecoveryAuthorization(row.binding.operationId, 'isolated-replay');
     this.authorizeNativeFallback(journal, tokens);
     row.state = 'running'; this.persist(journal);
     this.phase('native-fallback-running', row.binding.operationId, journal.generation);
+    this.assertOpen();
     const input = this.nativeBindingInput(row.binding.operationId, row.binding.unit,
       row.binding.generation, row.binding.processHead, row.before,
       row.binding.frame.left, row.binding.frame.right);
     assertProcessNativeFallbackBinding(row.binding, input);
     const outcome = await runProcessNativeFallback({ binding: row.binding, bindingInput: input,
       executablePath: profile.executablePath, lowered: profile.lowered, grant2: true });
+    this.assertOpen();
     if (recovery) this.requireRecoveryAuthorization(row.binding.operationId, 'isolated-replay');
     this.authorizeNativeFallback(journal, tokens);
     if (journal.heads.at(-1)?.digest !== row.binding.processHead
@@ -782,6 +785,7 @@ export class ProcessHost {
     if (outcome.state === 'completed') validateProcessResult(this.declarations.get(profile.tier1)!, outcome.value!, outcome.after);
     this.validateSnapshot(outcome.after, journal.generation, JSON.parse(journal.plan) as TopologyPlan);
     this.phase('native-fallback-before-commit', row.binding.operationId, journal.generation);
+    this.assertOpen();
     if (recovery) this.requireRecoveryAuthorization(row.binding.operationId, 'isolated-replay');
     this.authorizeNativeFallback(journal, tokens);
     row.result = copy(outcome); row.resultDigest = domainDigest('aether.process-native-fallback-outcome/1', row.result);
@@ -1931,7 +1935,7 @@ export class ProcessHost {
         || journal.checkpointLeases?.some(lease => lease.state === 'active')))
         throw new Error('native fallback does not exclusively own unresolved host state');
     }
-    if (journal.format === 'aether.process-host/4'
+    if ((journal.format === 'aether.process-host/4' || journal.format === 'aether.process-host/5')
       && ![journal.checkpointLeases, journal.checkpointReceipts, journal.checkpointControls].every(Array.isArray))
       throw new Error('invalid witnessed checkpoint journal extension');
     if (journal.format === 'aether.process-host/2' || journal.format === 'aether.process-host/3'

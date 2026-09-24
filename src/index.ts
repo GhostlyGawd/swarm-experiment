@@ -114,7 +114,7 @@ export { buildLedgerExample, ledgerCapabilities, ledgerTelemetry, ACCOUNT, CENTS
 // Versioned execution envelopes; kept namespaced to preserve the v1 API.
 export * as fabric from './fabric/index.ts';
 export { BrokerEffectRouter, EffectInvocationError, type RuntimeEffectRouter, type RuntimeEffectRouterOptions } from './tier3/effects.ts';
-export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessOperationEffectDisposition, type ProcessEffectContext, type ProcessCheckpointAccess, type ProcessInvocationGrant } from './tier4/process-host.ts';
+export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessOperationEffectDisposition, type ProcessEffectContext, type ProcessCheckpointAccess, type ProcessInvocationGrant, type ProcessNativeFallbackTokens, type ProcessHostNativeFallbackResult } from './tier4/process-host.ts';
 export { ProcessFallbackSupervisor, type ProcessFallbackOptions, type ProcessFallbackRepairEvent, type ProcessFallbackResult } from './tier4/process-fallback.ts';
 export { ProcessResumableSession, type ProcessResumableOptions, type ProcessResumableEffectsContext } from './tier4/process-resumable.ts';
 export { PackedNativeProcessRunner, PackedNativeRun, executePackedCheckpointNative, type PackedNativeProcessRunnerOptions, type NativeOperation, type NativeBridgeResult } from './tier4/packed-native-process.ts';

@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Witnessed native fallback host transaction — 2026-09-24
+
+- Added opt-in ProcessHost config `/10` and witnessed host journal `/5` for the exact pure one-field Int fallback. The native operation binds the source snapshot/head, generation, arguments, checked record proof, compiler profile and operator-pinned executable digest; an intent is witnessed before launch. The host publishes the native candidate, receipt and state head together, and same-ID retry reads the exact terminal result.
+- The native runner independently regenerates proof-bearing source, checks packaged driver bytes, rebuilds with fixed Clang flags, compares both selected and rebuilt executable bytes to the binding, then executes only the rebuilt private copy. It checks the full result/state against independent contract-enforcing Aether execution. A swapped executable or malformed result cannot publish state.
+- Focused v5 witness/runner/host tests pass 13/13 across alias commit, distinct Tier 3 rollback, denial, revocation, binary substitution, witness outage, controller close, older local state, malformed journal fields and real pre/postcommit controller SIGKILL. Recovery requires fresh grants and explicit authorization. The profile still trusts the toolchain, OS and controller UID and excludes native effects and general values; FR-3.7 ≤50 ns and T3-07 remain open. [Decision and limits](decisions/D13-native-fallback-host-transaction.md).
+
 ## Bounded record proof and native host binding — 2026-09-24
 
 - Added a portable certificate checker for the selected one-field Int record Tier 2. It rederives obligations from the exact full AST/manifest, proves signed-i64 arithmetic, one bounded allocation, total return and frame preservation for alias and distinct-reference cases, and checks the precise postcondition condition for distinct inputs. Changed declarations, incomplete/forged proofs, unsupported syntax and possible overflow fail closed.
