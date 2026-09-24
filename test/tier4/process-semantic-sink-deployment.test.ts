@@ -343,6 +343,8 @@ test('V12 witnessed deployment retires one dead signed sink, preserves live disp
     assert.equal(old.state, 'completed');
     assert.equal(f.decisions.length, 1);
     f.setEpoch('2');
+    assert.equal(deployment.status().servingReady, false,
+      'source V7 policy is stale during the signed epoch cutover');
     const candidateArtifactDigest = registerRetirementCandidate(f, deployment);
     const predecessorArtifactDigest = processArtifactDigest(
       deployment.artifact(executionManifestDigest(f.source.evidence.manifest)));
@@ -405,6 +407,7 @@ test('V12 commit fence rejects a new active-task pin after candidate preparation
       executionManifestDigest(f.source.evidence.manifest));
     assert.equal(witnessed.activeRetirementProofDigest, null);
     assert.equal(f.decisions.length, 0);
+    assert.equal(deployment.status().servingReady, false);
     f.setEpoch('1');
     assert.equal(deployment.status().servingReady, true);
   } finally { await deployment?.close(); f.cleanup(); }

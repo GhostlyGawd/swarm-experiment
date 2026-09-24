@@ -1017,7 +1017,16 @@ export class ProcessDeployment implements PromotionDriver {
     const state = this.readState(),admission=this.options.coordinator.state();
     let sinkReady = true;
     if (sinkProfile(this.capabilityProfile)) {
-      try { readSinkStateHead(this.options.sinkStateWitness!); }
+      try {
+        readSinkStateHead(this.options.sinkStateWitness!);
+        if (semanticSinkProfile(this.capabilityProfile)) {
+          const active = this.readArtifact(state.active.manifest);
+          if (active.format !== 'aether.process-artifact/2'
+            || active.signedEffectResourcePolicyV7.body.policyEpoch
+              !== this.options.effectSignerAnchor!.currentEpoch())
+            sinkReady = false;
+        }
+      }
       catch { sinkReady = false; }
     }
     const servingReady=!this.closed&&sinkReady&&this.options.coordinator.servingReady()&&state.readiness==='ready'&&state.active.manifest===admission.committedManifest&&state.active.generation===admission.generation;
