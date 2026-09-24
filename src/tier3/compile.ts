@@ -56,6 +56,7 @@ import { validateVettedEvidence, type VettedEvidence } from '../fabric/evidence.
 import type { ExecutionManifestV1 } from '../fabric/identity.ts';
 import { validateCheckedPortableCertificate, type CheckedPortableCertificate } from '../tier2/portable-proof-checker.ts';
 import { ResumableRuntime, type ResumableRuntimeOptions } from './resumable-runtime.ts';
+import { checkVirtualForwardDescriptor, type VirtualForwardDescriptor } from '../tier1/semantic-gc-virtual-forward.ts';
 
 // ---------------------------------------------------------------------------
 // compiled representation
@@ -141,6 +142,16 @@ export interface CompileOptions {
   readonly effectRouter?: RuntimeEffectRouter;
   /** Host liveness/fuel guard; false stops execution at entry or loop backedges. */
   readonly executionGuard?: () => boolean;
+  /**
+   * Opt in to the checked, one-wrapper AST rewrite. The descriptor is
+   * recomputed against this exact candidate before any call is compiled.
+   * This preserves the production guard at the removed wrapper's entry; it
+   * does not make the production runtime report reference-runtime steps.
+   */
+  readonly virtualForward?: {
+    readonly source: Extract<Term, { kind: 'Module' }>;
+    readonly descriptor: VirtualForwardDescriptor;
+  };
   /** Verification results, keyed by function symbol. Required for elision. */
   readonly verification?: ReadonlyMap<SymbolId, VerificationReport>;
   /** v4 admission: expectedManifest must come from the host's current build/policy context. */
@@ -195,6 +206,7 @@ export class ProductionRuntime {
   private readonly opts: CompileOptions;
   private readonly decisions: ClauseDecision[] = [];
   private readonly declarations = new Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>();
+  private readonly virtualForwardCalls = new WeakSet<Extract<Term, { kind: 'Call' }>>();
   private reportCache: CompilationReport | null = null;
 
   private constructor(opts: CompileOptions) {
@@ -215,6 +227,8 @@ export class ProductionRuntime {
    */
   static compile(module: Term, opts: CompileOptions): ProductionRuntime {
     const moduleRef = new GraphStore().intern(module);
+    if (opts.virtualForward && (opts.portableEvidence || opts.evidence || opts.effectRouter))
+      throw new TypeError('virtual forwarding is not covered by a versioned admission manifest');
     if (opts.portableEvidence) {
       const { vetted, expectedManifest } = opts.portableEvidence;
       validateCheckedPortableCertificate(vetted, expectedManifest);
@@ -241,6 +255,14 @@ export class ProductionRuntime {
     }
     const rt = new ProductionRuntime(opts);
     rt.moduleRef = moduleRef;
+    if (opts.virtualForward) {
+      if (module.kind !== 'Module') throw new TypeError('virtual forwarding requires a candidate Module');
+      const { source, descriptor } = opts.virtualForward;
+      const bindings = checkVirtualForwardDescriptor(descriptor, source, module);
+      if (opts.includeSymbols && !opts.includeSymbols.includes(descriptor.target))
+        throw new TypeError('virtual forwarding requires the target compiled locally');
+      for (const binding of bindings) rt.virtualForwardCalls.add(binding.candidateCall);
+    }
     opts.effectRouter?.bind(rt.moduleRef);
     const declarations: Array<Extract<Term, { kind: 'FunctionDecl' }>> = [];
     const collect = (t: Term): void => {
@@ -259,6 +281,8 @@ export class ProductionRuntime {
     collect(module);
     const include = opts.includeSymbols ? new Set(opts.includeSymbols) : null;
     for (const decl of declarations) if (!include || include.has(decl.symbol)) rt.compileFunction(decl);
+    if (opts.virtualForward && !rt.compiled.has(opts.virtualForward.descriptor.target))
+      throw new TypeError('virtual forwarding requires the target compiled locally');
     return rt;
   }
 
@@ -954,6 +978,7 @@ export class ProductionRuntime {
       case 'Call': {
         const args = term.args.map((a) => this.expr(a, ctx));
         const callee = term.callee;
+        const virtualForward = this.virtualForwardCalls.has(term);
         for (const cap of this.calleeCapabilities(callee)) {
           if (ctx.envelope.has(cap)) continue;
           throw new TypeError(
@@ -964,6 +989,12 @@ export class ProductionRuntime {
         return (f) => {
           target ??= this.compiled.get(callee);
           const values = args.map((a) => a(f));
+          if (virtualForward) {
+            if (!target) throw new ProductionFault('unbound', `${this.name(callee)} is not compiled`);
+            // The source enters the removed wrapper, then the target. Keep
+            // both host guard boundaries, in that order, before target work.
+            this.checkExecutionGuard();
+          }
           if (target) return this.enter(target, values);
           const remote = this.opts.callHandler ? this.atBoundary(() => this.opts.callHandler!(callee, values, ctx.functionSymbol)) : undefined;
           if (!remote) throw new ProductionFault('unbound', `${this.name(callee)} is not compiled`);
