@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { digest } from '../../bench/v4/manifest.ts';
+import { digest, type BenchmarkRunV1 } from '../../bench/v4/manifest.ts';
 import { verifyBenchmarkEvidence } from '../../bench/v4/verify.ts';
 
 function fixture() {
@@ -19,8 +19,14 @@ const write = (directory: string, file: string, value: unknown) => writeFileSync
 test('independent benchmark reader recounts complete messages, target rows and current source bytes', () => {
   const directory = fixture(); try {
     const result = verifyBenchmarkEvidence(directory, { sourceRoot: resolve('.') });
+    const manifest = read(directory, 'manifest.json') as BenchmarkRunV1;
+    assert.equal(manifest.profile.id, 'v4-release/2');
+    assert.deepEqual(manifest.measurements.filter(row => row.required && row.requirement === 'V4-NFR-11')
+      .map(row => row.verdict), ['pass', 'pass']);
+    assert.equal(manifest.measurements.filter(row =>
+      row.required && row.verdict === 'not_measured').length, 15);
     assert.equal(result.verified, true); assert.equal(result.sourceMatches, null);
-    assert.equal(result.requiredFailures.length, 17); assert.equal(result.releaseEligible, false);
+    assert.equal(result.requiredFailures.length, 15); assert.equal(result.releaseEligible, false);
     const exact = verifyBenchmarkEvidence(directory, { sourceRoot: resolve('.'), exactSource: true });
     assert.equal(exact.sourceMatches, true); assert.equal(exact.releaseEligible, false);
   } finally { rmSync(directory, { recursive: true, force: true }); }
@@ -30,7 +36,11 @@ test('verifier refuses altered verdicts, thresholds, raw messages, source list a
   for (const tamper of ['verdict', 'threshold', 'raw', 'source', 'duplicate-json'] as const) {
     const directory = fixture(); try {
       const manifest = read(directory, 'manifest.json'), samples = read(directory, 'samples.json');
-      if (tamper === 'verdict') manifest.measurements[0].verdict = 'pass';
+      if (tamper === 'verdict') {
+        const original = manifest.measurements[0].verdict;
+        manifest.measurements[0].verdict = original === 'pass' ? 'fail' : 'pass';
+        assert.notEqual(manifest.measurements[0].verdict, original);
+      }
       if (tamper === 'threshold') { manifest.profile.targets[0].minimum = 0; manifest.targetProfileDigest = digest(manifest.profile); }
       if (tamper === 'raw') {
         samples.corpus[0].session[0].candidate += ' extra tokens';
@@ -42,6 +52,8 @@ test('verifier refuses altered verdicts, thresholds, raw messages, source list a
         writeFileSync(path, readFileSync(path, 'utf8').replace('"format": "aether.benchmark/1",', '"format": "aether.benchmark/1", "format": "aether.benchmark/1",'));
       } else { write(directory, 'manifest.json', manifest); write(directory, 'samples.json', samples); }
       if (tamper === 'source') assert.throws(() => verifyBenchmarkEvidence(directory, { sourceRoot: resolve('.'), exactSource: true }), /source differs/);
+      else if (tamper === 'verdict') assert.throws(() => verifyBenchmarkEvidence(directory, { sourceRoot: resolve('.') }),
+        /benchmark measurement\/verdict differs from raw corpus/);
       else assert.throws(() => verifyBenchmarkEvidence(directory, { sourceRoot: resolve('.') }), /benchmark|noncanonical/i);
     } finally { rmSync(directory, { recursive: true, force: true }); }
   }
