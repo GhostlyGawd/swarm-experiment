@@ -33,7 +33,9 @@ separately packaged verifier tools remain future work. It refuses `DYLD_`
 runtime overrides.
 
 `assertProcessVirtualArtifactV4Launch` repeats full host admission and checks
-the selected worker path and bytes. The child opens operator-held signed
+the selected worker path and bytes once before spawn. The parent then rechecks
+the signed proof and current measured bytes after spawn and before each call,
+without rebuilding the graph again. The child opens operator-held signed
 lineage independently and uses the same proof core to validate source,
 candidate, descriptor, evidence, and direct ancestry before compiling the
 candidate. It rehashes its launched bundle, Node, declared inputs, tool files,
@@ -48,6 +50,10 @@ The child rehash cannot independently rebuild the input graph or resolve the
 native static-link closure; those are parent admission responsibilities. The
 static Mach-O closure does not cover `dlopen` outcomes, raw bytes of every
 system dyld-cache member, or launch-time custody after the last measurement.
+The checks before and after spawn reduce stale-file exposure but cannot prove
+the bytes loaded by the OS at the intervening instant. Per-call rehashing is
+also too expensive to qualify the v4 latency target; a separately measured
+custody and fast-path profile is still needed.
 There is no Artifact/4 ProcessHost deployment, effect-broker dispatch,
 integrated checkpoint recovery, or signed GC promotion. A one-worker snapshot
 restart does not prove ProcessHost recovery. This slice does not close

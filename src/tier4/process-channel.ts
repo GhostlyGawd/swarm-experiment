@@ -18,8 +18,9 @@ import { ProcessAuthenticator, fromWireSnapshot, encodeProcessValue, decodeProce
 import { encodeProcessExecution, decodeProcessExecution } from './process-execution-wire.ts';
 export { encodeProcessExecution, decodeProcessExecution } from './process-execution-wire.ts';
 import { validateProcessVirtualArtifactV3, type ProcessVirtualArtifactV3 } from './process-virtual-artifact.ts';
-import { assertProcessVirtualArtifactV4Launch, validateProcessVirtualArtifactV4,
+import { assertProcessVirtualArtifactV4Launch,
   type ProcessVirtualArtifactV4 } from './process-virtual-artifact-v4.ts';
+import { validatePackagedProcessVirtualArtifactV4 } from './process-virtual-worker-v4.ts';
 import { assertProcessVirtualWorkerBundleV1, openProcessVirtualWorkerLineageV1,
   type ProcessVirtualWorkerTrustV1 } from './process-virtual-worker-contract.ts';
 
@@ -237,9 +238,10 @@ export class ProcessChannel {
       throw new RangeError('invalid Artifact/4 worker guard budget');
     const trust = safe.trust as ProcessVirtualWorkerTrustV1;
     const lineage = openProcessVirtualWorkerLineageV1(trust);
-    const artifact = validateProcessVirtualArtifactV4(safe.artifact, lineage);
-    const path = artifact.executableSubject.manifest.bundle.path;
-    assertProcessVirtualArtifactV4Launch(artifact, lineage, path);
+    // One independent producer rebuild before spawn. Later checks rehash the
+    // signed file set without recompiling the graph for every pure call.
+    const path = safe.artifact.executableSubject.manifest.bundle.path;
+    const artifact = assertProcessVirtualArtifactV4Launch(safe.artifact, lineage, path);
     const module = decodeIR(artifact.candidateIr);
     if (module.kind !== 'Module') throw new TypeError('Artifact/4 candidate is not a module');
     const includeSymbols = module.members.filter(member => member.kind === 'FunctionDecl')
@@ -251,7 +253,7 @@ export class ProcessChannel {
       ownershipEpoch: safe.ownershipEpoch, snapshot: safe.snapshot }, options, path);
     channel.virtualAdmission = { version: 4, artifact, lineage };
     try {
-      assertProcessVirtualArtifactV4Launch(artifact, lineage, channel.workerPath);
+      validatePackagedProcessVirtualArtifactV4(artifact, lineage, channel.workerPath);
       if (safe.snapshot) fromWireSnapshot(safe.snapshot, channel.scope);
       const ready = await channel.request('init-virtual', {
         format: 'aether.process-worker-init/3', artifact, trust,
@@ -269,7 +271,7 @@ export class ProcessChannel {
         validateProcessVirtualArtifactV3(this.virtualAdmission.artifact, this.virtualAdmission.lineage);
         assertProcessVirtualWorkerBundleV1(this.virtualAdmission.artifact, this.workerPath);
       } else {
-        assertProcessVirtualArtifactV4Launch(this.virtualAdmission.artifact,
+        validatePackagedProcessVirtualArtifactV4(this.virtualAdmission.artifact,
           this.virtualAdmission.lineage, this.workerPath);
       }
     }
