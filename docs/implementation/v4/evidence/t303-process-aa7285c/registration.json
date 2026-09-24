@@ -1,0 +1,212 @@
+{
+  "format": "aether.living-process-broker-registration/1",
+  "at": "2026-09-24T19:28:58.860Z",
+  "gitHead": "aa7285c588912858d31b1d8d9bdba66f2c1818a1",
+  "gitStatus": "",
+  "profile": {
+    "seed": "20260924/process-broker",
+    "casesPerCandidate": 3,
+    "minimumBoundaryPermutationsPerSecond": 2000000
+  },
+  "profileSha256": "3810d063285581f88a2358d3f34db3b4f482d193b4bb994184f73e2148521a69",
+  "sources": {
+    "package-lock.json": "d7ec4b7a7eeb891ec1f91896c6b8cfaff33e29895c3a0cd6a647984b8b7f8936",
+    "roadmap/v4/research/microworld-broker/harness.ts": "2fd3e9e7c805823d8aeda1da941c90841f217adc170a7184af774c2c62eeb615",
+    "roadmap/v4/research/microworld-broker/process-campaign.ts": "c16f1b861c8e186f3fd4b8dd41d805b3e2433ad34485ab3b6e17929f0c439f4d",
+    "roadmap/v4/research/microworld-broker/process-harness.ts": "8a3e2c4b18ad3f21b41e1e9b043e52613c2f558735ae029b706dd959f9891109",
+    "roadmap/v4/research/microworld-broker/process-profile.json": "3810d063285581f88a2358d3f34db3b4f482d193b4bb994184f73e2148521a69",
+    "roadmap/v4/research/microworld-broker/process-worker.ts": "c2ac8340c24a17d5ca8793009e7b887ac01e939b78fc908c14a9297ba411b7c0",
+    "roadmap/v4/research/microworld/fixture.ts": "a1167d0bc86a91bc37ee06011794ede232014da051c7273b86bf56a11cb5bfee",
+    "src/examples/ledger.ts": "ef3ee4a64ab5227a6c4a4d135afe227583bcef0b313f50d30f5eee5de63362cd",
+    "src/fabric/attested-sink-adapter.ts": "41f4fffe0226e7ae37b5904a37331f9b0d93ef7eaa5b5d85e1f451c3e0e6c0f8",
+    "src/fabric/budget-journal-witness.ts": "9ea32a24579ff4f52b634752360638032744106c7e9f458df0bd9da102ae491a",
+    "src/fabric/effect-journal-witness.ts": "552ced2bb4ea6cdefa7e11beec9fbecf78ea17c54e60849319c8b5e632267345",
+    "src/fabric/effects.ts": "3e5311a47382add90094c3dbd38982203976bd2cfd77083883349e85a1ea6866",
+    "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+    "src/fabric/identity.ts": "a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+    "src/fabric/journal-lock.ts": "8a551fa3896b22c9b5f0de21ba9a56fcb4044e286a2a51939494fe4846ca6e74",
+    "src/fabric/sink-receipt.ts": "4cae1cab6363004a3b3f6378e2da19831669c3f1655e16f8dc39b0ec398b40d8",
+    "src/fabric/sink-state-witness.ts": "d5407e9c85a17cb77129c58f20ce4ab636b3847b2608b84bb9c74f87491a6ff3",
+    "src/tier1/ast.ts": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb",
+    "src/tier1/blake3.ts": "1fe06b0b58c78837acdb5a2a2431b313474c64427fde573196bcd58f86f709d4",
+    "src/tier1/build.ts": "e1617b0eed8c27cf4d3162e68494126f817f28ec1bf24d32828ebcaa55e6d934",
+    "src/tier1/canonical.ts": "16022baba00d8d0e87a4fe7f5eabfe1d79492945ad48c4bd6783ad22f5f83021",
+    "src/tier1/ids.ts": "73a6cf5a0b6537d879b2b3980ba9b4a1937701d52f97b4bf1deb09acf1e023a5",
+    "src/tier1/persistence.ts": "59a3d46d55aeeffadd80ecf834cbe3db5dd117142cf6ca8beb9c18abfa46ea06",
+    "src/tier1/provenance.ts": "2d18f16630b8eb189abd1e30cc64ab74b545234c7a6397741268fad6313a3b46",
+    "src/tier1/semantic-gc-virtual-forward.ts": "3e293c1c8d182e249ccf518bfe598491b73990aafe87da12e529345859f70900",
+    "src/tier1/store.ts": "b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3",
+    "src/tier1/symbols.ts": "1520a4adfd1f837f16357205d88c330056ffe73f3c74d4f26e1d1663dc0362a9",
+    "src/tier2/adapter-admission-registry.ts": "dae01ad802b3a616586b7b7d141cee8abc2930323fa33c1c9a093fe27240eeb8",
+    "src/tier2/budget-journal-mirror.ts": "2690cee7c1d7bdb9e2e061a52d005fa316dd8c12d8ccbd114d28747c1f9bf1f2",
+    "src/tier2/declarative-sink-table.ts": "f863c8e7f5f249c465808f59c2ad6fdc47ec7531dc51f07f4d5e959c891fe89f",
+    "src/tier2/effect-resource-policy.ts": "c143b8370218ff4db8233010b1d6304aeb6d11ecd0d4c66f06c5f276f966e81a",
+    "src/tier2/ocap.ts": "b4ae5aec25c07e0e50beca96a67fac555a397c1c06be564c2f334bb821d55ef6",
+    "src/tier2/resource-budget-bridge.ts": "21385e420c47f714b037905d91dbadcda2948b94e3e903070757849f7d5313df",
+    "src/tier2/resource-budget.ts": "d13599effc376aea794bc871f0f94e043fda98f2bec6b65ab79ff58c864fbc99",
+    "src/tier2/trusted-clock-anchor.ts": "5311a5e34c681c8545f719295b47ecc5c09919879467ce7b8ece830c87006132",
+    "src/tier2/typecheck.ts": "19113ce88ac99a02a1e7b1f4acad694a1d1c83f9520b2fe7f2545669a5da1b18",
+    "src/tier3/effects.ts": "00c02448dc5a0f49b7b18ca401bca085b75f4dc3bf9c08d15aeb1a67df58163c",
+    "src/tier3/living-campaign.ts": "efc50ba29431a6c5e35f5c4d74a258f1852f5c44b7ec9d752851a37d816cfc63",
+    "src/tier3/runtime.ts": "3fab8738ab7f73c7b7ea1b143eebbb959c0c82a5881d4080a31d9c4852db23f0",
+    "src/tier3/values.ts": "0b48ec39f48128c65c11a3fcd3edfec06720fd1c0c9871fd33ad3ea92759a99e",
+    "src/util/rng.ts": "722540744b859c0995931e6c0270f3b9a80012b6e31b2371c027cf19f4518295"
+  },
+  "cases": [
+    {
+      "format": "aether.living-broker-case/1",
+      "seed": "20260924/process-broker/0",
+      "ordinal": 0,
+      "sourceCase": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-cooperative-campaign/1:b3:a258e26688e624a5f56f54fb151130b4320f3918e9ed8c04d9bab21bb6bbb6de",
+        "scenario": "faulted-json-network",
+        "ordinal": 0,
+        "seed": "20260922/faulted-json-network/0",
+        "schedule": [
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport"
+        ],
+        "variables": {}
+      },
+      "actions": [
+        "send",
+        "partition",
+        "duplicate",
+        "deliver",
+        "drop",
+        "duplicate",
+        "heal",
+        "arm-fault",
+        "deliver",
+        "restart",
+        "deliver",
+        "replay"
+      ]
+    },
+    {
+      "format": "aether.living-broker-case/1",
+      "seed": "20260924/process-broker/1",
+      "ordinal": 1,
+      "sourceCase": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-cooperative-campaign/1:b3:a258e26688e624a5f56f54fb151130b4320f3918e9ed8c04d9bab21bb6bbb6de",
+        "scenario": "faulted-json-network",
+        "ordinal": 1,
+        "seed": "20260922/faulted-json-network/1",
+        "schedule": [
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport"
+        ],
+        "variables": {}
+      },
+      "actions": [
+        "send",
+        "partition",
+        "duplicate",
+        "deliver",
+        "drop",
+        "duplicate",
+        "drop",
+        "duplicate",
+        "heal",
+        "arm-fault",
+        "deliver",
+        "restart",
+        "deliver",
+        "replay"
+      ]
+    },
+    {
+      "format": "aether.living-broker-case/1",
+      "seed": "20260924/process-broker/2",
+      "ordinal": 2,
+      "sourceCase": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-cooperative-campaign/1:b3:a258e26688e624a5f56f54fb151130b4320f3918e9ed8c04d9bab21bb6bbb6de",
+        "scenario": "faulted-json-network",
+        "ordinal": 2,
+        "seed": "20260922/faulted-json-network/2",
+        "schedule": [
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport"
+        ],
+        "variables": {}
+      },
+      "actions": [
+        "send",
+        "partition",
+        "duplicate",
+        "deliver",
+        "drop",
+        "duplicate",
+        "heal",
+        "arm-fault",
+        "deliver",
+        "restart",
+        "deliver",
+        "replay"
+      ]
+    }
+  ],
+  "diagnostic": {
+    "at": "2026-09-24T19:28:58.955Z",
+    "node": "v26.7.0",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "arch": "arm64",
+    "cpus": [
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro"
+    ],
+    "load": [
+      3.61572265625,
+      3.7275390625,
+      3.98291015625
+    ],
+    "memory": {
+      "rss": 113426432,
+      "heapTotal": 22544384,
+      "heapUsed": 14200464,
+      "external": 7249265,
+      "arrayBuffers": 920838
+    }
+  }
+}

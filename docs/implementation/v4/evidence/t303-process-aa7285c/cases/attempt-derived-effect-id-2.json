@@ -1,0 +1,69 @@
+{
+  "input": {
+    "format": "aether.living-broker-case/1",
+    "seed": "20260924/process-broker/2",
+    "ordinal": 2,
+    "sourceCase": {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-cooperative-campaign/1:b3:a258e26688e624a5f56f54fb151130b4320f3918e9ed8c04d9bab21bb6bbb6de",
+      "scenario": "faulted-json-network",
+      "ordinal": 2,
+      "seed": "20260922/faulted-json-network/2",
+      "schedule": [
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport"
+      ],
+      "variables": {}
+    },
+    "actions": [
+      "send",
+      "partition",
+      "duplicate",
+      "deliver",
+      "drop",
+      "duplicate",
+      "heal",
+      "arm-fault",
+      "deliver",
+      "restart",
+      "deliver",
+      "replay"
+    ]
+  },
+  "result": {
+    "format": "aether.living-process-broker-result/1",
+    "candidate": "attempt-derived-effect-id",
+    "seed": "20260924/process-broker/2",
+    "sourcePassed": true,
+    "passed": false,
+    "failure": "duplicate-effect",
+    "filtered": false,
+    "coverage": [
+      "broker:isolated-replay",
+      "broker:reconciled-after-process-restart",
+      "process:sigkill-after-sink",
+      "tcp:duplicate-delivery",
+      "tcp:malformed-frame",
+      "tcp:truncated-frame"
+    ],
+    "workerPids": [
+      53542,
+      53555
+    ],
+    "sinkWrites": 2,
+    "journalEvents": 2,
+    "replayConsumed": 2,
+    "journalDigest": "aether.living-process-broker-journal/1:b3:f2abdb1167c546ff917a423ba12fb2f67a26a3cb4c488a26a38aa6dde02ab21d",
+    "sinkDigest": "aether.living-process-broker-sink/1:b3:e951368c4a9cb3e2e5b0639784bb1b77f03d570dd72653cd98c3d68b268914a4"
+  },
+  "elapsedMs": 485.030458
+}

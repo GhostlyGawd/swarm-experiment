@@ -54,9 +54,44 @@ one bounded shrink campaign. The reported rate uses **12 original cases** as
 the numerator, and includes shrink time in the denominator. Thus it is an
 honest complete-campaign rate for this local profile, not the rate of the R04
 four-field JSON kernel and not millions of distributed cases per second.
-There is no socket or independent host partition, native-thread race, real
-process SIGKILL in this new campaign, independent distributed sink, or full
-effectful Aether candidate admission. Those remain open for V4-T3-03.
+The original companion has no socket or independent host partition, native-thread
+race, real process SIGKILL, independent distributed sink, or full effectful Aether
+candidate admission. The extension below covers the socket and process crash
+boundaries only; the other gaps remain open for V4-T3-03.
+
+## Independent process and TCP extension
+
+`process-harness.ts` and `process-worker.ts` add a separately measured bounded
+campaign. Real loopback TCP connections carry each request to an independent
+worker process. An incomplete request is disconnected, a malformed request is
+rejected, and neither can dispatch an effect. The first valid request runs an
+Aether ledger transfer through `BrokerEffectRouter` and `DurableEffectBroker`.
+The worker receives `SIGKILL` after its adapter fsyncs the sink record and
+before the broker persists the committed receipt. A new worker explicitly
+recovers the dead journal owner, reconciles the uncertain effect from the sink,
+receives a duplicate request, and replays every terminal event with live policy
+and adapter callbacks forbidden. Stable logical IDs produce one sink write;
+attempt-derived IDs produce two and fail the same invariant.
+
+The fixed network/process boundary schedule runs for three seeded source
+network cases per candidate. Source cases vary; the process fault sequence is
+fixed. The actual socket is disconnected for incomplete frames. This does not
+simulate a host-level partition or qualify arbitrary effectful candidate
+admission. The production `LivingCampaign` still rejects live effects.
+
+[Exact-source campaign evidence](../../../../docs/implementation/v4/evidence/t303-process-aa7285c/REVIEW.md)
+pins clean commit `aa7285c`, profile and transitive source hashes. All six
+declared/generated cases executed, with zero filters. Stable IDs passed 3/3;
+attempt-derived IDs failed 3/3 with `duplicate-effect`. All six cases and raw
+broker/sink records replayed under the verifier. The complete campaign took
+2,966.8315 ms, or **2.0224 cases/s**, versus the unchanged R04 threshold of
+2,000,000 boundary permutations/s. It therefore fails T3-03/G2. The earlier
+four-field JSON kernel pass cannot be substituted for this complete campaign.
+
+```sh
+node --experimental-strip-types --test roadmap/v4/research/microworld-broker/process-harness.test.ts
+node --experimental-strip-types roadmap/v4/research/microworld-broker/process-campaign.ts --verify docs/implementation/v4/evidence/t303-process-aa7285c
+```
 
 ## Reproduce
 

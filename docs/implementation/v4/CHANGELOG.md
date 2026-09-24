@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## T3-03 process and socket fault campaign — 2026-09-24
+
+- Added a real loopback TCP and independent-worker extension to the living effect-broker campaign. The first worker is SIGKILLed after a durable sink write and before broker receipt; a fresh worker explicitly recovers the dead journal owner, reconciles, accepts a duplicate request, and replays terminal effects without live callbacks. Truncated and malformed socket frames do not dispatch. Stable logical IDs produce one sink write; attempt-derived IDs produce two.
+- [Preregistered exact-source evidence](evidence/t303-process-aa7285c/REVIEW.md) at clean `aa7285c` executed 6/6 generated process/socket cases with zero filters. Good candidate 3/3 passed; faulty candidate 3/3 failed. Complete rate was 2.0224 cases/s against the unchanged 2M/s R04 threshold. T3-03 remains in progress because G2 fails and arbitrary effectful candidate admission, host partitions and broader schedules remain open. The tracker stays **20/62**.
+
 ## Cold-bound Agent-IR V6 and measured worker subject — 2026-09-24
 
 - Added an opt-in Agent-IR V6 wire with full 256-bit root references and a checked one-literal edit. The unchanged ledger warm fixture now passes 4× on both pinned tokenizers, while cold and changed-session ratios miss. The clean [default release inventory](evidence/bench-fa2fc64/REVIEW.md) verifies 5.629× warm compression at `fa2fc64` and retains 15 unmeasured required NFR targets; representative FR-1.2 and Q03 remain open. [Protocol](AGENT-IR-V6.md).
