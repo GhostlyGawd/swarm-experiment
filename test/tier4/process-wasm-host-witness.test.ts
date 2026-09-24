@@ -261,6 +261,26 @@ test('V9 protects complete host and broker history across real Wasm calls, promo
     assert.equal(JSON.parse(readFileSync(join(deploymentOptions.directory, 'deployments', 'genesis', 'prepared.json'), 'utf8')).format,
       'aether.process-deployment-prepared/7');
     const deployedTokens = () => deployment!.issueScopedTokens(entry, 60_000, new Map([[CAP, ['wasm']]]));
+    const deployedIssued = deployedTokens(), deployedInvoke = deployedIssued.find(token => token.body.capability === PROCESS_INVOKE)!,
+      deployedEffect = deployedIssued.find(token => token.body.capability === CAP)!;
+    const deployedAttacks: readonly [string, readonly ScopedGrantV2[]][] = [
+      ['missing-all', []], ['missing-effect', [deployedInvoke]],
+      ['forged-effect', [deployedInvoke, { ...deployedEffect, signature: '0'.repeat(64) }]],
+      ['wrong-audience', [deployedInvoke, grants.issue({ capability: CAP, audience: 'other-entry',
+        path: deployedEffect.body.path }, 60_000)]],
+      ['wrong-path', [deployedInvoke, grants.issue({ capability: CAP, audience: entry, path: ['wrong'] }, 60_000)]],
+      ['duplicate-effect', [deployedInvoke, deployedEffect, deployedEffect]],
+      ['narrowed-invoke', [grants.attenuate(deployedInvoke, { capability: PROCESS_INVOKE, audience: entry,
+        path: [...deployedInvoke.body.path, 'child'] }, 60_000), deployedEffect]],
+    ];
+    const deploymentBeforeDenials = readFileSync(join(deploymentOptions.directory, 'deployment.json'), 'utf8');
+    const effectHeadsBeforeDenials = witnesses.size;
+    for (const [name, denied] of deployedAttacks) {
+      await assert.rejects(deployment.call(entry, [{ tag: 'int', value: '3' }],
+        { operationId: `deployed-denied-${name}`, tokens: denied }), /authority_denied|grant/);
+      assert.equal(readFileSync(join(deploymentOptions.directory, 'deployment.json'), 'utf8'), deploymentBeforeDenials, name);
+      assert.equal(witnesses.size, effectHeadsBeforeDenials, name);
+    }
     const brokerBeforeOuterLoss = witnesses.size;
     loseDeploymentAcknowledgmentFor = 'outer-uncertain-v9';
     await assert.rejects(deployment.call(entry, [{ tag: 'int', value: '11' }],

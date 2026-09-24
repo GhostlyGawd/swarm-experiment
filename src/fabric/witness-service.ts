@@ -165,6 +165,134 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string)
   if (id.kind !== 'effect' && record.witnessRevision !== revision)
     throw new TypeError('witness journal revision mismatch');
 }
+/** Prevent a key holder from pruning already witnessed operation inventory.
+ * This is a monotonicity guard, not independent proof of program semantics or
+ * of an external sink's commitment. */
+function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextBytes: string): void {
+  if (priorBytes === null) return;
+  const prior = parse(Buffer.from(priorBytes, 'utf8')) as Record<string, unknown>;
+  const next = parse(Buffer.from(nextBytes, 'utf8')) as Record<string, unknown>;
+  const same = (left: unknown, right: unknown): boolean => canonical(left).equals(canonical(right));
+  const array = (record: Record<string, unknown>, field: string): unknown[] => {
+    if (!Array.isArray(record[field])) throw new TypeError(`invalid witnessed ${field} inventory`);
+    return record[field] as unknown[];
+  };
+  const prefix = (field: string, check: (oldRow: Record<string, unknown>, newRow: Record<string, unknown>) => void): void => {
+    const oldRows = array(prior, field), newRows = array(next, field);
+    if (newRows.length < oldRows.length) throw new Error(`witnessed ${field} inventory was removed`);
+    for (let index = 0; index < oldRows.length; index++) {
+      const oldRow = oldRows[index] as Record<string, unknown>, newRow = newRows[index] as Record<string, unknown>;
+      if (!oldRow || !newRow || typeof oldRow !== 'object' || typeof newRow !== 'object')
+        throw new TypeError(`invalid witnessed ${field} row`);
+      check(oldRow, newRow);
+    }
+  };
+  const fixed = (oldRow: Record<string, unknown>, newRow: Record<string, unknown>, fields: readonly string[]): void => {
+    if (fields.some(field => !same(oldRow[field], newRow[field])))
+      throw new Error('witnessed operation identity changed');
+  };
+  const forward = (oldState: unknown, newState: unknown, graph: Record<string, readonly string[]>): void => {
+    if (typeof oldState !== 'string' || typeof newState !== 'string'
+      || !graph[oldState]?.includes(newState)) throw new Error('witnessed operation state regressed');
+  };
+  if (id.kind === 'effect') {
+    prefix('records', (oldRow, newRow) => {
+      fixed(oldRow, newRow, ['sequence', 'requestDigest', 'adapterId', 'adapterSemanticsDigest']);
+      forward(oldRow.state, newRow.state, {
+        requested: ['requested', 'reserved', 'rejected', 'aborted'],
+        reserved: ['reserved', 'prepared', 'aborted'],
+        prepared: ['prepared', 'committed', 'indeterminate', 'rejected', 'aborted'],
+        indeterminate: ['indeterminate', 'committed', 'aborted'],
+        committed: ['committed'], rejected: ['rejected'], aborted: ['aborted'],
+      });
+      const oldTransitions = array(oldRow, 'transitions'), newTransitions = array(newRow, 'transitions');
+      if (newTransitions.length < oldTransitions.length
+        || oldTransitions.some((row, index) => !same(row, newTransitions[index])))
+        throw new Error('witnessed effect transition prefix changed');
+      if (['committed', 'rejected', 'aborted'].includes(oldRow.state as string) && !same(oldRow, newRow))
+        throw new Error('witnessed terminal effect changed');
+    });
+    return;
+  }
+  if (id.kind === 'host') {
+    prefix('calls', (oldRow, newRow) => {
+      fixed(oldRow, newRow, ['operationId', 'requestDigest', 'symbol', 'generation', 'unit']);
+      forward(oldRow.state, newRow.state, {
+        running: ['running', 'indeterminate', 'completed', 'aborted'],
+        indeterminate: ['indeterminate', 'completed', 'aborted'],
+        completed: ['completed'], aborted: ['aborted'],
+      });
+      const oldEffects = array(oldRow, 'effects'), newEffects = array(newRow, 'effects');
+      if (newEffects.length < oldEffects.length) throw new Error('witnessed host effect inventory was removed');
+      oldEffects.forEach((effect, index) => {
+        const before = effect as Record<string, unknown>, after = newEffects[index] as Record<string, unknown>;
+        fixed(before, after, ['id', 'requestDigest', 'capability', 'parentOperationId', 'index']);
+        forward(before.state, after.state, {
+          requested: ['requested', 'dispatching', 'committed', 'rejected', 'aborted', 'indeterminate'],
+          dispatching: ['dispatching', 'committed', 'rejected', 'aborted', 'indeterminate'],
+          indeterminate: ['indeterminate', 'committed', 'rejected', 'aborted'],
+          committed: ['committed'], rejected: ['rejected'], aborted: ['aborted'],
+        });
+        if (['committed', 'rejected', 'aborted'].includes(before.state as string) && !same(before, after))
+          throw new Error('witnessed terminal host effect changed');
+      });
+      const oldBoundaries = array(oldRow, 'boundaries'), newBoundaries = array(newRow, 'boundaries');
+      if (newBoundaries.length < oldBoundaries.length || oldBoundaries.some((row, index) => !same(row, newBoundaries[index])))
+        throw new Error('witnessed call boundary history changed');
+      if (['completed', 'aborted'].includes(oldRow.state as string)) {
+        const { recovery: oldRecovery, ...oldBody } = oldRow;
+        const { recovery: newRecovery, ...newBody } = newRow;
+        if (!same(oldBody, newBody) || oldRecovery !== null && !same(oldRecovery, newRecovery)
+          || oldRecovery === null && newRecovery !== null &&
+            (oldRow.state !== 'completed' || (newRecovery as Record<string, unknown>)?.strategy !== 'isolated-replay'))
+          throw new Error('witnessed terminal host call changed');
+      }
+    });
+    prefix('allocations', (oldRow, newRow) => {
+      if (!same(oldRow, newRow)) throw new Error('witnessed allocation receipt changed');
+    });
+    prefix('migrations', (oldRow, newRow) => {
+      fixed(oldRow, newRow, ['migrationId', 'requestDigest', 'symbol', 'target', 'fromGeneration',
+        'toGeneration', 'beforePlan', 'afterPlan', 'before', 'after', 'decisionDigest']);
+      forward(oldRow.state, newRow.state, {
+        requested: ['requested', 'prepared', 'aborted'], prepared: ['prepared', 'committed', 'aborted'],
+        committed: ['committed', 'finalized'], finalized: ['finalized'], aborted: ['aborted'],
+      });
+      if (['finalized', 'aborted'].includes(oldRow.state as string) && !same(oldRow, newRow))
+        throw new Error('witnessed terminal migration changed');
+    });
+    prefix('checkpointLeases', (oldRow, newRow) => {
+      fixed(oldRow, newRow, ['binding']);
+      forward(oldRow.state, newRow.state, {
+        active: ['active', 'committed', 'aborted'], committed: ['committed'], aborted: ['aborted'],
+      });
+      const oldCheckpoints = array(oldRow, 'checkpoints'), newCheckpoints = array(newRow, 'checkpoints');
+      if (newCheckpoints.length < oldCheckpoints.length
+        || oldCheckpoints.some((row, index) => !same(row, newCheckpoints[index])))
+        throw new Error('witnessed checkpoint ancestry changed');
+      if (newCheckpoints.length === 0 || newRow.latestCheckpoint !== newCheckpoints.at(-1))
+        throw new Error('witnessed checkpoint head differs from retained ancestry');
+      if (['committed', 'aborted'].includes(oldRow.state as string) && !same(oldRow, newRow))
+        throw new Error('witnessed terminal checkpoint lease changed');
+    });
+    for (const field of ['heads', 'snapshots', 'checkpointControls', 'checkpointReceipts']) {
+      if (prior[field] === undefined && next[field] === undefined) continue;
+      prefix(field, (oldRow, newRow) => { if (!same(oldRow, newRow)) throw new Error(`witnessed ${field} history changed`); });
+    }
+    return;
+  }
+  prefix('invocations', (oldRow, newRow) => {
+    fixed(oldRow, newRow, ['operationId', 'requestDigest', 'heapId', 'deployment', 'symbol', 'unit']);
+    forward(oldRow.phase, newRow.phase, { pending: ['pending', 'settled'], settled: ['settled'] });
+    if (oldRow.phase === 'settled' && !same(oldRow, newRow))
+      throw new Error('witnessed settled invocation changed');
+  });
+  prefix('allocations', (oldRow, newRow) => {
+    fixed(oldRow, newRow, ['operationId', 'requestDigest', 'heapId', 'deployment']);
+    if (oldRow.result !== null && !same(oldRow, newRow))
+      throw new Error('witnessed settled allocation changed');
+  });
+}
 function writeHead(dir: string, id: WitnessIdentity, head: Head): void {
   const dest = location(dir, id);
   const tmp = path.join(dir, `.witness-${randomBytes(16).toString('hex')}.tmp`);
@@ -209,6 +337,7 @@ function processRequest(bytes: Buffer, key: Buffer, namespaces: readonly Witness
     validateJournal(id, nextRevision, request.journal);
     const current = readHead(dir, id);
     if (current.revision !== request.expectedRevision) return signedResponse(key, nonce, { ok: false, code: 'STALE' });
+    validateRetention(id, current.journal, request.journal);
     const head = { revision: nextRevision, journal: request.journal };
     try {
       writeHead(dir, id, head);
@@ -229,9 +358,14 @@ export async function startWitnessService(options: WitnessServiceOptions): Promi
     throw new TypeError('witness paths must be absolute');
   if (!Array.isArray(options.namespaces) || !options.namespaces.length) throw new TypeError('empty witness allowlist');
   const namespaces = options.namespaces.map(scope);
+  const socketParent = fs.lstatSync(path.dirname(options.socketPath));
+  if (!socketParent.isDirectory() || socketParent.isSymbolicLink()
+    || socketParent.uid !== process.getuid?.() || (socketParent.mode & 0o022))
+    throw new Error('witness socket parent must be service-owned and non-writable to clients');
   fs.mkdirSync(options.storageDir, { recursive: true, mode: 0o700 });
   const dirStat = fs.lstatSync(options.storageDir);
-  if (!dirStat.isDirectory() || dirStat.isSymbolicLink() || (dirStat.mode & 0o077))
+  if (!dirStat.isDirectory() || dirStat.isSymbolicLink() || dirStat.uid !== process.getuid?.()
+    || (dirStat.mode & 0o077))
     throw new Error('witness storage directory must be private');
   const lock = new JournalLock({ directory: path.join(options.storageDir, '.service-lock'),
     domain: 'aether.witness-service', maxTickets: 10_000, busyError: 'witness storage already served' });

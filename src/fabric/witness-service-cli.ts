@@ -10,6 +10,10 @@ import { startWitnessService, type WitnessNamespace } from './witness-service.ts
 export async function runWitnessServiceCli(args: readonly string[]): Promise<void> {
   if (args.length !== 2 || args[0] !== '--config' || !path.isAbsolute(args[1]))
     throw new TypeError('usage: witness-service-cli --config /absolute/private/config.json');
+  const configStat = fs.lstatSync(args[1]);
+  if (!configStat.isFile() || configStat.isSymbolicLink() || (configStat.mode & 0o077)
+    || configStat.uid !== process.getuid?.())
+    throw new Error('witness configuration must be private and owned by the service user');
   const bytes = fs.readFileSync(args[1]);
   const config = exactObject(decodeCanonical(bytes), ['socketPath', 'storageDir', 'keyFile', 'namespaces']);
   if (!Buffer.from(encodeCanonical(config)).equals(bytes)) throw new TypeError('noncanonical witness configuration');

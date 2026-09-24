@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path';
 import { encodeCanonical } from '../../src/fabric/encoding.ts';
 import { createProcessWitnessClient } from '../../src/fabric/witness-service.ts';
 import { readWitnessHead, selectEffectJournalWitness } from '../../src/fabric/effect-journal-witness.ts';
-import { selectHostJournalWitness } from '../../src/fabric/host-journal-witness.ts';
+import { selectHostJournalWitness, readHostJournalHead, advanceHostJournalHead } from '../../src/fabric/host-journal-witness.ts';
 
 const root = resolve(import.meta.dirname, '../..');
 const moduleUrl = (file: string): string => JSON.stringify(new URL(file, import.meta.url).href);
@@ -224,6 +224,15 @@ test('V9 independent witness preserves a committed guest effect across controlle
     const effectId = hostJournal.calls.find((row: { operationId: string }) => row.operationId === 'crash-v9').effects[0].id as string;
     const client = createProcessWitnessClient({ socketPath, key: readFileSync(keyFiles.witnessKeyFile), timeoutMs: 10_000 });
     const catalog = client.effectCatalog({ authorityId: 'effect-operator', repositoryId, deploymentId, clockDomain });
+    const hostWitness = selectHostJournalWitness(client.hostCatalog({ authorityId: 'host-operator',
+      repositoryId, deploymentId }), 'direct-host');
+    const hostHeadBefore = readHostJournalHead(hostWitness), forgedHost = JSON.parse(hostHeadBefore.journal!);
+    forgedHost.witnessRevision = String(BigInt(hostHeadBefore.revision) + 1n);
+    forgedHost.calls.find((row: { operationId: string }) => row.operationId === 'crash-v9').effects[0].state = 'requested';
+    assert.throws(() => advanceHostJournalHead(hostWitness, hostHeadBefore.revision,
+      Buffer.from(encodeCanonical(forgedHost)).toString('utf8')), /witness INVALID/);
+    assert.deepEqual(readHostJournalHead(hostWitness), hostHeadBefore,
+      'an authenticated client cannot relabel a witnessed committed effect as safe to abort');
     const witnessBefore = readWitnessHead(selectEffectJournalWitness(catalog, effectId));
     assert.ok(BigInt(witnessBefore.revision) > 0n);
     assert.equal(JSON.parse(witnessBefore.journal!).records.at(-1).state, 'committed');

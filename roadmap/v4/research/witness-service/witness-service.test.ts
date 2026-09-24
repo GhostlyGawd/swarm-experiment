@@ -25,6 +25,10 @@ test('controlled service close releases the Unix socket and durable service tick
     assert.equal(fs.existsSync(options.socketPath), true);
     await first.close();
     assert.equal(fs.existsSync(options.socketPath), false);
+    const writableParent = path.join(directory, 'writable-socket-parent');
+    fs.mkdirSync(writableParent, { mode: 0o700 }); fs.chmodSync(writableParent, 0o777);
+    await assert.rejects(startWitnessService({ ...options, socketPath: path.join(writableParent, 'w.sock') }),
+      /socket parent must be service-owned and non-writable/);
     const reopened = await startWitnessService(options);
     await reopened.close();
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
@@ -129,6 +133,15 @@ test('separate witness process authenticates bounded CAS and survives SIGKILL', 
       readiness: 'ready', pendingProposal: null, invocations: [], allocations: [] });
     assert.deepEqual(advanceWitnessHead(effect, '0', effectJournal), { revision: '1', journal: effectJournal });
     assert.deepEqual(advanceHostJournalHead(host, '0', hostJournal), { revision: '1', journal: hostJournal });
+    const leaseHost = selectHostJournalWitness(hosts, 'host-lease');
+    const leaseBody = { ...JSON.parse(hostJournal), checkpointLeases: [{ binding: { id: 'lease-1' },
+      state: 'active', latestCheckpoint: 'checkpoint-1', checkpoints: ['checkpoint-1'], receipt: null }],
+      checkpointReceipts: [], checkpointControls: [] };
+    const leaseJournal = canonical(leaseBody);
+    assert.deepEqual(advanceHostJournalHead(leaseHost, '0', leaseJournal), { revision: '1', journal: leaseJournal });
+    const omittedLease = canonical({ ...leaseBody, witnessRevision: '2', checkpointLeases: [] });
+    assert.throws(() => advanceHostJournalHead(leaseHost, '1', omittedLease), /witness INVALID/);
+    assert.deepEqual(readHostJournalHead(leaseHost), { revision: '1', journal: leaseJournal });
     assert.deepEqual(advanceDeploymentJournalHead(deployment, '0', deploymentJournal),
       { revision: '1', journal: deploymentJournal });
     assert.throws(() => advanceWitnessHead(effect, '0', effectJournal), /stale/);

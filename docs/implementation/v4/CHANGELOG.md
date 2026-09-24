@@ -1,10 +1,15 @@
 # Implementation specification changelog
 
+## V12 blockless binding semantics — 2026-09-23
+
+- Added executable projection V12 for direct `Let` under `If`, `While` and `Atomic`. Scoped slots preserve branch selection, loop rebinding, temporary locals and reads/writes that fall back to an outer binding before a shadowing `Let` executes. Exact-root and import-closure checks pass; actual TypeScript, Python and Rust executions match the reference cases.
+- The projection suite passes 92/92; 18 earlier V2/V7/V10/V11 and auto source/runtime outputs remain byte-identical against the prior source. Other valid cross-feature combinations and FR-1.2's unchanged 4× token target remain open; T1-02/Q03 status does not change.
+
 ## Process-external witness and controller crash campaign — 2026-09-23
 
-- Added an operator-run Unix socket witness service with authenticated bounded frames, namespace-scoped identities, durable atomic CAS and exact readback for V9 effect, host and deployment heads. A second live service is refused; service SIGKILL/restart recovers the exact heads. A controlled-close race was found in review and fixed.
+- Added an operator-run Unix socket witness service with authenticated bounded frames, namespace-scoped identities, durable atomic CAS and exact readback for V9 effect, host and deployment heads. It refuses authenticated attempts to remove retained broker effects, host effects or outer invocation records. A second live service is refused; service SIGKILL/restart recovers the exact heads. A controlled-close race was found in review and fixed.
 - Added real V9 ProcessHost and ProcessDeployment integration against the separate service. During service outage, reads fail closed; after restart, fresh witness objects reopen cached calls without broker redispatch. A separate controller SIGKILL after a committed read-only Wasm effect is recovered by a new controller, which refuses safe abort and records one guest dispatch.
-- Expanded signed V9 direct-call grant refusals under the full host/broker path. The service and controllers were tested under one UID; neither distinct-UID custody nor authenticated external sink results is qualified. T2-04, NFR-16 and the verified-task count remain open.
+- Expanded signed V9 direct/deployed grant refusals under the full host/broker path. Added a native peer-credential gateway using `getpeereid` on macOS, and routed real V9 host/deployment witness traffic through it. Service, gateway and controllers were tested under one UID; neither distinct-UID custody nor authenticated external sink results is qualified. T2-04, NFR-16 and the verified-task count remain open.
 
 ## V11 contract calls and V9 complete journal witnesses — 2026-09-23
 

@@ -31,6 +31,8 @@ answer it. A service-lifetime
 `JournalLock` ticket serializes access to one storage directory, including
 across process restarts. A second live server using that directory is rejected.
 After SIGKILL, dead-ticket recovery and stale-socket removal allow restart.
+The immutable service ticket log is bounded to 10,000 launches and currently
+requires a separately coordinated quiescent maintenance procedure afterward.
 
 The namespace allowlist accepts exact `{kind:'effect', authorityId,
 repositoryId, catalogDeploymentId, operationId, clockDomain}` and
@@ -67,8 +69,11 @@ uncertain because the write may already have committed.
 For each advance, the service writes a fresh private file, fsyncs it, renames
 it over the head, fsyncs the directory, then rereads the exact head before
 returning success. The journal identity and revision bindings are checked by
-the service; the existing witness wrappers and ProcessHost/ProcessDeployment
-validate the richer journal semantics.
+the service. It also refuses removal of previously witnessed broker records,
+host effects/calls and deployment invocations/allocations, and changes to
+terminal inventory. This retention check does not prove the program semantics
+or authenticate an external sink. The existing witness wrappers and
+ProcessHost/ProcessDeployment validate richer journal semantics.
 
 ## Evidence and limits
 
@@ -91,9 +96,11 @@ cross-UID transport/authentication design. HMAC and journal custody do not
 authenticate whether an external effect sink committed its result.
 
 The [V9 real host/deployment integration test](../../../../test/tier4/process-wasm-external-witness.test.ts)
-also runs real workers against this service, kills and restarts the service,
+routes real workers through the [native peer gateway](../witness-peer/README.md), kills and restarts the service,
 reconstructs fresh controller witness objects, and verifies cached calls do
-not redispatch. The [controller crash test](../../../../test/tier4/process-wasm-controller-crash-witness.test.ts)
+not redispatch. It sends correctly authenticated omission attempts against all
+three actual committed heads; the service refuses each without advancing. The
+[controller crash test](../../../../test/tier4/process-wasm-controller-crash-witness.test.ts)
 SIGKILLs a real controller while the service stays up, then reopens and
 reconciles the exact read-only Wasm effect in a fresh controller without another
 guest dispatch. Neither test proves independent UID custody or external sink

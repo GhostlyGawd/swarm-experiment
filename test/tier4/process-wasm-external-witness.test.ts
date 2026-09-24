@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -16,8 +16,10 @@ import { createTrustedClockAnchor } from '../../src/tier2/trusted-clock-anchor.t
 import { wasmAdapterArtifactForBytes, admitWasmAdapterBytes, admittedAdapterArtifactDigest } from '../../src/tier2/adapter-artifact.ts';
 import { effectResourcePolicyDigestV4, signEffectResourcePolicyV4, type EffectResourcePolicyBodyV4 } from '../../src/tier2/effect-resource-policy.ts';
 import { encodeCanonical } from '../../src/fabric/encoding.ts';
-import { selectEffectJournalWitness, readWitnessHead, type NamespacedEffectJournalWitnessCatalog } from '../../src/fabric/effect-journal-witness.ts';
-import { selectHostJournalWitness } from '../../src/fabric/host-journal-witness.ts';
+import { selectEffectJournalWitness, readWitnessHead, advanceWitnessHead,
+  type NamespacedEffectJournalWitnessCatalog } from '../../src/fabric/effect-journal-witness.ts';
+import { selectHostJournalWitness, readHostJournalHead, advanceHostJournalHead } from '../../src/fabric/host-journal-witness.ts';
+import { readDeploymentJournalHead, advanceDeploymentJournalHead } from '../../src/fabric/deployment-journal-witness.ts';
 import { createProcessWitnessClient } from '../../src/fabric/witness-service.ts';
 import { DEFAULT_EVIDENCE_POLICY_V2, mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
 import { DurableEffectBroker, effectAdapterDigest } from '../../src/fabric/effects.ts';
@@ -56,12 +58,31 @@ async function kill(child: ChildProcess): Promise<void> {
   const exited = new Promise<void>(resolveExit => child.once('exit', () => resolveExit()));
   child.kill('SIGKILL'); await exited;
 }
+async function launchPeer(binary: string, listenPath: string, upstreamPath: string): Promise<ChildProcess> {
+  const child = spawn(binary, ['--listen', listenPath, '--upstream', upstreamPath,
+    '--uid', String(process.getuid!()), '--upstream-uid', String(process.getuid!()), '--timeout-ms', '10000'],
+  { stdio: ['ignore', 'pipe', 'pipe'] });
+  await new Promise<void>((resolveReady, reject) => {
+    let output = '', errors = '';
+    const timeout = setTimeout(() => reject(new Error(`peer gateway startup timeout: ${errors}`)), 10_000);
+    child.stdout!.on('data', chunk => {
+      output += String(chunk);
+      if (output.includes('witness-peer ready')) { clearTimeout(timeout); resolveReady(); }
+    });
+    child.stderr!.on('data', chunk => { errors += String(chunk).slice(0, 2048); });
+    child.once('exit', code => { clearTimeout(timeout); reject(new Error(`peer gateway exited ${code}: ${errors}`)); });
+    child.once('error', error => { clearTimeout(timeout); reject(error); });
+  });
+  return child;
+}
 
-test('V9 real host and deployment survive external witness service SIGKILL and restart without redispatch', async () => {
+test('V9 host and deployment use peer-checked external witness across service SIGKILL without redispatch', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'aether-external-witness-'));
-  let server: ChildProcess | undefined, host: ProcessHost | undefined, deployment: ProcessDeployment | undefined;
+  let server: ChildProcess | undefined, peer: ChildProcess | undefined;
+  let host: ProcessHost | undefined, deployment: ProcessDeployment | undefined;
   try {
-    const socketPath = join(directory, 'w.sock'), storageDir = join(directory, 'operator-store');
+    const socketPath = join(directory, 'w.sock'), peerPath = join(directory, 'peer.sock');
+    const storageDir = join(directory, 'operator-store');
     const key = randomBytes(32), keyFile = join(directory, 'w.key'), configFile = join(directory, 'w.json');
     writeFileSync(keyFile, key, { mode: 0o600 });
     const repositoryId = 'external-witness-repository', deploymentId = 'external-witness-deployment',
@@ -73,6 +94,12 @@ test('V9 real host and deployment survive external witness service SIGKILL and r
     ];
     writeFileSync(configFile, encodeCanonical({ socketPath, storageDir, keyFile, namespaces }), { mode: 0o600 });
     server = await launch(configFile);
+    const binary = join(directory, 'witness-peer');
+    const nativeSource = resolve(import.meta.dirname, '../../native/witness-peer/witness-peer.c');
+    const built = spawnSync('cc', ['-std=c11', '-Wall', '-Wextra', '-Werror', '-O2', nativeSource, '-o', binary],
+      { encoding: 'utf8', timeout: 30_000 });
+    assert.equal(built.status, 0, built.stderr || built.error?.message);
+    peer = await launchPeer(binary, peerPath, socketPath);
     const symbols = new SymbolSpace('external-witness-v9'), entry = symbols.define('entry'), x = symbols.define('x');
     const CAP = capability('cap:test:external_witness'), registry = new CapabilityRegistry();
     registry.define({ name: CAP, domain: 'test', operation: 'external_witness', arity: 1,
@@ -107,7 +134,7 @@ test('V9 real host and deployment survive external witness service SIGKILL and r
       transportLatencyMsPerSecond: 0, monthlyCost: 0, recombinations: [], blockedMerges: [] };
     const effectNamespace = { authorityId: 'effect-operator', repositoryId, deploymentId, clockDomain };
     const hostNamespace = { authorityId: 'host-operator', repositoryId, deploymentId };
-    const client = createProcessWitnessClient({ socketPath, key, timeoutMs: 10_000 });
+    const client = createProcessWitnessClient({ socketPath: peerPath, key, timeoutMs: 10_000 });
     const routerFactory = (catalog: NamespacedEffectJournalWitnessCatalog): NonNullable<ProcessHostOptions['effectRouterFactory']> => effect => {
       const path = join(directory, 'effects', digest(effect.operationId).split(':').at(-1)!);
       const witness = selectEffectJournalWitness(catalog, effect.operationId);
@@ -130,18 +157,33 @@ test('V9 real host and deployment survive external witness service SIGKILL and r
       effectRouterFactory: routerFactory(catalog),
     });
     const catalog = client.effectCatalog(effectNamespace), hostCatalog = client.hostCatalog(hostNamespace);
-    host = await ProcessHost.open(makeOptions(catalog, selectHostJournalWitness(hostCatalog, 'direct-host')));
+    const directHostWitness = selectHostJournalWitness(hostCatalog, 'direct-host');
+    host = await ProcessHost.open(makeOptions(catalog, directHostWitness));
     const tokens = () => host!.issueScopedTokens(entry, 60_000, new Map([[CAP, ['wasm']]]));
     const first = await host.call(entry, [{ tag: 'int', value: '7' }], { operationId: 'external-v9', tokens: tokens() });
     assert.equal(first.state, 'completed');
     const recorded = JSON.parse(readFileSync(join(directory, 'host', 'host.json'), 'utf8'));
     const effectId = recorded.calls.find((call: { operationId: string }) => call.operationId === 'external-v9').effects[0].id as string;
-    const brokerBefore = readWitnessHead(selectEffectJournalWitness(catalog, effectId));
+    const directEffectWitness = selectEffectJournalWitness(catalog, effectId);
+    const brokerBefore = readWitnessHead(directEffectWitness), omittedBroker = JSON.parse(brokerBefore.journal!);
+    omittedBroker.revision = String(BigInt(brokerBefore.revision) + 1n);
+    omittedBroker.records = [];
+    assert.throws(() => advanceWitnessHead(directEffectWitness, brokerBefore.revision,
+      Buffer.from(encodeCanonical(omittedBroker)).toString('utf8')), /witness INVALID/);
+    assert.deepEqual(readWitnessHead(directEffectWitness), brokerBefore,
+      'service refuses a correctly authenticated request that drops a witnessed broker effect');
+    const hostBefore = readHostJournalHead(directHostWitness), omittedHost = JSON.parse(hostBefore.journal!);
+    omittedHost.witnessRevision = String(BigInt(hostBefore.revision) + 1n);
+    omittedHost.calls.find((call: { operationId: string }) => call.operationId === 'external-v9').effects = [];
+    assert.throws(() => advanceHostJournalHead(directHostWitness, hostBefore.revision,
+      Buffer.from(encodeCanonical(omittedHost)).toString('utf8')), /witness INVALID/);
+    assert.deepEqual(readHostJournalHead(directHostWitness), hostBefore,
+      'service refuses a correctly authenticated request that omits witnessed host effects');
     await kill(server); server = undefined;
     assert.throws(() => host!.operationResult('external-v9'), /uncertain witness response|witness/);
     await host.close(); host = undefined;
     server = await launch(configFile);
-    const resumed = createProcessWitnessClient({ socketPath, key, timeoutMs: 10_000 });
+    const resumed = createProcessWitnessClient({ socketPath: peerPath, key, timeoutMs: 10_000 });
     const resumedCatalog = resumed.effectCatalog(effectNamespace), resumedHostCatalog = resumed.hostCatalog(hostNamespace);
     host = await ProcessHost.open(makeOptions(resumedCatalog,
       selectHostJournalWitness(resumedHostCatalog, 'direct-host')));
@@ -182,11 +224,20 @@ test('V9 real host and deployment survive external witness service SIGKILL and r
     const deployedEffectId = deployedJournal.calls.find((call: { operationId: string }) =>
       call.operationId === 'external-deployed-v9').effects[0].id as string;
     const deployedBrokerBefore = readWitnessHead(selectEffectJournalWitness(resumedCatalog, deployedEffectId));
+    const outerWitness = resumed.deploymentWitness({ authorityId: 'deployment-operator', repositoryId, deploymentId });
+    const outerBefore = readDeploymentJournalHead(outerWitness), omittedOuter = JSON.parse(outerBefore.journal!);
+    omittedOuter.witnessRevision = String(BigInt(outerBefore.revision) + 1n);
+    omittedOuter.invocations = omittedOuter.invocations.filter((row: { operationId: string }) =>
+      row.operationId !== 'external-deployed-v9');
+    assert.throws(() => advanceDeploymentJournalHead(outerWitness, outerBefore.revision,
+      Buffer.from(encodeCanonical(omittedOuter)).toString('utf8')), /witness INVALID/);
+    assert.deepEqual(readDeploymentJournalHead(outerWitness), outerBefore,
+      'service refuses a correctly authenticated request that omits a witnessed invocation');
     await kill(server); server = undefined;
     assert.throws(() => deployment!.status(), /uncertain witness response|witness/);
     await deployment.close(); deployment = undefined;
     server = await launch(configFile);
-    const restoredClient = createProcessWitnessClient({ socketPath, key, timeoutMs: 10_000 });
+    const restoredClient = createProcessWitnessClient({ socketPath: peerPath, key, timeoutMs: 10_000 });
     const restoredCatalog = restoredClient.effectCatalog(effectNamespace);
     deployment = await ProcessDeployment.open({ ...deploymentOptions(restoredClient, restoredCatalog), genesis: undefined });
     assert.equal(deployment.status().generation, '0');
@@ -196,7 +247,7 @@ test('V9 real host and deployment survive external witness service SIGKILL and r
     assert.deepEqual(readWitnessHead(selectEffectJournalWitness(restoredCatalog, deployedEffectId)), deployedBrokerBefore,
       'deployment cached receipt did not redispatch after service restart');
   } finally {
-    await deployment?.close(); await host?.close(); if (server) await kill(server);
+    await deployment?.close(); await host?.close(); if (peer) await kill(peer); if (server) await kill(server);
     rmSync(directory, { recursive: true, force: true });
   }
 });
