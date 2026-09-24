@@ -224,11 +224,30 @@ export class ProductionRuntime {
    * Two passes, because a call's capability requirement has to be checkable
    * before the callee's own body has been compiled — mutual recursion would
    * otherwise decide which checks happen by declaration order.
-   */
+  */
   static compile(module: Term, opts: CompileOptions): ProductionRuntime {
-    const moduleRef = new GraphStore().intern(module);
     if (opts.virtualForward && (opts.portableEvidence || opts.evidence || opts.effectRouter))
       throw new TypeError('virtual forwarding is not covered by a versioned admission manifest');
+    let virtualBindings: ReturnType<typeof checkVirtualForwardDescriptor> = [];
+    let virtualTarget: SymbolId | null = null;
+    if (opts.virtualForward) {
+      if (module.kind !== 'Module') throw new TypeError('virtual forwarding requires a candidate Module');
+      // Validate untrusted input before GraphStore recursion, then compile a
+      // private checked snapshot. A caller cannot mutate a candidate Call
+      // after admission and silently change its virtual-site identity.
+      const { source, descriptor } = opts.virtualForward;
+      checkVirtualForwardDescriptor(descriptor, source, module);
+      const sourceSnapshot = structuredClone(source);
+      module = structuredClone(module);
+      if (module.kind !== 'Module') throw new TypeError('virtual forwarding candidate changed during compilation');
+      const descriptorSnapshot = structuredClone(descriptor);
+      virtualBindings = checkVirtualForwardDescriptor(descriptorSnapshot, sourceSnapshot, module);
+      virtualTarget = descriptorSnapshot.target;
+      if (opts.includeSymbols && !opts.includeSymbols.includes(virtualTarget))
+        throw new TypeError('virtual forwarding requires the target compiled locally');
+      opts = { ...opts, virtualForward: { source: sourceSnapshot, descriptor: descriptorSnapshot } };
+    }
+    const moduleRef = new GraphStore().intern(module);
     if (opts.portableEvidence) {
       const { vetted, expectedManifest } = opts.portableEvidence;
       validateCheckedPortableCertificate(vetted, expectedManifest);
@@ -255,14 +274,7 @@ export class ProductionRuntime {
     }
     const rt = new ProductionRuntime(opts);
     rt.moduleRef = moduleRef;
-    if (opts.virtualForward) {
-      if (module.kind !== 'Module') throw new TypeError('virtual forwarding requires a candidate Module');
-      const { source, descriptor } = opts.virtualForward;
-      const bindings = checkVirtualForwardDescriptor(descriptor, source, module);
-      if (opts.includeSymbols && !opts.includeSymbols.includes(descriptor.target))
-        throw new TypeError('virtual forwarding requires the target compiled locally');
-      for (const binding of bindings) rt.virtualForwardCalls.add(binding.candidateCall);
-    }
+    for (const binding of virtualBindings) rt.virtualForwardCalls.add(binding.candidateCall);
     opts.effectRouter?.bind(rt.moduleRef);
     const declarations: Array<Extract<Term, { kind: 'FunctionDecl' }>> = [];
     const collect = (t: Term): void => {
@@ -281,7 +293,7 @@ export class ProductionRuntime {
     collect(module);
     const include = opts.includeSymbols ? new Set(opts.includeSymbols) : null;
     for (const decl of declarations) if (!include || include.has(decl.symbol)) rt.compileFunction(decl);
-    if (opts.virtualForward && !rt.compiled.has(opts.virtualForward.descriptor.target))
+    if (virtualTarget && !rt.compiled.has(virtualTarget))
       throw new TypeError('virtual forwarding requires the target compiled locally');
     return rt;
   }

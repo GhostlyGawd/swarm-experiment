@@ -116,3 +116,15 @@ test('virtual forwarding cannot bind an effect router to the candidate root alon
   }), /virtual forwarding is not covered by a versioned admission manifest/);
   assert.equal(binds, 0, 'rejection must precede broker root binding');
 });
+
+test('compiled virtual calls retain the checked candidate after caller mutation', () => {
+  const f = fixture();
+  const runtime = ProductionRuntime.compile(f.candidate, { registry: f.registry,
+    policy: 'enforce', effects: new Map([[f.append, () => null]]),
+    virtualForward: { source: f.source, descriptor: f.descriptor },
+  });
+  const before = runtime.call(f.entry, [2n]);
+  (f.source.members[1] as { body: Term }).body = b.ret(b.int(99));
+  (f.candidate.members[1] as { body: Term }).body = b.ret(b.int(100));
+  assert.deepEqual(runtime.call(f.entry, [2n]), before);
+});
