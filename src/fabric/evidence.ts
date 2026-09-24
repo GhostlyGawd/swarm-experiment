@@ -1,7 +1,10 @@
 /** Exact-subject admission for the existing local verifier. This is not a portable proof kernel. */
+import { types as nodeTypes } from 'node:util';
 import { children, type Term, type Ty } from '../tier1/ast.ts';
 import type { SymbolId } from '../tier1/ids.ts';
 import { GraphStore } from '../tier1/store.ts';
+import { checkVirtualForwardDescriptor, type VirtualForwardDescriptor } from '../tier1/semantic-gc-virtual-forward.ts';
+import { virtualForwardResumableProfileDigest } from '../tier3/resumable-program.ts';
 import type { CapabilityRegistry } from '../tier2/ocap.ts';
 import { typecheck } from '../tier2/typecheck.ts';
 import { verifyFunction, type VerificationReport } from '../tier2/verify.ts';
@@ -23,12 +26,18 @@ export interface EvidencePolicyV2 extends Omit<EvidencePolicyV1, 'format'> {
   readonly format: 'aether.evidence-policy/2';
   readonly solverProfile: 'v4-hard/1';
 }
-export type EvidencePolicy = EvidencePolicyV1 | EvidencePolicyV2;
+export interface EvidencePolicyV3 extends Omit<EvidencePolicyV2, 'format'> {
+  readonly format: 'aether.evidence-policy/3';
+  readonly virtualForward: 'checked-tail/1';
+}
+export type EvidencePolicy = EvidencePolicyV1 | EvidencePolicyV2 | EvidencePolicyV3;
 export const DEFAULT_EVIDENCE_POLICY: EvidencePolicyV1 = Object.freeze({
   format: 'aether.evidence-policy/1', requireFormal: true, budgetMs: 1_500,
   maxPaths: 64, maxNodes: 50_000, maxDepth: 64, maxBytes: 8 * 1024 * 1024,
 });
 export const DEFAULT_EVIDENCE_POLICY_V2: EvidencePolicyV2 = Object.freeze({ ...DEFAULT_EVIDENCE_POLICY, format: 'aether.evidence-policy/2', solverProfile: 'v4-hard/1' });
+export const DEFAULT_EVIDENCE_POLICY_V3: EvidencePolicyV3 = Object.freeze({ ...DEFAULT_EVIDENCE_POLICY_V2,
+  format: 'aether.evidence-policy/3', virtualForward: 'checked-tail/1' });
 export interface EvidenceContext {
   readonly module: Term;
   readonly specification: string;
@@ -38,6 +47,10 @@ export interface EvidenceContext {
   readonly capabilityPolicyDigest: Digest;
   readonly registry: CapabilityRegistry;
   readonly policy?: EvidencePolicy;
+  /** Version 3 only: an archived source and exact checked one-wrapper rewrite.
+   * The candidate runtime profile must commit to this descriptor. */
+  readonly virtualForward?: { readonly source: Extract<Term, { kind: 'Module' }>;
+    readonly descriptor: VirtualForwardDescriptor };
   /** Return actual declaration content; hashes and transitive calls are recomputed here. */
   readonly resolveDeclaration?: (symbol: SymbolId) => Term | undefined;
 }
@@ -112,9 +125,11 @@ export function validateVettedEvidence(value: unknown, expectedManifest: Executi
 function policyFor(context: EvidenceContext): EvidencePolicy {
   const policy = context.policy ?? DEFAULT_EVIDENCE_POLICY;
   const fields = ['format', 'requireFormal', 'budgetMs', 'maxPaths', 'maxNodes', 'maxDepth', 'maxBytes'];
-  if (policy.format === 'aether.evidence-policy/2') {
-    exactObject(policy, [...fields, 'solverProfile']);
+  if (policy.format === 'aether.evidence-policy/2' || policy.format === 'aether.evidence-policy/3') {
+    exactObject(policy, [...fields, 'solverProfile', ...(policy.format === 'aether.evidence-policy/3' ? ['virtualForward'] : [])]);
     if (policy.solverProfile !== 'v4-hard/1' || policy.budgetMs > V4_SMT_HARD_CUTOFF_MS) throw new TypeError('invalid v4 hard evidence policy');
+    if (policy.format === 'aether.evidence-policy/3' && policy.virtualForward !== 'checked-tail/1')
+      throw new TypeError('unsupported virtual forward evidence profile');
   } else {
     exactObject(policy, fields);
     if (policy.format !== 'aether.evidence-policy/1') throw new TypeError('invalid evidence policy');
@@ -124,6 +139,8 @@ function policyFor(context: EvidenceContext): EvidencePolicy {
     if (!Number.isSafeInteger(policy[key]) || policy[key] < 1) throw new TypeError('invalid evidence resource limit');
   }
   if (policy.maxDepth > 128) throw new RangeError('evidence depth exceeds local checker limit');
+  if (policy.format === 'aether.evidence-policy/3' ? !context.virtualForward : context.virtualForward !== undefined)
+    throw new TypeError('virtual forward evidence requires its versioned context and policy');
   return policy;
 }
 function limits(policy: EvidencePolicy) {
@@ -180,10 +197,11 @@ function checkAstInput(value: unknown, policy: EvidencePolicy): void {
   };
   encodeCanonical(normalize(value, 0), limits(policy));
 }
-function calls(decl: Term, policy: EvidencePolicy): SymbolId[] {
+function calls(decl: Term, policy: EvidencePolicy, virtualCallees?: WeakMap<Term, SymbolId>): SymbolId[] {
   const out = new Set<SymbolId>();
   walk(decl, node => {
-    if (node.kind === 'Call' || node.kind === 'SeqMap' || node.kind === 'SeqFold') out.add(node.callee);
+    if (node.kind === 'Call' || node.kind === 'SeqMap' || node.kind === 'SeqFold')
+      out.add(node.kind === 'Call' ? virtualCallees?.get(node) ?? node.callee : node.callee);
   }, policy);
   return [...out].sort();
 }
@@ -192,6 +210,18 @@ function prepare(context: EvidenceContext) {
   checkAstInput(context.module, policy);
   if (context.module.kind !== 'Module') throw new TypeError('evidence requires a complete module');
   walk(context.module, () => {}, policy); // before content hashing / symbolic exploration
+  const virtualCallees = new WeakMap<Term, SymbolId>();
+  let archivedWrapper: Declaration | null = null;
+  if (context.virtualForward) {
+    if (nodeTypes.isProxy(context.virtualForward)) throw new TypeError('virtual forward evidence context proxy');
+    exactObject(context.virtualForward, ['source', 'descriptor']);
+    const { source, descriptor } = context.virtualForward;
+    const bindings = checkVirtualForwardDescriptor(descriptor, source, context.module);
+    if (context.target.profileDigest !== virtualForwardResumableProfileDigest(descriptor))
+      throw new TypeError('virtual forward evidence target profile does not bind the checked descriptor');
+    archivedWrapper = structuredClone(bindings[0].wrapper);
+    for (const binding of bindings) virtualCallees.set(binding.candidateCall, binding.wrapper.symbol);
+  }
   const store = new GraphStore();
   const environment = new Map<SymbolId, Declaration>();
   for (const member of context.module.members) if (member.kind === 'FunctionDecl') {
@@ -205,14 +235,17 @@ function prepare(context: EvidenceContext) {
     if (existing) return existing;
     if (loading.has(symbol)) throw new TypeError('recursive external resolution');
     loading.add(symbol);
-    const found = context.resolveDeclaration?.(symbol);
+    const found = symbol === archivedWrapper?.symbol ? archivedWrapper : context.resolveDeclaration?.(symbol);
     if (found?.kind !== 'FunctionDecl' || found.symbol !== symbol) throw new TypeError(`unresolved declaration ${symbol}`);
     checkAstInput(found, policy);
     walk(found, () => {}, policy);
+    if (symbol === context.virtualForward?.descriptor.wrapper
+      && store.intern(found) !== context.virtualForward.descriptor.wrapperDeclaration)
+      throw new TypeError('virtual forward archived declaration changed');
     environment.set(symbol, found); loading.delete(symbol);
     return found;
   };
-  const rootSymbols = new Set(initial.flatMap(decl => calls(decl, policy)));
+  const rootSymbols = new Set(initial.flatMap(decl => calls(decl, policy, virtualCallees)));
   const roots: DependencyV1[] = [...rootSymbols].sort().map(symbol => ({ symbol, declaration: store.intern(resolve(symbol)) }));
   const manifest = createExecutionManifest({
     astRoot: store.intern(context.module), specRoot: domainDigest('aether.specification/1', context.specification, limits(policy)),
@@ -220,7 +253,7 @@ function prepare(context: EvidenceContext) {
     capabilityPolicyDigest: context.capabilityPolicyDigest, evidencePolicyDigest: domainDigest(policy.format, policy),
   }, roots, dependency => {
     const decl = resolve(dependency.symbol as SymbolId);
-    return { declaration: store.intern(decl), dependencies: calls(decl, policy).map(symbol => ({ symbol, declaration: store.intern(resolve(symbol)) })) };
+    return { declaration: store.intern(decl), dependencies: calls(decl, policy, virtualCallees).map(symbol => ({ symbol, declaration: store.intern(resolve(symbol)) })) };
   }, limits(policy));
   const declarations = [...environment.values()].sort((a, b) => a.symbol < b.symbol ? -1 : 1);
   if (!declarations.length || declarations.length > policy.maxNodes) throw new RangeError('empty or oversized verification unit');
@@ -336,7 +369,8 @@ function run(prepared: ReturnType<typeof prepare>, expected: readonly Verificati
     const remaining = prepared.policy.budgetMs - (Date.now() - start);
     if (remaining <= 0) throw new TypeError('verification total budget exhausted');
     const report = verifyFunction(decl, { environment: prepared.environment, budgetMs: remaining, maxPaths: prepared.policy.maxPaths,
-      ...(prepared.policy.format === 'aether.evidence-policy/2' ? { solverProfile: prepared.policy.solverProfile } : {}) });
+      ...(prepared.policy.format === 'aether.evidence-policy/2' || prepared.policy.format === 'aether.evidence-policy/3'
+        ? { solverProfile: prepared.policy.solverProfile } : {}) });
     checkCoverage(decl, report, prepared.environment, prepared.policy); validResult(report, prepared.policy);
     return report;
   });
@@ -361,7 +395,10 @@ export function mintLocalEvidence(context: EvidenceContext): LocalEvidenceV1 {
       format: 'aether.evidence/1', executionManifest: executionManifestDigest(prepared.manifest),
       obligationSetDigest: domainDigest('aether.obligations/1', obligations(encoded), limits(prepared.policy)),
       assumptionsDigest: domainDigest('aether.assumptions/1', encoded.map(report => ({ symbol: report.symbol, assumptions: report.assumptions })), limits(prepared.policy)),
-      evidenceKind: 'local_solver', checker: { id: 'aether.local-verifier', version: prepared.policy.format === 'aether.evidence-policy/2' ? '2' : '1', semanticsVersion: context.semanticsVersion },
+      evidenceKind: 'local_solver', checker: { id: 'aether.local-verifier',
+        version: prepared.policy.format === 'aether.evidence-policy/3' ? '3'
+          : prepared.policy.format === 'aether.evidence-policy/2' ? '2' : '1',
+        semanticsVersion: context.semanticsVersion },
       evidenceDigest: domainDigest('aether.evidence-payload/1', encoded, limits(prepared.policy)),
       limits: { bytes: prepared.policy.maxBytes, steps: prepared.policy.maxNodes, depth: prepared.policy.maxDepth },
     },
@@ -380,7 +417,10 @@ export function validateEvidence(value: unknown, context: EvidenceContext): Vett
   for (const key of ['executionManifest', 'obligationSetDigest', 'assumptionsDigest', 'evidenceDigest']) validateDigest(envelope[key]);
   const checker = exactObject(envelope.checker, ['id', 'version', 'semanticsVersion']);
   identifier(checker.id); identifier(checker.version); identifier(checker.semanticsVersion);
-  if (checker.id !== 'aether.local-verifier' || checker.version !== (policy.format === 'aether.evidence-policy/2' ? '2' : '1') || checker.semanticsVersion !== context.semanticsVersion) throw new TypeError('unsupported evidence checker');
+  const checkerVersion = policy.format === 'aether.evidence-policy/3' ? '3'
+    : policy.format === 'aether.evidence-policy/2' ? '2' : '1';
+  if (checker.id !== 'aether.local-verifier' || checker.version !== checkerVersion
+    || checker.semanticsVersion !== context.semanticsVersion) throw new TypeError('unsupported evidence checker');
   if (envelope.evidenceKind !== 'local_solver') throw new TypeError(envelope.evidenceKind === 'property_campaign' ? 'property evidence cannot authorize formal proof elision' : 'portable certificate checker is not implemented');
   const resources = exactObject(envelope.limits, ['bytes', 'steps', 'depth']);
   if (!same(resources, { bytes: policy.maxBytes, steps: policy.maxNodes, depth: policy.maxDepth }, policy)) throw new TypeError('evidence resource policy mismatch');

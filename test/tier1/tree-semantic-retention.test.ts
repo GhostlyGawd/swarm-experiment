@@ -77,12 +77,16 @@ test('unstable replication refuses a missing authority, missing record, retired 
   try {
     const frame = f.a.seed(b.int(9)).frames[0];
     f.z.importContent(f.a.exportContent()); f.z.ingest(frame);
-    assert.throws(() => new DurableTreeWorkspace(f.options('b', { semanticRetention: undefined })), /authority required/);
+    assert.throws(() => new DurableTreeWorkspace(f.options('b', { semanticRetention: undefined })), /authority required|corrupt workspace state/);
     assert.throws(() => new DurableTreeWorkspace(f.options('b', { semanticRetention: epoch => ({ ...f.gcOptions('b', epoch), repositoryId: 'wrong' }) })), /repository\/epoch mismatch/);
     assert.throws(() => new DurableTreeWorkspace(f.options('b', { semanticRetention: epoch => ({ ...f.gcOptions('b', epoch), policy: { ...f.gcOptions('b', epoch).policy, epoch: 'wrong' } }) })), /repository\/epoch mismatch/);
     assert.throws(() => new DurableTreeWorkspace(f.options('b', { semanticRetention: epoch => ({ ...f.gcOptions('b', epoch), store: new DurableGraphStore({ directory: join(f.directory, 'store-b') }) }) })), /store\/repository\/epoch mismatch/);
     const markerPath = join(f.directory, 'b', 'semantic-retention', readdirSync(join(f.directory, 'b', 'semantic-retention'))[0]);
     const savedMarker = readFileSync(markerPath);
+    unlinkSync(markerPath);
+    assert.throws(() => new DurableTreeWorkspace(f.options('b')), /semantic retention marker missing/);
+    assert.throws(() => new DurableTreeWorkspace(f.options('b', { semanticRetention: undefined })), /workspace state|corrupt workspace|authority required/);
+    writeFileSync(markerPath, savedMarker);
     const marker = decodeCanonical(savedMarker) as Record<string, unknown>;
     writeFileSync(markerPath, encodeCanonical({ ...marker, repositoryId: 'changed' }));
     assert.throws(() => new DurableTreeWorkspace(f.options('b')), /marker corrupt/);

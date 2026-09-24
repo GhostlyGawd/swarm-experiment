@@ -6,7 +6,7 @@ import { GraphStore } from '../../src/tier1/store.ts';
 import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import {
   VIRTUAL_FORWARD_DESCRIPTOR_FORMAT, VIRTUAL_FORWARD_EVENT_SCRIPT,
-  checkVirtualForwardDescriptor, deriveVirtualForwardDescriptor,
+  buildVirtualForwardCandidate, checkVirtualForwardDescriptor, deriveVirtualForwardDescriptor,
   type VirtualForwardDescriptor,
 } from '../../src/tier1/semantic-gc-virtual-forward.ts';
 import type { Term } from '../../src/tier1/ast.ts';
@@ -64,6 +64,16 @@ test('descriptor binds only rewritten candidate Call objects and derives exact o
     [{ field: 'members', index: 1 }, { field: 'body', index: 0 }]);
   assert.equal(descriptor.sites[0].candidateCall, new GraphStore().intern(bindings[0].candidateCall));
   assert.deepEqual(deriveVirtualForwardDescriptor(f.source, f.candidate, f.wrapper, f.target), descriptor);
+});
+
+test('candidate builder removes only the checked wrapper and preserves other direct calls', () => {
+  const f = fixture();
+  const built = buildVirtualForwardCandidate(f.source, f.wrapper, f.target);
+  assert.equal(new GraphStore().intern(built.candidate), new GraphStore().intern(f.candidate));
+  assert.deepEqual(built.descriptor, deriveVirtualForwardDescriptor(f.source, f.candidate, f.wrapper, f.target));
+  assert.equal(checkVirtualForwardDescriptor(built.descriptor, f.source, built.candidate).length, 1);
+  assert.equal(f.source.members.some(member => member.kind === 'FunctionDecl' && member.symbol === f.wrapper), true,
+    'the input source remains intact for audit and replay');
 });
 
 test('checker refuses tampered script, site, root and forged digest even when resealed', () => {

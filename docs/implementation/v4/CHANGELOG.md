@@ -1,5 +1,12 @@
 # Implementation specification changelog
 
+## Checked virtual forwarding and semantic retention expansion — 2026-09-24
+
+- Added an exact one-wrapper candidate builder and independently checked descriptor `/1`. Reference execution preserves the archived call frame and finite AST-step observations; compiled execution retains its host guard boundary; the opt-in resumable profile binds the descriptor and archived declaration in its program identity and restores source bytecode. It still executes the wrapper physically. [D16](decisions/D16-checked-virtual-forward-reference.md), [D17](decisions/D17-virtual-forward-resumable.md).
+- Added evidence policy `/3`: the checked rewritten call sites contribute archived-wrapper dependency edges to the exact candidate manifest. Strict causal lineage now pins that dependency under a signed candidate intent, and a test reopens it after collection. This is a signed local evidence closure, not permission for semantic-GC promotion. Legacy `/1` proposals remain blocked by D14. [D18](decisions/D18-virtual-forward-evidence-closure.md).
+- Added opt-in direct checkpoint journal `/2` replay pins, direct active-task pins before the first frame, and versioned tree-workspace configuration `/2` with unstable-replication pins before frame publication. Adapter/sink retirement analyzes retained modules with their exact dependency declarations. These monotone profiles protect the bounded lifecycles; safe release, all producers and full G2 remain open. [Direct replay retention](DIRECT-CHECKPOINT-RETENTION.md), [direct active-task retention](DIRECT-ACTIVE-TASK-RETENTION.md), [replication retention](REPLICATION-SEMANTIC-RETENTION.md).
+- Focused combined `4e21063` evidence passed 86/86 plus build/typecheck/roadmap checks before evidence policy `/3` and the later active/replication slices. Current-source integration evidence and release benchmark qualification remain pending. The tracker stays **20/62**.
+
 ## Governor-admitted signed sink adapter retirement — 2026-09-24
 
 - Added versioned signed effect policy `/7`, declarative attested sink table `/2`, and independent retirement proof `/2`. Artifact `/2` embeds all three, with complete current broker adapter-map admission; old artifact/policy/table bytes remain explicit. Strict-lineage ProcessDeployment `/12` and ProcessHost V13 bind the live table to governor approval, operator signer/clock/sink witnesses and a retention-fenced durable commit. Historical predecessor Artifact `/2` remains available for exact receipt inspection but cannot dispatch new calls.

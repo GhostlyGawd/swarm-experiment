@@ -266,6 +266,27 @@ export function deriveVirtualForwardDescriptor(source: Module, candidate: Module
   return derive(source, candidate, wrapper, target).descriptor;
 }
 
+/** Construct the exact one-wrapper candidate before a separate consumer
+ * rechecks it. This does not authorize publication or production execution. */
+export function buildVirtualForwardCandidate(source: Module, wrapper: SymbolId,
+  target: SymbolId): { readonly candidate: Module; readonly descriptor: VirtualForwardDescriptor } {
+  preflight(source, false);
+  const snapshot = structuredClone(source);
+  const redirect = (term: Term): Term => {
+    const groups = new Map(linkGroups(term).map(group =>
+      [group.field, group.links.map(redirect)]));
+    const copied = withLinkGroups(term, groups);
+    return copied.kind === 'Call' && copied.callee === wrapper
+      ? { ...copied, callee: target } : copied;
+  };
+  const candidate: Module = { ...snapshot, members: snapshot.members
+    .filter(member => member.kind !== 'FunctionDecl' || member.symbol !== wrapper)
+    .map(member => member.kind === 'FunctionDecl'
+      ? { ...member, body: member.body === null ? null : redirect(member.body) }
+      : member) };
+  return { candidate, descriptor: derive(snapshot, candidate, wrapper, target).descriptor };
+}
+
 /** Recompute the rewrite, roots, site paths, event script and digest from both
  * ASTs. The returned bindings point into `candidate`, not an internal copy. */
 export function checkVirtualForwardDescriptor(value: unknown, source: Module,

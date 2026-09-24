@@ -350,9 +350,16 @@ export class CausalLineageLedger {
       const module = this.options.store.hydrate(node(vetted.manifest.astRoot));
       if (module.kind !== 'Module') throw new TypeError('artifact lineage requires a module');
       const locals = new Map(module.members.filter((item): item is Extract<Term, { kind: 'FunctionDecl' }> => item.kind === 'FunctionDecl').map(item => [item.symbol, item]));
+      const archivedWrapper = context.virtualForward?.source.members.find((item): item is Extract<Term, { kind: 'FunctionDecl' }> =>
+        item.kind === 'FunctionDecl' && item.symbol === context.virtualForward?.descriptor.wrapper);
       for (const dependency of vetted.manifest.dependencies) {
-        const declaration = locals.get(dependency.symbol as SymbolId) ?? context.resolveDeclaration?.(dependency.symbol as SymbolId);
+        const declaration = locals.get(dependency.symbol as SymbolId)
+          ?? (dependency.symbol === context.virtualForward?.descriptor.wrapper ? archivedWrapper : undefined)
+          ?? context.resolveDeclaration?.(dependency.symbol as SymbolId);
         if (!declaration || declaration.kind !== 'FunctionDecl' || declaration.symbol !== dependency.symbol || new GraphStore().intern(declaration) !== dependency.declaration) throw new TypeError('artifact dependency content changed after verification');
+        if (dependency.symbol === context.virtualForward?.descriptor.wrapper
+          && dependency.declaration !== context.virtualForward.descriptor.wrapperDeclaration)
+          throw new TypeError('virtual forward archived dependency identity changed');
         const root = this.options.store.intern(declaration, { leaseId: `lineage-dependency:${dependency.declaration}` });
         if (root !== dependency.declaration) throw new TypeError('artifact dependency identity mismatch');
       }

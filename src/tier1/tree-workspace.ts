@@ -86,7 +86,12 @@ export class DurableTreeWorkspace {
     const bytes = options.maxCheckpointBytes ?? 64 * 1024 * 1024;
     if (!Number.isSafeInteger(bytes) || bytes < 1024 || bytes > 128 * 1024 * 1024) throw new RangeError('checkpoint byte capacity');
     this.limits = { maxFrameBytes: bytes, maxDecompressedBytes: bytes, maxObjects: 1000000 };
-    this.configuration = domainDigest('aether.tree-workspace-config/1', { semantics: TREE_SEMANTICS, membership: this.initialMembership, registry: [...this.registry.names].sort(lexical).map(name => this.registry.get(name)!), maxOccurrences: this.maxOccurrences });
+    const configuration = { semantics: TREE_SEMANTICS, membership: this.initialMembership,
+      registry: [...this.registry.names].sort(lexical).map(name => this.registry.get(name)!), maxOccurrences: this.maxOccurrences };
+    this.configuration = options.semanticRetention
+      ? domainDigest('aether.tree-workspace-config/2', { ...configuration,
+        semanticRetention: 'aether.tree-semantic-retention/1' })
+      : domainDigest('aether.tree-workspace-config/1', configuration);
     if (options.privateKey) {
       this.key = typeof options.privateKey === 'string' ? createPrivateKey(options.privateKey) : options.privateKey;
       if (enrollment(this.replicaId, this.key).publicKey !== this.initialMembership.replicas.find(member => member.replicaId === this.replicaId)?.publicKey) throw new Error('workspace signer does not match membership');
@@ -106,7 +111,12 @@ export class DurableTreeWorkspace {
       // complete protection set before releasing any predecessor epoch lease.
       // Missing content is a recovery error, never a reason to drop a frame.
       this.options.store.retain(this.lease(state), this.contentRoots(state.base, this.replica(state).framesFor(), state.membership));
-      this.assertSemanticHistory(state, true);
+      // Only an empty opt-in workspace may create its first epoch marker on
+      // reopen after an interrupted initialization. Once any frame or epoch
+      // is published, deleting that marker must fail closed.
+      const empty = state.base.length === 0 && state.history.length === 0
+        && this.replica(state).framesFor().length === 0;
+      this.assertSemanticHistory(state, empty);
       for (const lease of state.retiredLeases) this.options.store.release(lease);
     }, 5000);
   }

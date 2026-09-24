@@ -18,6 +18,7 @@ import { compileResumableProgram, virtualForwardResumableProfileDigest } from '.
 import { ResumableRuntime, type ResumableRuntimeOptions } from '../../src/tier3/resumable-runtime.ts';
 import { ResumableCheckpointStore } from '../../src/tier3/resumable-checkpoint.ts';
 import { CheckpointSemanticRetention } from '../../src/tier3/checkpoint-semantic-retention.ts';
+import { ActiveTaskSemanticRetention } from '../../src/tier3/active-task-semantic-retention.ts';
 import { encodeStored } from '../../src/tier1/persistence.ts';
 import { ProcessResumableSession } from '../../src/tier4/process-resumable.ts';
 
@@ -154,8 +155,11 @@ test('direct replay retention keeps a virtual wrapper and target available after
     registry: f.registry,
     policy: { epoch: '1', exports: [f.pure], protectedSymbols: [] },
   });
-  const runtime = new ResumableRuntime(f.candidate, { ...f.candidateOptions, maxSteps: 100 });
+  const activeAuthority = new ActiveTaskSemanticRetention(gcOptions(store));
+  const runtime = new ResumableRuntime(f.candidate, { ...f.candidateOptions, maxSteps: 100,
+    activeTaskRetention: activeAuthority });
   runtime.start(f.pure, [2n]);
+  assert.equal(activeAuthority.collector.retentions().filter(record => record.kind === 'active-task').length, 3);
   while (!runtime.inspect().frames.some(frame => frame.code === `function:${f.descriptor.wrapper}`)) runtime.step();
   const authority = new CheckpointSemanticRetention(gcOptions(store));
   const checkpointDirectory = join(directory, 'checkpoints');
@@ -169,7 +173,8 @@ test('direct replay retention keeps a virtual wrapper and target available after
   const reopened = new ResumableCheckpointStore({ directory: checkpointDirectory,
     program: runtime.program, executionId: f.candidateOptions.executionId,
     semanticRetention: new CheckpointSemanticRetention(gcOptions(reopenedStore)) });
-  const resumed = new ResumableRuntime(f.candidate, { ...f.candidateOptions, maxSteps: 100 });
+  const resumed = new ResumableRuntime(f.candidate, { ...f.candidateOptions, maxSteps: 100,
+    activeTaskRetention: new ActiveTaskSemanticRetention(gcOptions(reopenedStore)) });
   resumed.restore(reopened.load(head.id), head.snapshot);
   assert.equal(resumed.run().state, 'completed');
   assert.equal(resumed.decodeValue(resumed.result().value!), 3n);
