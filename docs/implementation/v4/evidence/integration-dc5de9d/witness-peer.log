@@ -1,0 +1,10 @@
+✔ native peer proxy authenticates before forwarding and fails closed on bad frames and upstream faults (1061.699167ms)
+✔ real signed deployment witness read and durable advance traverse the native gateway (663.304292ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1769.805875
