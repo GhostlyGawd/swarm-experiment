@@ -1,0 +1,79 @@
+{
+  "format": "aether.living-effect-measurement/2",
+  "registrationSha256": "a89511e95f0fd3c062da9cba69e71544308bfe06272abda828f40c754fccd4ad",
+  "declared": 5,
+  "generated": 5,
+  "executed": 5,
+  "filtered": 0,
+  "passed": 5,
+  "failed": 0,
+  "effectEvents": 5,
+  "indeterminateEffects": 0,
+  "seeds": [
+    "effect-20260924-effect-admission/transfer/0",
+    "effect-20260924-effect-admission/transfer/1",
+    "effect-20260924-effect-admission/transfer/2",
+    "effect-20260924-effect-admission/transfer/3",
+    "effect-20260924-effect-admission/transfer/4"
+  ],
+  "coverage": [
+    "candidate-call",
+    "effect:broker-journal",
+    "effect:committed",
+    "resource:allocated",
+    "resource:released",
+    "runtime:assign",
+    "runtime:call",
+    "runtime:invoke",
+    "runtime:return",
+    "step:$checks/fee-check",
+    "step:actor/allocate",
+    "step:actor/release",
+    "step:actor/transfer"
+  ],
+  "receipt": {
+    "manifestDigest": "aether.living-effect-campaign/2:b3:be3ce175668238ac7142689c877ee141984ddc5f2593b8da959d61d699516f56",
+    "reportDigest": "aether.living-effect-campaign-report/2:b3:5ed89f15f7a16dbdce5247d771d6d839502bbc04dd6d422d595d6c2ff50e0c08",
+    "effectAuthorizationDigest": "aether.living-effect-authorization/2:b3:1079da42be13e8c61aef32eef750aef1ca1b9fb7b1b061d2929aca4c5da76725",
+    "productionAuthorized": false
+  },
+  "elapsedMs": 430.286667,
+  "completeCasesPerSecond": 11.62016019427346,
+  "minimumBoundaryPermutationsPerSecond": 2000000,
+  "throughputQualified": false,
+  "productionAuthorized": false,
+  "after": {
+    "at": "2026-09-24T19:51:47.179Z",
+    "node": "v26.7.0",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "arch": "arm64",
+    "cpus": [
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro"
+    ],
+    "load": [
+      5.3798828125,
+      4.6650390625,
+      4.7734375
+    ],
+    "memory": {
+      "rss": 111624192,
+      "heapTotal": 22806528,
+      "heapUsed": 16818448,
+      "external": 6919425,
+      "arrayBuffers": 603799
+    }
+  },
+  "timingScope": "Timer includes construction, case generation/check, all Aether calls and broker dispatches, durable case/report publication, and admission; excludes registration and final measurement write."
+}

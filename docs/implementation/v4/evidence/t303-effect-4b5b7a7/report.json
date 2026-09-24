@@ -1,0 +1,325 @@
+{
+  "format": "aether.living-effect-campaign-report/2",
+  "manifestDigest": "aether.living-effect-campaign/2:b3:be3ce175668238ac7142689c877ee141984ddc5f2593b8da959d61d699516f56",
+  "effectAuthorizationDigest": "aether.living-effect-authorization/2:b3:1079da42be13e8c61aef32eef750aef1ca1b9fb7b1b061d2929aca4c5da76725",
+  "candidateRoot": "ast:b3:2151a4235984ba7251cabfe8949ea57ad930adf1604c87b41cc5a0c795b7f3c3",
+  "declared": 5,
+  "generated": 5,
+  "executed": 5,
+  "filtered": 0,
+  "passed": 5,
+  "failed": 0,
+  "survival": "1",
+  "accepted": true,
+  "missingCoverage": [],
+  "cases": [
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:be3ce175668238ac7142689c877ee141984ddc5f2593b8da959d61d699516f56",
+        "scenario": "transfer",
+        "ordinal": 0,
+        "seed": "effect-20260924-effect-admission/transfer/0",
+        "schedule": [
+          "actor",
+          "actor",
+          "actor"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:78d675e4352768f5c06c1504f814885239d13df4a1d1dab7666ebf370d5c5901",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 2,
+        "steps": 80,
+        "evaluatedOperations": 4,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 8,
+        "allocationChecksum": 136,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "resource:allocated",
+          "resource:released",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/fee-check",
+          "step:actor/allocate",
+          "step:actor/release",
+          "step:actor/transfer"
+        ],
+        "trace": [
+          "actor/allocate",
+          "actor/transfer",
+          "actor/release",
+          "$checks/fee-check"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:ff8bff512e5e08799d6e285d1a7cfcba7d88713fe5d7d58007368f31a71dff05",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:c322e1c5d39bc18f472d0a50e683240bb8df1bac322f928e0c0d1457c6b4bede",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:8d28c92627890cdcd56d10d255c2bdd48bdb804d89fdf3bb9ed93090b78a2acb",
+          "eventCount": 1,
+          "sinkWrites": 1,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:be3ce175668238ac7142689c877ee141984ddc5f2593b8da959d61d699516f56",
+        "scenario": "transfer",
+        "ordinal": 1,
+        "seed": "effect-20260924-effect-admission/transfer/1",
+        "schedule": [
+          "actor",
+          "actor",
+          "actor"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:5086c8b6f2f2330b250583a3d89acc0b98d4de9b86e286d5176af39a04cd10ca",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 2,
+        "steps": 80,
+        "evaluatedOperations": 4,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 8,
+        "allocationChecksum": 384,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "resource:allocated",
+          "resource:released",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/fee-check",
+          "step:actor/allocate",
+          "step:actor/release",
+          "step:actor/transfer"
+        ],
+        "trace": [
+          "actor/allocate",
+          "actor/transfer",
+          "actor/release",
+          "$checks/fee-check"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:ff8bff512e5e08799d6e285d1a7cfcba7d88713fe5d7d58007368f31a71dff05",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:39a88bbe40c0473c4a9643eea091f67ce38c03456c59c2832fe04f7334da8b6a",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:9162f0065c732a78a7733bd5651caf5f7adea6c5990831648c3535ea650b063f",
+          "eventCount": 1,
+          "sinkWrites": 1,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:be3ce175668238ac7142689c877ee141984ddc5f2593b8da959d61d699516f56",
+        "scenario": "transfer",
+        "ordinal": 2,
+        "seed": "effect-20260924-effect-admission/transfer/2",
+        "schedule": [
+          "actor",
+          "actor",
+          "actor"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:dd7bf14a7e5d58362af8039f846da7fbd73e33033c95d6b6fd04d19cbb837a71",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 2,
+        "steps": 80,
+        "evaluatedOperations": 4,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 8,
+        "allocationChecksum": 632,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "resource:allocated",
+          "resource:released",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/fee-check",
+          "step:actor/allocate",
+          "step:actor/release",
+          "step:actor/transfer"
+        ],
+        "trace": [
+          "actor/allocate",
+          "actor/transfer",
+          "actor/release",
+          "$checks/fee-check"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:ff8bff512e5e08799d6e285d1a7cfcba7d88713fe5d7d58007368f31a71dff05",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:34200d6757d2f551ea93c01e318d0f008069810eb8df7fe29347be641eeb63eb",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:376289806cadf5ea37e22c3b3091a8a246e95c16eb789080336f03599f797d7f",
+          "eventCount": 1,
+          "sinkWrites": 1,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:be3ce175668238ac7142689c877ee141984ddc5f2593b8da959d61d699516f56",
+        "scenario": "transfer",
+        "ordinal": 3,
+        "seed": "effect-20260924-effect-admission/transfer/3",
+        "schedule": [
+          "actor",
+          "actor",
+          "actor"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:eea0df098be99b8b2a52c4635de901c20ee781307b7268ffa521430367730601",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 2,
+        "steps": 80,
+        "evaluatedOperations": 4,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 8,
+        "allocationChecksum": 880,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "resource:allocated",
+          "resource:released",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/fee-check",
+          "step:actor/allocate",
+          "step:actor/release",
+          "step:actor/transfer"
+        ],
+        "trace": [
+          "actor/allocate",
+          "actor/transfer",
+          "actor/release",
+          "$checks/fee-check"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:ff8bff512e5e08799d6e285d1a7cfcba7d88713fe5d7d58007368f31a71dff05",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:b9c6bceb1fbbc52edf6a7068125b072364936d168b627eed0ccd2adca05f4c58",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:fb4da27b031879f87924d5bc815f8ee17dd170292b4bf086870e035191eeba66",
+          "eventCount": 1,
+          "sinkWrites": 1,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:be3ce175668238ac7142689c877ee141984ddc5f2593b8da959d61d699516f56",
+        "scenario": "transfer",
+        "ordinal": 4,
+        "seed": "effect-20260924-effect-admission/transfer/4",
+        "schedule": [
+          "actor",
+          "actor",
+          "actor"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:fa87702b110f95e2374912919fce35c42801376cf34b364c1888b2d46cf56a21",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 2,
+        "steps": 80,
+        "evaluatedOperations": 4,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 8,
+        "allocationChecksum": 1128,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "resource:allocated",
+          "resource:released",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/fee-check",
+          "step:actor/allocate",
+          "step:actor/release",
+          "step:actor/transfer"
+        ],
+        "trace": [
+          "actor/allocate",
+          "actor/transfer",
+          "actor/release",
+          "$checks/fee-check"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:ff8bff512e5e08799d6e285d1a7cfcba7d88713fe5d7d58007368f31a71dff05",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:f806e3e8493f6cce219ff62ee9c546267454dde67bad092f019f8d400395a660",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:d8b1aa4ca3a1ed3ae5ef4145f4287d9a198ad539f0866ba145a7734f71a0f45a",
+          "eventCount": 1,
+          "sinkWrites": 1,
+          "indeterminate": 0
+        }
+      }
+    }
+  ],
+  "counterexamples": [],
+  "elapsedMs": "390.773333",
+  "executedCasesPerSecond": "12.795141269273868",
+  "evaluatedOperations": 20,
+  "evaluatedOperationsPerSecond": "51.18056507709547",
+  "effectEvents": 5,
+  "indeterminateEffects": 0,
+  "productionAuthorized": false
+}

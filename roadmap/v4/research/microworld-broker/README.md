@@ -79,7 +79,7 @@ fixed. The actual socket is disconnected for incomplete frames. This does not
 simulate a host-level partition or qualify arbitrary effectful candidate
 admission. The production `LivingCampaign` still rejects live effects.
 
-[Exact-source campaign evidence](../../../../docs/implementation/v4/evidence/t303-process-aa7285c/REVIEW.md)
+[Historical exact-source campaign evidence](../../../../docs/implementation/v4/evidence/t303-process-aa7285c/REVIEW.md)
 pins clean commit `aa7285c`, profile and transitive source hashes. All six
 declared/generated cases executed, with zero filters. Stable IDs passed 3/3;
 attempt-derived IDs failed 3/3 with `duplicate-effect`. All six cases and raw
@@ -88,9 +88,14 @@ broker/sink records replayed under the verifier. The complete campaign took
 2,000,000 boundary permutations/s. It therefore fails T3-03/G2. The earlier
 four-field JSON kernel pass cannot be substituted for this complete campaign.
 
+The [current-source refresh](../../../../docs/implementation/v4/evidence/t303-process-4b5b7a7/REVIEW.md)
+repeats all six cases after signed effectful `LivingCampaign` was added. It
+verified 6/6 with zero filters and ran at 2.6580 complete cases/s. The earlier
+exact-source verifier remains reproducible only at its registered source bytes.
+
 ```sh
 node --experimental-strip-types --test roadmap/v4/research/microworld-broker/process-harness.test.ts
-node --experimental-strip-types roadmap/v4/research/microworld-broker/process-campaign.ts --verify docs/implementation/v4/evidence/t303-process-aa7285c
+node --experimental-strip-types roadmap/v4/research/microworld-broker/process-campaign.ts --verify docs/implementation/v4/evidence/t303-process-4b5b7a7
 ```
 
 ## Reproduce

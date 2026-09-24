@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Signed effectful living campaign and current-source T3-03 measurement — 2026-09-24
+
+- Added an opt-in signed `LivingCampaign` `/2` path for arbitrary statically typed Aether modules within the declared scalar/record boundary. It binds the exact module root and scenario plan to signed execution and effect policies, routes effects through a per-case durable sandbox broker, persists seeded case and effect evidence, rechecks raw files at local admission, and rejects unknown post-dispatch outcomes or hidden precondition filters. The original pure `/1` path retains its denying router and wire bytes. [Contract and limits](LIVING-EFFECT-CAMPAIGN.md).
+- [Exact-source signed campaign](evidence/t303-effect-4b5b7a7/REVIEW.md) at clean `4b5b7a7`: 5/5 declared/generated/executed/passed, zero filters, five committed effects, 13 coverage labels, **11.6202 complete cases/s**. [Process/socket refresh](evidence/t303-process-4b5b7a7/REVIEW.md) on the same source: 6/6 declared/generated/executed, zero filters, **2.6580 complete cases/s**. Both miss the unchanged 2M/s R04 threshold; the historical four-field JSON kernel pass does not qualify these full campaigns. The signed candidate is not yet integrated with real process faults/external sinks or a combined out-of-order/race/memory/corrupt-network profile. T3-03 remains in progress and the tracker stays **20/62**.
+
 ## Typed read-only contract projection V13 — 2026-09-24
 
 - Added `aether.executable-projection/13` for direct composite and generic helpers and pure sequence map/fold callbacks in contracts. A transitive read-only check rejects pure-labeled helpers that mutate caller records, as well as effectful and indirect callees. Actual TypeScript, Python and Rust fixtures check exact roots, edits, pre/postconditions and adversarial refusals. Earlier named V11/V12 producers remain available. [Profile and limits](../../../roadmap/v4/research/projections/TYPED-CONTRACT-CALLS.md).

@@ -1,0 +1,112 @@
+{
+  "format": "aether.living-process-broker-campaign/1",
+  "registrationSha256": "a3ee0da8a84d63a4b14f722aa6758fa7fffc9bf1b3971015de35aa565acd8cc4",
+  "declared": 6,
+  "generated": 6,
+  "executed": 6,
+  "filtered": 0,
+  "goodPassed": 3,
+  "brokenFailed": 3,
+  "seeds": [
+    "20260924/process-broker/0",
+    "20260924/process-broker/1",
+    "20260924/process-broker/2"
+  ],
+  "coverage": [
+    "broker:isolated-replay",
+    "broker:reconciled-after-process-restart",
+    "process:sigkill-after-sink",
+    "tcp:duplicate-delivery",
+    "tcp:malformed-frame",
+    "tcp:truncated-frame"
+  ],
+  "rows": [
+    {
+      "candidate": "stable-effect-id",
+      "ordinal": 0,
+      "portableDigest": "aether.living-process-broker-result/1:b3:b9edee5693e3adb99baa03c79189cf80f63afdef110ff550b79d86e160e461c5",
+      "passed": true,
+      "failure": null,
+      "elapsedMs": 332.906417
+    },
+    {
+      "candidate": "stable-effect-id",
+      "ordinal": 1,
+      "portableDigest": "aether.living-process-broker-result/1:b3:247b8913a3b29dbbc1ad3df403c7cd252c342dad92f678a8fb4a1849a44e931e",
+      "passed": true,
+      "failure": null,
+      "elapsedMs": 331.85025
+    },
+    {
+      "candidate": "stable-effect-id",
+      "ordinal": 2,
+      "portableDigest": "aether.living-process-broker-result/1:b3:078681ecd40b4ce93b90d0feccc64789f0a744ef9cd0dc5ca45c26d9c207b49e",
+      "passed": true,
+      "failure": null,
+      "elapsedMs": 339.335042
+    },
+    {
+      "candidate": "attempt-derived-effect-id",
+      "ordinal": 0,
+      "portableDigest": "aether.living-process-broker-result/1:b3:cdb2e1b94b3f1485ee0276d0955021f28a1bcab36b237318b5031a6f4e65eb58",
+      "passed": false,
+      "failure": "duplicate-effect",
+      "elapsedMs": 418.053042
+    },
+    {
+      "candidate": "attempt-derived-effect-id",
+      "ordinal": 1,
+      "portableDigest": "aether.living-process-broker-result/1:b3:288b8697ba175060e560f7c415f21947a851860d32b61a8f1bddd6661a9b9fc6",
+      "passed": false,
+      "failure": "duplicate-effect",
+      "elapsedMs": 411.338709
+    },
+    {
+      "candidate": "attempt-derived-effect-id",
+      "ordinal": 2,
+      "portableDigest": "aether.living-process-broker-result/1:b3:02657e00ea0891222ab493147e304212c8a80d15323188f69ced31bad033aa4e",
+      "passed": false,
+      "failure": "duplicate-effect",
+      "elapsedMs": 398.61925
+    }
+  ],
+  "elapsedMs": 2257.304166,
+  "completeCasesPerSecond": 2.6580378889000817,
+  "minimumBoundaryPermutationsPerSecond": 2000000,
+  "throughputQualified": false,
+  "productionAuthorized": false,
+  "after": {
+    "at": "2026-09-24T19:51:57.455Z",
+    "node": "v26.7.0",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "arch": "arm64",
+    "cpus": [
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro"
+    ],
+    "load": [
+      5.794921875,
+      4.77490234375,
+      4.810546875
+    ],
+    "memory": {
+      "rss": 115900416,
+      "heapTotal": 23068672,
+      "heapUsed": 15257896,
+      "external": 6576043,
+      "arrayBuffers": 247576
+    }
+  },
+  "timingScope": "Timer includes every original process/socket case, process launches, real SIGKILL, recovery, replay, and durable raw observations; excludes preregistration and final result publication."
+}

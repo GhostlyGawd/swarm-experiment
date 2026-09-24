@@ -1,0 +1,37 @@
+{
+  "format": "aether.living-effect-attempt/2",
+  "before": {
+    "at": "2026-09-24T19:51:46.736Z",
+    "node": "v26.7.0",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "arch": "arm64",
+    "cpus": [
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro"
+    ],
+    "load": [
+      5.3798828125,
+      4.6650390625,
+      4.7734375
+    ],
+    "memory": {
+      "rss": 110051328,
+      "heapTotal": 22806528,
+      "heapUsed": 14628776,
+      "external": 6628778,
+      "arrayBuffers": 313192
+    }
+  },
+  "registrationSha256": "a89511e95f0fd3c062da9cba69e71544308bfe06272abda828f40c754fccd4ad"
+}
