@@ -89,6 +89,13 @@ test('direct checkpoint rejects altered marker and cannot attach retention to a 
   assert.throws(() => new ResumableCheckpointStore({ directory: legacy.checkpointDirectory, program: machine.program, executionId: legacy.executionId, semanticRetention: legacy.authority() }), /profile mismatch/);
 });
 
+test('direct replay authority rejects a forged program digest before journal publication', () => {
+  const f = fixture(), program = f.runtime().program;
+  const forged = { ...program, digest: domainDigest('aether.direct-retention-test/1', 'forged-program') };
+  assert.throws(() => new ResumableCheckpointStore({ directory: f.checkpointDirectory,
+    program: forged, executionId: f.executionId, semanticRetention: f.authority() }), /program digest mismatch/);
+});
+
 for (const point of ['before-head-publish', 'after-head-publish'] as const) test(`direct checkpoint ${point} fault leaves valid prior or next head with all replay pins`, () => {
   const f = fixture(), runtime = f.runtime(), authority = f.authority();
   const stable = new ResumableCheckpointStore({ directory: f.checkpointDirectory, program: runtime.program, executionId: f.executionId, semanticRetention: authority });

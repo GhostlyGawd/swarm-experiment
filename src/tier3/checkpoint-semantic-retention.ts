@@ -1,8 +1,7 @@
 /** Opt-in replay-root authority for direct resumable checkpoint journals.
  * Pins are monotone: this boundary does not infer replay completion or expiry.
- * External dependency declarations must remain replay pins. Current adapter
- * retirement fails closed on such non-module roots until manifest-associated
- * liveness analysis can evaluate their registrations.
+ * External dependency declarations remain replay pins. Retirement analysis
+ * groups them with the module under this exact execution reference.
  */
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -76,6 +75,10 @@ export class CheckpointSemanticRetention {
   private expected(directory: string, program: ResumableProgram, executionId: string): Marker {
     CheckpointSemanticRetention.assertInstance(this);
     identifier(executionId); validateExecutionManifest(program.manifest);
+    const { digest: programDigest, ...programBody } = program;
+    if (programDigest !== domainDigest('aether.resumable-program/1', programBody,
+      { maxDepth: 128, maxObjects: 1_000_000, maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024 }))
+      throw new Error('checkpoint semantic retention program digest mismatch');
     const roots = [program.manifest.astRoot, ...program.manifest.dependencies.map(item => item.declaration)];
     if (roots.some(root => !root.startsWith('ast:b3:'))) throw new Error('checkpoint semantic retention requires AST dependency roots');
     const unique = [...new Set(roots)] as NodeRef[];
