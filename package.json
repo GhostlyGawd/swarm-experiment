@@ -74,7 +74,7 @@
     "prepack": "npm run build",
     "pretest": "npm run build",
     "typecheck": "tsc -p tsconfig.check.json",
-    "test": "node --test --experimental-strip-types \"test/**/*.test.ts\"",
+    "test": "node --test --test-concurrency=1 --experimental-strip-types \"test/**/*.test.ts\"",
     "bench": "node --experimental-strip-types bench/nfr.bench.ts",
     "bench:record": "node --experimental-strip-types bench/nfr.bench.ts --record-only",
     "bench:v4:measure": "node --experimental-strip-types bench/v4/cli.ts --measure",

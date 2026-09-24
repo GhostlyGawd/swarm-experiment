@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Semantic GC fuel and retention safety — 2026-09-24
+
+- A tight `maxSteps` campaign found that old branch flattening could make an effect execute when the source would have exhausted its step budget. Added a versioned fuel-preserving branch profile that removes only the proved cold arm while keeping the executed guard and arm; new promotion of historical step-changing branch/wrapper/shim proposals is denied before a governor decision. Historical committed decisions remain recoverable.
+- Adapter candidate retirement now holds the retention lock through its final recheck and durable table publication, with a real concurrent task-pin regression. TreeWorkspace pins incoming content before frame publication and reconciles current epoch roots on reopen; missing content fails closed. [Decision and remaining gates](decisions/D14-semantic-gc-fuel-and-retention.md).
+- `npm test` now runs files serially. The prior two full-suite runs remain failed evidence; a clean uninterrupted full run is required. T1-05 remains open and the tracker stays **20/62**.
+
 ## Witnessed budgeted sink through direct ProcessHost — 2026-09-24
 
 - Added opt-in V5 budget broker and direct ProcessHost config `/11`. An operator predeclares the exact signed target, effect request and reservation before host construction. The host checks the worker's actual request before accepting its proposed snapshot; broker, bridge, ledger and sink witness bind the same request and fixed charge. Signed noncommit permits refund, while unknown status keeps funds encumbered.

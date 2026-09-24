@@ -278,6 +278,27 @@ test('legacy forwarder and flattened-branch proposals remain readable but cannot
   }
 });
 
+test('historical branch flattening changes a finite-step sink outcome and is barred from new promotion', async () => {
+  const f = branchFixture(true, false);
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    const run = (root: NodeRef, maxSteps: number) => {
+      const effects: unknown[][] = [];
+      const runtime = new Runtime({ registry: f.registry, maxSteps,
+        effects: new Map([[f.log, args => { effects.push([...args]); return null; }]]) });
+      runtime.load(f.store.hydrate(root));
+      return { result: runtime.call(f.sink, ['chosen-effect']), effects };
+    };
+    const changed = Array.from({ length: 24 }, (_, index) => index + 1)
+      .find(limit => run(proposal.sourceRoot, limit).effects.length
+        !== run(proposal.targetRoot, limit).effects.length);
+    assert.ok(changed, 'historical flattening must exhibit the finite-step semantic gap');
+    const candidate = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!]);
+    await assert.rejects(f.gc.promote(proposal.id, f.input(candidate), f.coordinator,
+      f.driver(proposal)), /step-quota behavior/);
+  } finally { f.cleanup(); }
+});
+
 test('fuel-preserving branch profile removes cold If calls but keeps exact reference-runtime effects and quota faults', () => {
   const f = branchFixture(true, true);
   try {
