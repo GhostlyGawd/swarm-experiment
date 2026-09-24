@@ -1,5 +1,9 @@
 # Implementation specification changelog
 
+## Clean combined verification checkpoint — 2026-09-24
+
+- At clean `244684b`, the serial full suite passed **1,199/1,201** with zero failures and two existing skips; build, typecheck, v4 roadmap and independently rebuilt worker-bundle checks passed. The exact-source default release inventory verifies a **5.6290×** warm ledger fixture pass but remains ineligible with 15 required NFR targets unmeasured; cold and changed-session diagnostic ratios miss. The tracker stays **20/62**. [Raw evidence and scope](evidence/integration-244684b/REVIEW.md).
+
 ## Bounded closure dataflow projection V16 — 2026-09-24
 
 - Added `aether.executable-projection/16` for scalar captures across both `If` factory arms, quantifier and Result binders, exact transitive pure helper roots, checked sequence map/fold, nested immediate lambdas and fresh scalar record reads. Real TypeScript, Python and Rust executions match the reference fixtures; a pinned V15 source/runtime hash comparison remains byte-identical. [Profile, trust boundary and limits](../../../roadmap/v4/research/projections/DATAFLOW-CLOSURES-V16.md).
