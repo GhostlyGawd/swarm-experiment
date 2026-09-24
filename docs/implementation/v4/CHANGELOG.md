@@ -6,6 +6,8 @@
 - Added a bounded native driver path fed by a validated `RuntimeSnapshotV1` projection with exact manifest, reference ownership, aliases and allocation capacity. Fourteen snapshot-fed native/reference cases match; stale references, malformed frames and binary-byte substitution are refused. The native path is still separate from ProcessHost admission and does not cover full values/effects or portable proof.
 - A reproducible local clock probe shows 125/3 ns Mach ticks and the same effective ~41.667 ns cadence from the nanosecond clock APIs and ordered virtual counter. The prior one-tick observed switch maximum remains inconclusive for FR-3.7's ≤50 ns hard maximum. No target or task status changed. [Native research and limits](../../../roadmap/v4/research/native-fallback-ast/README.md).
 
+- [Exact-source checkpoint](evidence/integration-0bbabae/REVIEW.md) at `0bbabae`: 976/977 tests pass with one existing opt-in skip; build, typecheck and both roadmap checks pass. The release benchmark remains ineligible at 1.861× warm-message compression with 17 failed or unmeasured required targets. The local clock probe qualifies resolution only.
+
 ## Signed sink fallback and terminal authority checks — 2026-09-24
 
 - Exercised V2 fallback against a witnessed V8 ProcessHost and separate signed `/2` sink/witness processes. A signed Tier 1 commit is returned once across reopen; a signed noncommit fence allows independently proved pure Tier 2; outage prevents fallback until witnessed status is available. The focused signed-sink and process-fallback tests pass 28/28.

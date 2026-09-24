@@ -1,0 +1,142 @@
+{
+  "format": "aether.fallback-clock-probe-evidence/1",
+  "subjectCommit": "0bbabaefb5d59f07258b99f07160a5d156a3f21b",
+  "capturedAt": "2026-09-24T07:03:11.586465+00:00",
+  "sourcePath": "roadmap/v4/research/native-fallback-ast/clock-probe.c",
+  "sourceSha256": "7061f8eda05e9c54e165e7042e32dfc30bce12f8c9b84f8db8ca7326d862efd9",
+  "binarySha256": "4829c30a44d5d2a53223118ae9a1741f0fc2272d5aa68094c236f52cf9cd67b2",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+  "compilerFlags": [
+    "-O2",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-Werror"
+  ],
+  "platform": "macOS-26.7-arm64-arm-64bit-Mach-O",
+  "processor": "Apple M4 Pro",
+  "probeResults": [
+    {
+      "machTimebaseNumer": 125,
+      "machTimebaseDenom": 3,
+      "counterFrequency": 1000000000
+    },
+    {
+      "clock": "mach_absolute_ticks",
+      "pairs": 100000,
+      "deltas": [
+        [
+          0,
+          89555
+        ],
+        [
+          1,
+          10433
+        ],
+        [
+          2,
+          11
+        ],
+        [
+          3,
+          1
+        ]
+      ],
+      "above128": 0
+    },
+    {
+      "clock": "clock_uptime_raw_ns",
+      "pairs": 100000,
+      "deltas": [
+        [
+          0,
+          76468
+        ],
+        [
+          41,
+          7846
+        ],
+        [
+          42,
+          15663
+        ],
+        [
+          83,
+          9
+        ],
+        [
+          84,
+          6
+        ],
+        [
+          125,
+          2
+        ]
+      ],
+      "above128": 6
+    },
+    {
+      "clock": "clock_monotonic_raw_ns",
+      "pairs": 100000,
+      "deltas": [
+        [
+          0,
+          76797
+        ],
+        [
+          41,
+          7759
+        ],
+        [
+          42,
+          15430
+        ],
+        [
+          83,
+          8
+        ],
+        [
+          84,
+          2
+        ],
+        [
+          125,
+          3
+        ]
+      ],
+      "above128": 1
+    },
+    {
+      "clock": "cntvct_el0_units",
+      "pairs": 100000,
+      "deltas": [
+        [
+          0,
+          74861
+        ],
+        [
+          18,
+          12
+        ],
+        [
+          41,
+          8404
+        ],
+        [
+          42,
+          16698
+        ],
+        [
+          58,
+          15
+        ],
+        [
+          59,
+          10
+        ]
+      ],
+      "above128": 0
+    }
+  ],
+  "qualification": "clock resolution only; not a switch measurement or hard-maximum pass"
+}
