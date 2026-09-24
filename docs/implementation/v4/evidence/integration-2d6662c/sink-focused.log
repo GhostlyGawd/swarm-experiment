@@ -1,0 +1,30 @@
+✔ V3 retains an exact signed receipt and rechecks it on cached dispatch, inspect, reconcile, and replay (254.080666ms)
+✔ V3 crash after sink success is indeterminate until receipt-backed read-only reconciliation (140.402709ms)
+✔ V3 will not certify a forged sink commit or reuse an unsigned structural adapter (89.316875ms)
+✔ legacy brokers refuse an attested sink adapter before any durable intent or sink call (3.465708ms)
+✔ V3 verifies a signed durable noncommit fence before terminal abort (114.532959ms)
+✔ V3 rejects forged witnessed cached records, missing signed proof, V1 witness, and downgrade (109.343334ms)
+✔ trusted wrapper accepts exact signed commit, pins copied identity, and exposes a detached proof (10.915583ms)
+✔ forged, mismatched, stale, and contradictory signed responses never yield a committed value (13.138125ms)
+✔ reconciliation reports noncommit only from a signed terminal fence; uncertainty stays unknown (4.570209ms)
+✔ broker keeps transport failure indeterminate and releases it only after signed fence (233.709417ms)
+✔ signed sink receipt reconciles a real postcommit controller SIGKILL without another external decision (2869.345333ms)
+✔ operator process commits exactly once and retains identical signed receipt after SIGKILL/restart (797.554ms)
+✔ near-limit accepted payload retains a recoverable signed response after restart (420.7605ms)
+✔ status makes a durable signed noncommit fence that permanently refuses execute (386.872917ms)
+✔ lost wire response remains a committed decision; wrong auth and forged stored receipt fail closed (289.015875ms)
+✔ CLI refuses a group-readable signing key before opening the sink (87.470292ms)
+✔ signed sink commit binds exact request, payload, approved adapter and committed value (16.062292ms)
+✔ signed terminal fence has no committed value or commit ID (1.358167ms)
+✔ forgery, signed-field alteration, wrong key and signer mismatch are refused (6.282792ms)
+✔ valid signature cannot be replayed into a different operation, repository, deployment, policy or value (12.364125ms)
+✔ even a valid sink signature must agree with independently supplied request and grant context (3.976ms)
+✔ malformed, oversized, accessor and noncanonical receipt or anchor objects fail closed (1.99725ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2998.797042

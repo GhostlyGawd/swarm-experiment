@@ -5,6 +5,7 @@
 - Added a domain-separated Ed25519 sink receipt bound to the exact effect request, deployment, approved adapter artifact, grant/policy context and committed value or durable noncommit fence. A trusted wrapper and separate sink fixture verify and retain signed decisions; cross-deployment reuse of one logical effect ID conflicts rather than committing twice.
 - Added witnessed broker journal `/3` with operator-pinned sink anchor and exact signed receipt per terminal post-dispatch event. Broker dispatch, reconciliation, cached reads and replay reverify the proof; historical V1/V2 journal bytes remain explicit. A real controller SIGKILL after sink commit but before broker terminal publication reconciles through signed status without another sink decision. Near-limit committed responses remain retrievable after restart.
 - This is broker-level and same-UID fixture evidence. ProcessHost/Deployment admission, independent sink custody, general effectful adapters and a real third-party transaction are still required. T2-04/NFR-16 and the task count do not change. [Decision and limits](decisions/D09-authenticated-sink-outcomes.md).
+- [Exact-source checkpoint](evidence/integration-2d6662c/REVIEW.md) at `2d6662c`: 932/933 tests pass with one opt-in skip; 22/22 focused sink tests pass. Benchmark verification confirms the unchanged failed 1.861× warm-message ratio and 17 failed/unmeasured required targets. The sink ledger still needs an independently witnessed monotonic head before rollback resistance can be claimed.
 
 ## V12 blockless binding semantics — 2026-09-23
 
