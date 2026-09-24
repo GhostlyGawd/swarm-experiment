@@ -59,7 +59,8 @@ integrated checkpoint recovery, or signed GC promotion. A one-worker snapshot
 restart does not prove ProcessHost recovery. This slice does not close
 V4-T1-05 or a release target.
 
-Focused branch verification: Artifact/4 tests 8/8 and Artifact/3 plus bundle
-tests 13/13; `npm run typecheck`, `npm run build`, and
-`npm run roadmap:v4:check` passed. An exact-source integration checkpoint is
-still required after merge.
+Focused [integration evidence](evidence/integration-d9be39e/REVIEW.md):
+Artifact/4 tests 8/8 and Artifact/3 plus bundle tests 13/13 passed at
+`719e5ca`. The later `d9be39e` source passed build, typecheck, roadmap,
+worker-bundle verification and 99/99 projection tests with the same measured
+worker bundle bytes. These are separate tested commits, as the record states.

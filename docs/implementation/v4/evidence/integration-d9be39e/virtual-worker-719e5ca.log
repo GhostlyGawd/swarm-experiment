@@ -1,0 +1,29 @@
+✔ Artifact/4 signed target binds independently rebuilt V2 bundle and exact virtual proof (9360.397333ms)
+✔ Artifact/4 rejects omitted input, changed tool, native library, Node and bundle identity (11515.0915ms)
+✔ Artifact/4 remeasures actual current input and build-recipe bytes on decode (9671.259834ms)
+✔ Artifact/4 rejects swapped descriptor, evidence and forged direct ancestry (25268.874417ms)
+✔ Artifact/4 bounded launch check starts only its measured worker bundle (10609.978458ms)
+✔ Artifact/4 init/3 executes the signed pure candidate and restores its real-worker snapshot (13440.393541ms)
+✔ Artifact/4 init/3 refuses tampered proof, authority, and packaged bytes before execution (13244.4285ms)
+✔ Artifact/4 packaged child independently rejects altered init/3 proof (7523.269917ms)
+✔ Artifact/3 init/2 executes source and candidate in separate real workers (1852.171541ms)
+✔ Artifact/3 launches the rebuilt closed worker bundle with its measured input set (3607.663833ms)
+✔ Artifact/3 virtual worker preserves source production guard denial order (2448.373333ms)
+✔ Artifact/3 worker denies altered roots, descriptor and executable bytes before dispatch (1436.509291ms)
+✔ Artifact/3 worker refuses trust accessors and proxies before reading them (782.574458ms)
+✔ Artifact/3 init/2 independently rejects tampered child payload before a worker call (1448.626583ms)
+✔ Artifact/3 reloads exact source, candidate, wrapper, V3 evidence and measured bytes (906.185709ms)
+✔ Artifact/3 rejects altered source, candidate, descriptor, wrapper, profile and executable bytes (921.321625ms)
+✔ Artifact/3 rejects unrelated signed lineage and forged admission authority (1826.854459ms)
+✔ Artifact/3 rejects effectful subjects, malformed IR and legacy version substitution (1691.327041ms)
+✔ worker bundle is rebuilt from a closed input graph and refuses stale or tampered bytes (14564.685458ms)
+✔ worker graph rejects missing and tree-shaken dynamic imports before measurement (3.111291ms)
+✔ actual bundled worker launches and returns an authenticated pre-init refusal (6276.239458ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 140817.254417

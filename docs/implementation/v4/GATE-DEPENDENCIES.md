@@ -28,6 +28,8 @@ The [lineage audit lease check](LINEAGE-AUDIT-RETENTION.md) now refuses a missin
 
 T1-02 now has a versioned [AE6 cold-bound wire](AGENT-IR-V6.md). It reconstructs complete declarations from checked 256-bit root references and one-literal edits. On the unchanged ledger fixture, four warm wires measure 5.629× cl100k and 5.694× o200k, with JSONL-framed messages also above 4×. Cold delivery measures 0.941× cl100k, and the complete changed session 1.141×. This passes one deterministic warm workload, while representative changed-workload compression, remaining semantic coverage and Q03 stay open; T1-02/G1 and G2 are not yet verified.
 
+[V13 typed read-only contract projection](../../../roadmap/v4/research/projections/TYPED-CONTRACT-CALLS.md) adds real TS/Python/Rust composite and generic contract-helper calls plus pure map/fold callbacks. The 99-test integrated projection campaign passes, but a valid pure closure predicate is still rejected by all native targets. Broader valid cross-feature semantics, representative change-session density and Q03 remain open; T1-02 stays in progress.
+
 ## Closure order
 
 T2-04's [D12 budget slice](decisions/D12-signed-sink-budget-evidence.md) now admits a predeclared non-null reservation in direct ProcessHost calls, with witnessed bridge/ledger journals, fixed charge, signed-fence refund and unknown encumbrance. It does not close the row above: deployed admission/promotion, dynamic operator grant selection, measured charges and the full effect-path matrix remain open. A generic pre-dispatch bridge release still needs a signed fence in this profile. These gaps remain visible even though the focused campaign passes.
