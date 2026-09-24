@@ -1,0 +1,37 @@
+✔ Mach-O load-path resolution rejects missing and ambiguous native dependencies (2.768208ms)
+✔ worker manifest pins transitive non-system libraries and macOS cache identity (18229.197292ms)
+✔ opt-in config/15 releases active pins from the host witness and reopens with replay intact (7041.694959ms)
+✔ reopen reconciles a committed host decision interrupted before active pin release (6213.634709ms)
+✔ witness outage, rollback, forged terminal receipt and altered marker block released-host reopen (20539.762625ms)
+﹣ child crash driver (0.120542ms) # SKIP
+✔ real controller death on both sides of active release reopens from the witnessed decision (13947.1315ms)
+✔ V2 releases active-task records after a committed checkpoint while replay remains pinned (6245.296417ms)
+✔ forged receipt, stale proof and witness outage or rollback refuse release (18125.261375ms)
+✔ an active checkpoint has no release proof and keeps both pin kinds (1622.409125ms)
+✔ a durable release record survives a crash before physical lease retirement (5348.614541ms)
+✔ another process racing a new active pin is serialized or fails closed (5575.552834ms)
+✔ host-bound semantic retention pins exact task/replay roots before checkpoint publication and survives direct collection and reopen (7329.308958ms)
+✔ host-bound retention rejects removed marker, missing AST root and wrong authority on reopen (6133.415958ms)
+✔ retention loss at the host publication phase blocks the durable heap decision (6009.154459ms)
+✔ controller death before pin and after checkpoint decision preserves the correct AST/lease ordering (13781.79425ms)
+✔ Artifact/3 init/2 executes source and candidate in separate real workers (2100.197958ms)
+✔ Artifact/3 launches the rebuilt closed worker bundle with its measured input set (4222.425875ms)
+✔ Artifact/3 virtual worker preserves source production guard denial order (2609.799292ms)
+✔ Artifact/3 worker denies altered roots, descriptor and executable bytes before dispatch (1666.682875ms)
+✔ Artifact/3 worker refuses trust accessors and proxies before reading them (1112.486875ms)
+✔ Artifact/3 init/2 independently rejects tampered child payload before a worker call (1461.967666ms)
+✔ Artifact/3 reloads exact source, candidate, wrapper, V3 evidence and measured bytes (1131.039833ms)
+✔ Artifact/3 rejects altered source, candidate, descriptor, wrapper, profile and executable bytes (1138.172917ms)
+✔ Artifact/3 rejects unrelated signed lineage and forged admission authority (2331.781667ms)
+✔ Artifact/3 rejects effectful subjects, malformed IR and legacy version substitution (2321.250333ms)
+✔ worker bundle is rebuilt from a closed input graph and refuses stale or tampered bytes (14853.958875ms)
+✔ worker graph rejects missing and tree-shaken dynamic imports before measurement (3.456084ms)
+✔ actual bundled worker launches and returns an authenticated pre-init refusal (5832.692709ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 178473.960458
