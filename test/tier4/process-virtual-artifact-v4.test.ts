@@ -1098,8 +1098,20 @@ test('pure Artifact/4 deployment refuses superseded source spec before any call 
       deploymentHead = { revision: String(BigInt(expected) + 1n), journal };
       return deploymentHead;
     } });
+  const sourceHostId = `source-${sourceManifest.split(':').at(-1)}`;
+  let sourceHead: { revision: string; journal: string | null } = {
+    revision: '0', journal: null };
+  const sourceWitness = createHostJournalWitness({ ...namespace, hostId: sourceHostId,
+    read: () => sourceHead, advance: (expected, journal) => {
+      if (sourceHead.revision !== expected) throw new Error('source CAS conflict');
+      sourceHead = { revision: String(BigInt(expected) + 1n), journal };
+      return sourceHead;
+    } });
   const hostCatalog = createHostJournalWitnessCatalog({ ...namespace,
-    witnessFor: () => { throw new Error('candidate witness must not be selected'); } });
+    witnessFor: hostId => {
+      if (hostId !== sourceHostId) throw new Error('candidate witness must not be selected');
+      return sourceWitness;
+    } });
   const candidatePlan = hostOptions(f).plan;
   const sourcePlan: TopologyPlan = { ...candidatePlan,
     units: [{ ...candidatePlan.units[0], members: f.source.members
