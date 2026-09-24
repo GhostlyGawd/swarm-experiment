@@ -13,6 +13,8 @@ import { domainDigest, validateDigest, type Digest } from '../fabric/identity.ts
 import { effectAdapterDigest, type EffectAdapter } from '../fabric/effects.ts';
 import { capability, type CapabilityName } from '../tier1/ids.ts';
 import { createIsolatedWasmAdapter } from './isolated-wasm-adapter.ts';
+import { recordAdmittedAdapter } from './adapter-admission-registry.ts';
+export { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from './adapter-admission-registry.ts';
 
 export interface AdapterArtifactV1 {
   readonly format: 'aether.effect-adapter-artifact/1';
@@ -43,8 +45,6 @@ export interface AdapterArtifactV3 {
   readonly timeoutMs: number;
 }
 export type AdapterArtifact = AdapterArtifactV1 | AdapterArtifactV2 | AdapterArtifactV3;
-const admitted = new WeakMap<EffectAdapter, Digest>();
-const admittedWasmCapability = new WeakMap<EffectAdapter, CapabilityName>();
 const SHA256 = /^[0-9a-f]{64}$/;
 const MAX_SOURCE_BYTES = 1024 * 1024;
 const MAX_WASM_BYTES = 64 * 1024;
@@ -116,8 +116,7 @@ export function admitWasmAdapterBytes(bytes: Uint8Array, artifact: AdapterArtifa
     id: approved.id, capability: approved.capability, maxMemoryPages: approved.maxMemoryPages, timeoutMs: approved.timeoutMs });
   if (effectAdapterDigest(adapter) !== domainDigest('aether.effect-adapter/1', { id: approved.id, semantics: approved.semantics }))
     throw new TypeError('Wasm adapter implementation differs from approved descriptor');
-  admitted.set(adapter, adapterArtifactDigest(approved));
-  admittedWasmCapability.set(adapter, approved.capability);
+  recordAdmittedAdapter(adapter, adapterArtifactDigest(approved), approved.capability);
   return adapter;
 }
 /** Parse complete module syntax. Strings, comments, and regex text do not count
@@ -171,14 +170,6 @@ export async function admitAdapterSource(source: Uint8Array, artifact: AdapterAr
     ...(implementation.reconcile ? { reconcile: implementation.reconcile.bind(implementation) } : {}),
   });
   if (effectAdapterDigest(adapter) !== effectAdapterDigest(implementation)) throw new TypeError('adapter descriptor changed during admission');
-  admitted.set(adapter, adapterArtifactDigest(approved));
+  recordAdmittedAdapter(adapter, adapterArtifactDigest(approved));
   return adapter;
-}
-export function admittedAdapterArtifactDigest(adapter: EffectAdapter): Digest | null {
-  const value = admitted.get(adapter);
-  if (!value) return null;
-  effectAdapterDigest(adapter); return value;
-}
-export function admittedWasmAdapterCapability(adapter: EffectAdapter): CapabilityName | null {
-  return admittedWasmCapability.get(adapter) ?? null;
 }

@@ -7,7 +7,7 @@ import { assertAttestedSinkAdapter, isAttestedSinkAdapter, type AttestedSinkIden
 import type { SinkStateWitnessV1 } from '../fabric/sink-state-witness.ts';
 import { ResourceBudgetBridge } from '../tier2/resource-budget-bridge.ts';
 import { assertDeclarativeSinkRuntimeMapV2, type SignedSinkTableSelectionV2 } from '../tier2/declarative-sink-table.ts';
-import { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from '../tier2/adapter-artifact.ts';
+import { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from '../tier2/adapter-admission-registry.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 import { isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
 const brokerRouters = new WeakSet<object>();

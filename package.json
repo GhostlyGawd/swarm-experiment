@@ -70,7 +70,10 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-native-fallback-driver.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/copy-native-fallback-driver.mjs && node --experimental-strip-types scripts/process-worker-bundle.ts build",
+    "worker:bundle": "node --experimental-strip-types scripts/process-worker-bundle.ts build",
+    "worker:bundle:verify": "node --experimental-strip-types scripts/process-worker-bundle.ts verify",
+    "worker:bundle:measure": "node --experimental-strip-types scripts/measure-process-worker-bundle.ts",
     "prepack": "npm run build",
     "pretest": "npm run build",
     "typecheck": "tsc -p tsconfig.check.json",
@@ -90,6 +93,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
+    "esbuild": "0.28.2",
     "typescript": "5.8.3"
   },
   "dependencies": {
