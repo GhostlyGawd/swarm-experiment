@@ -1,0 +1,35 @@
+✔ controlled service close releases the Unix socket and durable service ticket (63.451125ms)
+✔ separate witness process authenticates bounded CAS and survives SIGKILL (4619.170916ms)
+✔ trusted wrapper accepts exact signed commit, pins copied identity, and exposes a detached proof (11.391666ms)
+✔ forged, mismatched, stale, and contradictory signed responses never yield a committed value (15.529625ms)
+✔ reconciliation reports noncommit only from a signed terminal fence; uncertainty stays unknown (3.496708ms)
+✔ broker keeps transport failure indeterminate and releases it only after signed fence (169.403ms)
+✔ V4 broker withholds a valid sink signature until the independent sink head retains it (159.062375ms)
+✔ signed sink receipt reconciles a real postcommit controller SIGKILL without another external decision (2994.938542ms)
+✔ V4 broker requires independent sink head across real postcommit controller SIGKILL and replay (5154.356625ms)
+✔ operator process commits exactly once and retains identical signed receipt after SIGKILL/restart (735.335375ms)
+✔ near-limit accepted payload retains a recoverable signed response after restart (443.286792ms)
+✔ status makes a durable signed noncommit fence that permanently refuses execute (420.065708ms)
+✔ lost wire response remains a committed decision; wrong auth and forged stored receipt fail closed (354.908542ms)
+✔ CLI refuses a group-readable signing key before opening the sink (94.3655ms)
+✔ separate sink witness restores deleted/older local state and fails closed on outage or equivocation (2947.719791ms)
+✔ signed sink commit binds exact request, payload, approved adapter and committed value (6.797166ms)
+✔ signed terminal fence has no committed value or commit ID (1.279791ms)
+✔ forgery, signed-field alteration, wrong key and signer mismatch are refused (3.818875ms)
+✔ valid signature cannot be replayed into a different operation, repository, deployment, policy or value (3.77225ms)
+✔ even a valid sink signature must agree with independently supplied request and grant context (2.847875ms)
+✔ malformed, oversized, accessor and noncanonical receipt or anchor objects fail closed (1.224166ms)
+✔ sink witness binds operator, exact anchor and adapter; advances one signed decision per revision (13.732917ms)
+✔ sink witness rejects stale writers, rollback and same-revision equivocation (5.434167ms)
+✔ sink witness adopts an existing matching head but rejects a changed anchor or adapter at startup (1.98475ms)
+✔ sink witness refuses changed identity, wrong revision/count, invalid rows and noncanonical bytes before CAS (7.191875ms)
+✔ sink witness rejects repeated effect, decision and commit identities (3.812708ms)
+✔ sink witness rejects false CAS success and missing post-CAS retention (2.244833ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8327.088458
