@@ -14,7 +14,8 @@ import { JournalLock } from '../fabric/journal-lock.ts';
 import { runtimeSnapshotDigest, validateRuntimeSnapshot, type RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
 import { createPromotionHandle, evidenceBundleDigest, type PromotionAdmissionProfile, type PromotionBindingV1, type PromotionCoordinator, type PromotionDriver, type PromotionInput, type PreparedPromotionHandleV1, type ProductionAdmissionState } from '../fabric/promotion.ts';
 import { ProcessHost, type ProcessHostCallResult, type ProcessHostOptions, type ProcessInvocationGrant } from './process-host.ts';
-import { brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext, brokerBind, brokerMode } from '../tier3/effects.ts';
+import { brokerAdapterIdentity, brokerWasmAdapterCapability, brokerAttestContext,
+  brokerAssertAdmissionTableV2, brokerBind, brokerMode } from '../tier3/effects.ts';
 import { assertEffectResourceAdapterV4, assertEffectResourceAdapterV5,
   assertEffectResourceAdapterV6, assertEffectResourceSinkContextV5,
   assertEffectResourceSinkContextV6 } from '../tier2/effect-resource-policy.ts';
@@ -28,6 +29,13 @@ import { advanceDeploymentJournalHead, assertDeploymentJournalWitness, readDeplo
 import { brokerPinWitness } from '../tier3/effects.ts';
 import { brokerAssertAttestedSinkAuthority } from '../tier3/effects.ts';
 import { validateSinkAdapterArtifactDigest, validateSinkPublicAnchor } from '../fabric/sink-receipt.ts';
+import { assertDeclarativeSinkTablePolicyV2, declarativeSinkTableDigestV2,
+  type DeclarativeSinkTableV2 } from '../tier2/declarative-sink-table.ts';
+import { assertSignedEffectResourcePolicyV7, effectResourcePolicyDigestV7,
+  assertEffectResourceAdapterV7, assertEffectResourceSinkContextV7,
+  type SignedEffectResourcePolicyV7 } from '../tier2/effect-resource-policy.ts';
+import { verifySemanticSinkRetirementV2,
+  type SemanticSinkRetirementContextV2, type SemanticSinkRetirementProposalV2 } from '../tier1/semantic-gc-sink-retirement.ts';
 import { assertSinkStateWitness, readSinkStateHead, type SinkStateWitnessV1 } from '../fabric/sink-state-witness.ts';
 import type { AttestedSinkIdentityV1 } from '../fabric/attested-sink-adapter.ts';
 import { validateProcessAllocation, validateProcessArguments } from './process-type-validation.ts';
@@ -39,6 +47,11 @@ export interface ProcessArtifactInput {
   readonly plan: TopologyPlan;
   /** Reloadable host-service configuration identity. Functions and secrets are never serialized. */
   readonly factoryId: string;
+  /** Required by the versioned semantic sink profile. The policy is checked
+   * against the exact candidate manifest and operator signer on every read. */
+  readonly signedEffectResourcePolicyV7?: SignedEffectResourcePolicyV7;
+  readonly sinkTableV2?: DeclarativeSinkTableV2;
+  readonly retirementProofV2?: SemanticSinkRetirementProposalV2 | null;
 }
 export interface ProcessArtifactV1 {
   readonly format: 'aether.process-artifact/1';
@@ -53,9 +66,18 @@ export interface ProcessArtifactV1 {
   readonly evidence: LocalEvidenceV1;
   readonly schemaDigest: Digest;
 }
+export interface ProcessArtifactV2 extends Omit<ProcessArtifactV1, 'format'> {
+  readonly format: 'aether.process-artifact/2';
+  readonly signedEffectResourcePolicyV7: SignedEffectResourcePolicyV7;
+  readonly sinkTableV2: DeclarativeSinkTableV2;
+  /** Null for genesis; promotion must carry the independently checked proof. */
+  readonly retirementProofV2: SemanticSinkRetirementProposalV2 | null;
+}
+export type ProcessArtifact = ProcessArtifactV1 | ProcessArtifactV2;
 export type ProcessHostServices = Pick<ProcessHostOptions, 'sealer' | 'scopedGrants' | 'effectResourcePath' | 'effectResourcePolicyDigest' | 'signedEffectResourcePolicy' | 'effectResourceSignerKey' | 'currentEffectPolicyEpoch' | 'revocations' | 'effectRouterFactory' | 'authorizeRecovery' | 'timeoutMs' | 'lockWaitMs' | 'maxWorkers' | 'onPhase'>;
-export type CapabilityDeploymentProfile = 'scoped-anchored-sink-v11' | 'scoped-anchored-sink-v10' | 'scoped-anchored-wasm-v9' | 'scoped-anchored-wasm-v8' | 'scoped-anchored-wasm-v7' | 'scoped-anchored-wasm-v6' | 'scoped-anchored-v5' | 'scoped-anchored-v4' | 'scoped-artifact-v4' | 'scoped-signed-v3' | 'scoped-v2' | 'legacy-sealed-v1';
-const resourceSinkProfile = (profile: CapabilityDeploymentProfile): boolean => profile === 'scoped-anchored-sink-v11';
+export type CapabilityDeploymentProfile = 'scoped-anchored-sink-v12' | 'scoped-anchored-sink-v11' | 'scoped-anchored-sink-v10' | 'scoped-anchored-wasm-v9' | 'scoped-anchored-wasm-v8' | 'scoped-anchored-wasm-v7' | 'scoped-anchored-wasm-v6' | 'scoped-anchored-v5' | 'scoped-anchored-v4' | 'scoped-artifact-v4' | 'scoped-signed-v3' | 'scoped-v2' | 'legacy-sealed-v1';
+const semanticSinkProfile = (profile: CapabilityDeploymentProfile): boolean => profile === 'scoped-anchored-sink-v12';
+const resourceSinkProfile = (profile: CapabilityDeploymentProfile): boolean => semanticSinkProfile(profile) || profile === 'scoped-anchored-sink-v11';
 const sinkProfile = (profile: CapabilityDeploymentProfile): boolean => resourceSinkProfile(profile)
   || profile === 'scoped-anchored-sink-v10';
 const hostWitnessedProfile = (profile: CapabilityDeploymentProfile): boolean => sinkProfile(profile) || profile === 'scoped-anchored-wasm-v9';
@@ -63,7 +85,8 @@ const witnessedProfile = (profile: CapabilityDeploymentProfile): boolean => host
 const clockedProfile = (profile: CapabilityDeploymentProfile): boolean => witnessedProfile(profile) || profile === 'scoped-anchored-wasm-v7';
 const wasmProfile = (profile: CapabilityDeploymentProfile): boolean => !sinkProfile(profile) && (clockedProfile(profile) || profile === 'scoped-anchored-wasm-v6');
 const anchoredProfile = (profile: CapabilityDeploymentProfile): boolean => sinkProfile(profile) || wasmProfile(profile) || profile === 'scoped-anchored-v5' || profile === 'scoped-anchored-v4';
-const preparedFormat = (profile: CapabilityDeploymentProfile) => resourceSinkProfile(profile) ? 'aether.process-deployment-prepared/9' as const
+const preparedFormat = (profile: CapabilityDeploymentProfile) => semanticSinkProfile(profile) ? 'aether.process-deployment-prepared/10' as const
+  : resourceSinkProfile(profile) ? 'aether.process-deployment-prepared/9' as const
   : sinkProfile(profile) ? 'aether.process-deployment-prepared/8' as const
   : hostWitnessedProfile(profile) ? 'aether.process-deployment-prepared/7' as const
   : witnessedProfile(profile) ? 'aether.process-deployment-prepared/6' as const
@@ -71,7 +94,8 @@ const preparedFormat = (profile: CapabilityDeploymentProfile) => resourceSinkPro
   : profile === 'scoped-anchored-wasm-v6' ? 'aether.process-deployment-prepared/4' as const
   : profile === 'scoped-anchored-v5' ? 'aether.process-deployment-prepared/3' as const
     : profile === 'scoped-anchored-v4' ? 'aether.process-deployment-prepared/2' as const : 'aether.process-deployment-prepared/1' as const;
-const stateFormat = (profile: CapabilityDeploymentProfile) => resourceSinkProfile(profile) ? 'aether.process-deployment/11' as const
+const stateFormat = (profile: CapabilityDeploymentProfile) => semanticSinkProfile(profile) ? 'aether.process-deployment/12' as const
+  : resourceSinkProfile(profile) ? 'aether.process-deployment/11' as const
   : sinkProfile(profile) ? 'aether.process-deployment/10' as const
   : hostWitnessedProfile(profile) ? 'aether.process-deployment/9' as const
   : witnessedProfile(profile) ? 'aether.process-deployment/8' as const
@@ -83,6 +107,9 @@ export interface ProcessDeploymentOptions {
   readonly directory: string;
   readonly coordinator: PromotionCoordinator;
   readonly factories: ReadonlyMap<string, (artifact: ProcessArtifactV1) => ProcessHostServices>;
+  /** V12 factories receive only Artifact/2; older factories keep their exact
+   * Artifact/1 API and contextual typing. */
+  readonly semanticSinkFactories?: ReadonlyMap<string, (artifact: ProcessArtifactV2) => ProcessHostServices>;
   /** Required only when creating a fresh deployment; this is the trusted genesis factory path. */
   readonly genesis?: ProcessArtifactInput;
   readonly lockWaitMs?: number;
@@ -104,6 +131,9 @@ export interface ProcessDeploymentOptions {
   /** Operator-selected external write sink and monotonic decision custody. */
   readonly attestedSinkAuthority?: AttestedSinkIdentityV1;
   readonly sinkStateWitness?: SinkStateWitnessV1;
+  /** Operator custody for the complete AST, export policy, and monotone
+   * retention snapshot used by semantic retirement. Never factory supplied. */
+  readonly semanticSinkRetirement?: SemanticSinkRetirementContextV2;
   /** Existing v2 histories have no capability-profile field and require explicit adoption. */
   readonly legacyCapabilityMigration?: 'adopt-legacy-sealed-v1' | 'adopt-scoped-v2';
 }
@@ -114,7 +144,7 @@ interface DeploymentReference {
   readonly generation: string;
 }
 interface DeploymentState {
-  readonly format: 'aether.process-deployment/3' | 'aether.process-deployment/4' | 'aether.process-deployment/5' | 'aether.process-deployment/6' | 'aether.process-deployment/7' | 'aether.process-deployment/8' | 'aether.process-deployment/9' | 'aether.process-deployment/10' | 'aether.process-deployment/11';
+  readonly format: 'aether.process-deployment/3' | 'aether.process-deployment/4' | 'aether.process-deployment/5' | 'aether.process-deployment/6' | 'aether.process-deployment/7' | 'aether.process-deployment/8' | 'aether.process-deployment/9' | 'aether.process-deployment/10' | 'aether.process-deployment/11' | 'aether.process-deployment/12';
   readonly admissionProfile: PromotionAdmissionProfile;
   readonly capabilityProfile: CapabilityDeploymentProfile;
   readonly effectSignerAnchorDigest?: Digest;
@@ -126,6 +156,11 @@ interface DeploymentState {
   readonly sinkDeploymentId?: string;
   readonly approvedAdapterArtifactDigest?: Digest;
   readonly sinkStateWitnessDigest?: Digest;
+  readonly activeSinkTableDigest?: Digest;
+  readonly activeSinkPolicyDigest?: Digest;
+  readonly activeRetirementProofDigest?: Digest | null;
+  readonly activePredecessorArtifactDigest?: Digest | null;
+  readonly semanticExportPolicyDigest?: Digest;
   readonly witnessRevision?: string;
   readonly genesisManifest: Digest;
   readonly active: DeploymentReference;
@@ -153,7 +188,7 @@ interface DeploymentInvocation {
   readonly receiptDigest: Digest | null;
 }
 interface PreparedRecord {
-  readonly format: 'aether.process-deployment-prepared/1' | 'aether.process-deployment-prepared/2' | 'aether.process-deployment-prepared/3' | 'aether.process-deployment-prepared/4' | 'aether.process-deployment-prepared/5' | 'aether.process-deployment-prepared/6' | 'aether.process-deployment-prepared/7' | 'aether.process-deployment-prepared/8' | 'aether.process-deployment-prepared/9';
+  readonly format: 'aether.process-deployment-prepared/1' | 'aether.process-deployment-prepared/2' | 'aether.process-deployment-prepared/3' | 'aether.process-deployment-prepared/4' | 'aether.process-deployment-prepared/5' | 'aether.process-deployment-prepared/6' | 'aether.process-deployment-prepared/7' | 'aether.process-deployment-prepared/8' | 'aether.process-deployment-prepared/9' | 'aether.process-deployment-prepared/10';
   readonly effectSignerAnchorDigest?: Digest;
   readonly trustedClockAnchorDigest?: Digest;
   readonly effectJournalWitnessCatalogDigest?: Digest;
@@ -163,6 +198,11 @@ interface PreparedRecord {
   readonly sinkDeploymentId?: string;
   readonly approvedAdapterArtifactDigest?: Digest;
   readonly sinkStateWitnessDigest?: Digest;
+  readonly sinkTableDigest?: Digest;
+  readonly sinkPolicyDigest?: Digest;
+  readonly retirementProofDigest?: Digest | null;
+  readonly predecessorArtifactDigest?: Digest | null;
+  readonly semanticExportPolicyDigest?: Digest;
   readonly binding: PromotionBindingV1 | null;
   readonly reference: DeploymentReference;
   readonly source: DeploymentReference | null;
@@ -205,9 +245,15 @@ function allocationReceipt(allocation: DeploymentAllocation): Digest | null {
   return allocation.result === null ? null : domainDigest('aether.deployment-allocation-receipt/1', { operationId: allocation.operationId, requestDigest: allocation.requestDigest, deployment: allocation.deployment, result: allocation.result });
 }
 
-export function processArtifactDigest(artifact: ProcessArtifactV1): Digest { return domainDigest('aether.process-artifact/1', artifact, LIMITS); }
+export function processArtifactDigest(artifact: ProcessArtifact): Digest {
+  return domainDigest(artifact.format === 'aether.process-artifact/2'
+    ? 'aether.process-artifact/2' : 'aether.process-artifact/1', artifact, LIMITS);
+}
 export function processMigrationPlan(snapshot: RuntimeSnapshotV1, artifactDigest: Digest): TaggedValueV1 {
-  validateDigest(artifactDigest, 'aether.process-artifact/1');
+  validateDigest(artifactDigest);
+  if (!artifactDigest.startsWith('aether.process-artifact/1:')
+    && !artifactDigest.startsWith('aether.process-artifact/2:'))
+    throw new TypeError('process migration requires a versioned process artifact');
   return { tag: 'sequence', items: [{ tag: 'string', value: 'aether.same-schema-process-migration/1' }, { tag: 'string', value: runtimeSnapshotDigest(snapshot) }, { tag: 'string', value: artifactDigest }] };
 }
 export function processEffectPlan(factoryId: string, capabilityPolicyDigest: Digest): TaggedValueV1 {
@@ -318,6 +364,47 @@ export function processResourceScopedSinkEffectPlan(factoryId: string, capabilit
     { tag: 'string', value: sinkStateWitnessDigest },
   ] };
 }
+/** Complete governor decision for a V12 semantic sink transition. Historical
+ * receipt replay keeps the predecessor artifact even after a registration is
+ * removed from the active table. */
+export function processSemanticSinkEffectPlan(input: Readonly<{
+  factoryId: string; capabilityPolicyDigest: Digest; signerAnchorDigest: Digest;
+  clockAnchorDigest: Digest; effectWitnessCatalogDigest: Digest;
+  hostWitnessCatalogDigest: Digest; deploymentWitnessDigest: Digest;
+  sinkAnchorDigest: Digest; sinkDeploymentId: string;
+  approvedAdapterArtifactDigest: Digest; sinkStateWitnessDigest: Digest;
+  sinkTableDigest: Digest; candidateArtifactDigest: Digest;
+  predecessorArtifactDigest: Digest | null; retirementProofDigest: Digest | null;
+  semanticExportPolicyDigest: Digest;
+}>): TaggedValueV1 {
+  identifier(input.factoryId); identifier(input.sinkDeploymentId);
+  validateDigest(input.capabilityPolicyDigest, 'aether.effect-resource-policy/7');
+  validateDigest(input.signerAnchorDigest, 'aether.effect-signer-anchor/1');
+  validateDigest(input.clockAnchorDigest, 'aether.trusted-clock-anchor/1');
+  validateDigest(input.effectWitnessCatalogDigest, 'aether.effect-journal-witness-catalog/2');
+  validateDigest(input.hostWitnessCatalogDigest, 'aether.process-host-journal-witness-catalog/1');
+  validateDigest(input.deploymentWitnessDigest, 'aether.process-deployment-journal-witness/1');
+  validateDigest(input.sinkAnchorDigest, 'aether.sink-anchor/1');
+  validateSinkAdapterArtifactDigest(input.approvedAdapterArtifactDigest);
+  validateDigest(input.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
+  validateDigest(input.sinkTableDigest, 'aether.declarative-adapter-table/2');
+  validateDigest(input.candidateArtifactDigest, 'aether.process-artifact/2');
+  if (input.predecessorArtifactDigest !== null) validateDigest(input.predecessorArtifactDigest, 'aether.process-artifact/2');
+  if (input.retirementProofDigest !== null) validateDigest(input.retirementProofDigest, 'aether.semantic-sink-retirement/2');
+  validateDigest(input.semanticExportPolicyDigest, 'aether.semantic-sink-export-policy/2');
+  return { tag: 'sequence', items: [
+    { tag: 'string', value: 'aether.process-effect-factory/10' },
+    ...[input.factoryId, input.capabilityPolicyDigest, input.signerAnchorDigest,
+      input.clockAnchorDigest, input.effectWitnessCatalogDigest,
+      input.hostWitnessCatalogDigest, input.deploymentWitnessDigest,
+      input.sinkAnchorDigest, input.sinkDeploymentId,
+      input.approvedAdapterArtifactDigest, input.sinkStateWitnessDigest,
+      input.sinkTableDigest, input.candidateArtifactDigest,
+      input.predecessorArtifactDigest ?? '', input.retirementProofDigest ?? '',
+      input.semanticExportPolicyDigest]
+      .map(value => ({ tag: 'string' as const, value })),
+  ] };
+}
 function schemaDigest(module: Term): Digest {
   const signatures: unknown[] = [], types = new Map<string, Ty>();
   const add = (ty: Ty): void => {
@@ -334,14 +421,14 @@ function schemaDigest(module: Term): Digest {
   signatures.sort((a, b) => Buffer.compare(encodeCanonical(a), encodeCanonical(b)));
   return domainDigest('aether.process-schema/1', { signatures, types: [...types].sort(([a], [b]) => a < b ? -1 : 1).map(([, value]) => value) });
 }
-export function processArtifactContext(artifact: ProcessArtifactV1): EvidenceContext {
+export function processArtifactContext(artifact: ProcessArtifact): EvidenceContext {
   const registry = new CapabilityRegistry(); artifact.capabilities.forEach(descriptor => registry.define(descriptor));
   const externals = new Map(artifact.externals.map(item => [item.symbol, decodeIR(item.ir)]));
   return { module: decodeIR(artifact.ir), registry, specification: artifact.specification, semanticsVersion: artifact.manifest.semanticsVersion,
     compilerDigest: artifact.manifest.compilerDigest, target: artifact.manifest.target, capabilityPolicyDigest: artifact.manifest.capabilityPolicyDigest, policy: artifact.policy,
     resolveDeclaration: symbol => externals.get(symbol) };
 }
-function makeArtifact(input: ProcessArtifactInput): ProcessArtifactV1 {
+function makeArtifact(input: ProcessArtifactInput, semanticSink = false): ProcessArtifact {
   identifier(input.factoryId);
   const vetted = validateEvidence(input.evidence, input.context);
   const own = new Set([...walk(input.context.module)].filter(node => node.kind === 'FunctionDecl').map(node => (node as Extract<Term, { kind: 'FunctionDecl' }>).symbol));
@@ -350,16 +437,28 @@ function makeArtifact(input: ProcessArtifactInput): ProcessArtifactV1 {
     if (declaration?.kind !== 'FunctionDecl') throw new TypeError('external declaration cannot be persisted');
     return { symbol: declaration.symbol, ir: encodeIR(declaration).text };
   });
-  const artifact: ProcessArtifactV1 = { format: 'aether.process-artifact/1', ir: encodeIR(input.context.module).text, manifest: vetted.manifest,
+  const base = { ir: encodeIR(input.context.module).text, manifest: vetted.manifest,
     specification: input.context.specification, policy: input.context.policy ?? DEFAULT_EVIDENCE_POLICY,
     capabilities: [...input.context.registry.names].sort().map(name => input.context.registry.get(name)!), externals,
     plan: JSON.stringify(input.plan), factoryId: input.factoryId, evidence: input.evidence, schemaDigest: schemaDigest(input.context.module) };
+  if (!semanticSink && (input.signedEffectResourcePolicyV7 !== undefined
+      || input.sinkTableV2 !== undefined || input.retirementProofV2 !== undefined))
+    throw new TypeError('V7 sink policy and table require versioned Artifact/2 profile');
+  const artifact: ProcessArtifact = semanticSink
+    ? { ...base, format: 'aether.process-artifact/2',
+      signedEffectResourcePolicyV7: input.signedEffectResourcePolicyV7!,
+      sinkTableV2: input.sinkTableV2!, retirementProofV2: input.retirementProofV2 ?? null }
+    : { ...base, format: 'aether.process-artifact/1' };
   encodeCanonical(artifact, LIMITS); return freeze(copy(artifact));
 }
 function validateReference(value: unknown): asserts value is DeploymentReference {
   const ref = exactObject(value, ['id', 'manifest', 'artifactDigest', 'generation']);
   if (ref.id !== 'genesis' && (typeof ref.id !== 'string' || !/^[0-9a-f]{64}$/.test(ref.id))) throw new TypeError('invalid deployment directory identity');
-  validateDigest(ref.manifest, 'aether.execution/1'); validateDigest(ref.artifactDigest, 'aether.process-artifact/1'); decimal(ref.generation);
+  validateDigest(ref.manifest, 'aether.execution/1'); validateDigest(ref.artifactDigest);
+  if (!ref.artifactDigest.startsWith('aether.process-artifact/1:')
+    && !ref.artifactDigest.startsWith('aether.process-artifact/2:'))
+    throw new TypeError('unknown process artifact reference version');
+  decimal(ref.generation);
 }
 function rebind(snapshot: RuntimeSnapshotV1, manifest: Digest, epoch: string, plan: TopologyPlan): RuntimeSnapshotV1 {
   validateRuntimeSnapshot(snapshot); validateDigest(manifest, 'aether.execution/1'); decimal(epoch);
@@ -392,6 +491,7 @@ export class ProcessDeployment implements PromotionDriver {
   private readonly stateFile: string;
   private readonly hosts = new Map<string, ProcessHost>();
   readonly #deploymentJournalWitness: DeploymentJournalWitness | null;
+  readonly #semanticExportPolicyDigest: Digest | null;
   readonly #stateWitnessBases = new WeakMap<DeploymentState, { revision: string; journal: string | null }>();
   private lease: Lease | null = null;
   private historicalRecovery: string | null = null;
@@ -400,7 +500,7 @@ export class ProcessDeployment implements PromotionDriver {
     this.capabilityProfile = options.capabilityProfile ?? 'scoped-anchored-v5';
     this.options = { ...options, attestedSinkAuthority: sinkProfile(this.capabilityProfile)
       && options.attestedSinkAuthority ? freeze(copy(options.attestedSinkAuthority)) : undefined };
-    if (!['scoped-anchored-sink-v11', 'scoped-anchored-sink-v10', 'scoped-anchored-wasm-v9', 'scoped-anchored-wasm-v8', 'scoped-anchored-wasm-v7', 'scoped-anchored-wasm-v6', 'scoped-anchored-v5', 'scoped-anchored-v4', 'scoped-artifact-v4', 'scoped-signed-v3', 'scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
+    if (!['scoped-anchored-sink-v12', 'scoped-anchored-sink-v11', 'scoped-anchored-sink-v10', 'scoped-anchored-wasm-v9', 'scoped-anchored-wasm-v8', 'scoped-anchored-wasm-v7', 'scoped-anchored-wasm-v6', 'scoped-anchored-v5', 'scoped-anchored-v4', 'scoped-artifact-v4', 'scoped-signed-v3', 'scoped-v2', 'legacy-sealed-v1'].includes(this.capabilityProfile)
       || options.legacyCapabilityMigration !== undefined && !['adopt-legacy-sealed-v1', 'adopt-scoped-v2'].includes(options.legacyCapabilityMigration)) throw new TypeError('invalid capability deployment profile/migration');
     if (anchoredProfile(this.capabilityProfile)) assertEffectSignerAnchor(options.effectSignerAnchor);
     else if (options.effectSignerAnchor !== undefined) throw new TypeError('independent effect signer anchor requires anchored deployment profile');
@@ -447,6 +547,16 @@ export class ProcessDeployment implements PromotionDriver {
         throw new TypeError('sink deployment authority differs from operator witnesses');
     } else if (options.attestedSinkAuthority !== undefined || options.sinkStateWitness !== undefined)
       throw new TypeError('sink authority requires attested sink deployment profile');
+    if (semanticSinkProfile(this.capabilityProfile)) {
+      if (!options.semanticSinkRetirement
+        || options.semanticSinkRetirement.repositoryId !== options.effectSignerAnchor!.repositoryId
+        || !options.semanticSinkFactories
+        || options.coordinator.admissionProfile !== 'strict-lineage-v1')
+        throw new TypeError('semantic sink deployment requires strict signed lineage and independent retirement authority');
+    } else if (options.semanticSinkRetirement !== undefined || options.semanticSinkFactories !== undefined)
+      throw new TypeError('semantic sink retirement authority requires V12 deployment profile');
+    this.#semanticExportPolicyDigest = semanticSinkProfile(this.capabilityProfile)
+      ? this.semanticExportPolicyDigest() : null;
     this.#deploymentJournalWitness = options.deploymentJournalWitness ?? null;
     ensureDirectory(options.directory);
     ensureDirectory(join(options.directory, 'artifacts')); ensureDirectory(join(options.directory, 'deployments'));
@@ -463,6 +573,112 @@ export class ProcessDeployment implements PromotionDriver {
       sinkDeploymentId: authority.deploymentId,
       approvedAdapterArtifactDigest: authority.approvedAdapterArtifactDigest,
       sinkStateWitnessDigest: witness.digest };
+  }
+  private factoryFor(id: string): (artifact: ProcessArtifact) => ProcessHostServices {
+    const factory = semanticSinkProfile(this.capabilityProfile)
+      ? this.options.semanticSinkFactories!.get(id)
+      : this.options.factories.get(id);
+    if (!factory) throw new Error('trusted artifact factory is unavailable');
+    return factory as (artifact: ProcessArtifact) => ProcessHostServices;
+  }
+  private semanticExportPolicyDigest(): Digest {
+    const context = this.options.semanticSinkRetirement!;
+    return domainDigest('aether.semantic-sink-export-policy/2', {
+      repositoryId: context.repositoryId, policy: context.exportPolicy,
+      registry: [...context.registry.names].sort().map(name => context.registry.get(name)),
+    });
+  }
+  private assertExported(symbol: SymbolId): void {
+    if (!semanticSinkProfile(this.capabilityProfile)) return;
+    if (this.semanticExportPolicyDigest() !== this.#semanticExportPolicyDigest
+      || !this.options.semanticSinkRetirement!.exportPolicy.exports.includes(symbol))
+      throw new Error('semantic deployment symbol is outside signed export authority');
+  }
+  private assertSemanticArtifact(artifact: ProcessArtifactV2): void {
+    const anchor = this.options.effectSignerAnchor!;
+    const retirement = this.options.semanticSinkRetirement!;
+    if (this.semanticExportPolicyDigest() !== this.#semanticExportPolicyDigest
+      || !equal(artifact.capabilities,
+        [...retirement.registry.names].sort().map(name => retirement.registry.get(name))))
+      throw new TypeError('Artifact/2 registry differs from operator retirement/export authority');
+    if (artifact.signedEffectResourcePolicyV7.signer !== anchor.signer)
+      throw new TypeError('Artifact/2 policy signer differs from operator anchor');
+    assertDeclarativeSinkTablePolicyV2({ table: artifact.sinkTableV2,
+      policy: artifact.signedEffectResourcePolicyV7, manifest: artifact.manifest,
+      currentEpoch: artifact.signedEffectResourcePolicyV7.body.policyEpoch,
+      signerKey: anchor.publicKey, module: decodeIR(artifact.ir) });
+    if (artifact.sinkTableV2.repositoryId !== anchor.repositoryId
+      || artifact.manifest.capabilityPolicyDigest !== effectResourcePolicyDigestV7(
+        artifact.signedEffectResourcePolicyV7.body, decodeIR(artifact.ir)))
+      throw new TypeError('Artifact/2 policy/table differs from exact manifest');
+    if (artifact.retirementProofV2 !== null)
+      validateDigest(artifact.retirementProofV2.id, 'aether.semantic-sink-retirement/2');
+  }
+  private assertSemanticTransition(candidate: ProcessArtifactV2,
+    source: ProcessArtifactV2 | null): void {
+    this.assertSemanticArtifact(candidate);
+    if (candidate.signedEffectResourcePolicyV7.body.policyEpoch
+      !== this.options.effectSignerAnchor!.currentEpoch())
+      throw new Error('candidate Artifact/2 policy epoch is not current');
+    if (source === null) {
+      if (candidate.retirementProofV2 !== null) throw new Error('genesis Artifact/2 cannot claim retirement');
+      return;
+    }
+    this.assertSemanticArtifact(source);
+    const changed = declarativeSinkTableDigestV2(source.sinkTableV2)
+      !== declarativeSinkTableDigestV2(candidate.sinkTableV2);
+    const proof = candidate.retirementProofV2;
+    if (changed !== (proof !== null))
+      throw new Error('adapter table transition requires exact retirement proof');
+    if (proof === null) return;
+    if (candidate.factoryId !== source.factoryId || candidate.ir !== source.ir
+      || candidate.specification !== source.specification
+      || candidate.plan !== source.plan || candidate.schemaDigest !== source.schemaDigest
+      || !equal(candidate.capabilities, source.capabilities)
+      || !equal(candidate.externals, source.externals)
+      || !equal(candidate.policy, source.policy))
+      throw new Error('retirement promotion changed code, placement, factory or evidence policy');
+    const sourceSelection = { table: source.sinkTableV2,
+      policy: source.signedEffectResourcePolicyV7, manifest: source.manifest };
+    const candidateSelection = { table: candidate.sinkTableV2,
+      policy: candidate.signedEffectResourcePolicyV7, manifest: candidate.manifest };
+    if (!equal(proof.source, sourceSelection) || !equal(proof.candidate, candidateSelection))
+      throw new Error('retirement proof differs from exact predecessor/candidate Artifact/2');
+    const context = this.options.semanticSinkRetirement!;
+    if (context.repositoryId !== this.options.effectSignerAnchor!.repositoryId)
+      throw new Error('retirement context repository differs from operator anchor');
+    verifySemanticSinkRetirementV2(context, proof);
+  }
+  private semanticPreparedFields(artifact: ProcessArtifactV2,
+    predecessorArtifactDigest: Digest | null) {
+    return { sinkTableDigest: declarativeSinkTableDigestV2(artifact.sinkTableV2),
+      sinkPolicyDigest: effectResourcePolicyDigestV7(artifact.signedEffectResourcePolicyV7.body,
+        decodeIR(artifact.ir)), retirementProofDigest: artifact.retirementProofV2?.id ?? null,
+      predecessorArtifactDigest, semanticExportPolicyDigest: this.#semanticExportPolicyDigest! };
+  }
+  private semanticStateFields(artifact: ProcessArtifactV2,
+    predecessorArtifactDigest: Digest | null) {
+    const fields = this.semanticPreparedFields(artifact, predecessorArtifactDigest);
+    return { activeSinkTableDigest: fields.sinkTableDigest,
+      activeSinkPolicyDigest: fields.sinkPolicyDigest,
+      activeRetirementProofDigest: fields.retirementProofDigest,
+      activePredecessorArtifactDigest: fields.predecessorArtifactDigest,
+      semanticExportPolicyDigest: fields.semanticExportPolicyDigest };
+  }
+  private semanticEffectPlan(candidate: ProcessArtifactV2,
+    predecessorArtifactDigest: Digest | null): TaggedValueV1 {
+    return processSemanticSinkEffectPlan({ factoryId: candidate.factoryId,
+      capabilityPolicyDigest: candidate.manifest.capabilityPolicyDigest,
+      signerAnchorDigest: this.options.effectSignerAnchor!.digest,
+      clockAnchorDigest: this.options.trustedClockAnchor!.digest,
+      effectWitnessCatalogDigest: this.options.effectJournalWitnessCatalog!.digest,
+      hostWitnessCatalogDigest: this.options.hostJournalWitnessCatalog!.digest,
+      deploymentWitnessDigest: this.options.deploymentJournalWitness!.digest,
+      ...this.sinkBinding(), sinkTableDigest: declarativeSinkTableDigestV2(candidate.sinkTableV2),
+      candidateArtifactDigest: processArtifactDigest(candidate),
+      predecessorArtifactDigest,
+      retirementProofDigest: candidate.retirementProofV2?.id ?? null,
+      semanticExportPolicyDigest: this.#semanticExportPolicyDigest! });
   }
   static async open(options: ProcessDeploymentOptions): Promise<ProcessDeployment> {
     const deployment = new ProcessDeployment(options);
@@ -484,12 +700,16 @@ export class ProcessDeployment implements PromotionDriver {
         if (!existsSync(deployment.stateFile)
           && (!deployment.#deploymentJournalWitness || readDeploymentJournalHead(deployment.#deploymentJournalWitness).journal === null)) {
           if (!options.genesis) throw new Error('trusted genesis artifact is required');
-          const candidate = makeArtifact(options.genesis), factory = options.factories.get(candidate.factoryId);
-          if (!factory) throw new Error('trusted artifact factory is unavailable');
-          deployment.assertServices(factory(candidate), decodeIR(candidate.ir), candidate.policy, candidate.manifest, JSON.parse(candidate.plan));
+          const candidate = makeArtifact(options.genesis, semanticSinkProfile(deployment.capabilityProfile));
+          const factory = deployment.factoryFor(candidate.factoryId);
+          if (candidate.format === 'aether.process-artifact/2')
+            deployment.assertSemanticTransition(candidate, null);
+          deployment.assertServices(factory(candidate), decodeIR(candidate.ir), candidate.policy, candidate.manifest, JSON.parse(candidate.plan), candidate);
           const artifact = deployment.persistArtifact(candidate);
           const manifest = executionManifestDigest(artifact.manifest), admission = options.coordinator.state();
           if (admission.committedManifest !== manifest || admission.generation !== '0' || admission.pendingProposal !== null) throw new Error('genesis does not match production admission');
+          if (candidate.format === 'aether.process-artifact/2')
+            options.coordinator.assertLineageCurrent(manifest);
           const reference: DeploymentReference = { id: 'genesis', manifest, artifactDigest: processArtifactDigest(artifact), generation: '0' };
           deployment.writePrepared({ format: preparedFormat(deployment.capabilityProfile),
             ...(anchoredProfile(deployment.capabilityProfile) ? { effectSignerAnchorDigest: options.effectSignerAnchor!.digest } : {}),
@@ -498,6 +718,8 @@ export class ProcessDeployment implements PromotionDriver {
             ...(hostWitnessedProfile(deployment.capabilityProfile) ? { hostJournalWitnessCatalogDigest: options.hostJournalWitnessCatalog!.digest } : {}),
             ...(hostWitnessedProfile(deployment.capabilityProfile) ? { deploymentJournalWitnessDigest: options.deploymentJournalWitness!.digest } : {}),
             ...(sinkProfile(deployment.capabilityProfile) ? deployment.sinkBinding() : {}),
+            ...(candidate.format === 'aether.process-artifact/2'
+              ? deployment.semanticPreparedFields(candidate, null) : {}),
             binding: null, reference, source: null, sourceSnapshotDigest: null, seed: null });
           deployment.saveState({ format: stateFormat(deployment.capabilityProfile),
             admissionProfile: options.coordinator.admissionProfile, capabilityProfile: deployment.capabilityProfile,
@@ -507,6 +729,8 @@ export class ProcessDeployment implements PromotionDriver {
             ...(hostWitnessedProfile(deployment.capabilityProfile) ? { hostJournalWitnessCatalogDigest: options.hostJournalWitnessCatalog!.digest } : {}),
             ...(hostWitnessedProfile(deployment.capabilityProfile) ? { deploymentJournalWitnessDigest: options.deploymentJournalWitness!.digest, witnessRevision: '0' } : {}),
             ...(sinkProfile(deployment.capabilityProfile) ? deployment.sinkBinding() : {}),
+            ...(candidate.format === 'aether.process-artifact/2'
+              ? deployment.semanticStateFields(candidate, null) : {}),
             genesisManifest: manifest, active: reference, readiness: 'ready', pendingProposal: null, invocations: [], allocations: [] }, null);
         }
         let state = deployment.readState();
@@ -528,30 +752,46 @@ export class ProcessDeployment implements PromotionDriver {
   }
   registerArtifact(input: ProcessArtifactInput): Digest {
     if (this.closed) throw new Error('deployment is closed');
-    const artifact = makeArtifact(input), factory = this.options.factories.get(artifact.factoryId);
-    if (!factory) throw new Error('trusted artifact factory is unavailable');
-    this.assertServices(factory(artifact), decodeIR(artifact.ir), artifact.policy, artifact.manifest, JSON.parse(artifact.plan));
+    const artifact = makeArtifact(input, semanticSinkProfile(this.capabilityProfile));
+    const factory = this.factoryFor(artifact.factoryId);
+    if (artifact.format === 'aether.process-artifact/2') {
+      this.options.coordinator.assertLineageCurrent(executionManifestDigest(artifact.manifest));
+      const state = this.readState();
+      if (state.readiness !== 'ready' || state.pendingProposal !== null)
+        throw new Error('semantic candidate registration requires an unfrozen predecessor');
+      const source = this.readArtifact(state.active.manifest);
+      if (source.format !== 'aether.process-artifact/2') throw new TypeError('semantic candidate predecessor must be Artifact/2');
+      this.assertSemanticTransition(artifact, source);
+    }
+    this.assertServices(factory(artifact), decodeIR(artifact.ir), artifact.policy, artifact.manifest, JSON.parse(artifact.plan), artifact);
     return processArtifactDigest(this.persistArtifact(artifact));
   }
-  artifact(manifest: Digest): ProcessArtifactV1 { return this.readArtifact(manifest); }
+  artifact(manifest: Digest): ProcessArtifact { return this.readArtifact(manifest); }
   private artifactPath(manifest: Digest): string { validateDigest(manifest, 'aether.execution/1'); return join(this.options.directory, 'artifacts', `${suffix(manifest)}.json`); }
-  private persistArtifact(artifact: ProcessArtifactV1): ProcessArtifactV1 {
+  private persistArtifact(artifact: ProcessArtifact): ProcessArtifact {
     return this.registryGate.run(() => {
-      if (!this.options.factories.has(artifact.factoryId)) throw new Error('trusted artifact factory is unavailable');
+      this.factoryFor(artifact.factoryId);
       const path = this.artifactPath(executionManifestDigest(artifact.manifest));
       if (existsSync(path)) { const existing = this.readArtifact(executionManifestDigest(artifact.manifest)); if (!equal(existing, artifact)) throw new Error('artifact manifest already has different runtime configuration'); return existing; }
       save(path, artifact); return artifact;
     }, this.options.lockWaitMs ?? 5000);
   }
-  private readArtifact(manifest: Digest): ProcessArtifactV1 {
-    const value = exactObject(load(this.artifactPath(manifest)), ['format', 'ir', 'manifest', 'specification', 'policy', 'capabilities', 'externals', 'plan', 'factoryId', 'evidence', 'schemaDigest']);
-    if (value.format !== 'aether.process-artifact/1' || typeof value.ir !== 'string' || typeof value.specification !== 'string' || typeof value.plan !== 'string' || !Array.isArray(value.capabilities) || !Array.isArray(value.externals)) throw new TypeError('invalid durable artifact');
+  private readArtifact(manifest: Digest): ProcessArtifact {
+    const raw = load(this.artifactPath(manifest)) as { format?: unknown };
+    const semantic = raw.format === 'aether.process-artifact/2';
+    const value = exactObject(raw, ['format', 'ir', 'manifest', 'specification', 'policy', 'capabilities', 'externals', 'plan', 'factoryId', 'evidence', 'schemaDigest',
+      ...(semantic ? ['signedEffectResourcePolicyV7', 'sinkTableV2', 'retirementProofV2'] : [])]);
+    if (value.format !== (semantic ? 'aether.process-artifact/2' : 'aether.process-artifact/1')
+      || semantic !== semanticSinkProfile(this.capabilityProfile)
+      || typeof value.ir !== 'string' || typeof value.specification !== 'string' || typeof value.plan !== 'string' || !Array.isArray(value.capabilities) || !Array.isArray(value.externals)) throw new TypeError('invalid durable artifact');
     identifier(value.factoryId); validateDigest(value.schemaDigest, 'aether.process-schema/1');
-    const artifact = value as unknown as ProcessArtifactV1;
-    if (executionManifestDigest(artifact.manifest) !== manifest || !this.options.factories.has(artifact.factoryId)) throw new TypeError('artifact identity/factory mismatch');
+    const artifact = value as unknown as ProcessArtifact;
+    if (executionManifestDigest(artifact.manifest) !== manifest) throw new TypeError('artifact identity/factory mismatch');
+    this.factoryFor(artifact.factoryId);
     const context = processArtifactContext(artifact);
     if (schemaDigest(context.module) !== artifact.schemaDigest) throw new TypeError('artifact schema mismatch');
     validateEvidence(artifact.evidence, context);
+    if (artifact.format === 'aether.process-artifact/2') this.assertSemanticArtifact(artifact);
     return freeze(copy(artifact));
   }
   private directory(id: string): string { if (id !== 'genesis' && !/^[0-9a-f]{64}$/.test(id)) throw new TypeError('invalid deployment ID'); return join(this.options.directory, 'deployments', id); }
@@ -596,6 +836,9 @@ export class ProcessDeployment implements PromotionDriver {
       ...(hostWitnessedProfile(this.capabilityProfile) ? ['deploymentJournalWitnessDigest'] : []),
       ...(sinkProfile(this.capabilityProfile) ? ['sinkAnchorDigest', 'sinkDeploymentId',
         'approvedAdapterArtifactDigest', 'sinkStateWitnessDigest'] : []),
+      ...(semanticSinkProfile(this.capabilityProfile) ? ['sinkTableDigest',
+        'sinkPolicyDigest', 'retirementProofDigest', 'predecessorArtifactDigest',
+        'semanticExportPolicyDigest'] : []),
       'binding', 'reference', 'source', 'sourceSnapshotDigest', 'seed']);
     const expected = preparedFormat(this.capabilityProfile);
     if (value.format !== expected || !equal(value.reference, reference)) throw new TypeError('prepared deployment identity mismatch');
@@ -611,6 +854,14 @@ export class ProcessDeployment implements PromotionDriver {
     if (sinkProfile(this.capabilityProfile)
       && Object.entries(this.sinkBinding()).some(([key, expected]) => value[key] !== expected))
       throw new TypeError('prepared sink authority mismatch');
+    if (semanticSinkProfile(this.capabilityProfile)) {
+      const artifact = this.readArtifact(reference.manifest);
+      if (artifact.format !== 'aether.process-artifact/2'
+        || Object.entries(this.semanticPreparedFields(artifact,
+          value.source === null ? null : (value.source as DeploymentReference).artifactDigest))
+          .some(([key, expected]) => value[key] !== expected))
+        throw new TypeError('prepared semantic sink artifact/proof mismatch');
+    }
     if (value.source !== null) validateReference(value.source);
     if (value.sourceSnapshotDigest !== null) validateDigest(value.sourceSnapshotDigest, 'aether.state/1');
     if (value.seed !== null) {
@@ -642,6 +893,9 @@ export class ProcessDeployment implements PromotionDriver {
       ...(!legacy && hostWitnessedProfile(this.capabilityProfile) ? ['deploymentJournalWitnessDigest', 'witnessRevision'] : []),
       ...(!legacy && sinkProfile(this.capabilityProfile) ? ['sinkAnchorDigest', 'sinkDeploymentId',
         'approvedAdapterArtifactDigest', 'sinkStateWitnessDigest'] : []),
+      ...(!legacy && semanticSinkProfile(this.capabilityProfile) ? ['activeSinkTableDigest',
+        'activeSinkPolicyDigest', 'activeRetirementProofDigest',
+        'activePredecessorArtifactDigest', 'semanticExportPolicyDigest'] : []),
       'genesisManifest', 'active', 'readiness', 'pendingProposal', 'invocations', 'allocations']);
     validateReference(value.active); validateDigest(value.genesisManifest, 'aether.execution/1');
     if (value.format !== (legacy === 'v1' ? 'aether.process-deployment/1' : legacy === 'v2' ? 'aether.process-deployment/2'
@@ -661,6 +915,34 @@ export class ProcessDeployment implements PromotionDriver {
     if (!legacy && sinkProfile(this.capabilityProfile)
       && Object.entries(this.sinkBinding()).some(([key, expected]) => value[key] !== expected))
       throw new TypeError('durable sink authority mismatch');
+    if (!legacy && semanticSinkProfile(this.capabilityProfile)) {
+      const artifact = this.readArtifact((value.active as DeploymentReference).manifest);
+      const prepared = this.readPrepared(value.active as DeploymentReference);
+      if (artifact.format !== 'aether.process-artifact/2'
+        || processArtifactDigest(artifact) !== (value.active as DeploymentReference).artifactDigest
+        || Object.entries(this.semanticStateFields(artifact,
+          prepared.source?.artifactDigest ?? null)).some(([key, expected]) => value[key] !== expected))
+        throw new TypeError('witnessed semantic sink state differs from Artifact/2 lineage');
+      if (prepared.source === null) {
+        if ((value.active as DeploymentReference).generation !== '0'
+          || prepared.binding !== null || artifact.retirementProofV2 !== null)
+          throw new TypeError('semantic sink genesis lineage mismatch');
+      } else {
+        const predecessor = this.readArtifact(prepared.source.manifest);
+        const admittedBinding = this.options.coordinator.history()
+          .find(record => record.phase === 'active'
+            && record.binding.generation === (value.active as DeploymentReference).generation)?.binding;
+        if (predecessor.format !== 'aether.process-artifact/2'
+          || processArtifactDigest(predecessor) !== prepared.source.artifactDigest
+          || prepared.binding?.proposal.expectedParent !== prepared.source.manifest
+          || prepared.binding.proposal.candidateManifest !== (value.active as DeploymentReference).manifest
+          || prepared.binding.generation !== (value.active as DeploymentReference).generation
+          || !equal(prepared.binding, admittedBinding)
+          || !equal(prepared.binding.effectPlan,
+            this.semanticEffectPlan(artifact, prepared.source.artifactDigest)))
+          throw new TypeError('semantic sink predecessor or governor lineage mismatch');
+      }
+    }
     if (value.pendingProposal !== null) validateDigest(value.pendingProposal, 'aether.promotion/1');
     if (!Array.isArray(value.invocations)) throw new TypeError('missing durable invocation registry');
     const history = this.options.coordinator.history();
@@ -722,6 +1004,13 @@ export class ProcessDeployment implements PromotionDriver {
     const manifest = this.options.coordinator.servingManifest(), admission = this.options.coordinator.state();
     this.assertCommittedSource(state);
     if (state.readiness !== 'ready' || state.active.manifest !== manifest || state.active.generation !== admission.generation) throw new Error('deployment serving is frozen or does not match committed target');
+    if (semanticSinkProfile(this.capabilityProfile)) {
+      const active = this.readArtifact(state.active.manifest);
+      if (active.format !== 'aether.process-artifact/2'
+        || active.signedEffectResourcePolicyV7.body.policyEpoch
+          !== this.options.effectSignerAnchor!.currentEpoch())
+        throw new Error('active semantic sink policy epoch differs from operator authority');
+    }
   }
   servingManifest(): Digest { const state = this.readState(); this.assertServing(state); return state.active.manifest; }
   status(): { readiness: DeploymentState['readiness']; servingReady:boolean; capabilityProfile: CapabilityDeploymentProfile; activeManifest: Digest; generation: string; workerPids: Readonly<Record<string, number>> } {
@@ -739,9 +1028,15 @@ export class ProcessDeployment implements PromotionDriver {
     const existing = this.hosts.get(reference.id); if (existing) return existing;
     const record = this.readPrepared(reference), artifact = this.readArtifact(reference.manifest);
     if (processArtifactDigest(artifact) !== reference.artifactDigest) throw new TypeError('prepared artifact registry changed');
-    const context = processArtifactContext(artifact), factory = this.options.factories.get(artifact.factoryId)!;
+    const semanticHistorical = artifact.format === 'aether.process-artifact/2'
+      && (() => { const state = this.readState();
+        return state.active.id !== reference.id
+          && (state.pendingProposal === null
+            || suffix(state.pendingProposal) !== reference.id); })();
+    const context = processArtifactContext(artifact), factory = this.factoryFor(artifact.factoryId);
     const services = factory(artifact);
-    this.assertServices(services, context.module, artifact.policy, artifact.manifest, JSON.parse(artifact.plan));
+    this.assertServices(services, context.module, artifact.policy, artifact.manifest,
+      JSON.parse(artifact.plan), artifact, semanticHistorical);
     ensureDirectory(join(this.directory(reference.id), 'host'));
     const host = await ProcessHost.open({ ...services,
       ...(anchoredProfile(this.capabilityProfile) ? { effectSignerAnchor: this.options.effectSignerAnchor } : {}),
@@ -750,8 +1045,15 @@ export class ProcessDeployment implements PromotionDriver {
       ...(hostWitnessedProfile(this.capabilityProfile) ? { hostJournalWitness: selectHostJournalWitness(this.options.hostJournalWitnessCatalog!, reference.id) } : {}),
       ...(sinkProfile(this.capabilityProfile) ? { attestedSinkAuthority: this.options.attestedSinkAuthority!,
         sinkStateWitness: this.options.sinkStateWitness! } : {}),
+      ...(artifact.format === 'aether.process-artifact/2'
+        ? { signedEffectResourcePolicy: artifact.signedEffectResourcePolicyV7,
+          sinkTableV2: artifact.sinkTableV2,
+          ...(semanticHistorical ? { historicalEffectPolicyEpochV7:
+            artifact.signedEffectResourcePolicyV7.body.policyEpoch } : {}) } : {}),
       ...(this.capabilityProfile === 'scoped-anchored-v4' ? { legacyAnchoredEffectPolicy: 'anchored-v2' as const } : {}),
-      ...(resourceSinkProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'attested-sink-v9-resource-witness' as const }
+      ...(semanticSinkProfile(this.capabilityProfile)
+        ? { anchoredEffectPolicyProfile: 'attested-sink-v12-adapter-table-witness' as const }
+        : resourceSinkProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'attested-sink-v9-resource-witness' as const }
         : sinkProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'attested-sink-v8-host-witness' as const }
         : hostWitnessedProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'isolated-wasm-v7-host-witness' as const }
         : witnessedProfile(this.capabilityProfile) ? { anchoredEffectPolicyProfile: 'isolated-wasm-v6-witnessed' as const }
@@ -760,9 +1062,9 @@ export class ProcessDeployment implements PromotionDriver {
       ...(services.signedEffectResourcePolicy && !anchoredProfile(this.capabilityProfile)
         ? { legacyEffectSignerTrust: 'factory-v1' as const } : {}),
       onPhase:(phase,detail)=>{
-      if(this.historicalRecovery!==reference.id)this.options.coordinator.assertLineageCurrent(reference.manifest);
+      if(!semanticHistorical&&this.historicalRecovery!==reference.id)this.options.coordinator.assertLineageCurrent(reference.manifest);
       services.onPhase?.(phase,detail);
-      if(this.historicalRecovery!==reference.id)this.options.coordinator.assertLineageCurrent(reference.manifest);
+      if(!semanticHistorical&&this.historicalRecovery!==reference.id)this.options.coordinator.assertLineageCurrent(reference.manifest);
     }, directory: join(this.directory(reference.id), 'host'), module: context.module, manifest: artifact.manifest,
       registry: context.registry, plan: JSON.parse(artifact.plan), initialGeneration: reference.generation, initialSnapshot: record.seed ?? undefined });
     if (this.closed) { await host.close(); throw new Error('deployment closed during worker preparation'); }
@@ -782,10 +1084,18 @@ export class ProcessDeployment implements PromotionDriver {
   private assertTrustedServices(reference: DeploymentReference): void {
     if (!anchoredProfile(this.capabilityProfile)) return;
     const artifact = this.readArtifact(reference.manifest), context = processArtifactContext(artifact);
-    const factory = this.options.factories.get(artifact.factoryId)!;
-    this.assertServices(factory(artifact), context.module, artifact.policy, artifact.manifest, JSON.parse(artifact.plan));
+    const factory = this.factoryFor(artifact.factoryId);
+    this.assertServices(factory(artifact), context.module, artifact.policy, artifact.manifest, JSON.parse(artifact.plan), artifact);
   }
-  private assertServices(services: ProcessHostServices, module: Term, evidencePolicy: EvidencePolicy, manifest: ExecutionManifestV1, plan: TopologyPlan): void {
+  private assertServices(services: ProcessHostServices, module: Term, evidencePolicy: EvidencePolicy,
+    manifest: ExecutionManifestV1, plan: TopologyPlan, artifact: ProcessArtifact,
+    historicalSemantic = false): void {
+    if (semanticSinkProfile(this.capabilityProfile)) {
+      if (artifact.format !== 'aether.process-artifact/2'
+        || !equal(services.signedEffectResourcePolicy, artifact.signedEffectResourcePolicyV7))
+        throw new TypeError('factory V7 policy differs from exact Artifact/2');
+      this.assertSemanticArtifact(artifact);
+    }
     const invoked = new Set([...walk(module)].filter(node => node.kind === 'Invoke').map(node => (node as Extract<Term, { kind: 'Invoke' }>).capability));
     if (this.capabilityProfile === 'legacy-sealed-v1' ? !!services.scopedGrants || !!services.signedEffectResourcePolicy || !!services.effectResourcePath : !services.scopedGrants) {
       throw new Error('trusted deployment factory does not match durable capability profile');
@@ -794,7 +1104,8 @@ export class ProcessDeployment implements PromotionDriver {
       && (services.effectResourcePath || services.effectResourcePolicyDigest
         || invoked.size > 0 && (!services.signedEffectResourcePolicy
           || !anchoredProfile(this.capabilityProfile) && (!services.effectResourceSignerKey || !services.currentEffectPolicyEpoch)
-          || [...invoked].some(cap => !services.signedEffectResourcePolicy!.body.rules.some(rule => rule.capability === cap))))) {
+          || !semanticSinkProfile(this.capabilityProfile)
+            && [...invoked].some(cap => !services.signedEffectResourcePolicy!.body.rules.some(rule => rule.capability === cap))))) {
       throw new Error('signed deployment profile requires complete manifest-bound effect policy');
     }
     if (this.capabilityProfile === 'scoped-anchored-v5' && invoked.size > 0
@@ -805,7 +1116,7 @@ export class ProcessDeployment implements PromotionDriver {
       && (!invoked.size || services.signedEffectResourcePolicy?.format !== 'aether.signed-effect-resource-policy/4')) {
       throw new Error('isolated Wasm deployment profile requires a signed read-only adapter policy v4');
     }
-    if (sinkProfile(this.capabilityProfile)
+    if (sinkProfile(this.capabilityProfile) && !semanticSinkProfile(this.capabilityProfile)
       && (!invoked.size || services.signedEffectResourcePolicy?.format !==
         (resourceSinkProfile(this.capabilityProfile)
           ? 'aether.signed-effect-resource-policy/6' : 'aether.signed-effect-resource-policy/5')))
@@ -833,6 +1144,9 @@ export class ProcessDeployment implements PromotionDriver {
       if ((services as ProcessHostOptions).attestedSinkAuthority !== undefined
         || (services as ProcessHostOptions).sinkStateWitness !== undefined)
         throw new TypeError('sink authority and witness must be independently provisioned');
+      if ((services as ProcessHostOptions).sinkTableV2 !== undefined
+        || (services as ProcessHostOptions).historicalEffectPolicyEpochV7 !== undefined)
+        throw new TypeError('semantic sink table/history authority must come from Artifact/2');
       if (services.effectResourceSignerKey !== undefined || services.currentEffectPolicyEpoch !== undefined
         || (services as ProcessHostOptions).effectSignerAnchor !== undefined
         || (services as ProcessHostOptions).legacyEffectSignerTrust !== undefined
@@ -841,7 +1155,15 @@ export class ProcessDeployment implements PromotionDriver {
         throw new TypeError('effect signer authority must be independently provisioned');
       if (services.scopedGrants?.repositoryId !== anchor.repositoryId) throw new TypeError('effect grant repository differs from independent signer anchor');
       if (services.signedEffectResourcePolicy) {
-        if (sinkProfile(this.capabilityProfile)) {
+        if (semanticSinkProfile(this.capabilityProfile)) {
+          if (artifact.format !== 'aether.process-artifact/2'
+            || !equal(services.signedEffectResourcePolicy, artifact.signedEffectResourcePolicyV7)
+            || artifact.signedEffectResourcePolicyV7.signer !== anchor.signer)
+            throw new TypeError('semantic sink deployment requires exact signed V7 policy');
+          assertSignedEffectResourcePolicyV7(artifact.signedEffectResourcePolicyV7,
+            manifest, anchor.repositoryId, artifact.signedEffectResourcePolicyV7.body.policyEpoch,
+            anchor.publicKey, module);
+        } else if (sinkProfile(this.capabilityProfile)) {
           if (services.signedEffectResourcePolicy.format !== (resourceSinkProfile(this.capabilityProfile)
             ? 'aether.signed-effect-resource-policy/6' : 'aether.signed-effect-resource-policy/5'))
             throw new TypeError('attested sink deployment requires its signed policy version');
@@ -891,7 +1213,7 @@ export class ProcessDeployment implements PromotionDriver {
           brokerPinWitness(router, selectEffectJournalWitness(this.options.effectJournalWitnessCatalog!, operationId));
       }
     }
-    if (sinkProfile(this.capabilityProfile)) {
+    if (sinkProfile(this.capabilityProfile) && !semanticSinkProfile(this.capabilityProfile)) {
       const policy = services.signedEffectResourcePolicy;
       if ((policy?.format !== 'aether.signed-effect-resource-policy/5'
           && policy?.format !== 'aether.signed-effect-resource-policy/6') || !services.effectRouterFactory)
@@ -947,17 +1269,72 @@ export class ProcessDeployment implements PromotionDriver {
         brokerAssertAttestedSinkAuthority(router, rule.capability, authority, sinkWitness);
       }
     }
+    if (semanticSinkProfile(this.capabilityProfile)) {
+      if (artifact.format !== 'aether.process-artifact/2' || !services.effectRouterFactory)
+        throw new TypeError('semantic sink deployment requires exact Artifact/2 broker factory');
+      const signed = artifact.signedEffectResourcePolicyV7;
+      const tableDigest = declarativeSinkTableDigestV2(artifact.sinkTableV2);
+      const manifestDigest = executionManifestDigest(manifest);
+      const snapshot: RuntimeSnapshotV1 = { format: 'aether.state/1',
+        executionManifest: manifestDigest, heapId: 'heap-semantic-sink-preflight',
+        nextObjectId: '1', eventCursor: '0', records: [], ownership: [] };
+      const authority = this.options.attestedSinkAuthority!;
+      const sinkWitness = this.options.sinkStateWitness!;
+      const sinkContext = { deploymentId: authority.deploymentId,
+        sinkAnchorDigest: domainDigest('aether.sink-anchor/1', authority.anchor),
+        sinkStateWitnessDigest: sinkWitness.digest,
+        approvedAdapterArtifactDigest: authority.approvedAdapterArtifactDigest };
+      const selection = { table: artifact.sinkTableV2, policy: signed, manifest,
+        currentEpoch: signed.body.policyEpoch,
+        signerKey: this.options.effectSignerAnchor!.publicKey, module };
+      for (const rule of signed.body.rules) {
+        if (!historicalSemantic)
+          assertBeforeDeadline(this.options.trustedClockAnchor!, rule.deadline, rule.clockDomain);
+        const unit = plan.units.find(candidate => candidate.capabilities.includes(rule.capability))
+          ?? plan.units[0];
+        if (!unit) throw new TypeError('semantic sink deployment has no preflight unit');
+        const operationId = domainDigest('aether.deployment-semantic-sink-preflight/1', {
+          manifest: manifestDigest, capability: rule.capability });
+        const grantRef = domainDigest('aether.deployment-semantic-sink-preflight-grant/1', {
+          operationId, capability: rule.capability, policyEpoch: signed.body.policyEpoch,
+          tableDigest });
+        const router = services.effectRouterFactory(freeze({ operationId,
+          rootOperationId: operationId, unit: unit.id, generation: '0',
+          manifest: copy(manifest), capability: rule.capability,
+          mode: 'live' as const, snapshot: copy(snapshot),
+          policyEpoch: signed.body.policyEpoch, deadline: rule.deadline,
+          clockDomain: rule.clockDomain, grantRef,
+          admissionTableDigest: tableDigest }));
+        if (brokerMode(router) !== 'live') throw new TypeError('semantic sink preflight router mode mismatch');
+        brokerBind(router, manifest.astRoot as NodeRef);
+        assertEffectResourceSinkContextV7(signed, rule.capability, sinkContext);
+        assertEffectResourceAdapterV7(signed, rule.capability, {
+          ...brokerAdapterIdentity(router, rule.capability),
+          artifactDigest: authority.approvedAdapterArtifactDigest });
+        brokerAttestContext(router, { executionId: operationId,
+          manifestDigest, mode: 'live', policyEpoch: signed.body.policyEpoch,
+          deadline: rule.deadline, clockDomain: rule.clockDomain,
+          capability: rule.capability, grantRef,
+          admissionTableDigest: tableDigest });
+        brokerPinWitness(router, selectEffectJournalWitness(
+          this.options.effectJournalWitnessCatalog!, operationId));
+        brokerAssertAttestedSinkAuthority(router, rule.capability, authority, sinkWitness);
+        brokerAssertAdmissionTableV2(router, selection, authority, sinkWitness);
+      }
+    }
   }
   private assertHistoricalServices(state: DeploymentState): void {
-    const artifact = this.readArtifact(state.active.manifest), factory = this.options.factories.get(artifact.factoryId)!;
-    this.assertServices(factory(artifact), decodeIR(artifact.ir), artifact.policy, artifact.manifest, JSON.parse(artifact.plan));
+    const artifact = this.readArtifact(state.active.manifest), factory = this.factoryFor(artifact.factoryId);
+    this.assertServices(factory(artifact), decodeIR(artifact.ir), artifact.policy, artifact.manifest, JSON.parse(artifact.plan), artifact);
   }
   issueTokens(symbol: SymbolId, ttlMs?: number): CapabilityToken[] {
+    this.assertExported(symbol);
     const state = this.readState(); this.assertServing(state);
     const host = this.hosts.get(state.active.id); if (!host) throw new Error('deployment workers require recovery/open');
     return host.issueTokens(symbol, ttlMs);
   }
   issueScopedTokens(symbol: SymbolId, ttlMs?: number, resourceScopes?: ReadonlyMap<CapabilityName, readonly string[]>): ScopedGrantV2[] {
+    this.assertExported(symbol);
     const state = this.readState(); this.assertServing(state);
     const host = this.hosts.get(state.active.id); if (!host) throw new Error('deployment workers require recovery/open');
     return host.issueScopedTokens(symbol, ttlMs, resourceScopes);
@@ -1001,6 +1378,7 @@ export class ProcessDeployment implements PromotionDriver {
     }, this.options.lockWaitMs ?? 5000);
   }
   async call(symbol: SymbolId, args: readonly TaggedValueV1[], options: { operationId: string; tokens: readonly ProcessInvocationGrant[] }): Promise<ProcessHostCallResult> {
+    this.assertExported(symbol);
     this.assertServing();
     identifier(options.operationId); args.forEach(value => validateTaggedValue(value));
     args = freeze(copy(args)); options = Object.freeze({ operationId: options.operationId, tokens: freeze(copy(options.tokens)) });
@@ -1015,7 +1393,7 @@ export class ProcessDeployment implements PromotionDriver {
       if (old) {
         if (old.requestDigest !== requestDigest) throw new Error('deployment invocation identity conflict');
         const historical=this.readArtifact(old.deployment.manifest),current=this.readArtifact(state.active.manifest);
-        const declaration=(artifact:ProcessArtifactV1)=>[...walk(processArtifactContext(artifact).module)].find((node):node is Extract<Term,{kind:'FunctionDecl'}>=>node.kind==='FunctionDecl'&&node.symbol===symbol);
+        const declaration=(artifact:ProcessArtifact)=>[...walk(processArtifactContext(artifact).module)].find((node):node is Extract<Term,{kind:'FunctionDecl'}>=>node.kind==='FunctionDecl'&&node.symbol===symbol);
         const before=declaration(historical),after=declaration(current);
         if(!before||!after||historical.manifest.capabilityPolicyDigest!==current.manifest.capabilityPolicyDigest||before.capabilities.some(cap=>!after.capabilities.includes(cap)))throw new Error('historical invocation requires authority unavailable in the current declaration/policy; durable receipt retained without redispatch');
         this.assertServing();
@@ -1075,7 +1453,7 @@ export class ProcessDeployment implements PromotionDriver {
       const artifact = this.readArtifact(invocation.deployment.manifest);
       const authorize = (): void => {
         this.assertCommittedSource();
-        const services = this.options.factories.get(artifact.factoryId)?.(artifact);
+        const services = this.factoryFor(artifact.factoryId)(artifact);
         if (services?.authorizeRecovery?.(operationId, strategy) !== true) throw new Error('deployment recovery authorization denied');
       };
       authorize();
@@ -1131,13 +1509,23 @@ export class ProcessDeployment implements PromotionDriver {
     const state = this.readState(); this.assertCommittedSource(state);
     if (state.active.manifest !== binding.proposal.expectedParent || String(BigInt(state.active.generation) + 1n) !== binding.generation) throw new Error('stale source deployment generation');
     const candidate = this.readArtifact(binding.proposal.candidateManifest), source = this.readArtifact(state.active.manifest);
+    if (semanticSinkProfile(this.capabilityProfile)) {
+      if (candidate.format !== 'aether.process-artifact/2'
+        || source.format !== 'aether.process-artifact/2')
+        throw new TypeError('semantic promotion requires exact Artifact/2 lineage');
+      this.options.coordinator.assertLineageCurrent(state.active.manifest);
+      this.options.coordinator.assertLineageCurrent(binding.proposal.candidateManifest);
+      this.assertSemanticTransition(candidate, source);
+    }
     if (!equal(candidate.manifest, binding.manifest) || evidenceBundleDigest(candidate.evidence) !== binding.proposal.evidenceBundleDigest) throw new Error('candidate registry evidence does not match approval');
     if (candidate.schemaDigest !== source.schemaDigest) throw new Error('same-schema driver rejects changed types/layouts; a verified lens is required');
     const sourceHost = await this.hostFor(state.active);
     if (sourceHost.status().unresolved.length || state.invocations.some(invocation => invocation.phase === 'pending') || state.allocations.some(allocation => allocation.result === null)) throw new Error('unresolved source execution prevents deployment');
     const snapshot = await sourceHost.snapshot(), artifactDigest = processArtifactDigest(candidate);
     if (!equal(binding.migrationPlan, processMigrationPlan(snapshot, artifactDigest))) throw new Error('approved migration source snapshot/artifact is stale');
-    const expectedEffectPlan = resourceSinkProfile(this.capabilityProfile)
+    const expectedEffectPlan = candidate.format === 'aether.process-artifact/2'
+      ? this.semanticEffectPlan(candidate, state.active.artifactDigest)
+      : resourceSinkProfile(this.capabilityProfile)
       ? processResourceScopedSinkEffectPlan(candidate.factoryId,
         candidate.manifest.capabilityPolicyDigest,
         this.options.effectSignerAnchor!.digest, this.options.trustedClockAnchor!.digest,
@@ -1180,6 +1568,8 @@ export class ProcessDeployment implements PromotionDriver {
       ...(hostWitnessedProfile(this.capabilityProfile) ? { hostJournalWitnessCatalogDigest: this.options.hostJournalWitnessCatalog!.digest } : {}),
       ...(hostWitnessedProfile(this.capabilityProfile) ? { deploymentJournalWitnessDigest: this.options.deploymentJournalWitness!.digest } : {}),
       ...(sinkProfile(this.capabilityProfile) ? this.sinkBinding() : {}),
+      ...(candidate.format === 'aether.process-artifact/2'
+        ? this.semanticPreparedFields(candidate, state.active.artifactDigest) : {}),
       binding, reference, source: state.active, sourceSnapshotDigest: runtimeSnapshotDigest(snapshot), seed: rebind(snapshot, reference.manifest, reference.generation, JSON.parse(candidate.plan)) };
     const preparing = this.saveState({ ...state, readiness: 'preparing', pendingProposal: binding.proposalDigest }, state);
     this.writePrepared(record);
@@ -1196,6 +1586,37 @@ export class ProcessDeployment implements PromotionDriver {
     if (!equal(record.binding, binding) || !equal(handle, createPromotionHandle(binding, { tag: 'string', value: domainDigest('aether.process-prepared-record/1', record, LIMITS) }))) throw new Error('prepared process handle/binding mismatch');
     return record;
   }
+  /** The coordinator calls this synchronously immediately around its durable
+   * commit. A retirement proof is rechecked under the same GC retention lock
+   * that guards additions of active/replay/replication roots. */
+  commitFence(binding: PromotionBindingV1, commit: () => void): void {
+    if (!semanticSinkProfile(this.capabilityProfile)) { commit(); return; }
+    if (!this.lease || this.lease.proposal !== binding.proposalDigest)
+      throw new Error('semantic retirement commit requires held deployment gate');
+    const state = this.readState();
+    if (state.readiness !== 'prepared'
+      || state.pendingProposal !== binding.proposalDigest
+      || state.active.manifest !== binding.proposal.expectedParent)
+      throw new Error('semantic retirement prepared source changed before commit');
+    const candidate = this.readArtifact(binding.proposal.candidateManifest);
+    const source = this.readArtifact(state.active.manifest);
+    if (candidate.format !== 'aether.process-artifact/2'
+      || source.format !== 'aether.process-artifact/2')
+      throw new TypeError('semantic retirement commit requires Artifact/2 lineage');
+    const proposal = candidate.retirementProofV2;
+    const decision = (): void => {
+      this.assertSemanticTransition(candidate, source);
+      const prepared = this.readPrepared({ id: suffix(binding.proposalDigest),
+        manifest: binding.proposal.candidateManifest,
+        artifactDigest: processArtifactDigest(candidate), generation: binding.generation });
+      if (!equal(prepared.binding, binding) || !equal(prepared.source, state.active))
+        throw new Error('semantic retirement prepared artifact/source changed before commit');
+      commit();
+    };
+    if (proposal) this.options.semanticSinkRetirement!.retentionLedger
+      .withStableRetentions(proposal.retained, decision);
+    else decision();
+  }
   async activate(binding: PromotionBindingV1, handle: PreparedPromotionHandleV1): Promise<void> {
     this.assertBinding(binding, 'commit'); await this.hold(binding.proposalDigest);
     try { this.assertBinding(binding, 'commit'); } catch (error) { await this.release(); throw error; }
@@ -1211,7 +1632,11 @@ export class ProcessDeployment implements PromotionDriver {
     if (this.closed) throw new Error('deployment closed during activation');
     this.assertTrustedServices(record.reference);
     this.assertBinding(binding, 'commit');
-    this.saveState({ ...state, active: record.reference, readiness: 'ready', pendingProposal: null }, state);
+    const candidate = this.readArtifact(record.reference.manifest);
+    this.saveState({ ...state,
+      ...(candidate.format === 'aether.process-artifact/2'
+        ? this.semanticStateFields(candidate, record.source?.artifactDigest ?? null) : {}),
+      active: record.reference, readiness: 'ready', pendingProposal: null }, state);
     this.options.phase?.('activated', { proposalDigest: binding.proposalDigest, workerPids: host.workerPids });
     await this.release();
   }
