@@ -1,0 +1,96 @@
+{
+  "directory": "/private/tmp/aether-v16-exact-audit-59bbb5a",
+  "commit": "59bbb5a8f0faa930b08c485fe0a873e0bc207bec",
+  "rows": 55,
+  "aggregate": {
+    "cl100k_base": {
+      "legacyTsReviewTokens": 6560,
+      "ae2CompleteModelTokens": 22977,
+      "ratioOfSums": 0.28550289419854635,
+      "meetsFourfoldDiagnostic": false
+    },
+    "o200k_base": {
+      "legacyTsReviewTokens": 6572,
+      "ae2CompleteModelTokens": 22735,
+      "ratioOfSums": 0.2890697162964592,
+      "meetsFourfoldDiagnostic": false
+    }
+  },
+  "refused": [
+    {
+      "id": "lazy_task/inline",
+      "target": "typescript",
+      "reason": "TypeError: scalar contract profile excludes effectful or indirect calls"
+    },
+    {
+      "id": "lazy_task/inline",
+      "target": "python",
+      "reason": "TypeError: scalar contract profile excludes effectful or indirect calls"
+    },
+    {
+      "id": "lazy_task/inline",
+      "target": "rust",
+      "reason": "TypeError: scalar contract profile excludes effectful or indirect calls"
+    },
+    {
+      "id": "lazy_task/direct_factory",
+      "target": "typescript",
+      "reason": "TypeError: contract closure has unsupported state or effects"
+    },
+    {
+      "id": "lazy_task/direct_factory",
+      "target": "python",
+      "reason": "TypeError: contract closure has unsupported state or effects"
+    },
+    {
+      "id": "lazy_task/direct_factory",
+      "target": "rust",
+      "reason": "TypeError: contract closure has unsupported state or effects"
+    },
+    {
+      "id": "lazy_task/block_factory",
+      "target": "typescript",
+      "reason": "TypeError: contract closure has unsupported state or effects"
+    },
+    {
+      "id": "lazy_task/block_factory",
+      "target": "python",
+      "reason": "TypeError: contract closure has unsupported state or effects"
+    },
+    {
+      "id": "lazy_task/block_factory",
+      "target": "rust",
+      "reason": "TypeError: contract closure has unsupported state or effects"
+    },
+    {
+      "id": "lazy_task/branch_factory",
+      "target": "typescript",
+      "reason": "TypeError: contract closure has unsupported state or effects"
+    },
+    {
+      "id": "lazy_task/branch_factory",
+      "target": "python",
+      "reason": "TypeError: contract closure has unsupported state or effects"
+    },
+    {
+      "id": "lazy_task/branch_factory",
+      "target": "rust",
+      "reason": "TypeError: contract closure has unsupported state or effects"
+    },
+    {
+      "id": "lazy_task/passed_parameter",
+      "target": "typescript",
+      "reason": "passed closure has no checked certificate; contract guard refuses at execution"
+    },
+    {
+      "id": "lazy_task/passed_parameter",
+      "target": "python",
+      "reason": "passed closure has no checked certificate; contract guard refuses at execution"
+    },
+    {
+      "id": "lazy_task/passed_parameter",
+      "target": "rust",
+      "reason": "passed closure has no checked certificate; contract guard refuses at execution"
+    }
+  ]
+}

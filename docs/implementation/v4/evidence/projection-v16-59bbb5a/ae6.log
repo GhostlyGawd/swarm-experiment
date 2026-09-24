@@ -1,0 +1,12 @@
+✔ AE6 cold-bound references restore exact declaration and module roots without aliases (375.229917ms)
+✔ AE6 root-bound literal edits preserve contracts and execute both failed and repaired outputs (144.872709ms)
+✔ AE6 rejects stale, noncanonical, wrong-root, out-of-scope and malformed wires (43.939625ms)
+✔ AE6 edit is independently decoded in a fresh process from only the paid cold wire (276.811ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1016.176375
