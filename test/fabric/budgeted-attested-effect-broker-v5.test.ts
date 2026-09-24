@@ -114,12 +114,17 @@ function fixture() {
     deploymentId, journalKind: 'bridge', journalId: 'bridge:v5', read: () => bridgeHead,
     advance(expected, journal) { assert.equal(bridgeHead.revision, expected);
       bridgeHead = { revision: String(BigInt(expected) + 1n), journal }; return bridgeHead; } });
-  let broker!: DurableEffectBroker, authorizations = 0, denyOn = -1;
+  let broker!: DurableEffectBroker, authorizations = 0, denyOn = -1, failReserved = false;
   const bridge = new ResourceBudgetBridge({ directory: join(directory, 'bridge'), profile: bridgeProfile,
     ledger, key: budgetKeys.privateKey, journalWitness: bridgeWitness, mode: () => broker.executionMode,
     authorize: () => true, observe: evidence.observe });
   const brokerOptions = { directory: join(directory, 'broker'), clockDomain: 'clock:v5', clock: () => 100n,
     authorize: () => ++authorizations !== denyOn, authorizeReconciliation: () => true,
+    beforePersist: (event: { state: string }) => {
+      if (failReserved && event.state === 'reserved') {
+        failReserved = false; throw new Error('simulated prepublication crash');
+      }
+    },
     witness: effectWitness, attestedSinkV4: { anchor, deploymentId,
       approvedAdapterArtifactDigest: artifact, sinkStateWitness: sinkWitness },
     attestedSinkBudgetV1: { format: 'aether.attested-sink-budget-broker/1' as const,
@@ -136,6 +141,7 @@ function fixture() {
     setStatus(next: typeof status, publishRow: boolean) { status = next; publishStatus = publishRow; },
     setWitnessOutage(value: boolean) { witnessOutage = value; },
     setDenyOn(value: number) { denyOn = value; },
+    failNextReserved() { failReserved = true; },
     get executes() { return executes; },
     close() { rmSync(directory, { recursive: true, force: true }); } };
 }
@@ -161,6 +167,22 @@ test('V5 predispatch denial holds funds until an exact signed witnessed noncommi
     assert.equal(f.executes, 0);
     assert.equal(f.broker.events()[0].format, 'aether.effect-event/4');
     assert.equal(f.broker.events()[0].signedSinkReceipt?.body.disposition, 'not_committed');
+  } finally { f.close(); }
+});
+
+test('V5 recovers a reserve that reached the bridge before broker publication', () => {
+  const f = fixture();
+  try {
+    f.failNextReserved();
+    assert.equal(f.broker.dispatch(f.req, f.adapter).state, 'indeterminate');
+    assert.equal(f.executes, 0);
+    assert.equal(f.ledger.snapshot('budget-owner').inflight.usdMicros, '10');
+    const event = f.broker.events()[0];
+    assert.deepEqual(event.transitions.map(step => step.state), ['requested', 'indeterminate']);
+    f.setStatus('fence', true);
+    assert.equal(f.broker.reconcile(f.req, f.adapter).state, 'aborted');
+    assert.equal(f.ledger.snapshot('budget-owner').inflight.usdMicros, '0');
+    assert.equal(f.ledger.snapshot('budget-owner').spent.usdMicros, '0');
   } finally { f.close(); }
 });
 
