@@ -1,0 +1,21 @@
+✔ deployment witness pins operator and namespace with exact durable CAS bytes (3.545834ms)
+✔ deployment witness rejects stale writers, rollback and same-revision equivocation (18.2045ms)
+✔ deployment witness rejects incomplete, wrong-revision, wrong-identity and noncanonical journals before CAS (6.86125ms)
+✔ deployment witness rejects false CAS acknowledgments and can recover a lost response (1.955458ms)
+✔ deployment witness rejects malformed source heads (0.375875ms)
+✔ deployment witness admits exact /10 sink identity and retains canonical CAS bytes (0.953792ms)
+✔ deployment witness rejects malformed /10 sink fields and profile before CAS (2.783625ms)
+✔ deployment witness forbids sink identity drift and /9↔/10 switch before CAS (5.841959ms)
+✔ V5 policy binds an idempotent external write to signed deployment, sink and witness context (15.623709ms)
+✔ V5 rejects variable targets, changed semantics, malformed context and unsorted rules (9.539709ms)
+✔ V5 verification rejects stale or foreign manifests, signer, epoch and signature domains (6.56425ms)
+✔ V10 ProcessHost and Deployment pin witnessed sink outcomes across workers, promotion and restart (42505.830792ms)
+✔ V9 protects complete host and broker history across real Wasm calls, promotion and reopen (4973.896291ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42697.279916
