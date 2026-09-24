@@ -611,8 +611,21 @@ export class ProcessDeployment implements PromotionDriver {
       || artifact.manifest.capabilityPolicyDigest !== effectResourcePolicyDigestV7(
         artifact.signedEffectResourcePolicyV7.body, decodeIR(artifact.ir)))
       throw new TypeError('Artifact/2 policy/table differs from exact manifest');
-    if (artifact.retirementProofV2 !== null)
-      validateDigest(artifact.retirementProofV2.id, 'aether.semantic-sink-retirement/2');
+    if (artifact.retirementProofV2 !== null) {
+      const proof = artifact.retirementProofV2;
+      validateDigest(proof.id, 'aether.semantic-sink-retirement/2');
+      if (!equal(proof.candidate, { table: artifact.sinkTableV2,
+        policy: artifact.signedEffectResourcePolicyV7, manifest: artifact.manifest }))
+        throw new TypeError('Artifact/2 historical retirement proof differs from exact candidate');
+      // Audit a committed proof against its original monotone retention
+      // snapshot. Later task pins may arrive; they invalidate a new commit,
+      // not a predecessor decision already signed by the governor.
+      verifySemanticSinkRetirementV2({ ...this.options.semanticSinkRetirement!,
+        sourcePolicyEpoch: proof.source.policy.body.policyEpoch,
+        candidatePolicyEpoch: proof.candidate.policy.body.policyEpoch,
+        sourceSignerKey: anchor.publicKey, candidateSignerKey: anchor.publicKey,
+      }, proof, { historicalCommitted: true });
+    }
   }
   private assertSemanticTransition(candidate: ProcessArtifactV2,
     source: ProcessArtifactV2 | null): void {

@@ -64,7 +64,7 @@ function fixture(options: { exportUnused?: boolean; protectUnused?: boolean; fen
   };
   const propose = () => proposeSemanticSinkRetirementV2(context, source, candidate,
     f.genesis.context.specification);
-  return { f, table, source, candidate, context, propose, cleanup: f.cleanup };
+  return { f, keys, table, source, candidate, context, propose, cleanup: f.cleanup };
 }
 function reseal(proposal: SemanticSinkRetirementProposalV2): SemanticSinkRetirementProposalV2 {
   const { id, ...body } = proposal;
@@ -123,6 +123,20 @@ test('changed retention and dishonest liveness or table/rule edits fail independ
   } finally { f.cleanup(); }
 });
 
+test('committed retirement proof remains auditable after later task pins but cannot be reused for a new commit', () => {
+  const f = fixture();
+  try {
+    f.f.retentionLedger.retain({ kind: 'audit', reference: 'retained-before-commit',
+      root: f.f.root });
+    const proposal = f.propose(); assert.ok(proposal);
+    f.f.retentionLedger.retain({ kind: 'active-task', reference: 'arrived-after-commit',
+      root: f.f.root });
+    assert.throws(() => verifySemanticSinkRetirementV2(f.context, proposal),
+      /retention changed/);
+    verifySemanticSinkRetirementV2(f.context, proposal, { historicalCommitted: true });
+  } finally { f.cleanup(); }
+});
+
 test('changed source/candidate roots, epochs and portable proof fail closed', () => {
   const f = fixture();
   try {
@@ -137,6 +151,14 @@ test('changed source/candidate roots, epochs and portable proof fail closed', ()
         manifest: { ...proposal.source.manifest, astRoot: wrongRoot } } })), /AST|root|manifest/);
     const epoch = { ...f.context, candidatePolicyEpoch: '3' };
     assert.throws(() => verifySemanticSinkRetirementV2(epoch, proposal), /epoch/);
+    const equalEpochBody = { ...f.candidate.policy.body, policyEpoch: '1' };
+    const equalEpochCandidate: SinkRetirementSelectionV2 = { ...f.candidate,
+      policy: signEffectResourcePolicyV7(equalEpochBody, 'signer', f.keys.privateKey),
+      manifest: { ...f.candidate.manifest,
+        capabilityPolicyDigest: effectResourcePolicyDigestV7(equalEpochBody) } };
+    assert.throws(() => proposeSemanticSinkRetirementV2({ ...f.context,
+      candidatePolicyEpoch: '1' }, f.source, equalEpochCandidate,
+    f.f.genesis.context.specification), /epoch mismatch/);
     const witness = reseal({ ...proposal, witness: { ...proposal.witness,
       certificate: { ...proposal.witness.certificate, certificates: [] } } });
     assert.throws(() => verifySemanticSinkRetirementV2(f.context, witness), /certificate|coverage|obligation/i);

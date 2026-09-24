@@ -42,6 +42,20 @@ function resourceSinkJournal(witness: DeploymentJournalWitness, revision: string
     ...overrides,
   })).toString('utf8');
 }
+function semanticSinkJournal(witness: DeploymentJournalWitness, revision: string,
+  overrides: Record<string, unknown> = {}): string {
+  const v11 = JSON.parse(resourceSinkJournal(witness, revision)) as Record<string, unknown>;
+  return Buffer.from(encodeCanonical({ ...v11,
+    format: 'aether.process-deployment/12', capabilityProfile: 'scoped-anchored-sink-v12',
+    active: { id: 'genesis', manifest: digest('aether.execution/1'),
+      artifactDigest: digest('aether.process-artifact/2'), generation: '0' },
+    activeSinkTableDigest: digest('aether.declarative-adapter-table/2'),
+    activeSinkPolicyDigest: digest('aether.effect-resource-policy/7'),
+    activeRetirementProofDigest: null, activePredecessorArtifactDigest: null,
+    semanticExportPolicyDigest: digest('aether.semantic-sink-export-policy/2'),
+    ...overrides,
+  })).toString('utf8');
+}
 function fixture() {
   let head: DeploymentJournalHead = { revision: '0', journal: null };
   let advances = 0;
@@ -162,6 +176,35 @@ test('deployment witness admits exact /10 sink identity and retains canonical CA
   assert.deepEqual(advanceDeploymentJournalHead(f.witness, '0', first), { revision: '1', journal: first });
   assert.deepEqual(advanceDeploymentJournalHead(f.witness, '1', second), { revision: '2', journal: second });
   assert.deepEqual(readDeploymentJournalHead(f.witness), { revision: '2', journal: second });
+  assert.equal(f.advances(), 2);
+});
+
+test('deployment witness V12 pins signed sink table fields and immutable export authority', () => {
+  const f = fixture();
+  const first = semanticSinkJournal(f.witness, '1');
+  const second = semanticSinkJournal(f.witness, '2', {
+    activeSinkTableDigest: digest('aether.declarative-adapter-table/2'),
+  });
+  assert.deepEqual(advanceDeploymentJournalHead(f.witness, '0', first),
+    { revision: '1', journal: first });
+  assert.deepEqual(advanceDeploymentJournalHead(f.witness, '1', second),
+    { revision: '2', journal: second });
+  assert.equal(f.advances(), 2);
+  const alteredExport = semanticSinkJournal(f.witness, '3', {
+    semanticExportPolicyDigest: domainDigest('aether.semantic-sink-export-policy/2', 'other'),
+  });
+  assert.throws(() => advanceDeploymentJournalHead(f.witness, '2', alteredExport),
+    /identity changed/);
+  assert.equal(f.advances(), 2);
+  for (const invalid of [
+    { activeSinkTableDigest: digest('aether.declarative-adapter-table/1') },
+    { activeSinkPolicyDigest: digest('aether.effect-resource-policy/6') },
+    { activeRetirementProofDigest: digest('aether.other/1') },
+    { activePredecessorArtifactDigest: digest('aether.process-artifact/1') },
+    { active: { id: 'genesis', manifest: digest('aether.execution/1'),
+      artifactDigest: digest('aether.process-artifact/1'), generation: '0' } },
+  ]) assert.throws(() => advanceDeploymentJournalHead(f.witness, '2',
+    semanticSinkJournal(f.witness, '3', invalid)));
   assert.equal(f.advances(), 2);
 });
 

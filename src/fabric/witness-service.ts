@@ -187,7 +187,7 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
       : id.kind === 'sink' ? 'aether.attested-sink-state/2'
         : id.kind === 'budget' ? (id.journalKind === 'ledger'
           ? 'aether.resource-journal/1' : 'aether.resource-budget-bridge-journal/1')
-        : ['aether.process-deployment/9', 'aether.process-deployment/10', 'aether.process-deployment/11'];
+        : ['aether.process-deployment/9', 'aether.process-deployment/10', 'aether.process-deployment/11', 'aether.process-deployment/12'];
   // The service owns transport, identity, CAS and durable custody. Runtime
   // wrappers validate the richer journal semantics before calling advance.
   const journalFormat = id.kind === 'budget' && id.journalKind === 'bridge'
@@ -230,14 +230,27 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
     if (record.deploymentJournalWitnessDigest !== domainDigest(body.format, body))
       throw new TypeError('deployment journal witness binding mismatch');
     if (record.format === 'aether.process-deployment/10'
-      || record.format === 'aether.process-deployment/11') {
-      if (record.capabilityProfile !== (record.format === 'aether.process-deployment/11'
+      || record.format === 'aether.process-deployment/11'
+      || record.format === 'aether.process-deployment/12') {
+      if (record.capabilityProfile !== (record.format === 'aether.process-deployment/12'
+        ? 'scoped-anchored-sink-v12' : record.format === 'aether.process-deployment/11'
         ? 'scoped-anchored-sink-v11' : 'scoped-anchored-sink-v10')
         || record.sinkDeploymentId !== id.deploymentId)
         throw new TypeError('sink deployment witness namespace mismatch');
       validateDigest(record.sinkAnchorDigest, 'aether.sink-anchor/1');
       validateDigest(record.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
       validateSinkAdapterArtifactDigest(record.approvedAdapterArtifactDigest);
+      if (record.format === 'aether.process-deployment/12') {
+        validateDigest(record.activeSinkTableDigest, 'aether.declarative-adapter-table/2');
+        validateDigest(record.activeSinkPolicyDigest, 'aether.effect-resource-policy/7');
+        if (record.activeRetirementProofDigest !== null)
+          validateDigest(record.activeRetirementProofDigest, 'aether.semantic-sink-retirement/2');
+        if (record.activePredecessorArtifactDigest !== null)
+          validateDigest(record.activePredecessorArtifactDigest, 'aether.process-artifact/2');
+        validateDigest(record.semanticExportPolicyDigest, 'aether.semantic-sink-export-policy/2');
+        const active = exactObject(record.active, ['id', 'manifest', 'artifactDigest', 'generation']);
+        validateDigest(active.artifactDigest, 'aether.process-artifact/2');
+      }
     }
   }
   if (id.kind === 'sink') {
@@ -473,10 +486,14 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
     return;
   }
   if ((prior.format === 'aether.process-deployment/10'
-      || prior.format === 'aether.process-deployment/11')
+      || prior.format === 'aether.process-deployment/11'
+      || prior.format === 'aether.process-deployment/12')
     && ['sinkAnchorDigest', 'sinkDeploymentId', 'approvedAdapterArtifactDigest',
       'sinkStateWitnessDigest'].some(field => !same(prior[field], next[field])))
     throw new Error('witnessed sink deployment identity changed');
+  if (prior.format === 'aether.process-deployment/12'
+    && !same(prior.semanticExportPolicyDigest, next.semanticExportPolicyDigest))
+    throw new Error('witnessed semantic export authority changed');
   prefix('invocations', (oldRow, newRow) => {
     fixed(oldRow, newRow, ['operationId', 'requestDigest', 'heapId', 'deployment', 'symbol', 'unit']);
     forward(oldRow.phase, newRow.phase, { pending: ['pending', 'settled'], settled: ['settled'] });

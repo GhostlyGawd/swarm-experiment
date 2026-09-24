@@ -388,6 +388,8 @@ test('V12 witnessed deployment retires one dead signed sink, preserves live disp
     const beforeReplay = f.executes();
     assert.deepEqual(await deployment.recoverOperation('semantic:old'), old);
     assert.equal(f.executes(), beforeReplay, 'historical predecessor receipt cannot redispatch');
+    f.gc.retentionLedger.retain({ kind: 'active-task',
+      reference: 'arrived-after-retirement', root: f.gc.root });
     await deployment.close(); deployment = null;
     deployment = await ProcessDeployment.open({ ...f.options, genesis: undefined });
     assert.equal(deployment.status().servingReady, true);
@@ -419,8 +421,9 @@ test('V12 commit fence rejects a new active-task pin after candidate preparation
     assert.equal(witnessed.activeRetirementProofDigest, null);
     assert.equal(f.decisions.length, 0);
     assert.equal(deployment.status().servingReady, false);
-    f.setEpoch('1');
-    assert.equal(deployment.status().servingReady, true);
+    assert.equal(deployment.status().servingReady, false,
+      'aborted retirement cannot revive the stale epoch-1 source for new calls');
+    assert.throws(() => deployment!.issueScopedTokens(f.gc.live), /epoch|policy/i);
   } finally { await deployment?.close(); f.cleanup(); }
 });
 

@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Governor-admitted signed sink adapter retirement — 2026-09-24
+
+- Added versioned signed effect policy `/7`, declarative attested sink table `/2`, and independent retirement proof `/2`. Artifact `/2` embeds all three, with complete current broker adapter-map admission; old artifact/policy/table bytes remain explicit. Strict-lineage ProcessDeployment `/12` and ProcessHost V13 bind the live table to governor approval, operator signer/clock/sink witnesses and a retention-fenced durable commit. Historical predecessor Artifact `/2` remains available for exact receipt inspection but cannot dispatch new calls.
+- A direct V12 campaign passes 4/4 across real workers, signed sink outcomes, retirement, stale-epoch administrative restart, retained predecessor receipts and a late task pin. A separate-process 2/2 campaign uses sink and witness services and real controller SIGKILL before/after governor commit, with fresh recovery and custody outage/rollback refusal. [Decision and trust limits](decisions/D15-signed-sink-adapter-retirement.md).
+- This covers one signed sink registration profile, not general adapter execution, distinct-UID custody, full active-task/replay retention release, or fuel-equivalent wrapper collapse. T1-05/T2-04 remain open and the tracker stays **20/62**.
+
 ## Semantic GC fuel and retention safety — 2026-09-24
 
 - A tight `maxSteps` campaign found that old branch flattening could make an effect execute when the source would have exhausted its step budget. Added a versioned fuel-preserving branch profile that removes only the proved cold arm while keeping the executed guard and arm; new promotion of historical step-changing branch/wrapper/shim proposals is denied before a governor decision. Historical committed decisions remain recoverable.

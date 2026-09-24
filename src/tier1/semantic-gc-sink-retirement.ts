@@ -199,7 +199,8 @@ function harness(body: RetirementBodyV2): { module: Term; specification: string;
   };
   return { module, specification, manifest };
 }
-function verifyBody(context: SemanticSinkRetirementContextV2, body: RetirementBodyV2): void {
+function verifyBody(context: SemanticSinkRetirementContextV2, body: RetirementBodyV2,
+  historicalCommitted = false): void {
   exactObject(body.source, ['table', 'policy', 'manifest']);
   exactObject(body.candidate, ['table', 'policy', 'manifest']);
   if (body.repositoryId !== context.repositoryId
@@ -214,7 +215,7 @@ function verifyBody(context: SemanticSinkRetirementContextV2, body: RetirementBo
     })) throw new Error('retirement candidate changed the execution AST or non-policy manifest');
   if (body.source.policy.body.policyEpoch !== context.sourcePolicyEpoch
     || body.candidate.policy.body.policyEpoch !== context.candidatePolicyEpoch
-    || BigInt(context.candidatePolicyEpoch) < BigInt(context.sourcePolicyEpoch))
+    || BigInt(context.candidatePolicyEpoch) <= BigInt(context.sourcePolicyEpoch))
     throw new Error('retirement policy epoch mismatch');
   const module = context.store.hydrate(body.source.manifest.astRoot as NodeRef);
   assertDeclarativeSinkTablePolicyV2({ ...body.source,
@@ -229,9 +230,16 @@ function verifyBody(context: SemanticSinkRetirementContextV2, body: RetirementBo
   if (digest('aether.specification/1', body.specification) !== body.source.manifest.specRoot)
     throw new Error('retirement specification differs from signed source');
   const current = retentionSnapshot(context.retentionLedger);
-  if (!same(current, body.retained)) throw new Error('retention changed; retirement must be reproved');
+  if (historicalCommitted) {
+    // Retention is monotone. A committed predecessor remains verifiable after
+    // later tasks arrive, but every pin used in its original proof must still
+    // exist; historical inspection never authorizes a new commit.
+    if (body.retained.some(pin => !current.some(record => same(record, pin))))
+      throw new Error('historical retirement lost a proved retention record');
+  } else if (!same(current, body.retained))
+    throw new Error('retention changed; retirement must be reproved');
   const analysis = analyze(context, body.source.manifest.astRoot as NodeRef,
-    body.specification, body.source.manifest, current);
+    body.specification, body.source.manifest, body.retained);
   const removed = body.source.table.registrations
     .filter(entry => !analysis.usedCapabilities.includes(entry.capability)).map(entry => entry.id);
   if (!removed.length || !same(body.reachable, analysis.reachable)
@@ -256,7 +264,8 @@ function verifyBody(context: SemanticSinkRetirementContextV2, body: RetirementBo
     throw new Error('retirement changed signed live effect rules');
 }
 export function verifySemanticSinkRetirementV2(context: SemanticSinkRetirementContextV2,
-  input: SemanticSinkRetirementProposalV2): void {
+  input: SemanticSinkRetirementProposalV2,
+  options: { historicalCommitted?: true } = {}): void {
   const proposal = clone(input);
   exactObject(proposal, ['format', 'repositoryId', 'exportPolicyDigest', 'specification',
     'source', 'candidate', 'retained', 'reachable', 'usedCapabilities', 'removed', 'witness', 'id']);
@@ -265,7 +274,7 @@ export function verifySemanticSinkRetirementV2(context: SemanticSinkRetirementCo
   const { witness, id, ...body } = proposal;
   if (id !== digest('aether.semantic-sink-retirement/2', { ...body, witness }))
     throw new Error('semantic sink retirement identity mismatch');
-  verifyBody(context, body);
+  verifyBody(context, body, options.historicalCommitted === true);
   const expected = harness(body);
   exactObject(witness, ['root', 'specification', 'manifest', 'certificate']);
   if (witness.root !== expected.manifest.astRoot
