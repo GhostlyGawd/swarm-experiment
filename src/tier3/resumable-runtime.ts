@@ -10,6 +10,7 @@ import { isRef, isSeqValue, isResultValue, isTaskValue, isClosureValue, type Val
 import { validateMachineArguments, validateMachineResult, instantiateMachineType } from './resumable-types.ts';
 import { compileResumableProgram, type ResumableCode, type ResumableProgram, type ResumableProgramOptions } from './resumable-program.ts';
 import { PackedHeap, unpackResumableCheckpoint, type PackedHeapImage, type PackedResumableCheckpoint } from './packed-heap.ts';
+import { ActiveTaskSemanticRetention } from './active-task-semantic-retention.ts';
 import { MAX_MACHINE_EVENTS, MACHINE_LIMITS, checkpointDigest, emptyEventHead, eventDigest, machineClone, machineDigest, validateMachineCore, validateMachineValue, validateResumableSnapshot, type MachineCore, type MachineValue, type MachineFrame, type MachineEnvironment, type MachineCapture, type MachineEvent, type MachineSection, type ResumableSnapshot } from './resumable-state.ts';
 
 const executionSnapshots = new WeakMap<object, { digest: Digest; origin: Digest; program: Digest }>();
@@ -35,6 +36,9 @@ export interface ResumableRuntimeOptions extends ResumableProgramOptions {
   /** Trusted host resolves current authority; checkpoint bytes only request names. */
   readonly capabilities?: () => readonly CapabilityName[];
   readonly effects?: ResumableEffects;
+  /** Opt-in exact-root GC authority. It publishes monotone active-task pins
+   * before start creates a frame and checks them on continuation/recovery. */
+  readonly activeTaskRetention?: ActiveTaskSemanticRetention;
   readonly maxSteps?: number;
   /** Optional host quota, bounded by the versioned 64 MiB checkpoint profile. */
   readonly maxCheckpointBytes?: number;
@@ -86,6 +90,7 @@ export class ResumableRuntime {
   constructor(module: Term, options: ResumableRuntimeOptions) {
     if (options.virtualForward && options.effects)
       throw new TypeError('virtual forward resumable profile is not admitted to the effect broker');
+    if (options.activeTaskRetention) ActiveTaskSemanticRetention.assertInstance(options.activeTaskRetention);
     this.program = compileResumableProgram(module, options); this.options = options;
     this.checkpointBytes = options.maxCheckpointBytes ?? MACHINE_LIMITS.maxFrameBytes;
     if (options.maxSteps !== undefined && (!Number.isSafeInteger(options.maxSteps) || options.maxSteps < 1 || options.maxSteps > 100_000)) throw new TypeError('invalid resumable step quota');
@@ -211,6 +216,7 @@ export class ResumableRuntime {
   }
   private hostMutation<T>(op: string, action: () => T): T {
     if (this.mutating || this.executing) throw new Error('reentrant host state mutation');
+    if (this.core.state === 'running' || this.core.state === 'blocked') this.assertActiveTask();
     const before = machineClone(this.core), count = this.events.length; this.mutating = true;
     try { const result = action(); validateMachineCore(this.core, this.program); this.event(before, 'host', 0, op); return result; }
     catch (error) { this.core = before; this.events.length = count; this.eventEffect = null; throw error; } finally { this.mutating = false; }
@@ -240,6 +246,7 @@ export class ResumableRuntime {
   start(symbol: SymbolId, args: readonly Value[]): void {
     if (this.executing || this.core.frames.length || this.core.state === 'running' || this.core.state === 'blocked') throw new Error('resumable execution already active');
     const code = this.codes.get(`function:${symbol}`); if (!code) throw new TypeError('unknown resumable entry');
+    this.options.activeTaskRetention?.prepare(this.program, this.options.executionId);
     const before = machineClone(this.core), memo = new Map<object, MachineValue>();
     this.core.state = 'running'; this.core.result = null; this.core.fault = null;
     try { this.enter(code, args.map(value => this.importValue(value, memo))); validateMachineCore(this.core, this.program); this.event(before, code.id, 0, 'start'); }
@@ -384,6 +391,7 @@ export class ResumableRuntime {
   step(): ResumableRunResult {
     if (this.executing) throw new Error('reentrant resumable execution');
     if (this.core.state !== 'running') return this.result();
+    this.assertActiveTask();
     if (this.core.steps >= (this.options.maxSteps ?? 100_000)) throw new RangeError('resumable instruction budget exceeded');
     if (this.events.length >= MAX_MACHINE_EVENTS) throw new RangeError('resumable event history limit');
     this.checkAuthority();
@@ -410,8 +418,10 @@ export class ResumableRuntime {
   run(maxInstructions = 100_000): ResumableRunResult { if (!Number.isSafeInteger(maxInstructions) || maxInstructions < 0) throw new TypeError('invalid instruction slice'); for (let index = 0; index < maxInstructions && this.core.state === 'running'; index++) this.step(); return this.result(); }
   inspect(): Readonly<MachineCore> { return machineClone(this.core); }
   result(): ResumableRunResult { return machineClone({ state: this.core.state, value: this.core.result, fault: this.core.fault, steps: this.core.steps }); }
+  private assertActiveTask(): void { this.options.activeTaskRetention?.assert(this.program, this.options.executionId); }
   snapshot(): ResumableSnapshot {
     if (this.executing) throw new Error('checkpoint requires an instruction safe point');
+    if (this.core.state === 'running' || this.core.state === 'blocked') this.assertActiveTask();
     const snapshot: ResumableSnapshot = { format: this.snapshotFormat, core: machineClone(this.core), eventCursor: String(this.events.length), eventHead: this.events.length ? eventDigest(this.events.at(-1)!) : emptyEventHead(), events: machineClone(this.events) };
     encodeCanonical(snapshot, { ...MACHINE_LIMITS, maxFrameBytes: this.checkpointBytes, maxDecompressedBytes: this.checkpointBytes });
     validateResumableSnapshot(snapshot, this.program);
@@ -424,6 +434,7 @@ export class ResumableRuntime {
     if (snapshot.core.steps > (this.options.maxSteps ?? 100_000)) throw new RangeError('checkpoint exceeds current step quota');
     if (checkpointDigest(snapshot) !== expectedDigest) throw new TypeError('trusted checkpoint digest mismatch');
     if (snapshot.core.executionId !== this.options.executionId || snapshot.core.heapId !== (this.options.heapId ?? `heap:${this.options.executionId}`) || snapshot.core.ownerEpoch !== (this.options.ownerEpoch ?? '0') || snapshot.core.mode !== (this.options.mode ?? 'live') || snapshot.core.branchId !== (this.options.branchId ?? null)) throw new TypeError('checkpoint run/heap/ownership/mode binding mismatch');
+    this.assertActiveTask();
     for (const frame of snapshot.core.frames) this.currentCapabilities(frame.capabilities);
     if (this.options.effects && this.options.effects.broker.executionMode !== 'live') {
       if (snapshot.core.isolatedEffects.length && this.options.effects.broker.recordedEventCount !== snapshot.core.effectPrefix.length) throw new TypeError('isolated checkpoint recorded trace changed');
