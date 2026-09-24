@@ -173,10 +173,12 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw new TypeError('invalid witness journal');
   const expectedFormat = id.kind === 'effect' ? ['aether.effect-journal/2', 'aether.effect-journal/3', 'aether.effect-journal/4']
     : id.kind === 'host' ? 'aether.process-host/4'
-      : id.kind === 'sink' ? 'aether.attested-sink-state/2' : 'aether.process-deployment/9';
+      : id.kind === 'sink' ? 'aether.attested-sink-state/2'
+        : ['aether.process-deployment/9', 'aether.process-deployment/10'];
   // The service owns transport, identity, CAS and durable custody. Runtime
   // wrappers validate the richer journal semantics before calling advance.
-  if (id.kind === 'effect' ? !expectedFormat.includes(record.format as string) : record.format !== expectedFormat)
+  if (Array.isArray(expectedFormat) ? !expectedFormat.includes(record.format as string)
+    : record.format !== expectedFormat)
     throw new TypeError('invalid witness journal format');
   if (id.kind === 'effect') {
     const { kind: _kind, ...parts } = id;
@@ -199,6 +201,14 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
     const body = { format: 'aether.process-deployment-journal-witness/1', ...parts };
     if (record.deploymentJournalWitnessDigest !== domainDigest(body.format, body))
       throw new TypeError('deployment journal witness binding mismatch');
+    if (record.format === 'aether.process-deployment/10') {
+      if (record.capabilityProfile !== 'scoped-anchored-sink-v10'
+        || record.sinkDeploymentId !== id.deploymentId)
+        throw new TypeError('sink deployment witness namespace mismatch');
+      validateDigest(record.sinkAnchorDigest, 'aether.sink-anchor/1');
+      validateDigest(record.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
+      validateSinkAdapterArtifactDigest(record.approvedAdapterArtifactDigest);
+    }
   }
   if (id.kind === 'sink') {
     const configured = namespaces.find(entry => entry.kind === 'sink-scope' && allowed(id, [entry]));
@@ -348,6 +358,10 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
     }
     return;
   }
+  if (prior.format === 'aether.process-deployment/10'
+    && ['sinkAnchorDigest', 'sinkDeploymentId', 'approvedAdapterArtifactDigest',
+      'sinkStateWitnessDigest'].some(field => !same(prior[field], next[field])))
+    throw new Error('witnessed sink deployment identity changed');
   prefix('invocations', (oldRow, newRow) => {
     fixed(oldRow, newRow, ['operationId', 'requestDigest', 'heapId', 'deployment', 'symbol', 'unit']);
     forward(oldRow.phase, newRow.phase, { pending: ['pending', 'settled'], settled: ['settled'] });

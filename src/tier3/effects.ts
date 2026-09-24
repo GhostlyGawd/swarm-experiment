@@ -3,6 +3,8 @@ import { decodeExecutionManifest, encodeExecutionManifest, executionManifestDige
 import { encodeCanonical, validateTaggedValue, type LogicalRefV1, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { DurableEffectBroker, effectPayloadDigest, effectAdapterDigest, type EffectAdapter, type EffectOutcome, type EffectRequestV1, type ExecutionMode } from '../fabric/effects.ts';
 import { assertEffectJournalWitness, type AnyEffectJournalWitness } from '../fabric/effect-journal-witness.ts';
+import { assertAttestedSinkAdapter, isAttestedSinkAdapter, type AttestedSinkIdentityV1 } from '../fabric/attested-sink-adapter.ts';
+import type { SinkStateWitnessV1 } from '../fabric/sink-state-witness.ts';
 import { admittedAdapterArtifactDigest, admittedWasmAdapterCapability } from '../tier2/adapter-artifact.ts';
 import { assertBeforeDeadline, assertGrantLifetime, assertTrustedClockAnchor, type TrustedClockAnchor } from '../tier2/trusted-clock-anchor.ts';
 import { isClosureValue, isRef, isResultValue, isSeqValue, isTaskValue, type Ref, type Value } from './values.ts';
@@ -64,6 +66,7 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   #attested: Readonly<{ capability: CapabilityName; grantRef: string }> | null = null;
   #trustedClock: { anchor: TrustedClockAnchor; windows: readonly { issuedAt: number; expiresAt: number }[] } | null = null;
   #trustedWitness: AnyEffectJournalWitness | null = null;
+  #trustedSinkAuthority = false;
   get mode(): ExecutionMode { return this.#options.broker.executionMode; }
 
   constructor(options: RuntimeEffectRouterOptions) {
@@ -117,6 +120,20 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
     DurableEffectBroker.prototype.assertWitness.call(this.#options.broker, witness);
     this.#trustedWitness = witness;
   }
+  assertAttestedSinkAuthority(capability: CapabilityName, expected: AttestedSinkIdentityV1,
+    sinkStateWitness: SinkStateWitnessV1): void {
+    if (!this.#bound || !this.#attested || this.#attested.capability !== capability
+      || !this.#trustedWitness || this.#sequence !== 0n)
+      throw new TypeError('attested sink authority requires a fresh pinned broker router');
+    const adapter = this.#options.adapters.get(capability);
+    if (!adapter) throw new TypeError('attested sink adapter absent');
+    assertAttestedSinkAdapter(adapter, expected);
+    DurableEffectBroker.prototype.assertAttestedSinkAuthority.call(this.#options.broker, {
+      anchor: expected.anchor, deploymentId: expected.deploymentId,
+      approvedAdapterArtifactDigest: expected.approvedAdapterArtifactDigest,
+    }, sinkStateWitness);
+    this.#trustedSinkAuthority = true;
+  }
   fork(): RuntimeEffectRouter {
     if (!this.#options.isolatedFork) throw new Error('broker-backed fork requires an isolated effect router');
     const child = this.#options.isolatedFork();
@@ -155,7 +172,9 @@ export class BrokerEffectRouter implements RuntimeEffectRouter {
   reconcileRecorded(capability: CapabilityName, request: EffectRequestV1): EffectOutcome {
     this.#assertRecorded(capability, request);
     const adapter = this.#options.adapters.get(capability)!;
-    if (!adapter.semantics.readOnly || !adapter.semantics.reconciliation) throw new TypeError('recorded Wasm effect lacks read-only reconciliation');
+    if (!adapter.semantics.reconciliation || !adapter.semantics.readOnly
+      && !(this.#trustedSinkAuthority && isAttestedSinkAdapter(adapter)))
+      throw new TypeError('recorded effect lacks trusted reconciliation');
     return this.#trustedWitness
       ? DurableEffectBroker.prototype.reconcile.call(this.#options.broker, request, adapter)
       : this.#options.broker.reconcile(request, adapter);
@@ -284,6 +303,14 @@ export function brokerPinTrustedClock(router: RuntimeEffectRouter, anchor: Trust
 export function brokerPinWitness(router: RuntimeEffectRouter, witness: AnyEffectJournalWitness): void {
   if (!brokerRouters.has(router)) throw new TypeError('effect witness requires a broker-backed router');
   BrokerEffectRouter.prototype.pinWitness.call(router, witness);
+}
+/** Nonvirtual check of the exact trusted wrapper, broker context and sink
+ * decision witness. A reloadable factory cannot attest itself via overrides. */
+export function brokerAssertAttestedSinkAuthority(router: RuntimeEffectRouter,
+  capability: CapabilityName, expected: AttestedSinkIdentityV1,
+  sinkStateWitness: SinkStateWitnessV1): void {
+  if (!brokerRouters.has(router)) throw new TypeError('sink authority requires a broker-backed router');
+  BrokerEffectRouter.prototype.assertAttestedSinkAuthority.call(router, capability, expected, sinkStateWitness);
 }
 export function brokerReconcileLast(router: RuntimeEffectRouter, capability: CapabilityName, args: readonly Value[]): Value {
   if (!brokerRouters.has(router)) throw new TypeError('artifact policy requires a broker-backed router');

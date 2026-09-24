@@ -1,0 +1,17 @@
+# D10 — Signed external sink host and deployment profile
+
+Status: opt-in implementation profile under V4-T2-04. Specification 0.1.0 acceptance gates and historical V9 bytes remain unchanged.
+
+## Decision
+
+`aether.signed-effect-resource-policy/5` admits a fixed, sink-wide resource path for an idempotent external write adapter. Its separate digest and Ed25519 signature domains bind the exact AST root, repository, policy epoch, adapter ID/write semantics, approved adapter artifact label, deadline/clock domain, deployment ID, sink public anchor digest and sink state witness digest. The operator's signer anchor verifies the signature and current epoch. V4 remains the read-only Wasm policy.
+
+Direct ProcessHost uses `attested-sink-v8-host-witness` and `aether.process-host-config/8`. It requires an operator-supplied signer, clock, per-operation effect witness catalog, complete host witness, sink anchor/adapter identity and sink state witness. The host configuration digest binds these authorities. Before entering a new effect, the host constructs a broker router and nonvirtually checks the exact trusted adapter wrapper, V4 broker subject and the **same branded sink witness object** selected by the operator. It verifies the signed resource path, current grant, revocation and clock before dispatch. The host's durable terminal and cached-result checks reopen the V4 broker, which rechecks the exact sink decision head. An uncertain write is not treated as a read-only Wasm operation or safe abort.
+
+ProcessDeployment uses `scoped-anchored-sink-v10`, `aether.process-deployment/10`, prepared `/8` and effect plan `/8`. The operator supplies the sink authority and witness outside the reloadable factory; the factory is rejected if it supplies either. The deployment witness retains four immutable sink identity fields. Promotion approval binds the same sink authority alongside the signer, clock, effect witness catalog, host witness catalog and deployment witness. A historical V9 deployment cannot silently adopt V10 state, and V10 cannot silently adopt a V9 registry. Readiness reports false when the sink witness cannot be read; calls refuse before publishing a new outer intent.
+
+## Current evidence and limits
+
+The [integration test](../../../../test/tier4/process-attested-sink-host.test.ts) runs a real ProcessHost worker, a separate sink process and two separately launched witness services under one UID. It covers signed direct and deployed calls, grant denial before a sink decision, factory/witness substitution refusal, cached-result checks during sink witness outage, local sink mirror deletion, promotion and reopen after an older local deployment registry. The V9 historical profile tests remain passing. Exact-source evidence is recorded in STATUS after the integration checkpoint.
+
+This profile's grant path is fixed to the whole sink. It does not yet prove payload-specific target containment. The approved adapter artifact digest is an operator label; substituting it into the V5 policy check does not measure executable bytes. The fixture operation is still its append-once file record, not an arbitrary third-party transaction. Distinct-UID custody, controller SIGKILL at the V10 host/deployment effect boundary, complete recovery and budget settlement campaigns, malicious general-adapter isolation, and rollback-protected time/epoch authority remain open. T2-04/G1/G2 and NFR-16 are not verified.

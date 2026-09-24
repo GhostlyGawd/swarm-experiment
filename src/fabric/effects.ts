@@ -290,6 +290,18 @@ export class DurableEffectBroker {
     Object.preventExtensions(this);
     readWitnessHead(expected);
   }
+  /** A signed host/deployment pins both the exact sink subject and the live
+   * operator-selected decision witness before allowing an external adapter. */
+  assertAttestedSinkAuthority(expected: AttestedEffectBrokerOptionsV3,
+    sinkStateWitness: SinkStateWitnessV1): void {
+    assertSinkStateWitness(sinkStateWitness);
+    if (Object.getPrototypeOf(this) !== DurableEffectBroker.prototype
+      || this.#sinkStateWitness !== sinkStateWitness || !this.#attestedSink
+      || Buffer.compare(encodeCanonical(this.#attestedSink, this.limits),
+        encodeCanonical(expected, this.limits)) !== 0)
+      throw new TypeError('broker sink authority differs from operator selection');
+    readSinkStateHead(sinkStateWitness);
+  }
   recoverDeadWriter(): void { this.journalLock.recoverDeadWriter(); }
   private validateEvent(value: unknown, sinkState?: SinkStateJournalV2): asserts value is EffectEventV1 {
     const v3 = this.#attestedSink !== null;
