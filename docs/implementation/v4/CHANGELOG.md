@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Bounded closure dataflow projection V16 — 2026-09-24
+
+- Added `aether.executable-projection/16` for scalar captures across both `If` factory arms, quantifier and Result binders, exact transitive pure helper roots, checked sequence map/fold, nested immediate lambdas and fresh scalar record reads. Real TypeScript, Python and Rust executions match the reference fixtures; a pinned V15 source/runtime hash comparison remains byte-identical. [Profile, trust boundary and limits](../../../roadmap/v4/research/projections/DATAFLOW-CLOSURES-V16.md).
+- A generated 11×5 corpus typechecks and executes 55 reference-valid cases, then checks 165 native projection outcomes. The effect-free lazy-task body remains a valid counterexample: four carriers are rejected and the passed-function carrier lacks a certificate. Actual-token authored-corpus ratios remain far below 4×; the historical AE6 corpus and threshold are unchanged. T1-02/G1, G2, FR-1.2 and Q03 stay open; **20/62** is unchanged.
+
 ## Witnessed external living campaign and same-host partition — 2026-09-24
 
 - Added signed effect authorization `/4` with a distinct signature/campaign domain. It binds the exact Aether root and generated plan to signed V2 resource policy, approved adapter artifact, preselected sink anchor and two externally supplied witness identities. The executor uses a broker V4 journal and attested sink adapter; unknown transport/status cannot become success, and V4 cannot mint a V2 local admission receipt. Prior V2/V3 bytes and behavior remain explicit. [Contract](LIVING-EFFECT-CAMPAIGN.md).
