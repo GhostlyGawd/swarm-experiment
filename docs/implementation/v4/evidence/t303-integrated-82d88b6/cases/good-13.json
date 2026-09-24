@@ -1,0 +1,67 @@
+{
+  "input": {
+    "format": "aether.living-case/1",
+    "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+    "scenario": "out-of-order-events",
+    "ordinal": 1,
+    "seed": "20260924-integrated/out-of-order-events/1",
+    "schedule": [
+      "events",
+      "events",
+      "events",
+      "events"
+    ],
+    "variables": {}
+  },
+  "result": {
+    "caseDigest": "aether.living-case/1:b3:41f1bb5d87b1bb323c74fc2c8f0c543bd16af7c0af424aeb9685f566a897c646",
+    "passed": true,
+    "failure": null,
+    "filtered": false,
+    "calls": 3,
+    "steps": 51,
+    "evaluatedOperations": 5,
+    "allocatedBytes": 0,
+    "peakAllocatedBytes": 0,
+    "allocationChecksum": 0,
+    "networkFrames": 2,
+    "deliveredFrames": 2,
+    "rejectedFrames": 0,
+    "droppedFrames": 0,
+    "coverage": [
+      "candidate-call",
+      "effect:broker-journal",
+      "effect:committed",
+      "event:ordered",
+      "event:reordered",
+      "event:sequence",
+      "ingress:delivered",
+      "network:none",
+      "runtime:assign",
+      "runtime:branch",
+      "runtime:call",
+      "runtime:invoke",
+      "runtime:return",
+      "step:$checks/final-value",
+      "step:events/first",
+      "step:events/late-first",
+      "step:events/second",
+      "step:events/second-before-first"
+    ],
+    "trace": [
+      "events/second-before-first",
+      "events/second",
+      "events/late-first",
+      "events/first",
+      "$checks/final-value"
+    ],
+    "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+    "effects": {
+      "journalDigest": "aether.living-effect-journal/2:b3:0baf1147cf5c9457fb9389f55dcf48800c51a28586d4d60a8c284390b7888706",
+      "sinkDigest": "aether.living-effect-sink-set/2:b3:2562265ed6b029984d8ab8a2f0e6b90fc9ccf9575780ca58ae91ee890a6faa05",
+      "eventCount": 1,
+      "sinkWrites": 1,
+      "indeterminate": 0
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "input": {
+    "format": "aether.living-case/1",
+    "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+    "scenario": "bounded-allocation",
+    "ordinal": 0,
+    "seed": "20260924-integrated/bounded-allocation/0",
+    "schedule": [
+      "allocator",
+      "allocator",
+      "allocator",
+      "allocator",
+      "allocator"
+    ],
+    "variables": {}
+  },
+  "result": {
+    "caseDigest": "aether.living-case/1:b3:5a81750ce36fd591d41952e0e0f1b75557eb864352ca01ca8e364f6a26a33cc4",
+    "passed": true,
+    "failure": null,
+    "filtered": false,
+    "calls": 2,
+    "steps": 7,
+    "evaluatedOperations": 6,
+    "allocatedBytes": 1,
+    "peakAllocatedBytes": 4096,
+    "allocationChecksum": 69649,
+    "networkFrames": 0,
+    "deliveredFrames": 0,
+    "rejectedFrames": 0,
+    "droppedFrames": 0,
+    "coverage": [
+      "candidate-call",
+      "effect:broker-journal",
+      "resource:allocated",
+      "resource:exhausted",
+      "resource:released",
+      "runtime:call",
+      "runtime:return",
+      "step:$checks/final-value",
+      "step:allocator/excess",
+      "step:allocator/first",
+      "step:allocator/observe",
+      "step:allocator/release",
+      "step:allocator/reuse"
+    ],
+    "trace": [
+      "allocator/first",
+      "allocator/excess",
+      "allocator/observe",
+      "allocator/release",
+      "allocator/reuse",
+      "$checks/final-value"
+    ],
+    "heapDigest": "aether.living-heap/1:b3:6de7e77e2a40b2f5d13401f16087465c6afdf602a5308b54edd522d2a9d48dca",
+    "effects": {
+      "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+      "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+      "eventCount": 0,
+      "sinkWrites": 0,
+      "indeterminate": 0
+    }
+  }
+}

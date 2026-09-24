@@ -1,0 +1,665 @@
+{
+  "format": "aether.living-integrated-registration/1",
+  "at": "2026-09-24T21:04:43.886Z",
+  "gitHead": "82d88b6c22d42ad78fcea85d60bcee46febf048f",
+  "gitStatus": "",
+  "profileSha256": "a4e679c2a7fbd274767cb152d501fca778af64c7accc7d3a99766bc5fc7ab8cd",
+  "sources": {
+    "package-lock.json": "d7ec4b7a7eeb891ec1f91896c6b8cfaff33e29895c3a0cd6a647984b8b7f8936",
+    "roadmap/v4/research/microworld-integrated/campaign.ts": "13ac742dd4f3f50ee8275fbbb266b2f363ff0518a5412d0d16a11ebdfb08d1ae",
+    "roadmap/v4/research/microworld-integrated/fixture.ts": "660b64466a0a0fb8c7e90c24b8be728174b0a5afbcf4a00c849c3fe6b3e61731",
+    "roadmap/v4/research/microworld-integrated/harness.ts": "4dc3cdcb6d2aa840503bf2fd1917aef06b507c53b29ff1655d5e820e12bc66e6",
+    "roadmap/v4/research/microworld-integrated/profile.json": "a4e679c2a7fbd274767cb152d501fca778af64c7accc7d3a99766bc5fc7ab8cd",
+    "roadmap/v4/research/microworld-integrated/worker.ts": "75491c56c7da5ed29968d5992aa62a160433f1228e2527404c224bfb13c23fd2",
+    "roadmap/v4/research/microworld/fixture.ts": "a1167d0bc86a91bc37ee06011794ede232014da051c7273b86bf56a11cb5bfee",
+    "src/fabric/attested-sink-adapter.ts": "41f4fffe0226e7ae37b5904a37331f9b0d93ef7eaa5b5d85e1f451c3e0e6c0f8",
+    "src/fabric/budget-journal-witness.ts": "9ea32a24579ff4f52b634752360638032744106c7e9f458df0bd9da102ae491a",
+    "src/fabric/effect-journal-witness.ts": "552ced2bb4ea6cdefa7e11beec9fbecf78ea17c54e60849319c8b5e632267345",
+    "src/fabric/effects.ts": "3e5311a47382add90094c3dbd38982203976bd2cfd77083883349e85a1ea6866",
+    "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+    "src/fabric/identity.ts": "a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+    "src/fabric/journal-lock.ts": "8a551fa3896b22c9b5f0de21ba9a56fcb4044e286a2a51939494fe4846ca6e74",
+    "src/fabric/sink-receipt.ts": "4cae1cab6363004a3b3f6378e2da19831669c3f1655e16f8dc39b0ec398b40d8",
+    "src/fabric/sink-state-witness.ts": "d5407e9c85a17cb77129c58f20ce4ab636b3847b2608b84bb9c74f87491a6ff3",
+    "src/tier1/ast.ts": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb",
+    "src/tier1/blake3.ts": "1fe06b0b58c78837acdb5a2a2431b313474c64427fde573196bcd58f86f709d4",
+    "src/tier1/build.ts": "e1617b0eed8c27cf4d3162e68494126f817f28ec1bf24d32828ebcaa55e6d934",
+    "src/tier1/canonical.ts": "16022baba00d8d0e87a4fe7f5eabfe1d79492945ad48c4bd6783ad22f5f83021",
+    "src/tier1/ids.ts": "73a6cf5a0b6537d879b2b3980ba9b4a1937701d52f97b4bf1deb09acf1e023a5",
+    "src/tier1/persistence.ts": "59a3d46d55aeeffadd80ecf834cbe3db5dd117142cf6ca8beb9c18abfa46ea06",
+    "src/tier1/semantic-gc-virtual-forward.ts": "3e293c1c8d182e249ccf518bfe598491b73990aafe87da12e529345859f70900",
+    "src/tier1/store.ts": "b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3",
+    "src/tier1/symbols.ts": "1520a4adfd1f837f16357205d88c330056ffe73f3c74d4f26e1d1663dc0362a9",
+    "src/tier2/adapter-admission-registry.ts": "dae01ad802b3a616586b7b7d141cee8abc2930323fa33c1c9a093fe27240eeb8",
+    "src/tier2/budget-journal-mirror.ts": "2690cee7c1d7bdb9e2e061a52d005fa316dd8c12d8ccbd114d28747c1f9bf1f2",
+    "src/tier2/declarative-sink-table.ts": "f863c8e7f5f249c465808f59c2ad6fdc47ec7531dc51f07f4d5e959c891fe89f",
+    "src/tier2/effect-resource-policy.ts": "c143b8370218ff4db8233010b1d6304aeb6d11ecd0d4c66f06c5f276f966e81a",
+    "src/tier2/ocap.ts": "b4ae5aec25c07e0e50beca96a67fac555a397c1c06be564c2f334bb821d55ef6",
+    "src/tier2/resource-budget-bridge.ts": "21385e420c47f714b037905d91dbadcda2948b94e3e903070757849f7d5313df",
+    "src/tier2/resource-budget.ts": "d13599effc376aea794bc871f0f94e043fda98f2bec6b65ab79ff58c864fbc99",
+    "src/tier2/trusted-clock-anchor.ts": "5311a5e34c681c8545f719295b47ecc5c09919879467ce7b8ece830c87006132",
+    "src/tier2/typecheck.ts": "19113ce88ac99a02a1e7b1f4acad694a1d1c83f9520b2fe7f2545669a5da1b18",
+    "src/tier3/effects.ts": "00c02448dc5a0f49b7b18ca401bca085b75f4dc3bf9c08d15aeb1a67df58163c",
+    "src/tier3/living-campaign.ts": "9b584d49c39f37948d86061a29e213ebbc43fa619311d3477fa2a5613ac8d7eb",
+    "src/tier3/living-effect-authorization.ts": "d2d92de3119856b6a07784d377ec8a081b92d160c5ec82a1e5319a8629ea9806",
+    "src/tier3/runtime.ts": "3fab8738ab7f73c7b7ea1b143eebbb959c0c82a5881d4080a31d9c4852db23f0",
+    "src/tier3/values.ts": "0b48ec39f48128c65c11a3fcd3edfec06720fd1c0c9871fd33ad3ea92759a99e",
+    "src/util/rng.ts": "722540744b859c0995931e6c0270f3b9a80012b6e31b2371c027cf19f4518295"
+  },
+  "profile": {
+    "seed": "20260924-integrated",
+    "declaredGoodCases": 15,
+    "declaredBrokenCases": 15,
+    "minimumBoundaryPermutationsPerSecond": 2000000
+  },
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAk+f36FUEjkoG9OtxmgPlLAjWdBG6bMaZHXbzxHzw7Vw=\n-----END PUBLIC KEY-----\n",
+  "authorization": {
+    "executionManifest": {
+      "format": "aether.execution/1",
+      "astRoot": "ast:b3:9cf496a27c77253f45bc943b55d92df67e62be905a348fdfad7d8d32fe8ea523",
+      "specRoot": "aether.living-cooperative-campaign/1:b3:69963fb8ef3ea944ba5fe9e68b7efd106d1d3dd66a089f5c3581e153a268f4b0",
+      "dependencies": [],
+      "semanticsVersion": "aether-reference/1",
+      "compilerDigest": "aether.living-integrated-research/1:b3:23898ce7cf9a394b5681e65dcd73a719860897380fb3e6557de81c6dea46094d",
+      "target": {
+        "abiVersion": "local/1",
+        "profileDigest": "aether.living-integrated-research/1:b3:23898ce7cf9a394b5681e65dcd73a719860897380fb3e6557de81c6dea46094d",
+        "artifactDigest": "aether.living-integrated-research/1:b3:23898ce7cf9a394b5681e65dcd73a719860897380fb3e6557de81c6dea46094d"
+      },
+      "capabilityPolicyDigest": "aether.effect-resource-policy/1:b3:17d454596cf5e6aefcd38ee8663006c74ed2b73c6a5218e979b3dee7d9df0ca3",
+      "evidencePolicyDigest": "aether.living-integrated-research/1:b3:23898ce7cf9a394b5681e65dcd73a719860897380fb3e6557de81c6dea46094d"
+    },
+    "signedPolicy": {
+      "format": "aether.signed-effect-resource-policy/1",
+      "body": {
+        "format": "aether.effect-resource-policy/1",
+        "repositoryId": "living-integrated-research",
+        "astRoot": "ast:b3:9cf496a27c77253f45bc943b55d92df67e62be905a348fdfad7d8d32fe8ea523",
+        "policyEpoch": "1",
+        "rules": [
+          {
+            "capability": "cap:campaign:append",
+            "prefix": [
+              "campaign"
+            ],
+            "argument": null,
+            "adapterId": "adapter:living-integrated/1",
+            "adapterDigest": "aether.effect-adapter/1:b3:eea2d01410a3f50c2ae9d79a3a3bd37d73b2bf60c3f2147b4b622ba6c7407de9"
+          }
+        ]
+      },
+      "signer": "living-integrated-operator",
+      "signature": "TkKEmoi8RKMRWJs4XAL96bCpcxEZzbEJ+v+mIWH9pePjuiDwgxY7lSQCJ5f7klXSd/a6mob0rtVlxondKe1XBQ=="
+    },
+    "campaignDigest": "aether.living-cooperative-campaign/1:b3:69963fb8ef3ea944ba5fe9e68b7efd106d1d3dd66a089f5c3581e153a268f4b0",
+    "responses": [
+      {
+        "capability": "cap:campaign:append",
+        "value": {
+          "tag": "null"
+        }
+      }
+    ],
+    "signer": "living-integrated-operator",
+    "format": "aether.living-effect-authorization/3",
+    "faultMode": "sigkill-once-after-dispatch",
+    "signature": "Ps6NTaGiGSCC8o3ISWTdd6u2iDpja5vVKeuUnPkdWPEe61BmgwztITTZ48e0zftcgs1JDwfgnQIAogM08HfvDQ=="
+  },
+  "brokenAuthorization": {
+    "executionManifest": {
+      "format": "aether.execution/1",
+      "astRoot": "ast:b3:6bb5c866372481e8042a098cae4a90c6dd324cfafd631d0d8ed14268d849852d",
+      "specRoot": "aether.living-cooperative-campaign/1:b3:b4aabdefa990ead18999ee8a03ae107d111115ee30fd42a026471d2c9d800699",
+      "dependencies": [],
+      "semanticsVersion": "aether-reference/1",
+      "compilerDigest": "aether.living-integrated-research/1:b3:2b398c714c603634d832777db5599ffb2f87bebb41afef68976ee973ed414b43",
+      "target": {
+        "abiVersion": "local/1",
+        "profileDigest": "aether.living-integrated-research/1:b3:2b398c714c603634d832777db5599ffb2f87bebb41afef68976ee973ed414b43",
+        "artifactDigest": "aether.living-integrated-research/1:b3:2b398c714c603634d832777db5599ffb2f87bebb41afef68976ee973ed414b43"
+      },
+      "capabilityPolicyDigest": "aether.effect-resource-policy/1:b3:30d1a402c6a1a0ab1cdf175de4fe05263c8540da56df1a4030ebbfc7e44c1732",
+      "evidencePolicyDigest": "aether.living-integrated-research/1:b3:2b398c714c603634d832777db5599ffb2f87bebb41afef68976ee973ed414b43"
+    },
+    "signedPolicy": {
+      "format": "aether.signed-effect-resource-policy/1",
+      "body": {
+        "format": "aether.effect-resource-policy/1",
+        "repositoryId": "living-integrated-research",
+        "astRoot": "ast:b3:6bb5c866372481e8042a098cae4a90c6dd324cfafd631d0d8ed14268d849852d",
+        "policyEpoch": "1",
+        "rules": [
+          {
+            "capability": "cap:campaign:append",
+            "prefix": [
+              "campaign"
+            ],
+            "argument": null,
+            "adapterId": "adapter:living-integrated/1",
+            "adapterDigest": "aether.effect-adapter/1:b3:eea2d01410a3f50c2ae9d79a3a3bd37d73b2bf60c3f2147b4b622ba6c7407de9"
+          }
+        ]
+      },
+      "signer": "living-integrated-operator",
+      "signature": "v/+43P22JlRU91YUtR6uf0igGLB5VSpf5Qi6gnDLM0c0zcsfysVl2w3qDakQ5uRcxdzNb58O4gZPQ0RXOgVCDw=="
+    },
+    "campaignDigest": "aether.living-cooperative-campaign/1:b3:b4aabdefa990ead18999ee8a03ae107d111115ee30fd42a026471d2c9d800699",
+    "responses": [
+      {
+        "capability": "cap:campaign:append",
+        "value": {
+          "tag": "null"
+        }
+      }
+    ],
+    "signer": "living-integrated-operator",
+    "format": "aether.living-effect-authorization/2",
+    "faultMode": "none",
+    "signature": "GkqTqAKSSzm6RjZ6U67QRfKiZw7frtfnsj7sjzlWzDXxFzuwNinYN+emG8BussqcohEwvzbOfCuQjh/RDmc3CQ=="
+  },
+  "generated": [
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "two-writers",
+      "ordinal": 0,
+      "seed": "20260924-integrated/two-writers/0",
+      "schedule": [
+        "a",
+        "a",
+        "b",
+        "b"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "two-writers",
+      "ordinal": 1,
+      "seed": "20260924-integrated/two-writers/1",
+      "schedule": [
+        "a",
+        "b",
+        "a",
+        "b"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "two-writers",
+      "ordinal": 2,
+      "seed": "20260924-integrated/two-writers/2",
+      "schedule": [
+        "a",
+        "b",
+        "b",
+        "a"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "two-writers",
+      "ordinal": 3,
+      "seed": "20260924-integrated/two-writers/3",
+      "schedule": [
+        "b",
+        "a",
+        "a",
+        "b"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "two-writers",
+      "ordinal": 4,
+      "seed": "20260924-integrated/two-writers/4",
+      "schedule": [
+        "b",
+        "a",
+        "b",
+        "a"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "two-writers",
+      "ordinal": 5,
+      "seed": "20260924-integrated/two-writers/5",
+      "schedule": [
+        "b",
+        "b",
+        "a",
+        "a"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "bounded-allocation",
+      "ordinal": 0,
+      "seed": "20260924-integrated/bounded-allocation/0",
+      "schedule": [
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "bounded-allocation",
+      "ordinal": 1,
+      "seed": "20260924-integrated/bounded-allocation/1",
+      "schedule": [
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "bounded-allocation",
+      "ordinal": 2,
+      "seed": "20260924-integrated/bounded-allocation/2",
+      "schedule": [
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "faulted-json-network",
+      "ordinal": 0,
+      "seed": "20260924-integrated/faulted-json-network/0",
+      "schedule": [
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "faulted-json-network",
+      "ordinal": 1,
+      "seed": "20260924-integrated/faulted-json-network/1",
+      "schedule": [
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "faulted-json-network",
+      "ordinal": 2,
+      "seed": "20260924-integrated/faulted-json-network/2",
+      "schedule": [
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "out-of-order-events",
+      "ordinal": 0,
+      "seed": "20260924-integrated/out-of-order-events/0",
+      "schedule": [
+        "events",
+        "events",
+        "events",
+        "events"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "out-of-order-events",
+      "ordinal": 1,
+      "seed": "20260924-integrated/out-of-order-events/1",
+      "schedule": [
+        "events",
+        "events",
+        "events",
+        "events"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/3:b3:60b2fd3b359999eaeac344be1da933efe37fd47d58c9995b103c16b546ff51f4",
+      "scenario": "out-of-order-events",
+      "ordinal": 2,
+      "seed": "20260924-integrated/out-of-order-events/2",
+      "schedule": [
+        "events",
+        "events",
+        "events",
+        "events"
+      ],
+      "variables": {}
+    }
+  ],
+  "brokenGenerated": [
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "two-writers",
+      "ordinal": 0,
+      "seed": "20260924-integrated/two-writers/0",
+      "schedule": [
+        "a",
+        "a",
+        "b",
+        "b"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "two-writers",
+      "ordinal": 1,
+      "seed": "20260924-integrated/two-writers/1",
+      "schedule": [
+        "a",
+        "b",
+        "a",
+        "b"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "two-writers",
+      "ordinal": 2,
+      "seed": "20260924-integrated/two-writers/2",
+      "schedule": [
+        "a",
+        "b",
+        "b",
+        "a"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "two-writers",
+      "ordinal": 3,
+      "seed": "20260924-integrated/two-writers/3",
+      "schedule": [
+        "b",
+        "a",
+        "a",
+        "b"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "two-writers",
+      "ordinal": 4,
+      "seed": "20260924-integrated/two-writers/4",
+      "schedule": [
+        "b",
+        "a",
+        "b",
+        "a"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "two-writers",
+      "ordinal": 5,
+      "seed": "20260924-integrated/two-writers/5",
+      "schedule": [
+        "b",
+        "b",
+        "a",
+        "a"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "bounded-allocation",
+      "ordinal": 0,
+      "seed": "20260924-integrated/bounded-allocation/0",
+      "schedule": [
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "bounded-allocation",
+      "ordinal": 1,
+      "seed": "20260924-integrated/bounded-allocation/1",
+      "schedule": [
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "bounded-allocation",
+      "ordinal": 2,
+      "seed": "20260924-integrated/bounded-allocation/2",
+      "schedule": [
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator",
+        "allocator"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "faulted-json-network",
+      "ordinal": 0,
+      "seed": "20260924-integrated/faulted-json-network/0",
+      "schedule": [
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "faulted-json-network",
+      "ordinal": 1,
+      "seed": "20260924-integrated/faulted-json-network/1",
+      "schedule": [
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "faulted-json-network",
+      "ordinal": 2,
+      "seed": "20260924-integrated/faulted-json-network/2",
+      "schedule": [
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport",
+        "transport"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "out-of-order-events",
+      "ordinal": 0,
+      "seed": "20260924-integrated/out-of-order-events/0",
+      "schedule": [
+        "events",
+        "events",
+        "events",
+        "events"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "out-of-order-events",
+      "ordinal": 1,
+      "seed": "20260924-integrated/out-of-order-events/1",
+      "schedule": [
+        "events",
+        "events",
+        "events",
+        "events"
+      ],
+      "variables": {}
+    },
+    {
+      "format": "aether.living-case/1",
+      "manifestDigest": "aether.living-effect-campaign/2:b3:0388c558678cb6c7ee23f8473b93f01480508335d6bb77b93dfe7325b5ccf941",
+      "scenario": "out-of-order-events",
+      "ordinal": 2,
+      "seed": "20260924-integrated/out-of-order-events/2",
+      "schedule": [
+        "events",
+        "events",
+        "events",
+        "events"
+      ],
+      "variables": {}
+    }
+  ],
+  "diagnostic": {
+    "at": "2026-09-24T21:04:43.957Z",
+    "node": "v26.7.0",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "arch": "arm64",
+    "cpus": [
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro"
+    ],
+    "load": [
+      4.615234375,
+      4.16796875,
+      4.6337890625
+    ],
+    "memory": {
+      "rss": 110985216,
+      "heapTotal": 22282240,
+      "heapUsed": 16187960,
+      "external": 7237506,
+      "arrayBuffers": 909079
+    }
+  }
+}
