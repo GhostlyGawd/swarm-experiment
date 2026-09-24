@@ -74,6 +74,9 @@ export interface CausalLineageOptions {
   readonly authorKey: (author: string, policyEpoch: string) => KeyObject | string | undefined;
   readonly maxRecords?: number; readonly maxBytes?: number; readonly maxTickets?: number;
   readonly fault?: (point: LineageFault) => void;
+  /** Existing state only, without acquiring the writer ticket. Proof readers
+   * can run while a governor holds its lineage commit fence. */
+  readonly readOnlyExisting?: true;
 }
 interface State {
   readonly format: 'aether.causal-lineage/1'; readonly repositoryId: string;
@@ -145,13 +148,30 @@ export class CausalLineageLedger {
   private readonly profile: State['profile'];
   private readonly lock: JournalLock;
   private readonly file: string;
+  static openReadOnlyExisting(options: Omit<CausalLineageOptions, 'readOnlyExisting'>): CausalLineageLedger {
+    return new CausalLineageLedger({ ...options, readOnlyExisting: true });
+  }
   constructor(options: CausalLineageOptions) {
     identifier(options.repositoryId); this.options = options;
     this.profile = { maxRecords: options.maxRecords ?? 10_000, maxBytes: options.maxBytes ?? 32 * 1024 * 1024, maxTickets: options.maxTickets ?? 100_000 };
     Object.values(this.profile).forEach(number);
-    directory(options.directory); directory(join(options.directory, 'lock'));
+    if (options.readOnlyExisting) {
+      for (const path of [options.directory, join(options.directory, 'lock')])
+        if (!existsSync(path) || !statSync(path).isDirectory())
+          throw new Error('read-only lineage requires existing journal directories');
+    } else { directory(options.directory); directory(join(options.directory, 'lock')); }
     this.file = join(options.directory, 'lineage.json');
     this.lock = new JournalLock({ directory: join(options.directory, 'lock'), domain: 'aether.causal-lineage', maxTickets: this.profile.maxTickets });
+    if (options.readOnlyExisting) {
+      const complete = join(options.directory, 'initialized.json');
+      if (!existsSync(this.file) || !existsSync(complete))
+        throw new Error('read-only lineage requires an initialized journal');
+      this.read();
+      const marker = { format: 'aether.lineage-initialized/1', repositoryId: options.repositoryId, profile: this.profile };
+      if (!same(this.decode(this.readBytes(complete)), marker))
+        throw new TypeError('lineage initialization marker mismatch');
+      return;
+    }
     this.run(() => {
       const complete = join(options.directory, 'initialized.json');
       if (!existsSync(this.file)) {
@@ -170,7 +190,10 @@ export class CausalLineageLedger {
   private encode(value: unknown): Uint8Array { return encodeCanonical(value, { maxFrameBytes: this.profile.maxBytes, maxDecompressedBytes: this.profile.maxBytes, maxObjects: this.profile.maxRecords * 1024, maxDepth: 128 }); }
   private decode(bytes: Uint8Array): unknown { return decodeCanonical(bytes, { maxFrameBytes: this.profile.maxBytes, maxDecompressedBytes: this.profile.maxBytes, maxObjects: this.profile.maxRecords * 1024, maxDepth: 128 }); }
   private readBytes(path: string): Uint8Array { if (statSync(path).size > this.profile.maxBytes) throw new RangeError('lineage journal size limit'); return readFileSync(path); }
-  private run<T>(operation: () => T): T { this.lock.recoverDeadWriter(false); return this.lock.run(operation, 10_000); }
+  private run<T>(operation: () => T): T {
+    if (this.options.readOnlyExisting) throw new Error('read-only lineage cannot mutate authority');
+    this.lock.recoverDeadWriter(false); return this.lock.run(operation, 10_000);
+  }
   private publish(path: string, bytes: Uint8Array): void {
     const temporary = join(this.options.directory, `.lineage-${process.pid}-${randomUUID()}`), fd = openSync(temporary, 'wx', 0o600);
     try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }

@@ -4,8 +4,10 @@
 import { closeSync, existsSync, fsyncSync, openSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { atomicWrite } from '../tier1/persistence.ts';
-import { decodeCanonical, decimal, encodeCanonical, exactObject, identifier } from '../fabric/encoding.ts';
+import { decodeCanonical, decimal, encodeCanonical, exactObject, identifier,
+  validateTaggedValue, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { domainDigest, validateDigest, type Digest } from '../fabric/identity.ts';
+import type { ProcessHostCallResult } from './process-host.ts';
 
 const FORMAT = 'aether.process-virtual-deployment/1' as const;
 const WITNESS_FORMAT = 'aether.process-virtual-deployment-journal-witness/1' as const;
@@ -26,6 +28,26 @@ export interface PureVirtualDeploymentJournalV1 {
   readonly preparedDigest: Digest | null;
   readonly trustDigest: Digest;
   readonly hostWitnessCatalogDigest: Digest;
+}
+export interface PureVirtualInvocationV2 {
+  readonly operationId: string;
+  readonly requestDigest: Digest;
+  readonly manifest: Digest;
+  readonly generation: string;
+  readonly symbol: string;
+  readonly args: readonly TaggedValueV1[];
+  readonly phase: 'pending' | 'settled';
+  readonly result: ProcessHostCallResult | null;
+}
+export interface PureVirtualDeploymentJournalV2 extends Omit<PureVirtualDeploymentJournalV1, 'format'> {
+  readonly format: 'aether.process-virtual-deployment/2';
+  readonly invocations: readonly PureVirtualInvocationV2[];
+}
+export type PureVirtualDeploymentJournal = PureVirtualDeploymentJournalV1 | PureVirtualDeploymentJournalV2;
+export function pureVirtualInvocationDigestV2(row: Pick<PureVirtualInvocationV2,
+  'manifest' | 'generation' | 'symbol' | 'args'>): Digest {
+  return domainDigest('aether.process-virtual-invocation/2',
+    { manifest: row.manifest, generation: row.generation, symbol: row.symbol, args: row.args }, LIMITS);
 }
 export interface PureVirtualDeploymentWitnessV1 {
   readonly format: typeof WITNESS_FORMAT;
@@ -51,12 +73,15 @@ const sources = new WeakMap<object, Source>();
 const canonical = (value: unknown): string => Buffer.from(encodeCanonical(value, LIMITS)).toString('utf8');
 
 export function validatePureVirtualDeploymentJournalV1(value: unknown,
-  witness: PureVirtualDeploymentWitnessV1): PureVirtualDeploymentJournalV1 {
+  witness: PureVirtualDeploymentWitnessV1): PureVirtualDeploymentJournal {
   encodeCanonical(value, LIMITS);
+  const raw = value as { format?: unknown };
   const journal = exactObject(value, ['format', 'witnessRevision', 'witnessDigest',
     'repositoryId', 'deploymentId', 'admissionProfile', 'genesisManifest', 'active',
-    'readiness', 'pendingProposal', 'preparedDigest', 'trustDigest', 'hostWitnessCatalogDigest']);
-  if (journal.format !== FORMAT || journal.admissionProfile !== 'strict-lineage-v1'
+    'readiness', 'pendingProposal', 'preparedDigest', 'trustDigest', 'hostWitnessCatalogDigest',
+    ...(raw.format === 'aether.process-virtual-deployment/2' ? ['invocations'] : [])]);
+  if (![FORMAT, 'aether.process-virtual-deployment/2'].includes(journal.format as string)
+    || journal.admissionProfile !== 'strict-lineage-v1'
     || journal.repositoryId !== witness.repositoryId
     || journal.deploymentId !== witness.deploymentId
     || journal.witnessDigest !== witness.digest)
@@ -81,7 +106,48 @@ export function validatePureVirtualDeploymentJournalV1(value: unknown,
     validateDigest(journal.pendingProposal, 'aether.promotion/1');
   if (journal.preparedDigest !== null)
     validateDigest(journal.preparedDigest, 'aether.process-virtual-deployment-prepared/1');
-  return value as PureVirtualDeploymentJournalV1;
+  if (journal.format === 'aether.process-virtual-deployment/2') {
+    if (!Array.isArray(journal.invocations)) throw new TypeError('missing virtual invocation inventory');
+    const operations = new Set<string>();
+    for (const item of journal.invocations) {
+      const row = exactObject(item, ['operationId', 'requestDigest', 'manifest',
+        'generation', 'symbol', 'args', 'phase', 'result']);
+      identifier(row.operationId); identifier(row.symbol); decimal(row.generation);
+      validateDigest(row.manifest, 'aether.execution/1');
+      validateDigest(row.requestDigest, 'aether.process-virtual-invocation/2');
+      if (operations.has(row.operationId) || !Array.isArray(row.args)
+        || !['pending', 'settled'].includes(row.phase as string))
+        throw new TypeError('invalid virtual invocation inventory');
+      operations.add(row.operationId);
+      row.args.forEach(arg => validateTaggedValue(arg));
+      if (row.requestDigest !== pureVirtualInvocationDigestV2(row as unknown as PureVirtualInvocationV2)
+        || row.phase === 'settled' && row.result === null)
+        throw new TypeError('virtual invocation request/result mismatch');
+      if (row.result !== null) {
+        const result = row.result as ProcessHostCallResult;
+        const outcome = exactObject(result, result.state === 'completed'
+          ? ['state', 'operationId', 'generation', 'unit', 'execution']
+          : ['state', 'operationId', 'generation', 'unit', 'reason']);
+        identifier(outcome.unit);
+        if (result.operationId !== row.operationId || result.generation !== row.generation
+          || !['completed', 'aborted', 'indeterminate'].includes(result.state)
+          || row.phase === 'settled' && result.state === 'indeterminate')
+          throw new TypeError('virtual invocation result identity mismatch');
+        if (result.state === 'completed') {
+          const execution = exactObject(result.execution,
+            result.execution?.ok === true ? ['ok', 'value', 'steps'] : ['ok', 'fault', 'steps']);
+          if (typeof execution.steps !== 'number' || !Number.isSafeInteger(execution.steps)
+            || execution.steps < 0 || typeof execution.ok !== 'boolean')
+            throw new TypeError('invalid virtual invocation execution');
+          if (execution.ok) validateTaggedValue(execution.value);
+          else if (!execution.fault || typeof execution.fault !== 'object')
+            throw new TypeError('invalid virtual invocation fault');
+        } else if (typeof result.reason !== 'string' || !result.reason)
+          throw new TypeError('invalid virtual invocation noncommit reason');
+      }
+    }
+  }
+  return value as PureVirtualDeploymentJournal;
 }
 
 function checked(witness: PureVirtualDeploymentWitnessV1, source: Source,
@@ -141,7 +207,7 @@ export function readPureVirtualDeploymentHeadV1(witness: PureVirtualDeploymentWi
   return checked(witness, source, source.read());
 }
 export function advancePureVirtualDeploymentHeadV1(witness: PureVirtualDeploymentWitnessV1,
-  expectedRevision: string, journal: PureVirtualDeploymentJournalV1): PureVirtualDeploymentHeadV1 {
+  expectedRevision: string, journal: PureVirtualDeploymentJournal): PureVirtualDeploymentHeadV1 {
   assertPureVirtualDeploymentWitnessV1(witness); decimal(expectedRevision);
   const next = String(BigInt(expectedRevision) + 1n);
   validatePureVirtualDeploymentJournalV1(journal, witness);
@@ -170,7 +236,7 @@ export class PureVirtualDeploymentJournalStoreV1 {
     this.directory = directory; this.witness = witness;
     this.file = join(directory, 'virtual-deployment.json');
   }
-  read(): PureVirtualDeploymentJournalV1 | null {
+  read(): PureVirtualDeploymentJournal | null {
     const head = readPureVirtualDeploymentHeadV1(this.witness);
     if (head.journal === null) {
       if (existsSync(this.file)) throw new Error('local virtual journal exists before witness genesis');
@@ -190,7 +256,7 @@ export class PureVirtualDeploymentJournalStoreV1 {
     return validatePureVirtualDeploymentJournalV1(
       decodeCanonical(Buffer.from(head.journal, 'utf8'), LIMITS), this.witness);
   }
-  write(expectedRevision: string, journal: PureVirtualDeploymentJournalV1): PureVirtualDeploymentJournalV1 {
+  write(expectedRevision: string, journal: PureVirtualDeploymentJournal): PureVirtualDeploymentJournal {
     advancePureVirtualDeploymentHeadV1(this.witness, expectedRevision, journal);
     const bytes = canonical(journal);
     atomicWrite(this.file, bytes); this.syncDirectory();

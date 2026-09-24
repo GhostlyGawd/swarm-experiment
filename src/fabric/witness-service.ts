@@ -15,6 +15,8 @@ import { createNamespacedEffectJournalWitness, createNamespacedEffectJournalWitn
 import { createHostJournalWitness, createHostJournalWitnessCatalog,
   type HostJournalWitnessCatalog } from './host-journal-witness.ts';
 import { createDeploymentJournalWitness, type DeploymentJournalWitness } from './deployment-journal-witness.ts';
+import { createPureVirtualDeploymentWitnessV1,
+  type PureVirtualDeploymentWitnessV1 } from '../tier4/process-virtual-deployment-journal.ts';
 import { createSinkStateWitness, validateSinkStateJournalV2, type SinkStateWitnessV1 } from './sink-state-witness.ts';
 import { createBudgetJournalWitness, type BudgetJournalWitness, type BudgetJournalKind } from './budget-journal-witness.ts';
 import { JournalLock } from './journal-lock.ts';
@@ -39,6 +41,7 @@ export type WitnessIdentity =
   | Readonly<{ kind: 'effect'; authorityId: string; repositoryId: string; catalogDeploymentId: string; operationId: string; clockDomain: string }>
   | Readonly<{ kind: 'host'; authorityId: string; repositoryId: string; deploymentId: string; hostId: string }>
   | Readonly<{ kind: 'deployment'; authorityId: string; repositoryId: string; deploymentId: string }>
+  | Readonly<{ kind: 'virtual-deployment'; authorityId: string; repositoryId: string; deploymentId: string }>
   | Readonly<{ kind: 'sink'; authorityId: string; repositoryId: string; sinkAuthorityId: string; sinkId: string;
     sinkAnchorDigest: string; adapterArtifactDigest: string }>
   | Readonly<{ kind: 'budget'; authorityId: string; repositoryId: string; deploymentId: string;
@@ -107,6 +110,7 @@ function identity(value: unknown): WitnessIdentity {
     ? ['kind', 'authorityId', 'repositoryId', 'catalogDeploymentId', 'operationId', 'clockDomain']
     : record.kind === 'host' ? ['kind', 'authorityId', 'repositoryId', 'deploymentId', 'hostId']
     : record.kind === 'deployment' ? ['kind', 'authorityId', 'repositoryId', 'deploymentId']
+    : record.kind === 'virtual-deployment' ? ['kind', 'authorityId', 'repositoryId', 'deploymentId']
     : null;
   if (!fields) throw new TypeError('unsupported witness identity');
   exactObject(record, fields);
@@ -184,6 +188,7 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw new TypeError('invalid witness journal');
   const expectedFormat = id.kind === 'effect' ? ['aether.effect-journal/2', 'aether.effect-journal/3', 'aether.effect-journal/4', 'aether.effect-journal/5']
     : id.kind === 'host' ? ['aether.process-host/4', 'aether.process-host/5']
+      : id.kind === 'virtual-deployment' ? 'aether.process-virtual-deployment/2'
       : id.kind === 'sink' ? 'aether.attested-sink-state/2'
         : id.kind === 'budget' ? (id.journalKind === 'ledger'
           ? 'aether.resource-journal/1' : 'aether.resource-budget-bridge-journal/1')
@@ -252,6 +257,16 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
         validateDigest(active.artifactDigest, 'aether.process-artifact/2');
       }
     }
+  }
+  if (id.kind === 'virtual-deployment') {
+    const { kind: _kind, ...parts } = id;
+    const body = { format: 'aether.process-virtual-deployment-journal-witness/1', ...parts };
+    if (record.witnessDigest !== domainDigest(body.format, body)
+      || record.repositoryId !== id.repositoryId
+      || record.deploymentId !== id.deploymentId
+      || record.admissionProfile !== 'strict-lineage-v1'
+      || !Array.isArray(record.invocations))
+      throw new TypeError('pure virtual deployment witness binding mismatch');
   }
   if (id.kind === 'sink') {
     const configured = namespaces.find(entry => entry.kind === 'sink-scope' && allowed(id, [entry]));
@@ -485,6 +500,45 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
     }
     return;
   }
+  if (id.kind === 'virtual-deployment') {
+    if (prior.genesisManifest !== next.genesisManifest
+      || prior.trustDigest !== next.trustDigest
+      || prior.hostWitnessCatalogDigest !== next.hostWitnessCatalogDigest)
+      throw new Error('witnessed pure virtual deployment authority changed');
+    const previous = prior.active as Record<string, unknown>;
+    const updated = next.active as Record<string, unknown>;
+    const oldState = prior.readiness as string, newState = next.readiness as string;
+    if (!({ ready: ['ready', 'preparing'], preparing: ['prepared', 'ready'],
+      prepared: ['ready'] } as Record<string, string[]>)[oldState]?.includes(newState))
+      throw new Error('witnessed pure virtual preparation state regressed');
+    if (oldState === 'ready' && newState === 'preparing'
+      && (next.pendingProposal === null || next.preparedDigest !== null))
+      throw new Error('witnessed pure virtual preparation lacks proposal');
+    if (oldState === 'preparing' && newState === 'prepared'
+      && (prior.pendingProposal !== next.pendingProposal || next.preparedDigest === null))
+      throw new Error('witnessed pure virtual prepared binding changed');
+    if (oldState !== 'ready' && newState === 'ready'
+      && (next.pendingProposal !== null || next.preparedDigest !== null))
+      throw new Error('witnessed pure virtual terminal preparation did not clear');
+    if (oldState === 'ready' && newState === 'ready' && !same(previous, updated))
+      throw new Error('witnessed pure virtual active target changed without preparation');
+    if (previous.generation !== updated.generation
+      && !(previous.generation === '0' && updated.generation === '1'
+        && prior.readiness === 'prepared' && next.readiness === 'ready'))
+      throw new Error('witnessed pure virtual generation changed without prepared commit');
+    if (previous.generation === updated.generation && !same(previous, updated))
+      throw new Error('witnessed pure virtual active target changed');
+    prefix('invocations', (oldRow, newRow) => {
+      fixed(oldRow, newRow, ['operationId', 'requestDigest', 'manifest', 'generation', 'symbol', 'args']);
+      forward(oldRow.phase, newRow.phase, { pending: ['pending', 'settled'], settled: ['settled'] });
+      if (oldRow.phase === 'settled' && !same(oldRow, newRow))
+        throw new Error('witnessed pure virtual settled operation changed');
+    });
+    if (array(next, 'invocations').length > array(prior, 'invocations').length
+      && !(oldState === 'ready' && newState === 'ready'))
+      throw new Error('witnessed pure virtual call was added while promotion frozen');
+    return;
+  }
   if ((prior.format === 'aether.process-deployment/10'
       || prior.format === 'aether.process-deployment/11'
       || prior.format === 'aether.process-deployment/12')
@@ -643,6 +697,7 @@ export function createProcessWitnessClient(options: WitnessClientOptions): {
   effectCatalog(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string; clockDomain: string }>): NamespacedEffectJournalWitnessCatalog;
   hostCatalog(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string }>): HostJournalWitnessCatalog;
   deploymentWitness(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string }>): DeploymentJournalWitness;
+  virtualDeploymentWitness(namespace: Readonly<{ authorityId: string; repositoryId: string; deploymentId: string }>): PureVirtualDeploymentWitnessV1;
   sinkStateWitness(namespace: Readonly<{ authorityId: string; anchor: SinkPublicAnchorV1;
     adapterArtifactDigest: string }>): SinkStateWitnessV1;
   budgetJournalWitness(namespace: Readonly<{ authorityId: string; repositoryId: string;
@@ -721,6 +776,12 @@ export function createProcessWitnessClient(options: WitnessClientOptions): {
     deploymentWitness: namespace => {
       const id = { kind: 'deployment' as const, ...namespace };
       return createDeploymentJournalWitness({ ...namespace,
+        read: () => call(id, 'read', null, null),
+        advance: (revision, journal) => call(id, 'advance', revision, journal) });
+    },
+    virtualDeploymentWitness: namespace => {
+      const id = { kind: 'virtual-deployment' as const, ...namespace };
+      return createPureVirtualDeploymentWitnessV1({ ...namespace,
         read: () => call(id, 'read', null, null),
         advance: (revision, journal) => call(id, 'advance', revision, journal) });
     },

@@ -27,3 +27,13 @@ export { makeProcessVirtualArtifactV3, validateProcessVirtualArtifactV3,
   processVirtualArtifactDigestV3, measureExecutableSubjectV1,
   type ProcessVirtualArtifactV3, type ProcessVirtualArtifactInputV3,
   type MeasuredExecutableSubjectV1, type MeasuredFileV1 } from './process-virtual-artifact.ts';
+export { PureVirtualProcessDeployment,
+  type PureVirtualProcessDeploymentOptions } from './process-virtual-deployment.ts';
+export { assertPureVirtualPlanV1, processVirtualMigrationPlanV1,
+  processVirtualEffectPlanV1, preparePureVirtualPromotionV1,
+  pureVirtualPreparedDigestV1, PureVirtualPreparedStoreV1,
+  type PureVirtualPreparedV1 } from './process-virtual-deployment-contract.ts';
+export { createPureVirtualDeploymentWitnessV1, readPureVirtualDeploymentHeadV1,
+  PureVirtualDeploymentJournalStoreV1,
+  type PureVirtualDeploymentJournalV2,
+  type PureVirtualDeploymentWitnessV1 } from './process-virtual-deployment-journal.ts';

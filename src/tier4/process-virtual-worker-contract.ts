@@ -46,7 +46,7 @@ export function openProcessVirtualWorkerLineageV1(value: unknown): CausalLineage
       || !existsSync(trust[field])) throw new TypeError('worker trust requires an existing absolute directory');
   }
   const store = new DurableGraphStore({ directory: realpathSync(trust.storeDirectory as string) });
-  return new CausalLineageLedger({ directory: realpathSync(trust.lineageDirectory as string),
+  return CausalLineageLedger.openReadOnlyExisting({ directory: realpathSync(trust.lineageDirectory as string),
     repositoryId: trust.repositoryId as string, store,
     authority: () => ({ policyEpoch: trust.policyEpoch as string,
       eligibleAuthors: [...trust.eligibleAuthors as string[]] }),

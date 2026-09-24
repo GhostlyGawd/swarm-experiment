@@ -5,7 +5,7 @@ import { type Term, type Ty, walk } from '../tier1/ast.ts';
 import { type SymbolId } from '../tier1/ids.ts';
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync,
   statSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { atomicWrite } from '../tier1/persistence.ts';
 import { decodeCanonical, encodeCanonical, exactObject, identifier, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { domainDigest, executionManifestDigest, validateDigest, type Digest } from '../fabric/identity.ts';
@@ -26,6 +26,16 @@ const LIMITS = { maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 102
 const same = (a: unknown, b: unknown): boolean =>
   Buffer.from(encodeCanonical(a, LIMITS)).equals(Buffer.from(encodeCanonical(b, LIMITS)));
 const clone = <T>(value: T): T => decodeCanonical(encodeCanonical(value, LIMITS), LIMITS) as T;
+function ensureDurableDirectory(path: string): void {
+  if (existsSync(path)) return;
+  ensureDurableDirectory(dirname(path));
+  try { mkdirSync(path); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
+  for (const directory of [path, dirname(path)]) {
+    const fd = openSync(directory, 'r');
+    try { fsyncSync(fd); } finally { closeSync(fd); }
+  }
+}
 
 function schemaDigest(module: Term, archivedWrapper?: SymbolId): Digest {
   const signatures: unknown[] = [], types = new Map<string, Ty>();
@@ -171,7 +181,7 @@ export class PureVirtualPreparedStoreV1 {
   write(record: PureVirtualPreparedV1): Digest {
     const checked = validatePureVirtualPreparedV1(record);
     const digest = pureVirtualPreparedDigestV1(checked);
-    mkdirSync(this.directory, { recursive: true });
+    ensureDurableDirectory(this.directory);
     const path = this.path(checked.binding.proposalDigest);
     if (existsSync(path)) {
       this.read(checked.binding.proposalDigest, digest);

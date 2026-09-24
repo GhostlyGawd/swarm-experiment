@@ -877,6 +877,12 @@ export class ProcessHost {
     }
   }
   async snapshot(): Promise<RuntimeSnapshotV1> { return this.lock.runAsync(async () => copy(this.read().snapshot), this.options.lockWaitMs ?? 5000); }
+  /** Synchronous final source read for a governor commitFence. Callers must
+   * hold their deployment gate across prepare and this decision. */
+  snapshotForPromotionFence(): RuntimeSnapshotV1 {
+    return this.lock.run(() => { const journal = this.read(); this.assertReady(journal);
+      return copy(journal.snapshot); }, this.options.lockWaitMs ?? 5000);
+  }
   status(): { unresolved: string[]; migrations: Array<{ migrationId: string; state: MigrationRecord['state'] }> } {
     const journal = this.read(); return { unresolved: [
       ...journal.calls.filter(call => call.state === 'running' || call.state === 'indeterminate').map(call => call.operationId),

@@ -7,7 +7,10 @@ config/16 admits the same one-unit pure candidate and durable journal.
 An explicit `aether.process-host-virtual/2` selects host config/17 and the
 operator-held complete host-journal CAS witness. Config/16 retains its local
 journal identity and behavior.
-`ProcessDeployment` still does not register or promote Artifact/4.
+Legacy `ProcessDeployment` still does not register or promote Artifact/4. A
+separate `PureVirtualProcessDeployment` now drives one signed source to its
+exact Artifact/4 rewrite under a strict-lineage governor. It does not reinterpret
+the Artifact/1–2 wire or add an effectful deployment profile.
 
 The separate pure promotion contract validates a governor binding against
 the exact signed source/candidate evidence, rebuilt worker subject, archived
@@ -18,7 +21,13 @@ rebinding their ownership epoch, and has an immutable local file schema. A
 separate `/1` virtual deployment journal uses an operator-supplied monotone CAS
 as authority and repairs a stale local mirror after a controller death between
 CAS and file write. It does not reuse the legacy `/9–12` deployment witness or
-Artifact/1–2 records.
+Artifact/1–2 records. The live driver consumes that record, launches the
+candidate in witnessed ProcessHost config/17 during preparation, repeats the
+full signed proof and source snapshot check inside its synchronous commit
+fence, and serves only the governor-committed generation. Its `/2` deployment
+journal adds witnessed operation IDs and exact pending/settled receipts. A
+same-ID retry across promotion checks current invocation authority and returns
+the original settled result without candidate execution.
 
 ## Signed binding
 
@@ -61,6 +70,37 @@ static native libraries, and dyld-cache header/map. It does not execute a
 recipe from the artifact. A real-worker test executes the candidate, imports
 its snapshot after restart, and refuses tampered proof, trust, and bundle
 bytes. Legacy Artifact/3 `init/2` remains supported.
+
+## One-way governor operation
+
+Provision a strict-lineage `PromotionCoordinator`, a pure source plan and
+candidate plan, operator-held Artifact/4 lineage trust, a host witness catalog,
+and the separate virtual deployment witness. The process-external witness
+service accepts `host-scope` and `virtual-deployment` namespaces. Open
+`PureVirtualProcessDeployment` with the same exact artifact and authority on
+every controller restart. Its directory contains `artifact4.json`, the
+recoverable `virtual-deployment.json` mirror, immutable `prepared/` records,
+and separate `source-host/` and `candidate-host/` journals.
+
+The driver freezes deployment calls while preparing, reads the live source
+snapshot, verifies the approved migration and no-effects plans, and starts the
+candidate without invoking its functions. The commit fence rereads the source
+snapshot and complete signed Artifact/4 closure under the held deployment
+gate. After the governor commit, activation closes the source host before the
+deployment witness publishes the candidate as ready. `open()` first asks the
+governor to reconcile an interrupted decision; a precommit death aborts the
+prepared candidate, while a postcommit death finishes activation. The
+candidate host and deployment journal are separate witnessed domains.
+
+Every call writes a deployment-wide operation ID before host dispatch. A
+completed call is retained in the witnessed journal and checked against the
+active host receipt. A pending call with an indeterminate host result requires
+`recoverOperation()` and the operator recovery authorization; another source
+snapshot cannot be promoted while it is pending. Reusing an old ID after
+promotion requires current invocation tokens and returns its original settled
+receipt. Altering the request for the same ID is refused.
+Promotion refuses a recorded source operation whose symbol is absent from the
+candidate, so removal of a directly called wrapper cannot strand its ID.
 
 ## Boundaries still open
 
@@ -108,12 +148,18 @@ worker bundle bytes. These are separate tested commits, as the record states.
 `ProcessDeployment` still registers only Artifact/1–2 and retains its legacy
 same-schema migration guard. Legacy artifact registration/read and a legacy
 `ProcessHost` refuse the virtual-forward target profile; a legacy factory
-cannot inject `virtualArtifactV4` into `ProcessHost`. A production Artifact/4
-deployment still needs registry and governor driver wiring the versioned
-prepared/state records to actual ProcessHost creation, a commit fence that
-repeats the exact admission check, and real controller SIGKILL recovery on
-both sides of the governor commit. The contract and journal tests do not
-establish live promotion. There is no Artifact/4 effect-broker dispatch,
+cannot inject `virtualArtifactV4` into `ProcessHost`. The new one-way pure
+deployment has a versioned registry and real governor driver. Process-external
+deployment and candidate-host witnesses were exercised with real controller
+SIGKILL while prepared and after the governor commit. Reopening follows the
+governor decision; the old generation is never served after commit. The source
+host is still a local, unwitnessed pure ProcessHost, so independent custody of
+its pre-promotion state and rollback resistance remain unproved. Its original
+resumable executable identity is signed in source evidence but is not the
+Artifact/4 measured candidate bundle. The witness
+service test runs under the same UID and does not prove separate operator
+custody. The path handles one D16 rewrite and does not support chained virtual
+promotions. There is no Artifact/4 effect-broker dispatch,
 integrated checkpoint recovery, or signed GC promotion. This slice does not
 close V4-T1-05 or a release target.
 
