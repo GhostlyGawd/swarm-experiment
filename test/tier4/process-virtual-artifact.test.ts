@@ -128,7 +128,7 @@ test('Artifact/3 init/2 executes source and candidate in separate real workers',
     assert.deepEqual(rewritten.execution, { ok: true, value: 4n, steps: 0 });
     await candidate.kill();
     candidate = await ProcessChannel.startVirtual({ artifact: f.artifact!, trust: f.trust,
-      unit: 'pure', heapId: 'pure-heap', ownershipEpoch: '1' });
+      unit: 'pure', heapId: 'pure-heap', ownershipEpoch: '1', snapshot: rewritten.snapshot });
     const reopened = await candidate.call(f.entry, [3n], await candidate.snapshot());
     assert.deepEqual(reopened.execution, original.execution);
   } finally {
