@@ -6,6 +6,9 @@ export { FallbackTreeRuntime, FALLBACK_INVOKE, type FallbackTreeOptions, type Fa
 export { checkConservativeFallbackProof, type ConservativeFallbackProofInput } from './fallback-proof.ts';
 export { PackedHeap, migratePackedHeap, packResumableCheckpoint, unpackResumableCheckpoint, migratePackedResumableCheckpoint, type PackedField, type PackedLayout, type PackedRowHeader, type PackedHeapImage, type PackedResumableCheckpoint } from './packed-heap.ts';
 export { LivingCampaign, LIVING_CAMPAIGN_PROFILE, measureR04JsonEvents, type CampaignScalar, type CampaignInput, type CampaignEvent, type CampaignStep, type CampaignScenario, type LivingCampaignManifest, type LivingCase, type LivingCaseResult, type LivingCounterexample, type LivingCampaignReport, type LivingEffectCaseResultV2, type LivingExternalCaseResultV4, type LivingExternalEffectServicesV4, type LivingEffectCounterexampleV2, type LivingEffectCampaignReportV2, type R04JsonObservation } from './living-campaign.ts';
+export { LivingCampaignPipelineV1, auditLivingCampaignPipelineV1, LIVING_PIPELINE_PROFILE,
+  type LivingAttemptKindV1, type LivingPipelineGenerationV1, type LivingPipelineAttemptV1,
+  type LivingPipelineRecoveryV1, type LivingPipelineReportV1 } from './living-campaign-pipeline.ts';
 export { signLivingEffectAuthorizationV2, assertLivingEffectAuthorizationV2,
   signLivingEffectAuthorizationV3, assertLivingEffectAuthorizationV3,
   signLivingEffectAuthorizationV4, assertLivingEffectAuthorizationV4,

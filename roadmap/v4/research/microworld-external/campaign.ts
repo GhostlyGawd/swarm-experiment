@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { encodeCanonical } from '../../../../src/fabric/encoding.ts';
 import { domainDigest } from '../../../../src/fabric/identity.ts';
 import { assertLivingEffectAuthorizationV4 } from '../../../../src/tier3/living-effect-authorization.ts';
+import { measureR04JsonEvents } from '../../../../src/tier3/living-campaign.ts';
 import { externalFixture, EXTERNAL_REPOSITORY } from './fixture.ts';
 import { auditExternalRaw, prepareExternal, runExternal, type ExternalCampaignResult,
   type ExternalRegistration } from './harness.ts';
@@ -35,6 +36,36 @@ const sources = () => Object.fromEntries(sourcePaths.map(path => [path, sha(read
 const diagnostic = () => ({ at: new Date().toISOString(), node: process.version,
   platform: platform(), release: release(), arch: process.arch, cpus: cpus().map(cpu => cpu.model),
   load: loadavg(), memory: process.memoryUsage() });
+function durabilityProbe(): {
+  format: 'aether.living-durability-probe/1'; warmups: number; samples: number; bytesPerRecord: number;
+  raw: { ordinal: number; fileFsyncNs: string; directoryFsyncNs: string; totalNs: string }[];
+  minimumNs: string; medianNs: string; maximumNs: string; serialRecordsPerSecond: number;
+} {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-living-fsync-probe-'));
+  try {
+    const raw: { ordinal: number; fileFsyncNs: string; directoryFsyncNs: string; totalNs: string }[] = [];
+    for (let ordinal = -10; ordinal < 100; ordinal++) {
+      const started = process.hrtime.bigint();
+      const fd = openSync(join(directory, `record-${ordinal}`), 'wx', 0o600);
+      let fileFsyncNs: bigint;
+      try {
+        writeFileSync(fd, Buffer.alloc(256, ordinal & 255));
+        const before = process.hrtime.bigint(); fsyncSync(fd); fileFsyncNs = process.hrtime.bigint() - before;
+      } finally { closeSync(fd); }
+      const dirFd = openSync(directory, 'r'); let directoryFsyncNs: bigint;
+      try { const before = process.hrtime.bigint(); fsyncSync(dirFd); directoryFsyncNs = process.hrtime.bigint() - before; }
+      finally { closeSync(dirFd); }
+      const totalNs = process.hrtime.bigint() - started;
+      if (ordinal >= 0) raw.push({ ordinal, fileFsyncNs: String(fileFsyncNs),
+        directoryFsyncNs: String(directoryFsyncNs), totalNs: String(totalNs) });
+    }
+    const ordered = raw.map(sample => BigInt(sample.totalNs)).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+    const sum = ordered.reduce((a, b) => a + b, 0n);
+    return { format: 'aether.living-durability-probe/1', warmups: 10, samples: 100, bytesPerRecord: 256,
+      raw, minimumNs: String(ordered[0]), medianNs: String((ordered[49] + ordered[50]) / 2n),
+      maximumNs: String(ordered.at(-1)!), serialRecordsPerSecond: 100 / (Number(sum) / 1e9) };
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+}
 function write(path: string, value: unknown): void {
   mkdirSync(dirname(path), { recursive: true });
   const fd = openSync(path, 'wx', 0o600);
@@ -66,7 +97,7 @@ async function measure(directory: string): Promise<void> {
     prepared = await prepareExternal(privateDirectory, directory);
     validateRegistration(prepared.registration);
     const profile = read(profilePath);
-    assert.equal(profile.format, 'aether.living-external-research-profile/1');
+    assert.equal(profile.format, 'aether.living-external-research-profile/2');
     assert.equal(profile.minimumBoundaryPermutationsPerSecond, 2_000_000);
     write(join(directory, 'preregistration.json'), { format: 'aether.living-external-preregistration/1',
       at: new Date().toISOString(), gitHead, gitStatus, profileSha256: sha(readFileSync(profilePath)),
@@ -81,7 +112,14 @@ async function measure(directory: string): Promise<void> {
     for (let index = 0; index < result.cases.length; index++) write(join(directory, 'cases', `${index}.json`), result.cases[index]);
     write(join(directory, 'process-result.json'), result);
     const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
-    write(join(directory, 'results.json'), { format: 'aether.living-external-measurement/1',
+    // Fixed R04 kernel remains a separate materialized-input observation. Its
+    // pass/fail cannot authorize the signed/external campaign rate above.
+    const kernel = measureR04JsonEvents();
+    write(join(directory, 'r04-kernel.json'), kernel);
+    const durable = durabilityProbe();
+    write(join(directory, 'durability-probe.json'), durable);
+    const pipeline = result.pipeline;
+    write(join(directory, 'results.json'), { format: 'aether.living-external-measurement/2',
       registrationSha256: sha(readFileSync(prepared.registrationPath)),
       declared: 15, generated: result.generated, executed: result.executed, filtered: result.filtered,
       passed: result.passed, failed: result.failed, attempted: result.attempted,
@@ -89,10 +127,23 @@ async function measure(directory: string): Promise<void> {
       reconciled: result.reconciled, sinkDecisions: result.sinkDecisions,
       seeds: result.seeds, coverage: result.coverage, elapsedMs,
       completeCasesPerSecond: result.executed / (elapsedMs / 1000),
+      pipeline: { format: pipeline.format, generated: pipeline.generated, executed: pipeline.executed,
+        attemptedExecutions: pipeline.attemptedExecutions, failedAttempts: pipeline.failedAttempts,
+        filteredAttempts: pipeline.filteredAttempts, recoveries: pipeline.recoveries,
+        generationElapsedNs: pipeline.generationElapsedNs,
+        candidateExecutionNs: pipeline.candidateExecutionNs,
+        observationPublicationNs: pipeline.observationPublicationNs,
+        recoveryExecutionNs: pipeline.recoveryExecutionNs,
+        pipelineElapsedNs: pipeline.pipelineElapsedNs,
+        generatedCasesPerSecond: pipeline.generatedCasesPerSecond,
+        attemptedExecutionsPerSecond: pipeline.attemptedExecutionsPerSecond,
+        pipelineCasesPerSecond: pipeline.pipelineCasesPerSecond },
+      r04KernelPass: kernel.pass,
+      serialDurabilityProbePerSecond: durable.serialRecordsPerSecond,
       minimumBoundaryPermutationsPerSecond: profile.minimumBoundaryPermutationsPerSecond,
       throughputQualified: result.executed / (elapsedMs / 1000) >= profile.minimumBoundaryPermutationsPerSecond,
       productionAuthorized: false,
-      timingScope: 'Timer includes launch of independent sink, gateway and Aether worker; lost response, absent gateway, signed recovery/rejoin, 15 generated cases, duplicate delivery, raw state copy/audit and durable observations. Preregistration and final measurement publication are excluded.',
+      timingScope: 'Outer timer includes launch of independent sink, gateway and Aether worker; lost response, absent gateway, signed recovery/rejoin, all 15 generated cases, duplicate delivery, raw state copy/audit and durable observations. Pipeline timings separate case generation, candidate execution, recovery and immutable publication inside the worker. R04 JSON kernel, preregistration and final measurement publication are excluded from outer timer.',
       after: diagnostic() });
     console.log(`Complete ${result.executed}/${result.generated} witnessed external cases in ${elapsedMs.toFixed(3)} ms (${(result.executed / (elapsedMs / 1000)).toFixed(2)}/s).`);
   } finally { rmSync(privateDirectory, { recursive: true, force: true }); }
@@ -108,6 +159,7 @@ async function verify(directory: string): Promise<void> {
   equal(preregistration.sources, sources());
   validateRegistration(registration);
   assert.equal(measured.registrationSha256, preregistration.registrationSha256);
+  assert.equal(measured.format, 'aether.living-external-measurement/2');
   assert.equal(result.generated, 15); assert.equal(result.executed, 15);
   assert.equal(result.filtered, 0); assert.equal(result.passed, 15); assert.equal(result.failed, 0);
   assert.equal(result.attempted, 17); assert.equal(result.partitionUnknown, 1);
@@ -121,6 +173,48 @@ async function verify(directory: string): Promise<void> {
   for (const key of ['generated', 'executed', 'filtered', 'passed', 'failed', 'attempted', 'partitionUnknown', 'reconciled', 'sinkDecisions'] as const)
     assert.equal(measured[key], result[key]);
   equal(measured.seeds, result.seeds); equal(measured.coverage, result.coverage);
+  const pipeline = result.pipeline;
+  equal(measured.pipeline, { format: pipeline.format, generated: pipeline.generated, executed: pipeline.executed,
+    attemptedExecutions: pipeline.attemptedExecutions, failedAttempts: pipeline.failedAttempts,
+    filteredAttempts: pipeline.filteredAttempts, recoveries: pipeline.recoveries,
+    generationElapsedNs: pipeline.generationElapsedNs,
+    candidateExecutionNs: pipeline.candidateExecutionNs,
+    observationPublicationNs: pipeline.observationPublicationNs,
+    recoveryExecutionNs: pipeline.recoveryExecutionNs,
+    pipelineElapsedNs: pipeline.pipelineElapsedNs,
+    generatedCasesPerSecond: pipeline.generatedCasesPerSecond,
+    attemptedExecutionsPerSecond: pipeline.attemptedExecutionsPerSecond,
+    pipelineCasesPerSecond: pipeline.pipelineCasesPerSecond });
+  const kernel = read(join(directory, 'r04-kernel.json'));
+  assert.equal(kernel.format, 'aether.r04-json-event-measurement/1');
+  assert.equal(kernel.minimumPerSecond, 2_000_000);
+  assert.equal(kernel.warmups, 1); assert.equal(kernel.inputsPerTrial, 20_000);
+  assert.equal(kernel.samples.length, 5);
+  for (const [index, sample] of kernel.samples.entries()) {
+    assert.equal(sample.trial, index); assert.equal(sample.generated, 20_000);
+    assert.equal(sample.executed, 20_000); assert.equal(sample.filtered, 0);
+    assert.equal(sample.checksum, 25_534);
+    assert.ok(Math.abs(sample.inputsPerSecond - 20_000 / (Number(sample.elapsedNs) / 1e9)) < 1e-6);
+    assert.equal(sample.pass, sample.inputsPerSecond >= 2_000_000);
+  }
+  assert.equal(kernel.pass, kernel.samples.every((sample: { pass: boolean }) => sample.pass));
+  assert.equal(measured.r04KernelPass, kernel.pass);
+  const durable = read(join(directory, 'durability-probe.json'));
+  assert.equal(durable.format, 'aether.living-durability-probe/1');
+  assert.equal(durable.warmups, 10); assert.equal(durable.samples, 100);
+  assert.equal(durable.bytesPerRecord, 256); assert.equal(durable.raw.length, 100);
+  const orderedDurability = durable.raw.map((sample: { ordinal: number; fileFsyncNs: string;
+    directoryFsyncNs: string; totalNs: string }, ordinal: number) => {
+    assert.equal(sample.ordinal, ordinal);
+    assert.ok(BigInt(sample.totalNs) >= BigInt(sample.fileFsyncNs) + BigInt(sample.directoryFsyncNs));
+    return BigInt(sample.totalNs);
+  }).sort((a: bigint, b: bigint) => a < b ? -1 : a > b ? 1 : 0);
+  assert.equal(durable.minimumNs, String(orderedDurability[0]));
+  assert.equal(durable.medianNs, String((orderedDurability[49] + orderedDurability[50]) / 2n));
+  assert.equal(durable.maximumNs, String(orderedDurability.at(-1)));
+  assert.ok(Math.abs(durable.serialRecordsPerSecond - 100 /
+    (Number(orderedDurability.reduce((a: bigint, b: bigint) => a + b, 0n)) / 1e9)) < 1e-9);
+  assert.equal(measured.serialDurabilityProbePerSecond, durable.serialRecordsPerSecond);
   assert.equal(measured.minimumBoundaryPermutationsPerSecond, 2_000_000);
   assert.equal(measured.productionAuthorized, false);
   assert.equal(measured.throughputQualified, measured.completeCasesPerSecond >= 2_000_000);
@@ -133,6 +227,9 @@ async function verify(directory: string): Promise<void> {
     auditExternalRaw(freshPublic, repeated, fresh.registration);
     for (const key of ['generated', 'executed', 'filtered', 'passed', 'failed', 'attempted',
       'partitionUnknown', 'reconciled', 'sinkDecisions'] as const) assert.equal(repeated[key], result[key]);
+    for (const key of ['generated', 'executed', 'attemptedExecutions', 'failedAttempts',
+      'filteredAttempts', 'recoveries', 'complete'] as const)
+      assert.equal(repeated.pipeline[key], result.pipeline[key]);
     equal(repeated.seeds, result.seeds); equal(repeated.coverage, result.coverage);
     equal(registration.generated.map(({ manifestDigest: _manifestDigest, ...item }) => item),
       fresh.registration.generated.map(({ manifestDigest: _manifestDigest, ...item }) => item));

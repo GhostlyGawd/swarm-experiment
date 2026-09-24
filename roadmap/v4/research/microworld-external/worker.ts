@@ -5,6 +5,7 @@ import { createAttestedSinkClient } from '../../../../src/fabric/attested-sink-s
 import { createProcessWitnessClient } from '../../../../src/fabric/witness-service.ts';
 import { domainDigest } from '../../../../src/fabric/identity.ts';
 import { LivingCampaign, type LivingCase } from '../../../../src/tier3/living-campaign.ts';
+import { LivingCampaignPipelineV1 } from '../../../../src/tier3/living-campaign-pipeline.ts';
 import { externalFixture, EXTERNAL_ARTIFACT, EXTERNAL_CLOCK, EXTERNAL_DEPLOYMENT,
   EXTERNAL_REPOSITORY, EXTERNAL_WITNESS_AUTHORITY } from './fixture.ts';
 
@@ -35,7 +36,11 @@ const campaign = new LivingCampaign({ manifest: fixture.manifest, module: fixtur
   effectTrust: { repositoryId: EXTERNAL_REPOSITORY, policyEpoch: '1',
     signer: 'living-integrated-operator', key: registration.operatorPublicKeyPem },
   externalEffectServices: { client, sinkStateWitness, effectCatalog } });
-const generated = new Map(campaign.generate().map(item => [domainDigest('aether.living-case/1', item), item]));
+const pipeline = new LivingCampaignPipelineV1({ campaign, directory: `${config.directory}/pipeline`,
+  candidateRoot: authorization.executionManifest.astRoot,
+  authorizationDigest: domainDigest('aether.living-effect-authorization/4', authorization),
+  requiredCoverage: [...new Set(fixture.manifest.scenarios.flatMap(item => item.requiredCoverage))] });
+const generated = new Map(pipeline.generated.map(item => [domainDigest('aether.living-case/1', item), item]));
 function exactCase(value: unknown): LivingCase {
   const id = domainDigest('aether.living-case/1', value), found = generated.get(id);
   if (!found) throw new TypeError('case outside signed generated campaign');
@@ -43,10 +48,13 @@ function exactCase(value: unknown): LivingCase {
 }
 function handle(value: unknown): unknown {
   if (!value || typeof value !== 'object') throw new TypeError('TCP command object required');
-  const command = value as { op?: string; input?: LivingCase };
+  const command = value as { op?: string; input?: LivingCase; kind?: 'original' | 'retry' | 'duplicate' };
+  if (command.op === 'finalize') return pipeline.finish();
   if (!['run-case', 'recover-case'].includes(command.op ?? '')) throw new TypeError('unknown command');
   const input = exactCase(command.input);
-  return command.op === 'recover-case' ? campaign.recoverEffectCase(input) : campaign.execute(input);
+  if (command.op === 'recover-case') return pipeline.recover(input);
+  if (!command.kind) throw new TypeError('pipeline attempt kind required');
+  return pipeline.execute(input, command.kind);
 }
 const server = createServer(socket => {
   socket.setEncoding('utf8'); let buffer = '';

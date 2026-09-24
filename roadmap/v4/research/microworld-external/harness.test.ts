@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createProcessWitnessClient } from '../../../../src/fabric/witness-service.ts';
@@ -47,9 +47,20 @@ test('same signed candidate uses witnessed external sink and refuses partition s
   assert.equal(result.partitionUnknown, 1); assert.equal(result.reconciled, 1);
   assert.equal(result.sinkDecisions, 9); assert.equal(result.sinkWitnessRevision, '9');
   assert.equal(result.attempted, 17);
+  assert.equal(result.pipeline.generated, 15); assert.equal(result.pipeline.executed, 15);
+  assert.equal(result.pipeline.attemptedExecutions, 17);
+  assert.equal(result.pipeline.failedAttempts, 1); assert.equal(result.pipeline.filteredAttempts, 0);
+  assert.equal(result.pipeline.recoveries, 2); assert.equal(result.pipeline.complete, true);
   auditExternalRaw(join(root, 'public'), result, prepared.registration);
   const sinkState = join(root, 'public', 'sink-store', 'sink-state-v2.json');
-  writeFileSync(sinkState, readFileSync(sinkState, 'utf8').replace('executionManifest', 'changedManifest'));
+  const originalSink = readFileSync(sinkState, 'utf8');
+  writeFileSync(sinkState, originalSink.replace('executionManifest', 'changedManifest'));
   assert.throws(() => auditExternalRaw(join(root, 'public'), result, prepared.registration),
     /external sink decision outside signed execution|external sink receipt changed|external sink witness head changed/);
+  writeFileSync(sinkState, originalSink);
+  const attempts = join(root, 'public', 'pipeline', 'attempts');
+  const first = join(attempts, readdirSync(attempts).find(name => name.endsWith('.json'))!);
+  writeFileSync(first, readFileSync(first, 'utf8').replace('original', 'forged'));
+  assert.throws(() => auditExternalRaw(join(root, 'public'), result, prepared.registration),
+    /living pipeline attempt changed/);
 });

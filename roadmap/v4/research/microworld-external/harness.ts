@@ -13,6 +13,7 @@ import { readSinkStateHead } from '../../../../src/fabric/sink-state-witness.ts'
 import { verifySinkReceipt, type SinkPublicAnchorV1 } from '../../../../src/fabric/sink-receipt.ts';
 import { selectEffectJournalWitness } from '../../../../src/fabric/effect-journal-witness.ts';
 import { LivingCampaign, type LivingCase, type LivingExternalCaseResultV4 } from '../../../../src/tier3/living-campaign.ts';
+import { auditLivingCampaignPipelineV1, type LivingPipelineReportV1 } from '../../../../src/tier3/living-campaign-pipeline.ts';
 import { externalFixture, EXTERNAL_ARTIFACT, EXTERNAL_CLOCK, EXTERNAL_DEPLOYMENT,
   EXTERNAL_REPOSITORY, EXTERNAL_WITNESS_AUTHORITY, signExternalFixture } from './fixture.ts';
 
@@ -143,7 +144,7 @@ export async function prepareExternal(privateDirectory: string, publicDirectory:
   } catch (error) { await stop(witnessService); throw error; }
 }
 export interface ExternalCampaignResult {
-  readonly format: 'aether.living-external-campaign/1';
+  readonly format: 'aether.living-external-campaign/2';
   readonly generated: number; readonly executed: number; readonly filtered: number;
   readonly passed: number; readonly failed: number; readonly attempted: number;
   readonly partitionUnknown: number; readonly reconciled: number;
@@ -151,6 +152,7 @@ export interface ExternalCampaignResult {
   readonly seeds: readonly string[]; readonly coverage: readonly string[];
   readonly cases: readonly { input: LivingCase; result: LivingExternalCaseResultV4 }[];
   readonly partitionAttempt: LivingExternalCaseResultV4;
+  readonly pipeline: LivingPipelineReportV1;
 }
 export async function runExternal(prepared: ExternalPrepared, publicDirectory: string): Promise<ExternalCampaignResult> {
   const services: Service[] = [prepared.witnessService], child = (name: string) => join(sourceRoot, 'src/fabric', name);
@@ -163,9 +165,9 @@ export async function runExternal(prepared: ExternalPrepared, publicDirectory: s
       [prepared.registrationPath, prepared.workerConfig], 'external worker ready'));
     const input = prepared.registration.generated.find(item => item.scenario === 'faulted-json-network' && item.ordinal === 0)!;
     let attempted = 0;
-    const command = (op: string, caseInput: LivingCase) => ({ op, input: caseInput });
+    const command = (op: string, caseInput: LivingCase, kind?: 'original' | 'retry' | 'duplicate') => ({ op, input: caseInput, ...(kind ? { kind } : {}) });
     attempted++;
-    const partitionAttempt = await frame(prepared.workerSocket, command('run-case', input)) as LivingExternalCaseResultV4;
+    const partitionAttempt = await frame(prepared.workerSocket, command('run-case', input, 'original')) as LivingExternalCaseResultV4;
     if (partitionAttempt.passed || partitionAttempt.filtered || partitionAttempt.externalEffects.indeterminate !== 1)
       throw new Error('post-sink partition did not preserve unknown effect outcome');
     if (gateway.child.exitCode === null && gateway.child.signalCode === null)
@@ -195,19 +197,19 @@ export async function runExternal(prepared: ExternalPrepared, publicDirectory: s
       throw new Error(`rejoined signed status did not reconcile: ${JSON.stringify(healed)}`);
     const observed = new Map<string, { input: LivingCase; result: LivingExternalCaseResultV4 }>();
     attempted++;
-    const recovered = await frame(prepared.workerSocket, command('run-case', input)) as LivingExternalCaseResultV4;
+    const recovered = await frame(prepared.workerSocket, command('run-case', input, 'retry')) as LivingExternalCaseResultV4;
     if (!recovered.passed || recovered.filtered || recovered.externalEffects.indeterminate)
       throw new Error('recovered external candidate case failed');
     observed.set(caseDigest(input), { input, result: recovered });
     attempted++;
-    const duplicate = await frame(prepared.workerSocket, command('run-case', input)) as LivingExternalCaseResultV4;
+    const duplicate = await frame(prepared.workerSocket, command('run-case', input, 'duplicate')) as LivingExternalCaseResultV4;
     if (domainDigest('aether.living-external-case-result/4', duplicate)
       !== domainDigest('aether.living-external-case-result/4', recovered))
       throw new Error('duplicate external case changed result');
     for (const next of prepared.registration.generated) {
       if (caseDigest(next) === caseDigest(input)) continue;
       attempted++;
-      const result = await frame(prepared.workerSocket, command('run-case', next)) as LivingExternalCaseResultV4;
+      const result = await frame(prepared.workerSocket, command('run-case', next, 'original')) as LivingExternalCaseResultV4;
       if (!result.passed || result.filtered || result.externalEffects.indeterminate)
         throw new Error(`external candidate case failed: ${next.seed}`);
       observed.set(caseDigest(next), { input: next, result });
@@ -229,18 +231,27 @@ export async function runExternal(prepared: ExternalPrepared, publicDirectory: s
     const coverage = [...new Set(cases.flatMap(item => item.result.coverage))].sort();
     for (const label of ['scheduler:switched', 'resource:exhausted', 'network:malformed', 'event:reordered', 'effect:committed'])
       if (!coverage.includes(label)) throw new Error(`external candidate coverage missing ${label}`);
-    const result: ExternalCampaignResult = { format: 'aether.living-external-campaign/1',
+    const pipeline = await frame(prepared.workerSocket, { op: 'finalize' }) as LivingPipelineReportV1;
+    if (!pipeline.complete || pipeline.generated !== cases.length || pipeline.executed !== cases.length
+      || pipeline.attemptedExecutions !== attempted || pipeline.failedAttempts !== 1
+      || pipeline.filteredAttempts !== 0 || pipeline.recoveries !== 2
+      || JSON.stringify(pipeline.coverage) !== JSON.stringify(coverage)
+      || JSON.stringify(pipeline.seeds) !== JSON.stringify(cases.map(item => item.input.seed)))
+      throw new Error('external pipeline omitted or reclassified an execution');
+    const result: ExternalCampaignResult = { format: 'aether.living-external-campaign/2',
       generated: prepared.registration.generated.length, executed: cases.length,
       filtered: cases.filter(item => item.result.filtered).length,
       passed: cases.filter(item => item.result.passed).length,
       failed: cases.filter(item => !item.result.passed).length, attempted,
       partitionUnknown: during.unknown, reconciled: healed.reconciled,
       sinkDecisions: state.decisions.length, sinkWitnessRevision: head.revision,
-      seeds: cases.map(item => item.input.seed), coverage, cases, partitionAttempt };
+      seeds: cases.map(item => item.input.seed), coverage, cases, partitionAttempt, pipeline };
     cpSync(prepared.sinkStore, join(publicDirectory, 'sink-store'), { recursive: true });
     cpSync(prepared.witnessStore, join(publicDirectory, 'witness-store'), { recursive: true });
     cpSync(join(prepared.privateDirectory, 'candidate', 'external-effect-journals'),
       join(publicDirectory, 'broker-journals'), { recursive: true });
+    cpSync(join(prepared.privateDirectory, 'candidate', 'pipeline'),
+      join(publicDirectory, 'pipeline'), { recursive: true });
     return result;
   } finally {
     await stop(gateway);
@@ -250,6 +261,9 @@ export async function runExternal(prepared: ExternalPrepared, publicDirectory: s
 /** Offline audit uses only the preregistered public anchor and retained bytes. */
 export function auditExternalRaw(publicDirectory: string, result: ExternalCampaignResult,
   registration: ExternalRegistration): void {
+  if (result.format !== 'aether.living-external-campaign/2') throw new Error('external pipeline result version mismatch');
+  auditLivingCampaignPipelineV1(join(publicDirectory, 'pipeline'), result.pipeline,
+    [...new Set(externalFixture().manifest.scenarios.flatMap(item => item.requiredCoverage))]);
   const authorization = registration.authorization;
   if (authorization.format !== 'aether.living-effect-authorization/4'
     || domainDigest('aether.sink-anchor/1', registration.anchor)
