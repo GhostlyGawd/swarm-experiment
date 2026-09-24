@@ -3,7 +3,8 @@
  * fixed path. Unsupported payloads and missing rules fail before sink dispatch.
  */
 import { createPrivateKey, createPublicKey, sign, verify, type KeyObject } from 'node:crypto';
-import { encodeCanonical, exactObject, identifier, decimal, type TaggedValueV1 } from '../fabric/encoding.ts';
+import { types as nodeTypes } from 'node:util';
+import { encodeCanonical, exactObject, identifier, decimal, validateTaggedValue, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { domainDigest, validateDigest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import { validateSinkAdapterArtifactDigest } from '../fabric/sink-receipt.ts';
 import { capability, isNodeRef, type CapabilityName } from '../tier1/ids.ts';
@@ -362,4 +363,117 @@ export function assertEffectResourceSinkContextV5(policy: SignedEffectResourcePo
     || rule.sinkStateWitnessDigest !== actual.sinkStateWitnessDigest
     || rule.adapterArtifactDigest !== actual.approvedAdapterArtifactDigest)
     throw new Error('attested sink context is outside signed resource policy v5');
+}
+
+/** V6 retains V5's external write and sink binding, while permitting exactly
+ * one path segment selected from a bounded tagged string argument. */
+export interface EffectResourceRuleV6 extends EffectResourceRuleV5 {}
+export interface EffectResourcePolicyBodyV6 {
+  readonly format: 'aether.effect-resource-policy/6'; readonly repositoryId: string;
+  readonly astRoot: Digest; readonly policyEpoch: string; readonly rules: readonly EffectResourceRuleV6[];
+}
+export interface SignedEffectResourcePolicyV6 {
+  readonly format: 'aether.signed-effect-resource-policy/6'; readonly body: EffectResourcePolicyBodyV6;
+  readonly signer: string; readonly signature: string;
+}
+export function validateEffectResourcePolicyBodyV6(value: unknown): asserts value is EffectResourcePolicyBodyV6 {
+  encodeCanonical(value);
+  const body = exactObject(value, ['format', 'repositoryId', 'astRoot', 'policyEpoch', 'rules']);
+  if (body.format !== 'aether.effect-resource-policy/6' || !isNodeRef(body.astRoot))
+    throw new TypeError('invalid effect resource policy v6 subject');
+  identifier(body.repositoryId); decimal(body.policyEpoch);
+  if (!Array.isArray(body.rules) || body.rules.length < 1 || body.rules.length > 128)
+    throw new TypeError('effect resource policy v6 requires bounded rules');
+  let previous = '';
+  for (const item of body.rules) {
+    const rule = exactObject(item, ['capability', 'prefix', 'argument', 'adapterId', 'adapterDigest',
+      'adapterArtifactDigest', 'deadline', 'clockDomain', 'deploymentId', 'sinkAnchorDigest',
+      'sinkStateWitnessDigest']);
+    capability(rule.capability as string); path(rule.prefix); identifier(rule.adapterId);
+    validateDigest(rule.adapterDigest, 'aether.effect-adapter/1');
+    validateSinkAdapterArtifactDigest(rule.adapterArtifactDigest);
+    decimal(rule.deadline); identifier(rule.clockDomain); identifier(rule.deploymentId);
+    validateDigest(rule.sinkAnchorDigest, 'aether.sink-anchor/1');
+    validateDigest(rule.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
+    const expected = domainDigest('aether.effect-adapter/1', { id: rule.adapterId,
+      semantics: SINK_WRITE_SEMANTICS });
+    if (rule.adapterDigest !== expected) throw new TypeError('v6 policy requires exact idempotent sink write semantics');
+    if ((rule.capability as string) <= previous || rule.argument !== null
+      && (!Number.isSafeInteger(rule.argument) || (rule.argument as number) < 0 || (rule.argument as number) > 31))
+      throw new TypeError('v6 sink adapter requires sorted rules and bounded argument index');
+    previous = rule.capability as string;
+  }
+}
+export function effectResourcePolicyDigestV6(body: EffectResourcePolicyBodyV6): Digest {
+  validateEffectResourcePolicyBodyV6(body);
+  return domainDigest('aether.effect-resource-policy/6', body);
+}
+function signingBytesV6(body: EffectResourcePolicyBodyV6, signer: string): Uint8Array {
+  return encodeCanonical({ domain: 'aether.effect-resource-policy-signature/6', body, signer });
+}
+export function signEffectResourcePolicyV6(body: EffectResourcePolicyBodyV6, signer: string,
+  key: KeyObject | string): SignedEffectResourcePolicyV6 {
+  validateEffectResourcePolicyBodyV6(body); identifier(signer);
+  const privateKey = typeof key === 'string' ? createPrivateKey(key) : key;
+  if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'ed25519')
+    throw new TypeError('Ed25519 policy signing key required');
+  return { format: 'aether.signed-effect-resource-policy/6', body, signer,
+    signature: sign(null, signingBytesV6(body, signer), privateKey).toString('base64') };
+}
+export function assertSignedEffectResourcePolicyV6(value: unknown, manifest: ExecutionManifestV1,
+  repositoryId: string, currentEpoch: string, key: KeyObject | string): asserts value is SignedEffectResourcePolicyV6 {
+  encodeCanonical(value);
+  const policy = exactObject(value, ['format', 'body', 'signer', 'signature']);
+  if (policy.format !== 'aether.signed-effect-resource-policy/6')
+    throw new TypeError('unsupported signed effect resource policy v6');
+  validateEffectResourcePolicyBodyV6(policy.body); identifier(policy.signer);
+  identifier(repositoryId); decimal(currentEpoch);
+  const body = policy.body as EffectResourcePolicyBodyV6;
+  if (body.repositoryId !== repositoryId || body.astRoot !== manifest.astRoot
+    || body.policyEpoch !== currentEpoch || effectResourcePolicyDigestV6(body) !== manifest.capabilityPolicyDigest)
+    throw new Error('stale or foreign effect resource policy v6');
+  if (typeof policy.signature !== 'string' || !/^[A-Za-z0-9+/]{86}==$/.test(policy.signature))
+    throw new TypeError('invalid effect policy v6 signature');
+  const signature = Buffer.from(policy.signature, 'base64');
+  const publicKey = typeof key === 'string' ? createPublicKey(key)
+    : key.type === 'private' ? createPublicKey(key) : key;
+  if (publicKey.asymmetricKeyType !== 'ed25519' || signature.toString('base64') !== policy.signature
+    || !verify(null, signingBytesV6(body, policy.signer as string), publicKey, signature))
+    throw new TypeError('untrusted effect resource policy v6 signer');
+}
+export function effectResourcePathV6(policy: SignedEffectResourcePolicyV6, name: CapabilityName,
+  args: readonly TaggedValueV1[]): readonly string[] {
+  validateEffectResourcePolicyBodyV6(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule) throw new Error('effect capability has no signed v6 resource rule');
+  if (rule.argument === null) return [...rule.prefix];
+  if (nodeTypes.isProxy(args) || !Array.isArray(args))
+    throw new TypeError('effect target arguments must be an ordinary tagged array');
+  const selected = Object.getOwnPropertyDescriptor(args, String(rule.argument));
+  if (!selected) throw new TypeError('missing signed effect target argument');
+  if (!('value' in selected)) throw new TypeError('effect target argument accessor forbidden');
+  const value = selected.value as TaggedValueV1;
+  validateTaggedValue(value);
+  if (value.tag !== 'string' || !SEGMENT.test(value.value) || value.value === '.' || value.value === '..')
+    throw new TypeError('effect target is outside signed resource grammar');
+  return [...rule.prefix, value.value];
+}
+export function assertEffectResourceAdapterV6(policy: SignedEffectResourcePolicyV6, name: CapabilityName,
+  actual: Readonly<{ id: string; digest: Digest; artifactDigest: Digest | null }>): void {
+  validateEffectResourcePolicyBodyV6(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule || rule.adapterId !== actual.id || rule.adapterDigest !== actual.digest
+    || rule.adapterArtifactDigest !== actual.artifactDigest)
+    throw new Error('attested sink adapter is outside signed resource policy v6');
+}
+export function assertEffectResourceSinkContextV6(policy: SignedEffectResourcePolicyV6,
+  name: CapabilityName, actual: Readonly<{ deploymentId: string; sinkAnchorDigest: Digest;
+    sinkStateWitnessDigest: Digest; approvedAdapterArtifactDigest: Digest }>): void {
+  validateEffectResourcePolicyBodyV6(policy.body); capability(name);
+  const rule = policy.body.rules.find(item => item.capability === name);
+  if (!rule || rule.deploymentId !== actual.deploymentId
+    || rule.sinkAnchorDigest !== actual.sinkAnchorDigest
+    || rule.sinkStateWitnessDigest !== actual.sinkStateWitnessDigest
+    || rule.adapterArtifactDigest !== actual.approvedAdapterArtifactDigest)
+    throw new Error('attested sink context is outside signed resource policy v6');
 }
