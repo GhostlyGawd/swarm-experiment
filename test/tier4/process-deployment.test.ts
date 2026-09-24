@@ -120,6 +120,19 @@ async function accounts(deployment: ProcessDeployment) {
 }
 async function balances(deployment: ProcessDeployment) { return (await deployment.snapshot()).records.filter(record => record.fields.some(([key]) => key === 'balance')).map(record => (record.fields.find(([key]) => key === 'balance')![1] as { value: string }).value); }
 
+test('live ProcessDeployment refuses Artifact/3 before worker or effect dispatch', async () => {
+  const f = fixture(); let deployment: ProcessDeployment | undefined;
+  try {
+    deployment = await ProcessDeployment.open(f.options);
+    const path = join(f.options.directory, 'artifacts', `${f.genesisManifest.split(':').at(-1)}.json`);
+    const legacy = JSON.parse(readFileSync(path, 'utf8'));
+    assert.equal(legacy.format, 'aether.process-artifact/1');
+    writeFileSync(path, JSON.stringify({ ...legacy, format: 'aether.process-artifact/3' }));
+    assert.throws(() => deployment!.artifact(f.genesisManifest), /invalid durable artifact/);
+    assert.equal(f.rows().length, 0);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
 test('strict process deployment carries scoped grants through the production host and sink', async () => {
   const f = fixture(); let deployment: ProcessDeployment | undefined;
   const epochs = new DurableGrantEpochs({ directory: join(f.directory, 'grant-epochs'), repositoryId: 'deployment-test' });

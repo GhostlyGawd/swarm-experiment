@@ -21,3 +21,8 @@ export { ProcessSemanticRetention } from './process-semantic-retention.ts';
 export { PackedNativeProcessRunner, PackedNativeRun, executePackedCheckpointNative, type PackedNativeProcessRunnerOptions, type NativeOperation, type NativeBridgeResult } from './packed-native-process.ts';
 export { seedProcessCheckpoint, seededProcessReference, type ProcessCheckpointBinding, type ProcessCheckpointLease, type ProcessCheckpointReceipt, type ProcessCheckpointSeed, type ProcessCheckpointAuthorization, type ProcessCheckpointAction, type ProcessCheckpointControlRequest, type ProcessCheckpointControl } from './process-checkpoint-contract.ts';
 export { ProcessDeployment, processArtifactDigest, processArtifactContext, processMigrationPlan, processEffectPlan, processAnchoredEffectPlan, processImportFreeEffectPlan, processIsolatedWasmEffectPlan, processClockedWasmEffectPlan, type ProcessArtifactInput, type ProcessArtifactV1, type ProcessDeploymentOptions, type ProcessHostServices, type CapabilityDeploymentProfile } from './process-deployment.ts';
+export { makeProcessVirtualArtifactV3, validateProcessVirtualArtifactV3,
+  encodeProcessVirtualArtifactV3, decodeProcessVirtualArtifactV3,
+  processVirtualArtifactDigestV3, measureExecutableSubjectV1,
+  type ProcessVirtualArtifactV3, type ProcessVirtualArtifactInputV3,
+  type MeasuredExecutableSubjectV1, type MeasuredFileV1 } from './process-virtual-artifact.ts';
