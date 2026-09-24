@@ -39,14 +39,14 @@ export class ProcessCheckpointActiveReleaseAuthority {
   readonly repositoryId: string;
   private readonly witness: HostJournalWitness;
   private readonly hostDirectory: string;
-  private readonly hostConfiguration: Digest;
+  private readonly hostConfiguration: Digest | null;
   private readonly program: ResumableProgram;
   constructor(options: { readonly witness: HostJournalWitness; readonly hostDirectory: string;
-    readonly hostConfiguration: Digest; readonly repositoryId: string; readonly program: ResumableProgram }) {
+    readonly hostConfiguration?: Digest; readonly repositoryId: string; readonly program: ResumableProgram }) {
     assertHostJournalWitness(options.witness);
     identifier(options.repositoryId);
     if (options.witness.repositoryId !== options.repositoryId) throw new TypeError('release witness repository mismatch');
-    validateDigest(options.hostConfiguration);
+    if (options.hostConfiguration !== undefined) validateDigest(options.hostConfiguration);
     const { digest, ...body } = options.program;
     if (digest !== domainDigest('aether.resumable-program/1', body, { maxDepth: 128,
       maxObjects: 1_000_000, maxFrameBytes: 16 * 1024 * 1024, maxDecompressedBytes: 16 * 1024 * 1024 })
@@ -54,10 +54,12 @@ export class ProcessCheckpointActiveReleaseAuthority {
       throw new TypeError('release program identity mismatch');
     this.witness = options.witness;
     this.hostDirectory = realpathSync(options.hostDirectory);
-    this.hostConfiguration = options.hostConfiguration;
+    this.hostConfiguration = options.hostConfiguration ?? null;
     this.repositoryId = options.repositoryId;
     this.program = structuredClone(options.program);
-    this.digest = domainDigest('aether.process-checkpoint-active-release-authority/2', {
+    this.digest = domainDigest(this.hostConfiguration === null
+      ? 'aether.process-checkpoint-active-release-authority/3'
+      : 'aether.process-checkpoint-active-release-authority/2', {
       witness: options.witness.digest, hostDirectory: this.hostDirectory, hostConfiguration: this.hostConfiguration,
       repositoryId: this.repositoryId, program: options.program.digest, manifest: options.program.manifestDigest });
     live.add(this);
@@ -65,6 +67,16 @@ export class ProcessCheckpointActiveReleaseAuthority {
   }
   static assertInstance(value: ProcessCheckpointActiveReleaseAuthority): void {
     if (!value || !live.has(value)) throw new TypeError('untrusted checkpoint active release authority');
+  }
+  /** A host opts in only with the same operator witness and compiled subject. */
+  assertHost(options: { readonly witness: HostJournalWitness; readonly hostDirectory: string;
+    readonly configuration: Digest; readonly manifest: Digest; readonly program: Digest }): void {
+    ProcessCheckpointActiveReleaseAuthority.assertInstance(this);
+    assertHostJournalWitness(options.witness);
+    if (options.witness !== this.witness || realpathSync(options.hostDirectory) !== this.hostDirectory
+      || options.manifest !== this.program.manifestDigest || options.program !== this.program.digest
+      || this.hostConfiguration !== null && options.configuration !== this.hostConfiguration)
+      throw new Error('checkpoint active release authority differs from host witness, configuration, or program');
   }
   private current(bindingId: Digest): Omit<ProcessCheckpointActiveReleaseProof, 'id'> {
     ProcessCheckpointActiveReleaseAuthority.assertInstance(this);
@@ -76,16 +88,21 @@ export class ProcessCheckpointActiveReleaseAuthority {
       'snapshot', 'calls', 'migrations', 'allocations', 'snapshots', 'heads', 'checkpointLeases',
       'checkpointReceipts', 'checkpointControls', ...((value as { format?: string }).format === 'aether.process-host/5' ? ['nativeFallbacks'] : [])]);
     if (!['aether.process-host/4', 'aether.process-host/5'].includes(String(journal.format))
-      || journal.witnessRevision !== witnessed.revision || journal.configuration !== this.hostConfiguration
+      || journal.witnessRevision !== witnessed.revision
+      || this.hostConfiguration !== null && journal.configuration !== this.hostConfiguration
       || !Array.isArray(journal.checkpointLeases) || !Array.isArray(journal.checkpointReceipts)
       || !Array.isArray(journal.heads)) throw new Error('release requires the exact witnessed host profile');
+    validateDigest(journal.configuration);
+    const configuration = journal.configuration as Digest;
+    if (this.hostConfiguration === null && !configuration.startsWith('aether.process-host-config/15:'))
+      throw new Error('dynamic active release authority requires versioned host config/15');
     const matches = journal.checkpointLeases.filter(item => (item as ProcessCheckpointLease).binding?.id === bindingId) as ProcessCheckpointLease[];
     if (matches.length !== 1) throw new Error('release requires one exact checkpoint binding');
     const lease = matches[0];
     if (!lease) throw new Error('release checkpoint binding absent from witnessed host journal');
     exactObject(lease, ['binding', 'state', 'latestCheckpoint', 'checkpoints', 'receipt']);
     validateProcessCheckpointBinding(lease.binding);
-    if (lease.binding.configuration !== this.hostConfiguration || lease.binding.program !== this.program.digest
+    if (lease.binding.configuration !== configuration || lease.binding.program !== this.program.digest
       || lease.state !== 'committed' || lease.receipt === null || lease.latestCheckpoint === null
       || !Array.isArray(lease.checkpoints) || lease.checkpoints.at(-1) !== lease.latestCheckpoint)
       throw new Error('release checkpoint is not committed under this program');
@@ -127,7 +144,7 @@ export class ProcessCheckpointActiveReleaseAuthority {
       throw new Error('release checkpoint is not a resolved completed execution');
     readCheckpointEffectAudit(this.hostDirectory, receipt.effectAudit, snapshot);
     const markerKey = domainDigest('aether.process-semantic-retention-key/1', {
-      configuration: this.hostConfiguration, operationId: lease.binding.operationId }).split(':').at(-1)!;
+      configuration, operationId: lease.binding.operationId }).split(':').at(-1)!;
     const markerPath = join(this.hostDirectory, 'checkpoint-semantic-retention', `${markerKey}.json`);
     if (statSync(markerPath).size > 1024 * 1024) throw new RangeError('release marker size limit');
     const marker = exactObject(decodeCanonical(readFileSync(markerPath)), ['format', 'hostConfiguration', 'hostManifest',
@@ -137,7 +154,7 @@ export class ProcessCheckpointActiveReleaseAuthority {
     const roots = [...new Set([this.program.manifest.astRoot, ...this.program.manifest.dependencies.map(item => item.declaration)])].sort() as NodeRef[];
     if (marker.format !== 'aether.process-semantic-retention/1'
       || markerId !== domainDigest('aether.process-semantic-retention/1', markerBody)
-      || marker.hostConfiguration !== this.hostConfiguration || marker.hostManifest !== this.program.manifestDigest
+      || marker.hostConfiguration !== configuration || marker.hostManifest !== this.program.manifestDigest
       || marker.operationId !== lease.binding.operationId || marker.generation !== lease.binding.generation
       || marker.beforeSnapshot !== lease.binding.beforeSnapshot || marker.repositoryId !== this.repositoryId
       || !equal([...marker.roots as NodeRef[]].sort(), roots) || typeof marker.reference !== 'string'
@@ -145,7 +162,7 @@ export class ProcessCheckpointActiveReleaseAuthority {
       throw new Error('release marker differs from witnessed checkpoint');
     identifier(marker.reference);
     return { format: PROCESS_CHECKPOINT_ACTIVE_RELEASE_FORMAT, authority: this.digest,
-      hostConfiguration: this.hostConfiguration, hostRevision: witnessed.revision,
+      hostConfiguration: configuration, hostRevision: witnessed.revision,
       manifest: this.program.manifestDigest, program: this.program.digest, binding: bindingId,
       operationId: lease.binding.operationId, receipt: receipt.id, effectAudit: receipt.effectAudit,
       commitHead: head.digest as Digest, marker: markerId as Digest, reference: marker.reference as string,

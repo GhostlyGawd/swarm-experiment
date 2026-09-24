@@ -254,6 +254,11 @@ export class SemanticGarbageCollector {
     const released = new Set(this.releaseRecords().flatMap(item => item.activeRecords));
     return this.retentionHistory().filter(record => !released.has(this.retentionId(record)));
   }
+  /** Rechecks the witness and complete replay pins before reporting release. */
+  isCommittedActiveTaskReleased(reference: string): boolean {
+    identifier(reference);
+    return this.releaseRecords().some(item => item.proof.reference === reference);
+  }
   /** Retire only a complete active-task group after a witnessed committed
    * ProcessHost checkpoint and its independently validated effect audit. */
   releaseCommittedActiveTask(proof: ProcessCheckpointActiveReleaseProof): void {

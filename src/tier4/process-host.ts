@@ -159,7 +159,7 @@ export interface ProcessEffectContext {
   readonly budgetAuthorityDigest?: Digest;
   readonly admissionTableDigest?: Digest;
 }
-export type ProcessHostPhase = 'call-intent' | 'boundary' | 'effect-requested' | 'effect-recorded' | 'call-before-commit' | 'call-committed' | 'migration-requested' | 'migration-prepared' | 'migration-before-commit' | 'migration-committed' | 'migration-finalized' | 'checkpoint-started' | 'checkpoint-saved' | 'checkpoint-before-commit' | 'checkpoint-committed' | 'checkpoint-aborted' | 'checkpoint-control-before-commit' | 'checkpoint-control-committed' | 'native-fallback-intent' | 'native-fallback-running' | 'native-fallback-before-commit' | 'native-fallback-committed';
+export type ProcessHostPhase = 'call-intent' | 'boundary' | 'effect-requested' | 'effect-recorded' | 'call-before-commit' | 'call-committed' | 'migration-requested' | 'migration-prepared' | 'migration-before-commit' | 'migration-committed' | 'migration-finalized' | 'checkpoint-started' | 'checkpoint-saved' | 'checkpoint-before-commit' | 'checkpoint-committed' | 'checkpoint-active-released' | 'checkpoint-aborted' | 'checkpoint-control-before-commit' | 'checkpoint-control-committed' | 'native-fallback-intent' | 'native-fallback-running' | 'native-fallback-before-commit' | 'native-fallback-committed';
 export interface ProcessHostOptions {
   readonly directory: string;
   readonly module: Term;
@@ -204,6 +204,8 @@ export interface ProcessHostOptions {
   readonly historicalEffectPolicyEpochV7?: string;
   /** Operator-held exact AST/dependency retention for all resumable checkpoint leases. */
   readonly semanticCheckpointRetention?: ProcessSemanticRetention;
+  /** New host-config/15 profile: witnessed terminal active-task pin release. */
+  readonly semanticActiveReleaseProfile?: 'witnessed-active-task-release-v1';
   /** Explicitly reopen anchored V2 journals under their original host-config/2 identity. */
   readonly legacyAnchoredEffectPolicy?: 'anchored-v2';
   /** New isolated Wasm signed-policy profile with host-config/4 identity. */
@@ -284,6 +286,7 @@ export class ProcessHost {
   private readonly configuration: Digest;
   private readonly signedEffectResourcePolicy: SignedEffectResourcePolicyV1 | SignedEffectResourcePolicyV2 | SignedEffectResourcePolicyV3 | SignedEffectResourcePolicyV4 | SignedEffectResourcePolicyV5 | SignedEffectResourcePolicyV6 | SignedEffectResourcePolicyV7 | null;
   private readonly historicalV7Inspection: boolean;
+  private readonly activeReleaseProfile: boolean;
   private readonly file: string;
   readonly #hostJournalWitness: HostJournalWitness | null;
   readonly #journalWitnessBases = new WeakMap<HostJournal, { revision: string; journal: string | null }>();
@@ -312,6 +315,16 @@ export class ProcessHost {
     const witnessedSink = resourceScopedSink
       || options.anchoredEffectPolicyProfile === 'attested-sink-v8-host-witness';
     const hostWitnessed = witnessedSink || options.anchoredEffectPolicyProfile === 'isolated-wasm-v7-host-witness';
+    if (options.semanticActiveReleaseProfile !== undefined
+      && options.semanticActiveReleaseProfile !== 'witnessed-active-task-release-v1')
+      throw new TypeError('unsupported semantic active release host profile');
+    this.activeReleaseProfile = options.semanticActiveReleaseProfile === 'witnessed-active-task-release-v1';
+    if (this.activeReleaseProfile && (!hostWitnessed || !retainedCheckpoints || nativeProfile
+      || !options.hostJournalWitness || ProcessSemanticRetention.releaseAuthorityDigest(options.semanticCheckpointRetention!) === null))
+      throw new TypeError('active release requires a witnessed host and operator semantic release authority');
+    if (!this.activeReleaseProfile && retainedCheckpoints
+      && ProcessSemanticRetention.releaseAuthorityDigest(options.semanticCheckpointRetention!) !== null)
+      throw new TypeError('semantic release authority requires its versioned host profile');
     const witnessed = hostWitnessed || options.anchoredEffectPolicyProfile === 'isolated-wasm-v6-witnessed';
     const clocked = witnessed || options.anchoredEffectPolicyProfile === 'isolated-wasm-v5-clock';
     if (options.anchoredEffectPolicyProfile !== undefined &&
@@ -506,8 +519,10 @@ export class ProcessHost {
     this.registry = new CapabilityRegistry();
     for (const name of options.registry.names) this.registry.define(freeze(copy(options.registry.get(name)!)));
     this.validatePlan(options.plan);
-    this.configuration = domainDigest(tableSink ? retainedCheckpoints ? 'aether.process-host-config/14' : 'aether.process-host-config/13' : retainedCheckpoints ? 'aether.process-host-config/12' : nativeProfile ? 'aether.process-host-config/10' : budgetedSink ? 'aether.process-host-config/11' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
+    this.configuration = domainDigest(this.activeReleaseProfile ? 'aether.process-host-config/15' : tableSink ? retainedCheckpoints ? 'aether.process-host-config/14' : 'aether.process-host-config/13' : retainedCheckpoints ? 'aether.process-host-config/12' : nativeProfile ? 'aether.process-host-config/10' : budgetedSink ? 'aether.process-host-config/11' : anchored ? resourceScopedSink ? 'aether.process-host-config/9' : witnessedSink ? 'aether.process-host-config/8' : hostWitnessed ? 'aether.process-host-config/7' : witnessed ? 'aether.process-host-config/6' : clocked ? 'aether.process-host-config/5' : options.anchoredEffectPolicyProfile === 'isolated-wasm-v4' ? 'aether.process-host-config/4' : options.legacyAnchoredEffectPolicy === 'anchored-v2' ? 'aether.process-host-config/2' : 'aether.process-host-config/3' : 'aether.process-host-config/1', { manifest: executionManifestDigest(this.manifest), registry: [...this.registry.names].sort().map(name => this.registry.get(name)!), initialPlan: planBytes(options.plan), initialGeneration: options.initialGeneration ?? '1', initialSnapshot: options.initialSnapshot ? runtimeSnapshotDigest(options.initialSnapshot) : null,
       ...(retainedCheckpoints ? { semanticCheckpointRetentionAuthority: ProcessSemanticRetention.authorityDigest(options.semanticCheckpointRetention!) } : {}),
+      ...(this.activeReleaseProfile ? { semanticActiveReleaseProfile: options.semanticActiveReleaseProfile,
+        semanticActiveReleaseAuthority: ProcessSemanticRetention.releaseAuthorityDigest(options.semanticCheckpointRetention!) } : {}),
       ...(tableSink ? { sinkAdapterTableDigest: declarativeSinkTableDigestV2(this.options.sinkTableV2!) } : {}),
       ...(options.scopedGrants ? { grantProfile: 'aether.scoped-grants/2', grantRepositoryId: options.scopedGrants.repositoryId, effectResourcePolicy: this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/6' ? effectResourcePolicyDigestV6(this.signedEffectResourcePolicy.body)
         : this.signedEffectResourcePolicy?.format === 'aether.signed-effect-resource-policy/7' ? effectResourcePolicyDigestV7(this.signedEffectResourcePolicy.body, this.module)
@@ -536,6 +551,10 @@ export class ProcessHost {
         approvedAdapterArtifactDigest: options.attestedSinkAuthority!.approvedAdapterArtifactDigest,
         sinkStateWitnessDigest: options.sinkStateWitness!.digest } : {}) });
     ensureDurableDirectory(options.directory);
+    if (this.activeReleaseProfile) ProcessSemanticRetention.prototype.assertActiveReleaseProfile.call(
+      options.semanticCheckpointRetention!, { witness: options.hostJournalWitness!, hostDirectory: options.directory,
+        configuration: this.configuration, manifest: executionManifestDigest(this.manifest),
+        program: this.checkpointProgram().digest });
     this.file = join(options.directory, 'host.json');
     this.lock = new JournalLock({ directory: join(options.directory, 'host-lock'), domain: 'aether.process-host-lock', busyError: 'process_host_busy: another state transition is active' });
   }
@@ -559,7 +578,12 @@ export class ProcessHost {
           if (host.#hostJournalWitness) host.#journalWitnessBases.set(journal, { revision: '0', journal: null });
           host.retain(journal, snapshot); host.appendHead(journal, { kind: 'initial', operationId: 'initial', subjectDigest: host.configuration }); host.persist(journal);
         }
-        for (const lease of journal.checkpointLeases ?? []) ProcessHost.prototype.assertCheckpointSemanticRetention.call(host, lease.binding);
+        for (const lease of journal.checkpointLeases ?? []) {
+          if (host.activeReleaseProfile && lease.state === 'committed')
+            ProcessSemanticRetention.prototype.releaseCommitted.call(options.semanticCheckpointRetention!,
+              ProcessHost.prototype.fallbackIdentity.call(host), host.module, host.manifest, lease.binding);
+          ProcessHost.prototype.assertCheckpointSemanticRetention.call(host, lease.binding);
+        }
         for (const call of journal.calls) if (call.state === 'running') { call.state = 'indeterminate'; call.failure = 'coordinator restarted without a durable completed outcome'; }
         for (const migration of journal.migrations) {
           if (migration.state === 'requested' || migration.state === 'prepared') { migration.state = 'aborted'; migration.failure = 'no durable migration commit; original generation remains authoritative'; }
@@ -1305,7 +1329,13 @@ export class ProcessHost {
           const body: Omit<ProcessCheckpointReceipt, 'id'> = { format: 'aether.process-checkpoint-receipt/1', binding: lease.binding.id, checkpoint: lease.latestCheckpoint, beforeSnapshot: lease.binding.beforeSnapshot, afterSnapshot: runtimeSnapshotDigest(after), effectAudit: audit, eventHead: snapshot.eventHead, eventCursor: snapshot.eventCursor };
           const receipt = { ...body, id: processCheckpointReceiptDigest(body) };
           this.phase('checkpoint-before-commit', lease.binding.operationId, lease.binding.generation); assertAuthority(); ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding); journal.snapshot = after; this.retain(journal, after); lease.state = 'committed'; lease.receipt = receipt.id; journal.checkpointReceipts!.push(receipt);
-          this.appendHead(journal, { kind: 'checkpoint', operationId: lease.binding.operationId, subjectDigest: receipt.id }); this.persist(journal); this.phase('checkpoint-committed', lease.binding.operationId, lease.binding.generation); return freeze(copy(receipt));
+          this.appendHead(journal, { kind: 'checkpoint', operationId: lease.binding.operationId, subjectDigest: receipt.id }); this.persist(journal); this.phase('checkpoint-committed', lease.binding.operationId, lease.binding.generation);
+          if (this.activeReleaseProfile) {
+            ProcessSemanticRetention.prototype.releaseCommitted.call(this.options.semanticCheckpointRetention!,
+              ProcessHost.prototype.fallbackIdentity.call(this), this.module, this.manifest, lease.binding);
+            this.phase('checkpoint-active-released', lease.binding.operationId, lease.binding.generation);
+          }
+          return freeze(copy(receipt));
         },
         abort: () => { if (action !== 'abort') throw new Error('checkpoint abort requires explicit recovery action'); assertAuthority(); const latest = readProcessCheckpoint(this.options.directory, lease.latestCheckpoint, program); if (latest.core.effectCursor !== '0') throw new Error('cannot abort a checkpoint with terminal external effects'); ProcessHost.prototype.assertCheckpointSemanticRetention.call(this, lease.binding); lease.state = 'aborted'; this.persist(journal); this.phase('checkpoint-aborted', lease.binding.operationId, lease.binding.generation); },
       };

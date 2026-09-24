@@ -12,6 +12,8 @@ import { decodeCanonical, encodeCanonical, exactObject, identifier } from '../fa
 import { domainDigest, executionManifestDigest, validateExecutionManifest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import { atomicWriteOnce } from '../tier1/persistence.ts';
 import type { ProcessCheckpointBinding } from './process-checkpoint-contract.ts';
+import type { HostJournalWitness } from '../fabric/host-journal-witness.ts';
+import { ProcessCheckpointActiveReleaseAuthority } from './process-checkpoint-active-release.ts';
 
 const live = new WeakSet<ProcessSemanticRetention>();
 type Source = Readonly<{ operationId: string; generation: string; beforeSnapshot: Digest }>;
@@ -63,12 +65,14 @@ export class ProcessSemanticRetention {
   private readonly repositoryId: string;
   private readonly collectorDirectory: string;
   private readonly storeDirectory: string;
+  private readonly activeReleaseAuthority: ProcessCheckpointActiveReleaseAuthority | null;
   constructor(options: SemanticGcOptions) {
     this.store = options.store;
     this.collector = new SemanticGarbageCollector(options);
     this.repositoryId = options.repositoryId;
     this.collectorDirectory = realpathSync(options.directory);
     this.storeDirectory = realpathSync(options.store.directory);
+    this.activeReleaseAuthority = options.activeReleaseAuthority ?? null;
     this.digest = domainDigest('aether.process-semantic-retention-authority/1', {
       repositoryId: options.repositoryId, storeDirectory: this.storeDirectory,
       collectorDirectory: this.collectorDirectory, policy: options.policy,
@@ -82,8 +86,20 @@ export class ProcessSemanticRetention {
     ProcessSemanticRetention.assertInstance(value);
     return value.digest;
   }
+  static releaseAuthorityDigest(value: ProcessSemanticRetention): Digest | null {
+    ProcessSemanticRetention.assertInstance(value);
+    return value.activeReleaseAuthority?.digest ?? null;
+  }
   private static assertInstance(value: ProcessSemanticRetention): void {
     if (!live.has(value)) throw new TypeError('untrusted process semantic retention boundary');
+  }
+  /** Bound once to an independently held witness, exact host configuration,
+   * and the same compiled program used by ProcessHost's checkpoint journal. */
+  assertActiveReleaseProfile(options: { readonly witness: HostJournalWitness; readonly hostDirectory: string;
+    readonly configuration: Digest; readonly manifest: Digest; readonly program: Digest }): void {
+    ProcessSemanticRetention.assertInstance(this);
+    if (!this.activeReleaseAuthority) throw new Error('checkpoint active release authority missing');
+    ProcessCheckpointActiveReleaseAuthority.prototype.assertHost.call(this.activeReleaseAuthority, options);
   }
   private roots(module: Term, manifest: ExecutionManifestV1): readonly NodeRef[] {
     validateExecutionManifest(manifest);
@@ -123,11 +139,37 @@ export class ProcessSemanticRetention {
   }
   private assertRecords(marker: RetentionMarker): void {
     const records = SemanticGarbageCollector.prototype.retentions.call(this.collector);
-    for (const kind of ['active-task', 'replay'] as const) for (const root of marker.roots) {
+    const released = SemanticGarbageCollector.prototype.isCommittedActiveTaskReleased.call(this.collector, marker.reference);
+    if (released) {
+      if (!this.activeReleaseAuthority) throw new Error('checkpoint active release authority missing');
+      const history = SemanticGarbageCollector.prototype.retentionHistory.call(this.collector);
+      for (const root of marker.roots) if (!history.some(record => same(record, {
+        kind: 'active-task', reference: marker.reference, root })))
+        throw new Error('released active task lacks its immutable retention history');
+    }
+    for (const kind of released ? ['replay'] as const : ['active-task', 'replay'] as const) for (const root of marker.roots) {
       const wanted: SemanticRetention = { kind, reference: marker.reference, root };
       if (!records.some(record => same(record, wanted))) throw new Error('process semantic retention record missing');
       DurableGraphStore.prototype.hydrate.call(this.store, root);
     }
+  }
+  /** Called only after ProcessHost has durably published a committed receipt.
+   * The witness, checkpoint, effect audit, marker, and GC records are checked
+   * again under the host -> GC -> AST lock order. */
+  releaseCommitted(identity: HostIdentity, module: Term, manifest: ExecutionManifestV1,
+    binding: ProcessCheckpointBinding): void {
+    ProcessSemanticRetention.assertInstance(this);
+    if (!this.activeReleaseAuthority) throw new Error('checkpoint active release authority missing');
+    const expected = this.marker(identity, module, manifest, source(binding));
+    const actual = readMarker(identity, binding.operationId);
+    if (!actual || !same(actual, expected)) throw new Error('process semantic retention marker missing or identity changed');
+    const proof = ProcessCheckpointActiveReleaseAuthority.prototype.prove.call(this.activeReleaseAuthority, binding.id);
+    if (proof.hostConfiguration !== identity.configuration || proof.manifest !== identity.manifest
+      || proof.marker !== expected.id || proof.reference !== expected.reference
+      || !same(proof.roots, [...expected.roots].sort()))
+      throw new Error('checkpoint release proof differs from host retention marker');
+    SemanticGarbageCollector.prototype.releaseCommittedActiveTask.call(this.collector, proof);
+    this.assertRecords(expected);
   }
   assert(identity: HostIdentity, module: Term, manifest: ExecutionManifestV1, binding: ProcessCheckpointBinding): void {
     ProcessSemanticRetention.assertInstance(this);
