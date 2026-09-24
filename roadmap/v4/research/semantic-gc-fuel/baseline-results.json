@@ -1,0 +1,687 @@
+{
+  "format": "aether.gc-fuel-baseline/1",
+  "sourceRoot": "ast:b3:9ae64bb6048049949181701fbdd8e99a6f39cc2e159c6dc6b1e0f59798c1c21d",
+  "candidateRoot": "ast:b3:fe369a82ff696a1c625a3a4d9c00cec100c93806262116f9a79f8c40517044f2",
+  "observations": [
+    {
+      "maxSteps": 1,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 2
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 2
+      },
+      "same": true
+    },
+    {
+      "maxSteps": 2,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 3
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 3
+      },
+      "same": true
+    },
+    {
+      "maxSteps": 3,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 4
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 4
+      },
+      "same": true
+    },
+    {
+      "maxSteps": 4,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 5
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 5
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 5,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 6
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 6
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 6,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 7
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 7
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 7,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 8
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 8
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 8,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 9
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 9
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 9,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 10
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 10
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 10,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 11
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 11
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 11,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 12
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [
+          "4"
+        ],
+        "steps": 12
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 12,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 13
+      },
+      "redirected": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 13,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 14
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 14,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [],
+        "steps": 15
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 15,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [
+          "4"
+        ],
+        "steps": 16
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 16,
+      "source": {
+        "ok": false,
+        "fault": "step_budget",
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 17,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 18,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 19,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 20,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 21,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 22,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 23,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 24,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 25,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 26,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 27,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 28,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 29,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 30,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 31,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    },
+    {
+      "maxSteps": 32,
+      "source": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 17
+      },
+      "redirected": {
+        "ok": true,
+        "fault": null,
+        "effects": [
+          "4"
+        ],
+        "steps": 13
+      },
+      "same": false
+    }
+  ],
+  "sourceTrace": [
+    {
+      "step": 0,
+      "kind": "call",
+      "node": "FunctionDecl",
+      "detail": "sym:llqfvx2un3mxwlrvzo32rk(3)",
+      "depth": 1
+    },
+    {
+      "step": 4,
+      "kind": "call",
+      "node": "FunctionDecl",
+      "detail": "sym:cdncd7kwi7kc5w2iftpaeb(3)",
+      "depth": 2
+    },
+    {
+      "step": 8,
+      "kind": "call",
+      "node": "FunctionDecl",
+      "detail": "sym:wc6xdeddmlvrkn2656m67r(3)",
+      "depth": 3
+    },
+    {
+      "step": 12,
+      "kind": "return",
+      "node": "Return",
+      "detail": "4",
+      "depth": 3
+    },
+    {
+      "step": 12,
+      "kind": "return",
+      "node": "Return",
+      "detail": "4",
+      "depth": 2
+    },
+    {
+      "step": 15,
+      "kind": "invoke",
+      "node": "Invoke",
+      "detail": "cap:test:append(4)",
+      "depth": 1
+    },
+    {
+      "step": 17,
+      "kind": "return",
+      "node": "Return",
+      "detail": "4",
+      "depth": 1
+    }
+  ],
+  "redirectedTrace": [
+    {
+      "step": 0,
+      "kind": "call",
+      "node": "FunctionDecl",
+      "detail": "sym:llqfvx2un3mxwlrvzo32rk(3)",
+      "depth": 1
+    },
+    {
+      "step": 4,
+      "kind": "call",
+      "node": "FunctionDecl",
+      "detail": "sym:wc6xdeddmlvrkn2656m67r(3)",
+      "depth": 2
+    },
+    {
+      "step": 8,
+      "kind": "return",
+      "node": "Return",
+      "detail": "4",
+      "depth": 2
+    },
+    {
+      "step": 11,
+      "kind": "invoke",
+      "node": "Invoke",
+      "detail": "cap:test:append(4)",
+      "depth": 1
+    },
+    {
+      "step": 13,
+      "kind": "return",
+      "node": "Return",
+      "detail": "4",
+      "depth": 1
+    }
+  ]
+}

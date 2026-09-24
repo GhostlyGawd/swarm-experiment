@@ -1,0 +1,20 @@
+{
+  "format": "aether.gc-virtual-forwarder-prototype/1",
+  "sourceRoot": "ast:b3:6fab47ee09b43e3b3a7a741106fe00c2da929c297f8b9a4faa0664f7a07a07d3",
+  "candidateRoot": "ast:b3:54d835df97764836753837d8c6c76be4cf337efc90a8c5d2bcc2e0f89dd97d16",
+  "descriptorDigest": "aether.gc-virtual-forward-script/1:b3:1ab1eb71cab43ac372be729dfdafa9a2d1c73eda8f0d97bc6d851f577b1f00d8",
+  "wrapperArchived": true,
+  "inputs": [
+    "-1",
+    "0",
+    "3"
+  ],
+  "budgets": [
+    1,
+    64
+  ],
+  "compared": 192,
+  "equal": 192,
+  "failures": [],
+  "fullFailureCount": 0
+}

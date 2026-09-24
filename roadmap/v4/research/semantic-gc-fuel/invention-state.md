@@ -1,6 +1,6 @@
 # Semantic GC fuel-preserving wrapper search
 
-Status: **partial invention search**, 2026-09-24. Full mode began during the `c8d3de3` integration run. Deconstruction and reframing are recorded below; concept generation, constraint/mutation passes, critique, reconstruction, ranking and a prototype are pending. This file is a research continuation record, not T1-05 acceptance evidence.
+Status: **partial invention search**, 2026-09-24. Full mode began during the `c8d3de3` integration run. Deconstruction, 15 reframes, 20 abstract analogies, eight independent lens first passes, 12 merged causal families, ten temporary constraints and five immediate-rejection prompts are recorded here and in [generation.md](generation.md). Three independent mutation passes accepted five causal changes for each of five unusual parents, and three distant combinations are recorded in [mutations-and-combinations.md](mutations-and-combinations.md). Generation, critique, reconstruction and provisional separate scores are recorded in [review.md](review.md). A bounded M01 reference-runtime prototype matches 192/192 cases. Representative five-category prior-art comparison for the three operational concepts is in [prior-art.md](prior-art.md); novelty remains unknown. Production integration and broader tests remain pending. This is research, not T1-05 acceptance evidence.
 
 ## Brief and fixed requirements
 
@@ -68,8 +68,12 @@ These are mechanism prompts, not claims that a named external system implements 
 - [Trace-Relating Compiler Correctness and Secure Compilation](https://arxiv.org/abs/1907.05320) motivates checking relations between source and target traces rather than assuming ordinary input/output equivalence preserves trace properties.
 - [Trusted CerCo Cost Annotating Compiler](https://cris.unibo.it/handle/11585/399568) is a cost-semantics precedent; no Aether-compatible fuel translation is claimed.
 
-Search coverage is preliminary: patents, products and startups have not been checked. No novelty or freedom-to-operate claim is made.
+The initial list above is supplemented by the inspected patent, product, startup, and adjacent-system sources in [prior-art.md](prior-art.md). Coverage is a small engineering sample. No novelty or freedom-to-operate claim is made.
+
+## Observed baseline
+
+The executable [baseline.ts](baseline.ts), raw [baseline-results.json](baseline-results.json) and fresh-process [verify.ts](verify.ts) compare one source `entry → wrapper → target → Invoke` with an unadmitted `entry → target → Invoke` redirection under `maxSteps` 1–32. Source root `ast:b3:9ae64bb6048049949181701fbdd8e99a6f39cc2e159c6b1e0f59798c1c21d` takes **17** reference steps with no quota fault; redirected root `ast:b3:fe369a82ff696a1c625a3a4d9c00cec100c93806262116f9a79f8c40517044f2` takes **13**. At budgets **11–12**, the source faults before the sink while redirection calls it. At **13–14**, source faults while redirection succeeds. The source trace has wrapper call/return at depth 2 and target call at depth 3; redirection lacks that frame and enters target at depth 2. This is a bounded counterexample to value-only wrapper admission, not an implementation of a repair.
 
 ## Next phase
 
-Run the eight independent domain lenses from the skill's search operators, form at least 12 causally distinct mechanisms, then apply the temporary constraints/mutations and review/reconstruct a shortlist. The cheapest technical test is a versioned experimental virtual-frame instruction for a pure one-argument forwarder, differential against the unmodified source for `maxSteps` 1–64, traces, fault bindings, an effect after the call, checkpoint/replay IDs and two process restarts. A failure in any observation rejects or revises that mechanism; the prototype is not yet built.
+The M01 reference-runtime test is observed, with exact raw data and fresh-process verification. Next independently specify/check the transition descriptor, implement a versioned public AST/IR/runtime path and compare compiled/resumable/ProcessHost behavior, checkpoint/replay IDs and two process restarts. Refresh the prior-art search if the mechanism broadens. Do not advance T1-05 from the bounded prototype.
