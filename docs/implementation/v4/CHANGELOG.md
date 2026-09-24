@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Direct pure lazy-task contract projection V17 — 2026-09-24
+
+- Added `aether.executable-projection/17` for a directly awaited new scalar task inside a checked closure. Static admission binds the exact task body under the owner/lambda certificate, rejects unjoined tasks and ambient callback/effect paths, and retains earlier native task laziness and completed-result behavior. Actual TypeScript, Python and Rust execution matches the reference with zero external-effect callbacks; pinned V16 source/runtime bytes remain identical. [Profile and limits](../../../roadmap/v4/research/projections/PURE-LAZY-TASK-CONTRACTS-V17.md).
+- The generated 13×5 reference-valid corpus still finds two task-state gaps in all five carriers: a fresh-record task result and unjoined task identity. The authored actual-token cold ratios remain below 4×; historical AE6 results and thresholds are unchanged. T1-02/G1, G2, FR-1.2 and Q03 remain open at **20/62**.
+
 ## Signed living boundary pipeline and throughput decision record — 2026-09-24
 
 - Added versioned `aether.living-boundary-pipeline/1` for the V4 signed candidate: immutable generation, every original/retry/duplicate Aether execution, both recovery calls, raw per-attempt/publication timing, complete recount and offline tamper audit. The one failed partition attempt remains visible when its retry succeeds; zero filters are required. It does not grant deployment authority. [Contract](LIVING-PIPELINE-V1.md).

@@ -34,6 +34,8 @@ The [V13–V15 projection sequence](../../../roadmap/v4/research/projections/CHE
 
 The [V16 dataflow profile](../../../roadmap/v4/research/projections/DATAFLOW-CLOSURES-V16.md) checks those three contexts and several adjacent scalar forms in actual TypeScript/Python/Rust. Its certificate includes the exact roots of transitive pure helpers, and V15 fixture source/runtime hashes remain unchanged. A generated 55-case reference-valid corpus still finds an effect-free lazy task in every carrier form outside the certified native contract path; the authored cold token ratio is 0.2855× cl100k, far below the unchanged 4× requirement and not a representative release profile. T1-02/G1, G2, FR-1.2 and Q03 stay open at 20/62.
 
+The [V17 direct lazy-task profile](../../../roadmap/v4/research/projections/PURE-LAZY-TASK-CONTRACTS-V17.md) closes that bounded scalar task path in actual TypeScript/Python/Rust with zero external callbacks and unchanged V16 profile bytes. Its expanded generated audit finds fresh-record task results and unjoined task identity as reference-valid native misses in all five carriers. The authored 65-case cold ratio is approximately 0.286× cl100k, not representative changed-session or 4× release qualification. T1-02/G1, G2, FR-1.2 and Q03 remain open at 20/62.
+
 [V13 typed read-only contract projection](../../../roadmap/v4/research/projections/TYPED-CONTRACT-CALLS.md) adds real TS/Python/Rust composite and generic contract-helper calls plus pure map/fold callbacks. The 99-test integrated projection campaign passes, but a valid pure closure predicate is still rejected by all native targets. Broader valid cross-feature semantics, representative change-session density and Q03 remain open; T1-02 stays in progress.
 
 ## Closure order

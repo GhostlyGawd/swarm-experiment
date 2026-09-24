@@ -6,12 +6,13 @@ import type { SymbolId } from '../../../../src/tier1/ids.ts';
 export const CONTRACT_BODY_FORMS = ['literal', 'negative_division', 'string_length',
   'quantifier', 'direct_pure_call', 'result_binder', 'sequence_fold', 'nested_lambda',
   'fresh_record_field', 'fixed_wrap', 'lazy_task'] as const;
+export const CONTRACT_BODY_FORMS_V17 = [...CONTRACT_BODY_FORMS, 'task_record_field', 'task_identity'] as const;
 export const CONTRACT_CARRIERS = ['inline', 'direct_factory', 'block_factory',
   'branch_factory', 'passed_parameter'] as const;
 
 export interface ValidContractContext {
   id: string;
-  bodyForm: typeof CONTRACT_BODY_FORMS[number];
+  bodyForm: typeof CONTRACT_BODY_FORMS_V17[number];
   carrier: typeof CONTRACT_CARRIERS[number];
   module: Term;
   symbols: SymbolSpace;
@@ -20,9 +21,10 @@ export interface ValidContractContext {
 
 /** Fixed Cartesian corpus: 11 body forms × 5 closure carriers. Every row is
  * accepted and executed by the reference runtime before native classification. */
-export function validContractContexts(): ValidContractContext[] {
+export function validContractContexts(version: 16 | 17 = 16): ValidContractContext[] {
   const rows: ValidContractContext[] = [];
-  for (const bodyForm of CONTRACT_BODY_FORMS) for (const carrier of CONTRACT_CARRIERS) {
+  const forms = version === 17 ? CONTRACT_BODY_FORMS_V17 : CONTRACT_BODY_FORMS;
+  for (const bodyForm of forms) for (const carrier of CONTRACT_CARRIERS) {
     const id = `${bodyForm}/${carrier}`, symbols = new SymbolSpace(`projection-valid-v16-${id}`);
     const helper = symbols.define('helper'), sum = symbols.define('sum');
     const factory = symbols.define('factory');
@@ -49,6 +51,9 @@ export function validContractContexts(): ValidContractContext[] {
         case 'fixed_wrap': return b.cond(b.eq(b.fixed('add', byte as Extract<Ty,{t:'IntN'}>,
           b.typed(byte, 250n), b.typed(byte, 10n)), b.typed(byte, 4n)), b.int(1), b.int(0));
         case 'lazy_task': return b.await_(b.spawn(b.int(5)));
+        case 'task_record_field': return b.field(b.await_(b.spawn(
+          b.record(box as Extract<Ty,{t:'Record'}>, { value: b.int(5) }))), 'value');
+        case 'task_identity': return b.cond(b.ne(b.spawn(b.int(1)), b.spawn(b.int(1))), b.int(1), b.int(0));
       }
     };
     const lambda = (extra?: SymbolId): Term => b.lambda({ returns: b.Int,

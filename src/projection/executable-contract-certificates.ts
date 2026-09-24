@@ -18,13 +18,17 @@ function scalar(ty: Ty): boolean {
 
 /** Conservative certificate set for native closure bodies. The parser
  * recomputes it from the visible AST; runtime admission also checks captures. */
-export function contractClosureCertificates(module: Term, version: 15 | 16 = 15): ReadonlyMap<string, string> {
+export function contractClosureCertificates(module: Term, version: 15 | 16 | 17 = 15): ReadonlyMap<string, string> {
   const result = new Map<string, string>(), store = new GraphStore();
   const functions = new Map(moduleFunctions(module).map(fn => [fn.symbol, fn] as const));
   const helperRoots = (node: Term, initial: ReadonlySet<SymbolId>): string[] | null => {
     const roots = new Set<string>(), checking = new Set<SymbolId>(), checked = new Set<SymbolId>();
-    const safeExpression = (expression: Term, bound: ReadonlySet<SymbolId>): boolean => {
-      if (!BODY_KINDS_16.has(expression.kind)) return false;
+    const safeExpression = (expression: Term, bound: ReadonlySet<SymbolId>, inTask = false): boolean => {
+      if (version === 17 && expression.kind === 'Await' && !inTask) {
+        if (expression.task.kind !== 'Spawn') return false;
+        return safeExpression(expression.task.body, bound, true);
+      }
+      if (inTask ? !BODY_KINDS.has(expression.kind) : !BODY_KINDS_16.has(expression.kind)) return false;
       if (expression.kind === 'Var' && !bound.has(expression.symbol)) return false;
       if (expression.kind === 'Lambda') {
         if (expression.capabilities.length || !scalar(expression.returns)
@@ -54,7 +58,7 @@ export function contractClosureCertificates(module: Term, version: 15 | 16 = 15)
           && safeExpression(expression.err, new Set([...bound, expression.errSymbol]));
       }
       for (const group of linkGroups(expression)) for (const child of group.links)
-        if (!safeExpression(child, bound)) return false;
+        if (!safeExpression(child, bound, inTask)) return false;
       return true;
     };
     const safeHelper = (symbol: SymbolId): boolean => {
@@ -90,13 +94,13 @@ export function contractClosureCertificates(module: Term, version: 15 | 16 = 15)
         if(node.capabilities.length||!scalar(node.returns)||node.params.some(param=>!scalar(param.ty))
           ||[...scope.values()].some(ty=>!scalar(ty)))return;
         const bound=new Set([...scope.keys(),...node.params.map(param=>param.symbol)]);
-        const dependencies = version === 16 ? helperRoots(node.body, bound) : null;
+        const dependencies = version >= 16 ? helperRoots(node.body, bound) : null;
         if(version===15&&[...walk(node.body)].some(child=>!BODY_KINDS.has(child.kind)
           ||child.kind==='Var'&&!bound.has(child.symbol)))return;
-        if(version===16&&!dependencies)return;
+        if(version>=16&&!dependencies)return;
         const lambdaRoot=store.intern(node);
-        const profile=version===16?'aether.executable-projection/16':CONTRACT_CLOSURE_PROFILE;
-        const subject = `${profile}\n${ownerRoot}\n${lambdaRoot}${version===16?`\n${dependencies!.join('\n')}`:''}`;
+        const profile=version>=16?`aether.executable-projection/${version}`:CONTRACT_CLOSURE_PROFILE;
+        const subject = `${profile}\n${ownerRoot}\n${lambdaRoot}${version>=16?`\n${dependencies!.join('\n')}`:''}`;
         const digest = createHash('sha256').update(subject).digest('hex');
         result.set(`${fn.symbol}/${lambdaRoot}`, `cc${version}:${digest}`);
         return;

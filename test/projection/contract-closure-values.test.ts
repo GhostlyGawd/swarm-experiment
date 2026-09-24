@@ -28,6 +28,8 @@ function fixture() {
   const quantified = symbols.define('quantified'), iterator = symbols.define('iterator');
   const matched = symbols.define('matched'), matchOk = symbols.define('matchOk'), matchErr = symbols.define('matchErr');
   const nested = symbols.define('nested');
+  const lazyTask = symbols.define('lazyTask'), lazyTaskWrapper = symbols.define('lazyTaskWrapper');
+  const lazyFault = symbols.define('lazyFault');
   const input = symbols.define('input'), local = symbols.define('local'), fn = symbols.define('fn');
   const closureLocal = symbols.define('closureLocal');
   const flag = symbols.define('flag');
@@ -80,6 +82,16 @@ function fixture() {
       contract: b.contract({ requires: [b.clause(b.gt(b.apply(b.lambda({ returns: b.Int,
         body: b.apply(b.lambda({ returns: b.Int, body: b.int(5) })) })), b.int(0)), 'nested closure')] }),
       body: b.ret(b.int(1)) }),
+    b.fn({ symbol: lazyTask, returns: b.Int,
+      contract: b.contract({ requires: [b.clause(b.gt(b.apply(b.lambda({ returns: b.Int,
+        body: b.await_(b.spawn(b.int(5))) })), b.int(0)), 'pure lazy task')] }),
+      body: b.ret(b.int(1)) }),
+    b.fn({ symbol: lazyTaskWrapper, returns: b.Int,
+      body: b.ret(b.call(entry, b.lambda({ returns: b.Int, body: b.await_(b.spawn(b.int(5))) }))) }),
+    b.fn({ symbol: lazyFault, returns: b.Int,
+      contract: b.contract({ requires: [b.clause(b.gt(b.apply(b.lambda({ returns: b.Int,
+        body: b.await_(b.spawn(b.div(b.int(1), b.int(0)))) })), b.int(0)), 'faulted lazy task')] }),
+      body: b.ret(b.int(1)) }),
     b.fn({ symbol: wrapper, returns: b.Int,
       body: b.ret(b.call(entry, b.lambda({ returns: b.Int, body: b.int(7) }))) }),
     b.fn({ symbol: factoryWrapper, returns: b.Int,
@@ -107,21 +119,23 @@ function fixture() {
       body: b.block(b.let_(box, boxType, b.record(boxType as Extract<Ty,{t:'Record'}>, { value: b.int(9) })),
         b.ret(b.call(entry, b.lambda({ returns: b.Int, body: b.field(b.v(box), 'value') })))) }),
   ] });
-  return { symbols, module, factory, entry, direct, branchDirect, branchLocalDirect, quantified, matched, nested, wrapper, factoryWrapper, localWrapper, helper, callWrapper, sum, foldWrapper, increment, mapWrapper, freshRecordWrapper, unsafeWrapper };
+  return { symbols, module, factory, entry, direct, branchDirect, branchLocalDirect, quantified, matched, nested, lazyTask, lazyTaskWrapper, lazyFault, wrapper, factoryWrapper, localWrapper, helper, callWrapper, sum, foldWrapper, increment, mapWrapper, freshRecordWrapper, unsafeWrapper };
 }
 
-test('V16 checked function values and dataflow factories parse to exact roots', () => {
+test('V17 checked function values and direct lazy tasks parse to exact roots', () => {
   const f = fixture(), store = new GraphStore(), root = store.intern(f.module);
   const reference = new Runtime({ registry: new CapabilityRegistry() }).load(f.module);
-  for (const [symbol, expected] of [[f.direct, 4n], [f.branchDirect, 1n], [f.branchLocalDirect, 1n], [f.quantified, 1n], [f.matched, 1n], [f.nested, 1n], [f.wrapper, 7n], [f.factoryWrapper, 4n], [f.localWrapper, 6n], [f.callWrapper, 8n], [f.foldWrapper, 3n], [f.mapWrapper, 2n], [f.freshRecordWrapper, 5n], [f.unsafeWrapper, 9n]] as const) {
+  for (const [symbol, expected] of [[f.direct, 4n], [f.branchDirect, 1n], [f.branchLocalDirect, 1n], [f.quantified, 1n], [f.matched, 1n], [f.nested, 1n], [f.lazyTask, 1n], [f.lazyTaskWrapper, 5n], [f.wrapper, 7n], [f.factoryWrapper, 4n], [f.localWrapper, 6n], [f.callWrapper, 8n], [f.foldWrapper, 3n], [f.mapWrapper, 2n], [f.freshRecordWrapper, 5n], [f.unsafeWrapper, 9n]] as const) {
     const result = reference.call(symbol, []);
     assert.equal(result.ok, true); if (result.ok) assert.equal(result.value, expected);
   }
+  const fault = reference.call(f.lazyFault, []);
+  assert.equal(fault.ok, false); if (!fault.ok) assert.equal(fault.fault.kind, 'division_by_zero');
   const old = { typescript: projectTypeScriptV14, python: projectPythonV14, rust: projectRustV14 };
   for (const target of ['typescript', 'python', 'rust'] as const) {
-    assert.throws(() => old[target](f.module, f.symbols), /exact direct factory/);
+    assert.throws(() => old[target](f.module, f.symbols), /exact direct factory|contract profile/);
     const bundle = executableBundle(f.module, f.symbols, target);
-    assert.match(bundle.source, /@aether-projection\/16/);
+    assert.match(bundle.source, /@aether-projection\/17/);
     assert.equal(store.intern(parseExecutableBundle(bundle).module), root);
     const edited = bundle.source.replace('ae_int("7")', 'ae_int("8")');
     assert.notEqual(edited, bundle.source);
@@ -140,14 +154,14 @@ test('V16 checked function values and dataflow factories parse to exact roots', 
     const headerOf = (source: string) => JSON.parse(source.split('\n')[0].slice(source.indexOf('{')));
     assert.notDeepEqual(headerOf(rebound.source).closureCertificates, headerOf(bundle.source).closureCertificates);
     assert.equal(store.intern(parseExecutableBundle(rebound).module), store.intern(ownerChanged));
-    const changedCertificate = bundle.source.replace(/cc16:[0-9a-f]{64}/, `cc16:${'0'.repeat(64)}`);
+    const changedCertificate = bundle.source.replace(/cc17:[0-9a-f]{64}/, `cc17:${'0'.repeat(64)}`);
     assert.notEqual(changedCertificate, bundle.source);
     assert.throws(() => parseExecutableBundle({ ...bundle, source: changedCertificate }), /certificate|scaffolding/);
     const [first, ...tail] = bundle.source.split('\n');
-    const alteredSite = first + '\n' + tail.join('\n').replace(/cc16:[0-9a-f]{64}/, `cc16:${'0'.repeat(64)}`);
+    const alteredSite = first + '\n' + tail.join('\n').replace(/cc17:[0-9a-f]{64}/, `cc17:${'0'.repeat(64)}`);
     assert.notEqual(alteredSite, bundle.source);
     assert.throws(() => parseExecutableBundle({ ...bundle, source: alteredSite }), /scaffolding|certificate/);
-    assert.throws(() => parseExecutableBundle({ ...bundle, runtime: bundle.runtime.replace(/cc16:[0-9a-f]{64}/, 'cc16:'+'0'.repeat(64)) }), /runtime/);
+    assert.throws(() => parseExecutableBundle({ ...bundle, runtime: bundle.runtime.replace(/cc17:[0-9a-f]{64}/, 'cc17:'+'0'.repeat(64)) }), /runtime/);
   }
 });
 
@@ -183,7 +197,7 @@ test('V15 certificates close over an exact-address imported scalar factory', () 
 });
 
 for (const target of ['typescript', 'python', 'rust'] as const)
-  test(`V16 actual ${target} contract admits checked values and refuses raw/record captures`, () => {
+  test(`V17 actual ${target} contract admits pure lazy tasks and refuses raw/record captures`, () => {
     const f = fixture(), bundle = executableBundle(f.module, f.symbols, target);
     const directory = mkdtempSync(join(tmpdir(), 'aether-contract-values-v15-'));
     const name = (key: keyof typeof f) => bundle.aliases.get(f[key] as never)!;
@@ -191,7 +205,7 @@ for (const target of ['typescript', 'python', 'rust'] as const)
       let program: string, args: string[];
       if (target === 'typescript') {
         writeFileSync(join(directory, 'aether_runtime.ts'), bundle.runtime);
-        writeFileSync(join(directory, 'main.ts'), bundle.source + `\nlet rawCalls=0;const ctx=new Context();const direct=${name('direct')}(ctx,[]),branch=${name('branchDirect')}(ctx,[]),branchLocal=${name('branchLocalDirect')}(ctx,[]),quantified=${name('quantified')}(ctx,[]),matched=${name('matched')}(ctx,[]),nested=${name('nested')}(ctx,[]),wrapped=${name('wrapper')}(ctx,[]),factory=${name('factoryWrapper')}(ctx,[]),local=${name('localWrapper')}(ctx,[]);let recordDenied=false;try{${name('unsafeWrapper')}(ctx,[])}catch(e){recordDenied=String(e).includes('unverified_contract_closure')}const helper=${name('callWrapper')}(ctx,[]),fold=${name('foldWrapper')}(ctx,[]),mapped=${name('mapWrapper')}(ctx,[]),fresh=${name('freshRecordWrapper')}(ctx,[]);const meta=JSON.stringify({kind:'Lambda',params:[],returns:{t:'Int'},capabilities:[]});const raw=ae_lambda(ctx,meta,[],[],()=>{rawCalls++;return 9n});let rawDenied=false;try{${name('entry')}(ctx,[raw])}catch(e){rawDenied=String(e).includes('unverified_contract_closure')}console.log(JSON.stringify({direct:String(direct),branch:String(branch),branchLocal:String(branchLocal),quantified:String(quantified),matched:String(matched),nested:String(nested),wrapped:String(wrapped),factory:String(factory),local:String(local),recordDenied,helper:String(helper),fold:String(fold),mapped:String(mapped),fresh:String(fresh),rawDenied,rawCalls}));\n`);
+        writeFileSync(join(directory, 'main.ts'), bundle.source + `\nlet rawCalls=0,effects=0;const ctx=new Context(['cap:test:emit'],(_cap,_args)=>{effects++;return null});const direct=${name('direct')}(ctx,[]),branch=${name('branchDirect')}(ctx,[]),branchLocal=${name('branchLocalDirect')}(ctx,[]),quantified=${name('quantified')}(ctx,[]),matched=${name('matched')}(ctx,[]),nested=${name('nested')}(ctx,[]),lazy=${name('lazyTask')}(ctx,[]),lazyValue=${name('lazyTaskWrapper')}(ctx,[]),wrapped=${name('wrapper')}(ctx,[]),factory=${name('factoryWrapper')}(ctx,[]),local=${name('localWrapper')}(ctx,[]);let fault=false;try{${name('lazyFault')}(ctx,[])}catch(e){fault=String(e).includes('division_by_zero')}let recordDenied=false;try{${name('unsafeWrapper')}(ctx,[])}catch(e){recordDenied=String(e).includes('unverified_contract_closure')}const helper=${name('callWrapper')}(ctx,[]),fold=${name('foldWrapper')}(ctx,[]),mapped=${name('mapWrapper')}(ctx,[]),fresh=${name('freshRecordWrapper')}(ctx,[]);const meta=JSON.stringify({kind:'Lambda',params:[],returns:{t:'Int'},capabilities:[]});const raw=ae_lambda(ctx,meta,[],[],()=>{rawCalls++;return 9n});let rawDenied=false;try{${name('entry')}(ctx,[raw])}catch(e){rawDenied=String(e).includes('unverified_contract_closure')}console.log(JSON.stringify({direct:String(direct),branch:String(branch),branchLocal:String(branchLocal),quantified:String(quantified),matched:String(matched),nested:String(nested),lazy:String(lazy),lazyValue:String(lazyValue),fault,wrapped:String(wrapped),factory:String(factory),local:String(local),recordDenied,helper:String(helper),fold:String(fold),mapped:String(mapped),fresh:String(fresh),rawDenied,rawCalls,effects}));\n`);
         const checked = spawnSync(process.execPath, [new URL('../../node_modules/typescript/bin/tsc', import.meta.url).pathname,
           '--noEmit', '--strict', '--skipLibCheck', '--target', 'ES2023', '--module', 'NodeNext',
           '--allowImportingTsExtensions', join(directory, 'main.ts')], { encoding: 'utf8', timeout: 60_000 });
@@ -199,25 +213,25 @@ for (const target of ['typescript', 'python', 'rust'] as const)
         program = process.execPath; args = ['--experimental-strip-types', join(directory, 'main.ts')];
       } else if (target === 'python') {
         writeFileSync(join(directory, 'aether_runtime.py'), bundle.runtime);
-        writeFileSync(join(directory, 'main.py'), bundle.source + `\nctx=Context()\ndirect=${name('direct')}(ctx,[])\nbranch=${name('branchDirect')}(ctx,[])\nbranchLocal=${name('branchLocalDirect')}(ctx,[])\nquantified=${name('quantified')}(ctx,[])\nmatched=${name('matched')}(ctx,[])\nnested=${name('nested')}(ctx,[])\nwrapped=${name('wrapper')}(ctx,[])\nfactory=${name('factoryWrapper')}(ctx,[])\nlocal=${name('localWrapper')}(ctx,[])\nrecordDenied=False\ntry: ${name('unsafeWrapper')}(ctx,[])\nexcept Exception as e: recordDenied='unverified_contract_closure' in str(e)\nhelper=${name('callWrapper')}(ctx,[])\nfold=${name('foldWrapper')}(ctx,[])\nmapped=${name('mapWrapper')}(ctx,[])\nfresh=${name('freshRecordWrapper')}(ctx,[])\nrawCalls=[0]\ndef raw_body(ctx,captures,args):\n    rawCalls[0]+=1\n    return 9\nraw=ae_lambda(ctx,json.dumps({'kind':'Lambda','params':[],'returns':{'t':'Int'},'capabilities':[]}),[],[],raw_body)\nrawDenied=False\ntry: ${name('entry')}(ctx,[raw])\nexcept Exception as e: rawDenied='unverified_contract_closure' in str(e)\nprint(json.dumps({'direct':str(direct),'branch':str(branch),'branchLocal':str(branchLocal),'quantified':str(quantified),'matched':str(matched),'nested':str(nested),'wrapped':str(wrapped),'factory':str(factory),'local':str(local),'recordDenied':recordDenied,'helper':str(helper),'fold':str(fold),'mapped':str(mapped),'fresh':str(fresh),'rawDenied':rawDenied,'rawCalls':rawCalls[0]}))\n`);
+        writeFileSync(join(directory, 'main.py'), bundle.source + `\neffects=[]\ndef effect(cap,args): effects.append([cap,args])\nctx=Context(['cap:test:emit'],effect)\ndirect=${name('direct')}(ctx,[])\nbranch=${name('branchDirect')}(ctx,[])\nbranchLocal=${name('branchLocalDirect')}(ctx,[])\nquantified=${name('quantified')}(ctx,[])\nmatched=${name('matched')}(ctx,[])\nnested=${name('nested')}(ctx,[])\nlazy=${name('lazyTask')}(ctx,[])\nlazyValue=${name('lazyTaskWrapper')}(ctx,[])\nwrapped=${name('wrapper')}(ctx,[])\nfactory=${name('factoryWrapper')}(ctx,[])\nlocal=${name('localWrapper')}(ctx,[])\nfault=False\ntry: ${name('lazyFault')}(ctx,[])\nexcept Exception as e: fault='division_by_zero' in str(e)\nrecordDenied=False\ntry: ${name('unsafeWrapper')}(ctx,[])\nexcept Exception as e: recordDenied='unverified_contract_closure' in str(e)\nhelper=${name('callWrapper')}(ctx,[])\nfold=${name('foldWrapper')}(ctx,[])\nmapped=${name('mapWrapper')}(ctx,[])\nfresh=${name('freshRecordWrapper')}(ctx,[])\nrawCalls=[0]\ndef raw_body(ctx,captures,args):\n    rawCalls[0]+=1\n    return 9\nraw=ae_lambda(ctx,json.dumps({'kind':'Lambda','params':[],'returns':{'t':'Int'},'capabilities':[]}),[],[],raw_body)\nrawDenied=False\ntry: ${name('entry')}(ctx,[raw])\nexcept Exception as e: rawDenied='unverified_contract_closure' in str(e)\nprint(json.dumps({'direct':str(direct),'branch':str(branch),'branchLocal':str(branchLocal),'quantified':str(quantified),'matched':str(matched),'nested':str(nested),'lazy':str(lazy),'lazyValue':str(lazyValue),'fault':fault,'wrapped':str(wrapped),'factory':str(factory),'local':str(local),'recordDenied':recordDenied,'helper':str(helper),'fold':str(fold),'mapped':str(mapped),'fresh':str(fresh),'rawDenied':rawDenied,'rawCalls':rawCalls[0],'effects':len(effects)}))\n`);
         program = 'python3'; args = [join(directory, 'main.py')];
       } else {
         mkdirSync(join(directory, 'src'));
         writeFileSync(join(directory, 'Cargo.toml'), RUST_PROJECTION_CARGO);
         writeFileSync(join(directory, 'Cargo.lock'), readFileSync(new URL('../../roadmap/v4/research/projections/Cargo.lock', import.meta.url)));
         writeFileSync(join(directory, 'src/aether_runtime.rs'), bundle.runtime);
-        writeFileSync(join(directory, 'src/main.rs'), bundle.source + `\nstatic RAW_CALLS:std::sync::atomic::AtomicUsize=std::sync::atomic::AtomicUsize::new(0);fn sink(_cap:&str,_args:Vec<Value>)->Value{Value::Unit}fn as_int(v:Value)->String{match v{Value::Int(n)=>n.to_string(),_=>panic!("wrong_type")}}fn main(){std::panic::set_hook(Box::new(|_|{}));let mut ctx=Context::new(vec![],sink);let direct=${name('direct')}(&mut ctx,vec![]);let branch=${name('branchDirect')}(&mut ctx,vec![]);let branch_local=${name('branchLocalDirect')}(&mut ctx,vec![]);let quantified=${name('quantified')}(&mut ctx,vec![]);let matched=${name('matched')}(&mut ctx,vec![]);let nested=${name('nested')}(&mut ctx,vec![]);let wrapped=${name('wrapper')}(&mut ctx,vec![]);let factory=${name('factoryWrapper')}(&mut ctx,vec![]);let local=${name('localWrapper')}(&mut ctx,vec![]);let record_denied=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||${name('unsafeWrapper')}(&mut ctx,vec![]))).is_err();let helper=${name('callWrapper')}(&mut ctx,vec![]);let fold=${name('foldWrapper')}(&mut ctx,vec![]);let mapped=${name('mapWrapper')}(&mut ctx,vec![]);let fresh=${name('freshRecordWrapper')}(&mut ctx,vec![]);let raw=ae_lambda(&mut ctx,r#"{"kind":"Lambda","params":[],"returns":{"t":"Int"},"capabilities":[]}"#,&[],vec![],|_,_,_|{RAW_CALLS.fetch_add(1,std::sync::atomic::Ordering::SeqCst);ae_int("9")});let raw_denied=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||${name('entry')}(&mut ctx,vec![raw]))).is_err();println!("{}",serde_json::json!({"direct":as_int(direct),"branch":as_int(branch),"branchLocal":as_int(branch_local),"quantified":as_int(quantified),"matched":as_int(matched),"nested":as_int(nested),"wrapped":as_int(wrapped),"factory":as_int(factory),"local":as_int(local),"recordDenied":record_denied,"helper":as_int(helper),"fold":as_int(fold),"mapped":as_int(mapped),"fresh":as_int(fresh),"rawDenied":raw_denied,"rawCalls":RAW_CALLS.load(std::sync::atomic::Ordering::SeqCst)}));}\n`);
+        writeFileSync(join(directory, 'src/main.rs'), bundle.source + `\nstatic RAW_CALLS:std::sync::atomic::AtomicUsize=std::sync::atomic::AtomicUsize::new(0);static EFFECTS:std::sync::atomic::AtomicUsize=std::sync::atomic::AtomicUsize::new(0);fn sink(_cap:&str,_args:Vec<Value>)->Value{EFFECTS.fetch_add(1,std::sync::atomic::Ordering::SeqCst);Value::Unit}fn as_int(v:Value)->String{match v{Value::Int(n)=>n.to_string(),_=>panic!("wrong_type")}}fn main(){std::panic::set_hook(Box::new(|_|{}));let mut ctx=Context::new(vec!["cap:test:emit".to_string()],sink);let direct=${name('direct')}(&mut ctx,vec![]);let branch=${name('branchDirect')}(&mut ctx,vec![]);let branch_local=${name('branchLocalDirect')}(&mut ctx,vec![]);let quantified=${name('quantified')}(&mut ctx,vec![]);let matched=${name('matched')}(&mut ctx,vec![]);let nested=${name('nested')}(&mut ctx,vec![]);let lazy=${name('lazyTask')}(&mut ctx,vec![]);let lazy_value=${name('lazyTaskWrapper')}(&mut ctx,vec![]);let wrapped=${name('wrapper')}(&mut ctx,vec![]);let factory=${name('factoryWrapper')}(&mut ctx,vec![]);let local=${name('localWrapper')}(&mut ctx,vec![]);let fault=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||${name('lazyFault')}(&mut ctx,vec![]))).is_err();let record_denied=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||${name('unsafeWrapper')}(&mut ctx,vec![]))).is_err();let helper=${name('callWrapper')}(&mut ctx,vec![]);let fold=${name('foldWrapper')}(&mut ctx,vec![]);let mapped=${name('mapWrapper')}(&mut ctx,vec![]);let fresh=${name('freshRecordWrapper')}(&mut ctx,vec![]);let raw=ae_lambda(&mut ctx,r#"{"kind":"Lambda","params":[],"returns":{"t":"Int"},"capabilities":[]}"#,&[],vec![],|_,_,_|{RAW_CALLS.fetch_add(1,std::sync::atomic::Ordering::SeqCst);ae_int("9")});let raw_denied=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||${name('entry')}(&mut ctx,vec![raw]))).is_err();println!("{}",serde_json::json!({"direct":as_int(direct),"branch":as_int(branch),"branchLocal":as_int(branch_local),"quantified":as_int(quantified),"matched":as_int(matched),"nested":as_int(nested),"lazy":as_int(lazy),"lazyValue":as_int(lazy_value),"fault":fault,"wrapped":as_int(wrapped),"factory":as_int(factory),"local":as_int(local),"recordDenied":record_denied,"helper":as_int(helper),"fold":as_int(fold),"mapped":as_int(mapped),"fresh":as_int(fresh),"rawDenied":raw_denied,"rawCalls":RAW_CALLS.load(std::sync::atomic::Ordering::SeqCst),"effects":EFFECTS.load(std::sync::atomic::Ordering::SeqCst)}));}\n`);
         program = 'cargo'; args = ['run', '--quiet', '--locked', '--offline', '--manifest-path', join(directory, 'Cargo.toml')];
       }
       const output = spawnSync(program, args, { encoding: 'utf8', timeout: 120_000,
         env: { ...process.env, CARGO_TARGET_DIR: join(directory, 'target') }, maxBuffer: 16 * 1024 * 1024 });
       assert.equal(output.status, 0, output.stderr);
-      assert.deepEqual(JSON.parse(output.stdout), { direct: '4', branch: '1', branchLocal: '1', quantified: '1', matched: '1', nested: '1', wrapped: '7', factory: '4', local: '6', recordDenied: true, helper: '8', fold: '3', mapped: '2', fresh: '5', rawDenied: true, rawCalls: 0 });
+      assert.deepEqual(JSON.parse(output.stdout), { direct: '4', branch: '1', branchLocal: '1', quantified: '1', matched: '1', nested: '1', lazy: '1', lazyValue: '5', fault: true, wrapped: '7', factory: '4', local: '6', recordDenied: true, helper: '8', fold: '3', mapped: '2', fresh: '5', rawDenied: true, rawCalls: 0, effects: 0 });
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 
 for (const target of ['typescript', 'python'] as const)
-  test(`V16 actual ${target} refuses a certified closure after host capture mutation`, () => {
+  test(`V17 actual ${target} refuses a certified closure after host capture mutation`, () => {
     const f = fixture(), bundle = executableBundle(f.module, f.symbols, target);
     const directory = mkdtempSync(join(tmpdir(), 'aether-contract-tamper-v15-'));
     const factory = bundle.aliases.get(f.factory)!;
