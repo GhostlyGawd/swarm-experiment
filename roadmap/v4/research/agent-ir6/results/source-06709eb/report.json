@@ -1,0 +1,258 @@
+{
+  "format": "aether.agent-ir6-measurement/1",
+  "commit": "06709eb60525489b44207e38f4fd6aaa2baa8ca4",
+  "sourceHashes": {
+    "roadmap/v4/research/agent-ir6/measure.ts": "1c236af09d35e37586033c276f28715bf11a541114bb959c513596473ad71588",
+    "bench/v4/tokens.ts": "81603b3fb5fe42011d716f20a80e6779ce44da638f37306b18e02ecc451cb545",
+    "bench/v4/manifest.ts": "8438749d6d333be5dab674fef367e8f1ea3cf9a480efb6372efb83bb74b56b1f",
+    "src/tier1/agent-ir-v6.ts": "3f9cc9d5f748268d1e552008749b998c88786d62f21cd326496cb238e471e702",
+    "src/tier1/agent-ir.ts": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b",
+    "src/tier1/agent-ir-v2.ts": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671",
+    "src/tier1/store.ts": "b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3",
+    "src/tier1/ast.ts": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb",
+    "src/examples/ledger.ts": "ef3ee4a64ab5227a6c4a4d135afe227583bcef0b313f50d30f5eee5de63362cd",
+    "src/projection/typescript.ts": "952e790f7da01ab12dd2fa0a247c7ac1699e106462c70fe388fe9923e592594a",
+    "src/util/tokens.ts": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9",
+    "package-lock.json": "d7ec4b7a7eeb891ec1f91896c6b8cfaff33e29895c3a0cd6a647984b8b7f8936"
+  },
+  "samplesSha256": "0b1ed6dc43433b1e9482ae72aad8c268eba19011cad40a26024692647b20b545",
+  "tokenizerPackage": "js-tiktoken@1.0.21",
+  "counts": [
+    {
+      "encoding": "cl100k_base",
+      "cold": {
+        "samples": [
+          {
+            "baseline": 878,
+            "candidate": 933
+          }
+        ],
+        "baseline": 878,
+        "candidate": 933,
+        "ratio": 0.9410503751339764
+      },
+      "warm": {
+        "samples": [
+          {
+            "baseline": 226,
+            "candidate": 31
+          },
+          {
+            "baseline": 120,
+            "candidate": 31
+          },
+          {
+            "baseline": 166,
+            "candidate": 31
+          },
+          {
+            "baseline": 186,
+            "candidate": 31
+          }
+        ],
+        "baseline": 698,
+        "candidate": 124,
+        "ratio": 5.629032258064516
+      },
+      "framedWarm": {
+        "samples": [
+          {
+            "baseline": 249,
+            "candidate": 43
+          },
+          {
+            "baseline": 140,
+            "candidate": 43
+          },
+          {
+            "baseline": 195,
+            "candidate": 43
+          },
+          {
+            "baseline": 207,
+            "candidate": 43
+          }
+        ],
+        "baseline": 791,
+        "candidate": 172,
+        "ratio": 4.598837209302325
+      },
+      "changedEdit": {
+        "samples": [
+          {
+            "baseline": 120,
+            "candidate": 66
+          }
+        ],
+        "baseline": 120,
+        "candidate": 66,
+        "ratio": 1.8181818181818181
+      },
+      "changedFullModule": {
+        "samples": [
+          {
+            "baseline": 878,
+            "candidate": 933
+          }
+        ],
+        "baseline": 878,
+        "candidate": 933,
+        "ratio": 0.9410503751339764
+      },
+      "fullSession": {
+        "samples": [
+          {
+            "baseline": 28,
+            "candidate": 28
+          },
+          {
+            "baseline": 955,
+            "candidate": 946
+          },
+          {
+            "baseline": 37,
+            "candidate": 37
+          },
+          {
+            "baseline": 141,
+            "candidate": 44
+          },
+          {
+            "baseline": 30,
+            "candidate": 30
+          },
+          {
+            "baseline": 140,
+            "candidate": 78
+          },
+          {
+            "baseline": 30,
+            "candidate": 30
+          }
+        ],
+        "baseline": 1361,
+        "candidate": 1193,
+        "ratio": 1.140821458507963
+      }
+    },
+    {
+      "encoding": "o200k_base",
+      "cold": {
+        "samples": [
+          {
+            "baseline": 886,
+            "candidate": 931
+          }
+        ],
+        "baseline": 886,
+        "candidate": 931,
+        "ratio": 0.9516648764769066
+      },
+      "warm": {
+        "samples": [
+          {
+            "baseline": 228,
+            "candidate": 31
+          },
+          {
+            "baseline": 123,
+            "candidate": 31
+          },
+          {
+            "baseline": 168,
+            "candidate": 31
+          },
+          {
+            "baseline": 187,
+            "candidate": 31
+          }
+        ],
+        "baseline": 706,
+        "candidate": 124,
+        "ratio": 5.693548387096774
+      },
+      "framedWarm": {
+        "samples": [
+          {
+            "baseline": 252,
+            "candidate": 43
+          },
+          {
+            "baseline": 144,
+            "candidate": 43
+          },
+          {
+            "baseline": 198,
+            "candidate": 43
+          },
+          {
+            "baseline": 209,
+            "candidate": 43
+          }
+        ],
+        "baseline": 803,
+        "candidate": 172,
+        "ratio": 4.6686046511627906
+      },
+      "changedEdit": {
+        "samples": [
+          {
+            "baseline": 123,
+            "candidate": 66
+          }
+        ],
+        "baseline": 123,
+        "candidate": 66,
+        "ratio": 1.8636363636363635
+      },
+      "changedFullModule": {
+        "samples": [
+          {
+            "baseline": 886,
+            "candidate": 931
+          }
+        ],
+        "baseline": 886,
+        "candidate": 931,
+        "ratio": 0.9516648764769066
+      },
+      "fullSession": {
+        "samples": [
+          {
+            "baseline": 28,
+            "candidate": 28
+          },
+          {
+            "baseline": 963,
+            "candidate": 944
+          },
+          {
+            "baseline": 37,
+            "candidate": 37
+          },
+          {
+            "baseline": 145,
+            "candidate": 44
+          },
+          {
+            "baseline": 30,
+            "candidate": 30
+          },
+          {
+            "baseline": 144,
+            "candidate": 78
+          },
+          {
+            "baseline": 30,
+            "candidate": 30
+          }
+        ],
+        "baseline": 1377,
+        "candidate": 1191,
+        "ratio": 1.1561712846347607
+      }
+    }
+  ],
+  "requiredWarmRatio": 4,
+  "scope": "Deterministic ledger profile only; changed module, cold, and full session are separately charged. No Q03 closure."
+}
