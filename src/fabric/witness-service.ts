@@ -188,7 +188,8 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw new TypeError('invalid witness journal');
   const expectedFormat = id.kind === 'effect' ? ['aether.effect-journal/2', 'aether.effect-journal/3', 'aether.effect-journal/4', 'aether.effect-journal/5']
     : id.kind === 'host' ? ['aether.process-host/4', 'aether.process-host/5']
-      : id.kind === 'virtual-deployment' ? 'aether.process-virtual-deployment/2'
+      : id.kind === 'virtual-deployment'
+        ? ['aether.process-virtual-deployment/2', 'aether.process-virtual-deployment/3']
       : id.kind === 'sink' ? 'aether.attested-sink-state/2'
         : id.kind === 'budget' ? (id.journalKind === 'ledger'
           ? 'aether.resource-journal/1' : 'aether.resource-budget-bridge-journal/1')
@@ -267,6 +268,15 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
       || record.admissionProfile !== 'strict-lineage-v1'
       || !Array.isArray(record.invocations))
       throw new TypeError('pure virtual deployment witness binding mismatch');
+    if (record.format === 'aether.process-virtual-deployment/3') {
+      validateDigest(record.sourcePlanDigest, 'aether.process-virtual-source-plan/1');
+      validateDigest(record.candidatePlanDigest, 'aether.process-virtual-plan/1');
+      if (record.sourceInitialSnapshotDigest !== null)
+        validateDigest(record.sourceInitialSnapshotDigest, 'aether.state/1');
+      validateDigest(record.sealerIdentityDigest, 'aether.process-virtual-sealer-identity/1');
+      validateDigest(record.recoveryAuthorityDigest,
+        'aether.process-virtual-recovery-authority/1');
+    }
   }
   if (id.kind === 'sink') {
     const configured = namespaces.find(entry => entry.kind === 'sink-scope' && allowed(id, [entry]));
@@ -505,6 +515,11 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
       || prior.trustDigest !== next.trustDigest
       || prior.hostWitnessCatalogDigest !== next.hostWitnessCatalogDigest)
       throw new Error('witnessed pure virtual deployment authority changed');
+    if (prior.format === 'aether.process-virtual-deployment/3'
+      && ['sourcePlanDigest', 'candidatePlanDigest', 'sourceInitialSnapshotDigest',
+        'sealerIdentityDigest', 'recoveryAuthorityDigest']
+        .some(field => !same(prior[field], next[field])))
+      throw new Error('witnessed pure virtual configuration identity changed');
     const previous = prior.active as Record<string, unknown>;
     const updated = next.active as Record<string, unknown>;
     const oldState = prior.readiness as string, newState = next.readiness as string;

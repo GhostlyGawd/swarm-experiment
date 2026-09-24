@@ -24,8 +24,11 @@ CAS and file write. It does not reuse the legacy `/9–12` deployment witness or
 Artifact/1–2 records. The live driver consumes that record, launches the
 candidate in witnessed ProcessHost config/17 during preparation, repeats the
 full signed proof and source snapshot check inside its synchronous commit
-fence, and serves only the governor-committed generation. Its `/2` deployment
-journal adds witnessed operation IDs and exact pending/settled receipts. A
+fence, and serves only the governor-committed generation. Its `/3` deployment
+journal retains the `/2` witnessed operation IDs and exact pending/settled
+receipts, and pins both plans, the source seed, sealer-key commitment and
+operator-selected recovery-authority identity. An existing `/2` journal
+requires an explicit `/3` migration; it is never silently adopted. A
 same-ID retry across promotion checks current invocation authority and returns
 the original settled result without candidate execution.
 
@@ -75,7 +78,8 @@ bytes. Legacy Artifact/3 `init/2` remains supported.
 
 Provision a strict-lineage `PromotionCoordinator`, a pure source plan and
 candidate plan, operator-held Artifact/4 lineage trust, a host witness catalog,
-and the separate virtual deployment witness. The process-external witness
+the separate virtual deployment witness, and a stable recovery authority ID.
+The process-external witness
 service accepts `host-scope` and `virtual-deployment` namespaces. Open
 `PureVirtualProcessDeployment` with the same exact artifact and authority on
 every controller restart. Its directory contains `artifact4.json`, the

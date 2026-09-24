@@ -56,7 +56,7 @@ const deployment = await PureVirtualProcessDeployment.open({ directory: config.d
   sealer: new CapabilitySealer(new Uint8Array(32).fill(7), () => 100),
   hostWitnessCatalog: witness.hostCatalog(namespace),
   deploymentWitness: witness.virtualDeploymentWitness(namespace),
-  authorizeRecovery: () => true,
+  authorizeRecovery: () => true, recoveryAuthorityId: 'pure-recovery',
   onPhase: phase => { if (phase === config.crashPhase) process.kill(process.pid, 'SIGKILL'); } });
 await deployment.promote({ proposal: config.proposal, approval: config.approval,
   migrationPlan: config.migrationPlan, effectPlan: config.effectPlan,

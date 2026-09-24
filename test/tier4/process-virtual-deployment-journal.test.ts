@@ -7,7 +7,8 @@ import { domainDigest } from '../../src/fabric/identity.ts';
 import { advancePureVirtualDeploymentHeadV1, createPureVirtualDeploymentWitnessV1,
   PureVirtualDeploymentJournalStoreV1, type PureVirtualDeploymentHeadV1,
   pureVirtualInvocationDigestV2, type PureVirtualDeploymentJournalV1,
-  type PureVirtualDeploymentJournalV2 } from '../../src/tier4/process-virtual-deployment-journal.ts';
+  type PureVirtualDeploymentJournalV2,
+  type PureVirtualDeploymentJournalV3 } from '../../src/tier4/process-virtual-deployment-journal.ts';
 
 test('versioned pure virtual witness repairs a mirror after CAS/crash and refuses rollback', () => {
   const directory = mkdtempSync(join(tmpdir(), 'aether-virtual-deployment-journal-'));
@@ -51,6 +52,47 @@ test('versioned pure virtual witness repairs a mirror after CAS/crash and refuse
     /invalid digest|digest domain/i);
     head = { revision: '1', journal: JSON.stringify(base) };
     assert.throws(() => reopened.read(), /rolled back|noncanonical/i);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('pure virtual /3 witness pins source plan and operator authority across revisions', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-virtual-config-journal-'));
+  let head: PureVirtualDeploymentHeadV1 = { revision: '0', journal: null };
+  const witness = createPureVirtualDeploymentWitnessV1({ authorityId: 'operator',
+    repositoryId: 'virtual-repo', deploymentId: 'pure-config', read: () => head,
+    advance: (expected, journal) => {
+      if (head.revision !== expected) throw new Error('witness CAS conflict');
+      head = { revision: String(BigInt(expected) + 1n), journal }; return head;
+    } });
+  const digest = (domain: string, value: string) => domainDigest(domain, value);
+  const manifest = digest('aether.execution/1', 'source');
+  const state: PureVirtualDeploymentJournalV3 = {
+    format: 'aether.process-virtual-deployment/3', witnessRevision: '1',
+    witnessDigest: witness.digest, repositoryId: witness.repositoryId,
+    deploymentId: witness.deploymentId, admissionProfile: 'strict-lineage-v1',
+    genesisManifest: manifest,
+    active: { manifest, generation: '0', artifactDigest: null },
+    readiness: 'ready', pendingProposal: null, preparedDigest: null,
+    trustDigest: digest('aether.process-virtual-worker-trust/1', 'operator-trust'),
+    hostWitnessCatalogDigest: digest('aether.process-host-journal-witness-catalog/1', 'catalog'),
+    sourcePlanDigest: digest('aether.process-virtual-source-plan/1', 'source-plan'),
+    candidatePlanDigest: digest('aether.process-virtual-plan/1', 'candidate-plan'),
+    sourceInitialSnapshotDigest: null,
+    sealerIdentityDigest: digest('aether.process-virtual-sealer-identity/1', 'key'),
+    recoveryAuthorityDigest: digest('aether.process-virtual-recovery-authority/1', 'operator'),
+    invocations: [],
+  };
+  try {
+    const store = new PureVirtualDeploymentJournalStoreV1(directory, witness);
+    store.write('0', state);
+    assert.equal(store.read()?.format, 'aether.process-virtual-deployment/3');
+    assert.throws(() => store.write('1', { ...state, witnessRevision: '2',
+      sourcePlanDigest: digest('aether.process-virtual-source-plan/1', 'swapped') }),
+    /genesis\/authority changed/);
+    assert.throws(() => store.write('1', { ...state, witnessRevision: '2',
+      recoveryAuthorityDigest: digest('aether.process-virtual-recovery-authority/1', 'swapped') }),
+    /genesis\/authority changed/);
+    assert.equal(head.revision, '1');
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 

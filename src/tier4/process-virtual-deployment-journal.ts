@@ -43,7 +43,16 @@ export interface PureVirtualDeploymentJournalV2 extends Omit<PureVirtualDeployme
   readonly format: 'aether.process-virtual-deployment/2';
   readonly invocations: readonly PureVirtualInvocationV2[];
 }
-export type PureVirtualDeploymentJournal = PureVirtualDeploymentJournalV1 | PureVirtualDeploymentJournalV2;
+export interface PureVirtualDeploymentJournalV3 extends Omit<PureVirtualDeploymentJournalV2, 'format'> {
+  readonly format: 'aether.process-virtual-deployment/3';
+  readonly sourcePlanDigest: Digest;
+  readonly candidatePlanDigest: Digest;
+  readonly sourceInitialSnapshotDigest: Digest | null;
+  readonly sealerIdentityDigest: Digest;
+  readonly recoveryAuthorityDigest: Digest;
+}
+export type PureVirtualDeploymentJournal = PureVirtualDeploymentJournalV1
+  | PureVirtualDeploymentJournalV2 | PureVirtualDeploymentJournalV3;
 export function pureVirtualInvocationDigestV2(row: Pick<PureVirtualInvocationV2,
   'manifest' | 'generation' | 'symbol' | 'args'>): Digest {
   return domainDigest('aether.process-virtual-invocation/2',
@@ -68,9 +77,28 @@ interface Source {
   genesis: Digest | null;
   trust: Digest | null;
   hostCatalog: Digest | null;
+  format: string | null;
+  sourcePlan: Digest | null;
+  candidatePlan: Digest | null;
+  initialSnapshot: Digest | null;
+  sealer: Digest | null;
+  recoveryAuthority: Digest | null;
 }
 const sources = new WeakMap<object, Source>();
 const canonical = (value: unknown): string => Buffer.from(encodeCanonical(value, LIMITS)).toString('utf8');
+function assertStableIdentity(source: Source, journal: PureVirtualDeploymentJournal): void {
+  if (source.genesis !== null && (journal.format !== source.format
+    || journal.genesisManifest !== source.genesis
+    || journal.trustDigest !== source.trust
+    || journal.hostWitnessCatalogDigest !== source.hostCatalog
+    || journal.format === 'aether.process-virtual-deployment/3'
+      && (journal.sourcePlanDigest !== source.sourcePlan
+        || journal.candidatePlanDigest !== source.candidatePlan
+        || journal.sourceInitialSnapshotDigest !== source.initialSnapshot
+        || journal.sealerIdentityDigest !== source.sealer
+        || journal.recoveryAuthorityDigest !== source.recoveryAuthority)))
+    throw new Error('pure virtual witness genesis/authority changed');
+}
 
 export function validatePureVirtualDeploymentJournalV1(value: unknown,
   witness: PureVirtualDeploymentWitnessV1): PureVirtualDeploymentJournal {
@@ -79,8 +107,13 @@ export function validatePureVirtualDeploymentJournalV1(value: unknown,
   const journal = exactObject(value, ['format', 'witnessRevision', 'witnessDigest',
     'repositoryId', 'deploymentId', 'admissionProfile', 'genesisManifest', 'active',
     'readiness', 'pendingProposal', 'preparedDigest', 'trustDigest', 'hostWitnessCatalogDigest',
-    ...(raw.format === 'aether.process-virtual-deployment/2' ? ['invocations'] : [])]);
-  if (![FORMAT, 'aether.process-virtual-deployment/2'].includes(journal.format as string)
+    ...(['aether.process-virtual-deployment/2', 'aether.process-virtual-deployment/3']
+      .includes(raw.format as string) ? ['invocations'] : []),
+    ...(raw.format === 'aether.process-virtual-deployment/3'
+      ? ['sourcePlanDigest', 'candidatePlanDigest', 'sourceInitialSnapshotDigest',
+        'sealerIdentityDigest', 'recoveryAuthorityDigest'] : [])]);
+  if (![FORMAT, 'aether.process-virtual-deployment/2',
+    'aether.process-virtual-deployment/3'].includes(journal.format as string)
     || journal.admissionProfile !== 'strict-lineage-v1'
     || journal.repositoryId !== witness.repositoryId
     || journal.deploymentId !== witness.deploymentId
@@ -106,7 +139,17 @@ export function validatePureVirtualDeploymentJournalV1(value: unknown,
     validateDigest(journal.pendingProposal, 'aether.promotion/1');
   if (journal.preparedDigest !== null)
     validateDigest(journal.preparedDigest, 'aether.process-virtual-deployment-prepared/1');
-  if (journal.format === 'aether.process-virtual-deployment/2') {
+  if (journal.format === 'aether.process-virtual-deployment/3') {
+    validateDigest(journal.sourcePlanDigest, 'aether.process-virtual-source-plan/1');
+    validateDigest(journal.candidatePlanDigest, 'aether.process-virtual-plan/1');
+    if (journal.sourceInitialSnapshotDigest !== null)
+      validateDigest(journal.sourceInitialSnapshotDigest, 'aether.state/1');
+    validateDigest(journal.sealerIdentityDigest, 'aether.process-virtual-sealer-identity/1');
+    validateDigest(journal.recoveryAuthorityDigest,
+      'aether.process-virtual-recovery-authority/1');
+  }
+  if (journal.format === 'aether.process-virtual-deployment/2'
+    || journal.format === 'aether.process-virtual-deployment/3') {
     if (!Array.isArray(journal.invocations)) throw new TypeError('missing virtual invocation inventory');
     const operations = new Set<string>();
     for (const item of journal.invocations) {
@@ -156,25 +199,33 @@ function checked(witness: PureVirtualDeploymentWitnessV1, source: Source,
   const revision = BigInt(head.revision as string);
   if ((revision === 0n) !== (head.journal === null))
     throw new TypeError('pure virtual witness genesis/journal mismatch');
+  let journal: PureVirtualDeploymentJournal | null = null;
   if (revision > 0n) {
     if (typeof head.journal !== 'string' || !head.journal.length)
       throw new TypeError('missing pure virtual witness journal');
     const decoded = decodeCanonical(Buffer.from(head.journal, 'utf8'), LIMITS);
     if (canonical(decoded) !== head.journal) throw new TypeError('noncanonical virtual witness journal');
-    const journal = validatePureVirtualDeploymentJournalV1(decoded, witness);
+    journal = validatePureVirtualDeploymentJournalV1(decoded, witness);
     if (journal.witnessRevision !== head.revision)
       throw new Error('pure virtual witness revision mismatch');
-    if (source.genesis !== null && (journal.genesisManifest !== source.genesis
-      || journal.trustDigest !== source.trust
-      || journal.hostWitnessCatalogDigest !== source.hostCatalog))
-      throw new Error('pure virtual witness genesis/authority changed');
-    source.genesis = journal.genesisManifest;
-    source.trust = journal.trustDigest;
-    source.hostCatalog = journal.hostWitnessCatalogDigest;
+    assertStableIdentity(source, journal);
   }
   if (revision < source.lastRevision || revision === source.lastRevision
     && head.journal !== source.lastJournal)
     throw new Error('pure virtual deployment witness rolled back or equivocated');
+  if (journal) {
+    source.genesis = journal.genesisManifest;
+    source.trust = journal.trustDigest;
+    source.hostCatalog = journal.hostWitnessCatalogDigest;
+    source.format = journal.format;
+    if (journal.format === 'aether.process-virtual-deployment/3') {
+      source.sourcePlan = journal.sourcePlanDigest;
+      source.candidatePlan = journal.candidatePlanDigest;
+      source.initialSnapshot = journal.sourceInitialSnapshotDigest;
+      source.sealer = journal.sealerIdentityDigest;
+      source.recoveryAuthority = journal.recoveryAuthorityDigest;
+    }
+  }
   source.lastRevision = revision; source.lastJournal = head.journal as string | null;
   return { revision: head.revision as string, journal: head.journal as string | null };
 }
@@ -191,7 +242,9 @@ export function createPureVirtualDeploymentWitnessV1(options: Readonly<{
     repositoryId: options.repositoryId, deploymentId: options.deploymentId };
   const witness = Object.freeze({ ...body, digest: domainDigest(WITNESS_FORMAT, body) });
   sources.set(witness, { read: options.read, advance: options.advance,
-    lastRevision: -1n, lastJournal: null, genesis: null, trust: null, hostCatalog: null });
+    lastRevision: -1n, lastJournal: null, genesis: null, trust: null, hostCatalog: null,
+    format: null, sourcePlan: null, candidatePlan: null, initialSnapshot: null,
+    sealer: null, recoveryAuthority: null });
   readPureVirtualDeploymentHeadV1(witness);
   return witness;
 }
@@ -215,6 +268,7 @@ export function advancePureVirtualDeploymentHeadV1(witness: PureVirtualDeploymen
   const source = sources.get(witness)!;
   if (readPureVirtualDeploymentHeadV1(witness).revision !== expectedRevision)
     throw new Error('stale pure virtual witness revision');
+  assertStableIdentity(source, journal);
   const bytes = canonical(journal);
   const accepted = checked(witness, source, source.advance(expectedRevision, bytes));
   if (accepted.revision !== next || accepted.journal !== bytes)

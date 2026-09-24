@@ -247,6 +247,14 @@ export class CapabilitySealer {
       .digest('hex');
   }
 
+  /** Stable public commitment to the sealing key, without exposing key bytes
+   * or freezing the operator's live clock/revocation policy. */
+  keyCommitment(): string {
+    return createHmac('sha256', this.key)
+      .update('aether.capability-sealer-key-commitment/1')
+      .digest('hex');
+  }
+
   issue(capability: CapabilityName, scope: string, ttlMs = 60_000): CapabilityToken {
     capability = capabilityName(capability); identifier(scope);
     if (!Number.isSafeInteger(ttlMs) || ttlMs < 1) throw new TypeError('invalid capability lifetime');

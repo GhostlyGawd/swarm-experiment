@@ -739,7 +739,9 @@ test('pure Artifact/4 governor deployment promotes a real host and pins same-ID 
   const options = { directory: join(f.directory, 'virtual-deployment'), coordinator,
     artifact, trust: f.trust, sourcePlan, candidatePlan,
     sealer: new CapabilitySealer(new Uint8Array(32).fill(7), () => 100),
-    hostWitnessCatalog: hostCatalog, deploymentWitness, authorizeRecovery: () => true };
+    hostWitnessCatalog: hostCatalog, deploymentWitness, authorizeRecovery: () => true,
+    recoveryAuthorityId: 'pure-recovery' };
+  const stableOptions = { ...options };
   let deployment: PureVirtualProcessDeployment | undefined;
   try {
     deployment = await PureVirtualProcessDeployment.open(options);
@@ -755,6 +757,40 @@ test('pure Artifact/4 governor deployment promotes a real host and pins same-ID 
     const sourceResult = await deployment.call(f.entry, args,
       { operationId: 'same-across-promotion', tokens: await deployment.issueTokens(f.entry) });
     assert.equal(sourceResult.state, 'completed');
+    const swapped = options as Record<string, unknown>;
+    swapped.directory = join(f.directory, 'redirected');
+    swapped.coordinator = { admissionProfile: 'strict-lineage-v1',
+      servingManifest: () => { throw new Error('swapped governor reached'); } };
+    swapped.artifact = { ...artifact, candidateIr: artifact.sourceIr };
+    swapped.trust = { ...f.trust, policyEpoch: '1' };
+    swapped.sourcePlan = { ...sourcePlan, units: [{ ...sourcePlan.units[0], memoryMb: 32 }] };
+    swapped.candidatePlan = { ...candidatePlan, units: [{ ...candidatePlan.units[0], memoryMb: 32 }] };
+    swapped.sealer = new CapabilitySealer(new Uint8Array(32).fill(8), () => 100);
+    swapped.hostWitnessCatalog = null;
+    swapped.deploymentWitness = null;
+    swapped.authorizeRecovery = () => false;
+    swapped.recoveryAuthorityId = 'redirected-recovery';
+    assert.equal(deployment.status().servingReady, true);
+    const callerUnit = candidatePlan.units[0] as { memoryMb: number };
+    callerUnit.memoryMb = 64;
+    try { assert.equal(deployment.status().servingReady, true); }
+    finally { callerUnit.memoryMb = 16; }
+    const callerArtifact = artifact as { candidateIr: string };
+    const originalCandidateIr = callerArtifact.candidateIr;
+    callerArtifact.candidateIr = artifact.sourceIr;
+    try { assert.equal(deployment.status().servingReady, true); }
+    finally { callerArtifact.candidateIr = originalCandidateIr; }
+    const callerTrust = f.trust as { policyEpoch: string };
+    callerTrust.policyEpoch = '1';
+    try { assert.equal(deployment.status().servingReady, true); }
+    finally { callerTrust.policyEpoch = '0'; }
+    await deployment.close(); deployment = undefined;
+    const differentSourcePlan: TopologyPlan = { ...sourcePlan,
+      units: [{ ...sourcePlan.units[0], memoryMb: 32 }] };
+    await assert.rejects(PureVirtualProcessDeployment.open({ ...stableOptions,
+      sourcePlan: differentSourcePlan }), /state\/authority changed/);
+    deployment = await PureVirtualProcessDeployment.open(stableOptions);
+    assert.equal(deployment.status().generation, '0');
     const sourceCommitted = readFileSync(sourceJournal, 'utf8');
     writeFileSync(sourceJournal, sourceInitial);
     await assert.rejects(deployment.snapshot(), /receipt differs from active host/);
@@ -785,14 +821,16 @@ test('pure Artifact/4 governor deployment promotes a real host and pins same-ID 
       /measured bundle|bundle\/input|bundle rebuild/i);
     } finally { writeFileSync(bundlePath, originalBundle); }
     assert.equal(deployment.status().generation, '0');
-    const unit = candidatePlan.units[0] as { memoryMb: number };
-    unit.memoryMb = 32;
-    try {
-      const stale = { ...proposal, expiresAt: '800' };
-      await assert.rejects(deployment.promote({ ...input, proposal: stale,
-        approval: approvePromotion(stale, 'governor', governorKeys.privateKey) }),
-      /approved pure virtual migration\/effect plan changed/);
-    } finally { unit.memoryMb = 16; }
+    const alteredPlan: TopologyPlan = { ...candidatePlan,
+      units: [{ ...candidatePlan.units[0], memoryMb: 32 }] };
+    const alteredMigration = processVirtualMigrationPlanV1(snapshot, artifactDigest,
+      assertPureVirtualPlanV1(alteredPlan, artifact));
+    const stale = { ...proposal, expiresAt: '800',
+      migrationPlanDigest: migrationPlanDigest(alteredMigration) };
+    await assert.rejects(deployment.promote({ ...input, proposal: stale,
+      approval: approvePromotion(stale, 'governor', governorKeys.privateKey),
+      migrationPlan: alteredMigration }),
+    /approved pure virtual migration\/effect plan changed/);
     assert.equal(deployment.status().generation, '0');
     const admitted = await deployment.promote(input);
     assert.equal(admitted.committedManifest, candidateManifest);
@@ -806,11 +844,16 @@ test('pure Artifact/4 governor deployment promotes a real host and pins same-ID 
       { operationId: 'candidate-call', tokens: await deployment.issueTokens(f.entry) });
     assert.equal(candidateResult.state, 'completed');
     await deployment.close(); deployment = undefined;
-    await assert.rejects(PureVirtualProcessDeployment.open({ ...options,
+    await assert.rejects(PureVirtualProcessDeployment.open({ ...stableOptions,
       hostWitnessCatalog: createHostJournalWitnessCatalog({ ...namespace,
         deploymentId: 'wrong-deployment', witnessFor: () => { throw new Error('unreachable'); } }) }),
     /witness\/trust namespace mismatch/);
-    deployment = await PureVirtualProcessDeployment.open(options);
+    await assert.rejects(PureVirtualProcessDeployment.open({ ...stableOptions,
+      sealer: new CapabilitySealer(new Uint8Array(32).fill(8), () => 100) }),
+    /state\/authority changed/);
+    await assert.rejects(PureVirtualProcessDeployment.open({ ...stableOptions,
+      recoveryAuthorityId: 'other-recovery' }), /state\/authority changed/);
+    deployment = await PureVirtualProcessDeployment.open(stableOptions);
     assert.equal(deployment.status().generation, '1');
     assert.deepEqual(await deployment.call(f.entry, args,
       { operationId: 'candidate-call', tokens: await deployment.issueTokens(f.entry) }), candidateResult);
@@ -847,7 +890,8 @@ test('pure Artifact/4 deployment refuses superseded source spec before any call 
   const options = { directory: join(f.directory, 'virtual-deployment'), coordinator,
     artifact, trust: f.trust, sourcePlan, candidatePlan,
     sealer: new CapabilitySealer(new Uint8Array(32).fill(7), () => 100),
-    hostWitnessCatalog: hostCatalog, deploymentWitness, authorizeRecovery: () => true };
+    hostWitnessCatalog: hostCatalog, deploymentWitness, authorizeRecovery: () => true,
+    recoveryAuthorityId: 'pure-recovery' };
   let deployment: PureVirtualProcessDeployment | undefined;
   try {
     deployment = await PureVirtualProcessDeployment.open(options);
@@ -908,7 +952,7 @@ for (const crashPhase of ['prepared', 'before-activation'] as const) {
       sealer: new CapabilitySealer(new Uint8Array(32).fill(7), () => 100),
       hostWitnessCatalog: client().hostCatalog(namespace),
       deploymentWitness: client().virtualDeploymentWitness(namespace),
-      authorizeRecovery: () => true });
+      authorizeRecovery: () => true, recoveryAuthorityId: 'pure-recovery' });
     let service: ChildProcess | undefined, deployment: PureVirtualProcessDeployment | undefined;
     try {
       service = await launchHostWitness(serviceConfig);

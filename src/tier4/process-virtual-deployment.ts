@@ -28,7 +28,7 @@ import { assertPureVirtualPlanV1, preparePureVirtualPromotionV1,
   pureVirtualPreparedDigestV1, PureVirtualPreparedStoreV1,
   type PureVirtualPreparedV1 } from './process-virtual-deployment-contract.ts';
 import { assertPureVirtualDeploymentWitnessV1, PureVirtualDeploymentJournalStoreV1,
-  pureVirtualInvocationDigestV2, type PureVirtualDeploymentJournalV2,
+  pureVirtualInvocationDigestV2, type PureVirtualDeploymentJournalV3,
   type PureVirtualDeploymentWitnessV1, type PureVirtualInvocationV2 } from './process-virtual-deployment-journal.ts';
 import type { TopologyPlan } from './topology.ts';
 
@@ -60,6 +60,9 @@ export interface PureVirtualProcessDeploymentOptions {
   readonly hostWitnessCatalog: HostJournalWitnessCatalog;
   readonly deploymentWitness: PureVirtualDeploymentWitnessV1;
   readonly authorizeRecovery: NonNullable<ProcessHostOptions['authorizeRecovery']>;
+  /** Stable operator-selected identity for the live recovery policy. Its
+   * callback may consult changing epoch/revocation state across restarts. */
+  readonly recoveryAuthorityId: string;
   readonly sourceInitialSnapshot?: RuntimeSnapshotV1;
   readonly timeoutMs?: number;
   readonly lockWaitMs?: number;
@@ -79,6 +82,11 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
   readonly #sourceManifest: Digest;
   readonly #candidateManifest: Digest;
   readonly #trustDigest: Digest;
+  readonly #sourcePlanDigest: Digest;
+  readonly #candidatePlanDigest: Digest;
+  readonly #sourceInitialSnapshotDigest: Digest | null;
+  readonly #sealerIdentityDigest: Digest;
+  readonly #recoveryAuthorityDigest: Digest;
   readonly #hosts = new Map<'source' | 'candidate', ProcessHost>();
   readonly #vetted = new Map<Digest, VettedEvidence>();
   #lease: Lease | null = null;
@@ -92,14 +100,24 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
       || typeof options.authorizeRecovery !== 'function'
       || !isAbsolute(options.directory))
       throw new TypeError('pure Artifact/4 deployment requires operator authority and absolute storage');
+    identifier(options.recoveryAuthorityId);
     assertHostJournalWitnessCatalog(options.hostWitnessCatalog);
     assertPureVirtualDeploymentWitnessV1(options.deploymentWitness);
     if (options.hostWitnessCatalog.repositoryId !== options.trust.repositoryId
       || options.deploymentWitness.repositoryId !== options.trust.repositoryId
       || options.hostWitnessCatalog.deploymentId !== options.deploymentWitness.deploymentId)
       throw new TypeError('pure Artifact/4 deployment witness/trust namespace mismatch');
+    // Capture each operator selection once. Do not freeze the coordinator,
+    // witnesses, sealer or recovery callback: their live authority state is
+    // intentionally dynamic, while caller replacement of the top-level slot
+    // must never redirect an already-open deployment.
+    this.#options = Object.freeze({ ...options,
+      artifact: clone(options.artifact), trust: clone(options.trust),
+      sourcePlan: clone(options.sourcePlan), candidatePlan: clone(options.candidatePlan),
+      sourceInitialSnapshot: options.sourceInitialSnapshot
+        ? clone(options.sourceInitialSnapshot) : undefined });
+    options = this.#options;
     ensureDurableDirectory(options.directory);
-    this.#options = options;
     this.#store = new PureVirtualDeploymentJournalStoreV1(options.directory, options.deploymentWitness);
     this.#prepared = new PureVirtualPreparedStoreV1(join(options.directory, 'prepared'));
     this.#gate = new JournalLock({ directory: join(options.directory, 'deployment-lock'),
@@ -107,7 +125,7 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
     this.#artifactFile = join(options.directory, 'artifact4.json');
     const artifact = validateProcessVirtualArtifactV4(options.artifact,
       openProcessVirtualWorkerLineageV1(options.trust));
-    assertPureVirtualPlanV1(options.candidatePlan, artifact);
+    this.#candidatePlanDigest = assertPureVirtualPlanV1(options.candidatePlan, artifact);
     const source = decodeIR(artifact.sourceIr);
     if (source.kind !== 'Module' || options.sourcePlan.units.length !== 1
       || options.sourcePlan.crossEdges.length !== 0
@@ -115,6 +133,16 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
       || !same([...options.sourcePlan.units[0].members].sort(),
         source.members.filter(member => member.kind === 'FunctionDecl').map(member => member.symbol).sort()))
       throw new TypeError('pure Artifact/4 source requires one complete no-effects unit');
+    this.#sourcePlanDigest = domainDigest('aether.process-virtual-source-plan/1',
+      options.sourcePlan, LIMITS);
+    this.#sourceInitialSnapshotDigest = options.sourceInitialSnapshot
+      ? runtimeSnapshotDigest(options.sourceInitialSnapshot) : null;
+    this.#sealerIdentityDigest = domainDigest('aether.process-virtual-sealer-identity/1',
+      CapabilitySealer.prototype.keyCommitment.call(options.sealer));
+    this.#recoveryAuthorityDigest = domainDigest('aether.process-virtual-recovery-authority/1',
+      { repositoryId: options.trust.repositoryId,
+        deploymentId: options.deploymentWitness.deploymentId,
+        authorityId: options.recoveryAuthorityId });
     this.#artifactDigest = processVirtualArtifactDigestV4(artifact);
     this.#sourceManifest = executionManifestDigest(artifact.sourceEvidence.manifest);
     this.#candidateManifest = executionManifestDigest(artifact.candidateEvidence.manifest);
@@ -136,6 +164,7 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
 
   static async open(options: PureVirtualProcessDeploymentOptions): Promise<PureVirtualProcessDeployment> {
     const deployment = new PureVirtualProcessDeployment(options);
+    options = deployment.#options;
     try {
       deployment.#gate.recoverDeadWriter(false);
       let state = deployment.#store.read();
@@ -145,7 +174,7 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
           || governor.pendingProposal !== null)
           throw new Error('virtual deployment genesis differs from strict governor');
         state = deployment.#store.write('0', {
-          format: 'aether.process-virtual-deployment/2', witnessRevision: '1',
+          format: 'aether.process-virtual-deployment/3', witnessRevision: '1',
           witnessDigest: options.deploymentWitness.digest,
           repositoryId: options.trust.repositoryId,
           deploymentId: options.deploymentWitness.deploymentId,
@@ -154,6 +183,11 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
           readiness: 'ready', pendingProposal: null, preparedDigest: null,
           trustDigest: deployment.#trustDigest,
           hostWitnessCatalogDigest: options.hostWitnessCatalog.digest,
+          sourcePlanDigest: deployment.#sourcePlanDigest,
+          candidatePlanDigest: deployment.#candidatePlanDigest,
+          sourceInitialSnapshotDigest: deployment.#sourceInitialSnapshotDigest,
+          sealerIdentityDigest: deployment.#sealerIdentityDigest,
+          recoveryAuthorityDigest: deployment.#recoveryAuthorityDigest,
           invocations: [],
         });
       }
@@ -166,24 +200,33 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
     } catch (error) { await deployment.close(); throw error; }
   }
 
-  #state(): PureVirtualDeploymentJournalV2 {
+  #state(): PureVirtualDeploymentJournalV3 {
     const state = this.#store.read();
-    if (!state || state.format !== 'aether.process-virtual-deployment/2'
+    if (state?.format === 'aether.process-virtual-deployment/2')
+      throw new TypeError('pure virtual deployment /2 requires explicit /3 configuration migration');
+    if (!state || state.format !== 'aether.process-virtual-deployment/3'
       || state.genesisManifest !== this.#sourceManifest
       || state.trustDigest !== this.#trustDigest
       || state.hostWitnessCatalogDigest !== this.#options.hostWitnessCatalog.digest
+      || state.sourcePlanDigest !== this.#sourcePlanDigest
+      || state.candidatePlanDigest !== this.#candidatePlanDigest
+      || state.sourceInitialSnapshotDigest !== this.#sourceInitialSnapshotDigest
+      || state.sealerIdentityDigest !== this.#sealerIdentityDigest
+      || state.recoveryAuthorityDigest !== this.#recoveryAuthorityDigest
       || state.witnessDigest !== this.#options.deploymentWitness.digest)
       throw new TypeError('pure virtual deployment state/authority changed');
     return state;
   }
-  #write(state: PureVirtualDeploymentJournalV2, fields: Omit<PureVirtualDeploymentJournalV2,
+  #write(state: PureVirtualDeploymentJournalV3, fields: Omit<PureVirtualDeploymentJournalV3,
     'format' | 'witnessRevision' | 'witnessDigest' | 'repositoryId' | 'deploymentId'
-    | 'admissionProfile' | 'genesisManifest' | 'trustDigest' | 'hostWitnessCatalogDigest'>):
-    PureVirtualDeploymentJournalV2 {
+    | 'admissionProfile' | 'genesisManifest' | 'trustDigest' | 'hostWitnessCatalogDigest'
+    | 'sourcePlanDigest' | 'candidatePlanDigest' | 'sourceInitialSnapshotDigest'
+    | 'sealerIdentityDigest' | 'recoveryAuthorityDigest'>):
+    PureVirtualDeploymentJournalV3 {
     const next = { ...state, ...fields, witnessRevision: String(BigInt(state.witnessRevision) + 1n) };
-    return this.#store.write(state.witnessRevision, next) as PureVirtualDeploymentJournalV2;
+    return this.#store.write(state.witnessRevision, next) as PureVirtualDeploymentJournalV3;
   }
-  #assertServing(state: PureVirtualDeploymentJournalV2): void {
+  #assertServing(state: PureVirtualDeploymentJournalV3): void {
     if (this.#closed || state.readiness !== 'ready')
       throw new Error('pure virtual deployment is closed or frozen');
     if (domainDigest('aether.process-virtual-worker-trust/1', this.#options.trust, LIMITS)
@@ -191,6 +234,14 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
       throw new Error('pure virtual operator trust changed');
     if (processVirtualArtifactDigestV4(this.#options.artifact) !== this.#artifactDigest)
       throw new Error('pure virtual signed artifact changed');
+    if (domainDigest('aether.process-virtual-source-plan/1', this.#options.sourcePlan, LIMITS)
+      !== this.#sourcePlanDigest
+      || domainDigest('aether.process-virtual-plan/1', this.#options.candidatePlan, LIMITS)
+        !== this.#candidatePlanDigest
+      || domainDigest('aether.process-virtual-sealer-identity/1',
+        CapabilitySealer.prototype.keyCommitment.call(this.#options.sealer))
+        !== this.#sealerIdentityDigest)
+      throw new Error('pure virtual deployment live configuration changed');
     const governor = this.#options.coordinator.state();
     if (governor.activationPending || governor.committedManifest !== state.active.manifest
       || governor.generation !== state.active.generation
@@ -233,7 +284,7 @@ export class PureVirtualProcessDeployment implements PromotionDriver {
     if (this.#closed) { await host.close(); throw new Error('deployment closed during host preparation'); }
     this.#hosts.set(which, host); return host;
   }
-  async #activeHost(state: PureVirtualDeploymentJournalV2): Promise<ProcessHost> {
+  async #activeHost(state: PureVirtualDeploymentJournalV3): Promise<ProcessHost> {
     let host: ProcessHost;
     if (state.active.generation === '0') host = await this.#hostFor('source');
     else {

@@ -35,5 +35,5 @@ export { assertPureVirtualPlanV1, processVirtualMigrationPlanV1,
   type PureVirtualPreparedV1 } from './process-virtual-deployment-contract.ts';
 export { createPureVirtualDeploymentWitnessV1, readPureVirtualDeploymentHeadV1,
   PureVirtualDeploymentJournalStoreV1,
-  type PureVirtualDeploymentJournalV2,
+  type PureVirtualDeploymentJournalV2, type PureVirtualDeploymentJournalV3,
   type PureVirtualDeploymentWitnessV1 } from './process-virtual-deployment-journal.ts';
