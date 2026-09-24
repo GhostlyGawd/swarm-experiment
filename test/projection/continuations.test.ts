@@ -52,9 +52,9 @@ for(const target of targets)test(`actual ${target} completed tasks retain result
  }finally{rmSync(directory,{recursive:true,force:true});}
 });
 
-test('unsupported control/contract contexts fail explicitly instead of changing captures or running predicates',()=>{
+test('unsupported contract contexts fail explicitly and blockless bindings select V12',()=>{
  const f=fixture(),module=f.module as Extract<Term,{kind:'Module'}>,check=module.members.find((n):n is Extract<Term,{kind:'FunctionDecl'}>=>n.kind==='FunctionDecl'&&n.symbol===f.fn.ownedCheck)!;
  const predicate=b.eq(b.length(b.map(b.seq(check.params[1].ty,b.v(check.params[1].symbol)),f.fn.apply)),b.int(1));
  const badContract={...module,members:module.members.map(n=>n===check?{...check,contract:b.contract({ensures:[b.clause(predicate,'indirect')]})}:n)};
- for(const target of targets){assert.throws(()=>projectExecutable(badContract,f.symbols,target),/contract profile/);const bad={...module,members:[b.fn({symbol:f.fn.simple,returns:b.Unit,body:b.block(b.if_(b.bool(false),b.let_(check.params[0].symbol,b.Int,b.int(1))),b.ret(b.unit()))})]};assert.throws(()=>projectExecutable(bad,f.symbols,target),/conditional bindings/);}
+ for(const target of targets){assert.throws(()=>projectExecutable(badContract,f.symbols,target),/contract profile/);const blockless={...module,members:[b.fn({symbol:f.fn.simple,returns:b.Unit,body:b.block(b.if_(b.bool(false),b.let_(check.params[0].symbol,b.Int,b.int(1))),b.ret(b.unit()))})]};assert.match(projectExecutable(blockless,f.symbols,target),/@aether-projection\/12/);}
 });
