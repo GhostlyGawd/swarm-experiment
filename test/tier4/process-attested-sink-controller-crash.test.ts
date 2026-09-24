@@ -41,14 +41,18 @@ async function kill(child: ChildProcess | undefined): Promise<void> {
 // Three long-lived service processes survive both short-lived controller processes.
 // This exercises the service boundary under one UID; separate-user custody is a
 // distinct acceptance gate.
-for (const scenario of ['postcommit', 'pre-sink', 'signed-fence'] as const) test(
-  `V10 Deployment ${scenario} recovery across real controller SIGKILL`, async t => {
+for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-postcommit'] as const) test(
+  `${scenario === 'v11-resource-postcommit' ? 'V11' : 'V10'} Deployment ${scenario} recovery across real controller SIGKILL`, async t => {
+  const resourceScoped = scenario === 'v11-resource-postcommit';
+  const operationId = resourceScoped ? 'v11-resource-crash' : 'v10-crash';
+  const target = resourceScoped ? 'alice' : 'append-once';
   const directory = mkdtempSync(join(tmpdir(), 'aether-v10-crash-'));
   let sink: ChildProcess | undefined, sinkWitnessProcess: ChildProcess | undefined,
     operatorWitnessProcess: ChildProcess | undefined;
   try {
-    const repositoryId = 'repo:v10-crash', deploymentId = 'deployment:v10-crash',
-      clockDomain = 'clock:v10-crash';
+    const repositoryId = resourceScoped ? 'repo:v11-resource-crash' : 'repo:v10-crash';
+    const deploymentId = resourceScoped ? 'deployment:v11-resource-crash' : 'deployment:v10-crash';
+    const clockDomain = resourceScoped ? 'clock:v11-resource-crash' : 'clock:v10-crash';
     const sinkKeys = generateKeyPairSync('ed25519');
     const policyKeys = generateKeyPairSync('ed25519');
     const governorKeys = generateKeyPairSync('ed25519');
@@ -80,7 +84,8 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence'] as const) test
         { kind: 'effect-scope', authorityId: 'operator:effects', repositoryId,
           catalogDeploymentId: deploymentId, clockDomain },
         { kind: 'host-scope', authorityId: 'operator:host', repositoryId, deploymentId },
-        { kind: 'deployment', authorityId: 'operator:deployment', repositoryId, deploymentId },
+        { kind: 'deployment', authorityId: resourceScoped
+          ? 'operator:deployment-v11' : 'operator:deployment', repositoryId, deploymentId },
       ] }), { mode: 0o600 });
     writeFileSync(sinkConfig, encodeCanonical({ format: 'aether.attested-sink-config/2',
       socketPath: sinkSocket, storageDir: join(directory, 'sink-store'), authKeyFile: sinkAuthKeyFile,
@@ -95,27 +100,27 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence'] as const) test
     writeFileSync(fixtureFile, encodeCanonical({ directory, repositoryId, deploymentId, clockDomain,
       anchor, adapterArtifactDigest, sinkSocket, sinkAuthKeyFile, sinkWitnessSocket,
       sinkWitnessKeyFile, operatorSocket, operatorKeyFile, policySignerKeyFile,
-      grantKeyFile, sealerKeyFile, governorKeyFile }), { mode: 0o600 });
+      grantKeyFile, sealerKeyFile, governorKeyFile, resourceScoped }), { mode: 0o600 });
     const controllerFile = join(root, 'test/tier4/process-attested-sink-controller.ts');
     const run = (mode: 'crash' | 'recover' | 'crash-pre-sink' | 'recover-abort'
       | 'crash-before-sink-entry' | 'recover-fenced') => spawnSync(process.execPath,
       ['--experimental-strip-types', controllerFile, fixtureFile, mode],
       { cwd: root, encoding: 'utf8', timeout: 90_000,
         env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' } });
-    const crashed = run(scenario === 'postcommit' ? 'crash'
+    const crashed = run(scenario === 'postcommit' || resourceScoped ? 'crash'
       : scenario === 'pre-sink' ? 'crash-pre-sink' : 'crash-before-sink-entry');
     assert.equal(crashed.signal, 'SIGKILL', crashed.stderr || crashed.error?.message);
     const ready = JSON.parse(crashed.stdout.trim().split('\n').find(line => line.includes('worker-ready'))!);
     const workerPids = Object.values(ready.workerPids) as number[];
-    assert.equal(workerPids.length, 1, 'one real process worker served the V10 deployment');
+    assert.equal(workerPids.length, 1, 'one real process worker served the deployment');
     assert.ok(workerPids[0] > 0 && workerPids[0] !== ready.controllerPid);
     assert.ok(![sink.pid, sinkWitnessProcess.pid, operatorWitnessProcess.pid].includes(workerPids[0]));
     const sinkWitness = createProcessWitnessClient({ socketPath: sinkWitnessSocket,
       key: readFileSync(sinkWitnessKeyFile), timeoutMs: 10_000 }).sinkStateWitness({
         authorityId: 'operator:sink', anchor, adapterArtifactDigest });
     let sinkHeadBefore = readSinkStateHead(sinkWitness);
-    assert.equal(sinkHeadBefore.revision, scenario === 'postcommit' ? '1' : '0');
-    if (scenario === 'postcommit') {
+    assert.equal(sinkHeadBefore.revision, scenario === 'postcommit' || resourceScoped ? '1' : '0');
+    if (scenario === 'postcommit' || resourceScoped) {
       const sinkJournalBefore = JSON.parse(sinkHeadBefore.journal!);
       assert.equal(sinkJournalBefore.decisions.length, 1);
       assert.equal(sinkJournalBefore.decisions[0].receipt.body.disposition, 'committed');
@@ -126,7 +131,8 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence'] as const) test
       repositoryId, deploymentId, clockDomain });
     const hostJournal = JSON.parse(readFileSync(join(directory, 'deployment', 'deployments',
       'genesis', 'host', 'host.json'), 'utf8'));
-    const hostEffect = hostJournal.calls.find((row: { operationId: string }) => row.operationId === 'v10-crash').effects[0];
+    const hostCall = hostJournal.calls.find((row: { operationId: string }) => row.operationId === operationId);
+    const hostEffect = hostCall.effects[0];
     const effectId = hostEffect.id as string;
     const effectWitness = selectEffectJournalWitness(effectCatalog, effectId);
     const effectHeadBefore = readWitnessHead(effectWitness);
@@ -138,6 +144,21 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence'] as const) test
       const event = JSON.parse(effectHeadBefore.journal!).records[0];
       assert.equal(event.state, 'prepared');
       assert.equal(event.dispatchStarted, true);
+      if (resourceScoped) {
+        assert.equal(hostJournal.configuration.split(':')[0], 'aether.process-host-config/9');
+        assert.equal(hostCall.args[0].value, target, 'the host retained the exact target argument');
+        assert.equal(event.request.capabilityGrantRef,
+          domainDigest('aether.process-effect-grant-ref/2', {
+            configuration: hostJournal.configuration, operationId: effectId,
+            capability: hostEffect.capability, policyEpoch: '0',
+            resourcePathDigest: domainDigest('aether.process-effect-resource-path/1', [
+              'process', hostJournal.configuration.split(':').at(-1), hostCall.generation,
+              domainDigest('aether.process-grant-unit/1', hostCall.unit).split(':').at(-1),
+              'account', target,
+            ]),
+          }), 'the signed request binds the selected Alice resource path');
+        assert.match(event.request.capabilityGrantRef, /^aether\.process-effect-grant-ref\/2:b3:/);
+      }
       if (scenario === 'signed-fence') {
         const request = event.request as EffectRequestV1;
         const sinkClient = createAttestedSinkClient({ socketPath: sinkSocket,
@@ -158,20 +179,26 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence'] as const) test
         assert.equal(sinkJournal.decisions[0].receipt.body.disposition, 'not_committed');
       }
     }
-    const recovered = run(scenario === 'postcommit' ? 'recover'
+    const recovered = run(scenario === 'postcommit' || resourceScoped ? 'recover'
       : scenario === 'pre-sink' ? 'recover-abort' : 'recover-fenced');
     assert.equal(recovered.status, 0, recovered.stderr || recovered.error?.message);
     const result = JSON.parse(recovered.stdout.trim().split('\n').at(-1)!);
     assert.notEqual(result.pid, crashed.pid);
     assert.equal(result.recovered.state, scenario === 'pre-sink' ? 'aborted' : 'completed');
     if (scenario === 'signed-fence') assert.equal(result.recovered.execution.ok, false);
+    if (resourceScoped) {
+      assert.equal(result.recovered.execution.ok, true);
+      assert.equal(result.recovered.execution.value.value, target);
+      assert.equal(JSON.parse(readFileSync(join(directory, 'deployment', 'deployment.json'), 'utf8')).format,
+        'aether.process-deployment/11');
+    }
     assert.deepEqual(result.cached, result.recovered);
     assert.deepEqual(readSinkStateHead(sinkWitness), sinkHeadBefore,
       'recovery must not append or redispatch a sink decision');
     const effectHeadAfter = readWitnessHead(effectWitness);
     if (scenario === 'pre-sink') assert.deepEqual(effectHeadAfter, effectHeadBefore);
     else assert.equal(JSON.parse(effectHeadAfter.journal!).records[0].state,
-      scenario === 'postcommit' ? 'committed' : 'aborted');
+      scenario === 'postcommit' || resourceScoped ? 'committed' : 'aborted');
     if (scenario !== 'pre-sink') assert.equal(JSON.parse(readFileSync(join(directory,
       'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 1);
     t.diagnostic(JSON.stringify({ crashSignal: crashed.signal, controllerPid: result.pid,
