@@ -1,0 +1,21 @@
+✔ v5 host witness retains native fallback binding, before snapshot, state and terminal result across service restart (2247.485417ms)
+✔ native runner validates a complete Tier 2 frame against independent exact-source execution (1128.7355ms)
+✔ native runner requires exact Tier 3 rollback and rejects changed artifact and proof identities (1137.092291ms)
+✔ native runner refuses symlinked and mismatched artifact bytes before launch (815.82825ms)
+✔ witnessed native fallback publishes the proved alias result and survives reopen (3930.036791ms)
+✔ distinct-reference native Tier 3 abort preserves the exact host source state (3318.740083ms)
+✔ native grants fail before intent and revocation at publication retains recoverable source (5418.958542ms)
+✔ substituted executable leaves a witnessed native intent unresolved until exact bytes return (3287.009084ms)
+✔ controller close at native intent, launch or publication cannot commit a result (12018.098458ms)
+✔ witnessed v5 reopen rejects malformed empty checkpoint extension fields (4754.066375ms)
+✔ native publication waits for the host witness and recovers after service restart (4636.057208ms)
+✔ fresh controller recovers a witnessed native intent after SIGKILL before publication (5386.060334ms)
+✔ fresh controller reads the one committed native decision after postcommit SIGKILL (4280.082125ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 47197.953834
