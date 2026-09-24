@@ -11,7 +11,7 @@ import { GraphStore } from '../../src/tier1/store.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { typecheck } from '../../src/tier2/typecheck.ts';
 import { Runtime } from '../../src/tier3/runtime.ts';
-import { executableBundle, parseExecutableBundle, RUST_PROJECTION_CARGO } from '../../src/projection/executable.ts';
+import { executableBundle, parseExecutableBundle, projectTypeScriptV14, projectPythonV14, projectRustV14, RUST_PROJECTION_CARGO } from '../../src/projection/executable.ts';
 
 function fixture() {
   const symbols = new SymbolSpace('projection-contract-closure-v14');
@@ -64,7 +64,7 @@ test('V14 round-trips exact closure contracts and rejects hidden native capture 
   }
 });
 
-test('V14 rejects captured records, effectful closure bodies and opaque targets', () => {
+test('V14 retains bounded refusals while V15 admits checked function values and scalar locals', () => {
   const symbols = new SymbolSpace('projection-contract-closure-refusal-v14');
   const box: Ty = { t: 'Record', name: 'type:projection:captured-box' as never, fields: [['value', b.Int]] };
   const recordFactory = symbols.define('recordFactory'), recordEntry = symbols.define('recordEntry');
@@ -114,10 +114,16 @@ test('V14 rejects captured records, effectful closure bodies and opaque targets'
     ? { ...member, body: b.ret(b.lambda({ returns: b.Int, capabilities: ['cap:test:emit' as never], body: b.int(1) })) } : member) };
   const recursive = { ...f.module, members: (f.module as Extract<Term,{kind:'Module'}>).members.map(member => member.kind === 'FunctionDecl' && member.symbol === f.factory
     ? { ...member, body: b.ret(b.lambda({ returns: b.Int, body: b.apply(b.call(f.factory, b.int(1))) })) } : member) };
+  const old = { typescript: projectTypeScriptV14, python: projectPythonV14, rust: projectRustV14 };
   for (const target of ['typescript', 'python', 'rust'] as const) {
     assert.throws(() => executableBundle(recordModule, symbols, target), /captures mutable or opaque state/);
-    assert.throws(() => executableBundle(opaqueModule, opaqueSymbols, target), /exact direct factory/);
-    assert.throws(() => executableBundle(localModule, localSymbols, target), /visible direct lambda/);
+    assert.throws(() => old[target](opaqueModule, opaqueSymbols), /exact direct factory/);
+    assert.throws(() => old[target](localModule, localSymbols), /visible direct lambda/);
+    for (const [module, space] of [[opaqueModule, opaqueSymbols], [localModule, localSymbols]] as const) {
+      const bundle = executableBundle(module, space, target);
+      assert.match(bundle.source, /@aether-projection\/15/);
+      assert.equal(new GraphStore().intern(parseExecutableBundle(bundle).module), new GraphStore().intern(module));
+    }
     assert.throws(() => executableBundle(effectful, f.symbols, target), /requires no capabilities/);
     assert.throws(() => executableBundle(recursive, f.symbols, target), /factory cycle/);
   }

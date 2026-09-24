@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Checked closure values in contract projection V15 — 2026-09-24
+
+- Added `aether.executable-projection/15` for capability-free function values passed into contracts and straight-line factories with scalar block-local captures. The projector derives exact owner/lambda-root certificates, the parser recomputes the certificate set, and matched native runtimes refuse unmarked host closures and mutable captures before contract execution. [Bounded profile and trust limits](../../../roadmap/v4/research/projections/CHECKED-CLOSURE-VALUES.md).
+- The valid-context audit retains branch-local captures, binder-bearing lambdas and passed lambdas with pure direct helper calls as reference-valid G1 gaps. Both direct `If` return arms are checked in V15. Current V15 token costs and FR-1.2's ≥4× changed-session requirement remain open; V4-T1-02 and Q03 status do not change.
+
 ## Read-only closure contract projection V14 — 2026-09-24
 
 - Added `aether.executable-projection/14` for inline capability-free contract lambdas and direct pure factories returning visible lambdas with scalar captures. A transitive static check refuses mutable/opaque captures, effectful or unknown targets, nonlocal writes and unsupported closure state. Actual TypeScript, Python and Rust execution, exact-root edits and imported-factory checks pass. [Profile and limits](../../../roadmap/v4/research/projections/READ-ONLY-CONTRACT-CLOSURES.md).
