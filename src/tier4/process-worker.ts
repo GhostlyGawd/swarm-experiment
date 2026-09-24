@@ -2,6 +2,7 @@
 import { readSync, writeSync, closeSync } from 'node:fs';
 import { Socket } from 'node:net';
 import { decode as decodeIR } from '../tier1/agent-ir.ts';
+import { CausalLineageLedger } from '../tier1/causal-lineage.ts';
 import { GraphStore } from '../tier1/store.ts';
 import { capability, type CapabilityName, type NodeRef, type SymbolId } from '../tier1/ids.ts';
 import { CapabilityRegistry, type CapabilityDescriptor } from '../tier2/ocap.ts';
@@ -15,6 +16,8 @@ import { executionManifestDigest, validateExecutionManifest, type ExecutionManif
 import type { RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
 import { ProcessAuthenticator, processBoundaryId, validateProcessScope, fromWireSnapshot, toWireSnapshot, decodeProcessValue, encodeProcessValue, type ProcessScope, type ProcessSession } from './process-values.ts';
 import { decodeProcessExecution, encodeProcessExecution } from './process-channel.ts';
+import { validateProcessVirtualArtifactV3, type ProcessVirtualArtifactV3 } from './process-virtual-artifact.ts';
+import { assertProcessVirtualWorkerBundleV1, openProcessVirtualWorkerLineageV1 } from './process-virtual-worker-contract.ts';
 
 const pause = new Int32Array(new SharedArrayBuffer(4));
 function readExact(fd: number, size: number): Buffer {
@@ -74,6 +77,8 @@ function main(): void {
     }
   };
   let runtime: ProductionRuntime | null = null;
+  let virtualAdmission: { artifact: ProcessVirtualArtifactV3; lineage: CausalLineageLedger } | null = null;
+  let virtualGuardCount = 0;
   let scope: ProcessScope | null = null;
   let previous: RuntimeSnapshotV1 | undefined;
   let callbackSequence = 0;
@@ -185,6 +190,52 @@ function main(): void {
     if (init.snapshot !== null) restore(init.snapshot as RuntimeSnapshotV1);
     return { pid: process.pid };
   };
+  const initializeVirtual = (payload: unknown): unknown => {
+    if (runtime) throw new Error('worker is already initialized');
+    const init = exactObject(payload, ['format', 'artifact', 'trust', 'unit', 'heapId',
+      'ownershipEpoch', 'snapshot', 'maxGuardChecks']);
+    if (init.format !== 'aether.process-worker-init/2')
+      throw new TypeError('unsupported process worker init version');
+    if (init.maxGuardChecks !== null && (!Number.isSafeInteger(init.maxGuardChecks)
+      || (init.maxGuardChecks as number) < 0 || (init.maxGuardChecks as number) > 1_000_000))
+      throw new RangeError('invalid virtual worker guard budget');
+    const lineage = openProcessVirtualWorkerLineageV1(init.trust);
+    const artifact = validateProcessVirtualArtifactV3(init.artifact, lineage);
+    assertProcessVirtualWorkerBundleV1(artifact, process.argv[1]!);
+    const manifest = artifact.candidateEvidence.manifest;
+    if (executionManifestDigest(manifest) !== session.executionManifest
+      || init.ownershipEpoch !== session.ownershipEpoch)
+      throw new TypeError('virtual worker manifest or ownership differs from session');
+    const module = decodeIR(artifact.candidateIr), source = decodeIR(artifact.sourceIr);
+    if (module.kind !== 'Module' || source.kind !== 'Module'
+      || new GraphStore().intern(module) !== manifest.astRoot)
+      throw new TypeError('virtual worker exact candidate root mismatch');
+    const registry = new CapabilityRegistry();
+    if (!typecheck(module, { registry }).ok) throw new TypeError('virtual worker module failed typechecking');
+    const includeSymbols = module.members.filter(member => member.kind === 'FunctionDecl')
+      .map(member => member.symbol);
+    if (!includeSymbols.includes(artifact.descriptor.target))
+      throw new TypeError('virtual worker target must compile locally');
+    const nextScope: ProcessScope = { executionManifest: session.executionManifest,
+      astRoot: manifest.astRoot as NodeRef, heapId: init.heapId as string,
+      ownershipEpoch: init.ownershipEpoch as string, unit: init.unit as string };
+    validateProcessScope(nextScope);
+    const nextRuntime = ProductionRuntime.compile(module, { registry,
+      includeSymbols, policy: 'enforce', executionGuard: () => {
+        if (!executionGuard()) return false;
+        return init.maxGuardChecks === null || virtualGuardCount++ < (init.maxGuardChecks as number);
+      },
+      virtualForward: { source, descriptor: artifact.descriptor } });
+    scope = nextScope; runtime = nextRuntime;
+    virtualAdmission = { artifact, lineage };
+    try {
+      if (init.snapshot !== null) restore(init.snapshot as RuntimeSnapshotV1);
+    } catch (error) {
+      runtime = null; scope = null; virtualAdmission = null;
+      throw error;
+    }
+    return { pid: process.pid };
+  };
   function dispatch(value: unknown): void {
     const message = exactObject(value, ['kind', 'id', 'method', 'payload']);
     if (message.kind !== 'request') throw new TypeError('expected parent request');
@@ -192,6 +243,7 @@ function main(): void {
     try {
       let result: unknown;
       if (message.method === 'init') result = initialize(message.payload);
+      else if (message.method === 'init-virtual') result = initializeVirtual(message.payload);
       else {
         if (!runtime || !scope) throw new Error('worker is not initialized');
         if (message.method === 'snapshot') {
@@ -203,6 +255,10 @@ function main(): void {
           if (message.payload !== null) throw new TypeError('invalid close request');
           send({ kind: 'response', id: message.id, ok: true, value: null }); process.exit(0);
         } else if (message.method === 'call') {
+          if (virtualAdmission) {
+            validateProcessVirtualArtifactV3(virtualAdmission.artifact, virtualAdmission.lineage);
+            assertProcessVirtualWorkerBundleV1(virtualAdmission.artifact, process.argv[1]!);
+          }
           const call = exactObject(message.payload, ['symbol', 'args', 'snapshot', 'operationId']);
           identifier(call.symbol); identifier(call.operationId);
           if (!Array.isArray(call.args)) throw new TypeError('invalid call arguments');

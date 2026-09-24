@@ -13,7 +13,8 @@ export {
   type DistributedFault, type DistributedFaultKind, type DistributedResult,
   type TopologyHostOptions, type WireRequest,
 } from './host.ts';
-export { ProcessChannel, ProcessChannelError, type ProcessChannelInit, type ProcessChannelOptions, type ProcessCallRequest, type ProcessCallResult, type ProcessEffectRequest } from './process-channel.ts';
+export { ProcessChannel, ProcessChannelError, type ProcessChannelInit, type ProcessVirtualChannelInitV2, type ProcessChannelOptions, type ProcessCallRequest, type ProcessCallResult, type ProcessEffectRequest } from './process-channel.ts';
+export { type ProcessVirtualWorkerTrustV1 } from './process-virtual-worker-contract.ts';
 export { ProcessHost, PROCESS_INVOKE, processExecutionId, type ProcessHostOptions, type ProcessHostCallResult, type ProcessOperationEffectDisposition, type ProcessEffectContext, type ProcessHostPhase, type ProcessCheckpointAccess, type ProcessInvocationGrant, type ProcessNativeFallbackTokens, type ProcessHostNativeFallbackResult } from './process-host.ts';
 export { ProcessFallbackSupervisor, type ProcessFallbackOptions, type ProcessFallbackRepairEvent, type ProcessFallbackResult } from './process-fallback.ts';
 export { ProcessResumableSession, type ProcessResumableOptions, type ProcessResumableEffectsContext } from './process-resumable.ts';

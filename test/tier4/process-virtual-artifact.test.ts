@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ProcessChannel } from '../../src/tier4/process-channel.ts';
+import { type ProcessVirtualWorkerTrustV1 } from '../../src/tier4/process-virtual-worker-contract.ts';
 import * as b from '../../src/tier1/build.ts';
 import type { Term } from '../../src/tier1/ast.ts';
 import type { NodeRef } from '../../src/tier1/ids.ts';
@@ -13,6 +16,7 @@ import { encode as encodeIR } from '../../src/tier1/agent-ir.ts';
 import { CausalLineageLedger, signIntent, signSpecRevision } from '../../src/tier1/causal-lineage.ts';
 import { buildVirtualForwardCandidate } from '../../src/tier1/semantic-gc-virtual-forward.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
+import { ProductionRuntime } from '../../src/tier3/compile.ts';
 import { createEvidenceManifest, DEFAULT_EVIDENCE_POLICY_V2, DEFAULT_EVIDENCE_POLICY_V3,
   mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
@@ -24,12 +28,16 @@ import { processMigrationPlan } from '../../src/tier4/process-deployment.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
 
-function fixture(options: { unrelatedCandidate?: boolean; effectfulEntry?: boolean } = {}) {
+function fixture(options: { unrelatedCandidate?: boolean; effectfulEntry?: boolean; realWorker?: boolean } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'aether-process-artifact-v3-'));
   const bundlePath = join(directory, 'worker.mjs'), sourcePath = join(directory, 'worker.ts');
   writeFileSync(bundlePath, 'export const worker = 1;\n');
   writeFileSync(sourcePath, 'export const worker: number = 1;\n');
-  const subject = measureExecutableSubjectV1(bundlePath, [sourcePath]);
+  const workerPaths = options.realWorker
+    ? { bundlePath: fileURLToPath(new URL('../../src/tier4/process-worker.ts', import.meta.url)),
+      sourcePaths: [join(process.cwd(), 'package.json')] }
+    : { bundlePath, sourcePaths: [sourcePath] };
+  const subject = measureExecutableSubjectV1(workerPaths.bundlePath, workerPaths.sourcePaths);
   const symbols = new SymbolSpace('process-virtual-artifact');
   const target = symbols.define('target'), wrapper = symbols.define('wrapper');
   const entry = symbols.define('entry'), x = symbols.define('x');
@@ -84,12 +92,135 @@ function fixture(options: { unrelatedCandidate?: boolean; effectfulEntry?: boole
   const candidateIntent = admit(candidateContext, candidateEvidence,
     options.unrelatedCandidate ? [] : [sourceIntent], 'candidate');
   const input = { sourceContext, candidateContext, sourceEvidence, candidateEvidence,
-    bundlePath, sourcePaths: [sourcePath], sourceIntent, candidateIntent, lineage };
+    bundlePath: workerPaths.bundlePath, sourcePaths: workerPaths.sourcePaths,
+    sourceIntent, candidateIntent, lineage };
   const artifact = options.unrelatedCandidate || options.effectfulEntry ? null
     : makeProcessVirtualArtifactV3(input);
+  const trust: ProcessVirtualWorkerTrustV1 = {
+    format: 'aether.process-virtual-worker-trust/1', repositoryId: 'process-virtual-artifact',
+    lineageDirectory: join(directory, 'lineage'), storeDirectory: join(directory, 'ast'),
+    policyEpoch: '0', eligibleAuthors: ['author'],
+    authorKeys: [{ author: 'author', policyEpoch: '0',
+      publicKeyPem: keys.publicKey.export({ type: 'spki', format: 'pem' }).toString() }],
+  };
   return { directory, bundlePath, sourcePath, source, candidate, descriptor, wrapper,
-    lineage, artifact, input };
+    entry, target, lineage, trust, artifact, input };
 }
+
+test('Artifact/3 init/2 executes source and candidate in separate real workers', async () => {
+  const f = fixture({ realWorker: true });
+  let source: ProcessChannel | undefined, candidate: ProcessChannel | undefined;
+  try {
+    const manifest = f.artifact!.sourceEvidence.manifest;
+    source = await ProcessChannel.start({ module: f.source, manifest,
+      unit: 'pure', includeSymbols: [f.entry, f.wrapper, f.target], capabilities: [],
+      heapId: 'pure-heap', ownershipEpoch: '1' });
+    candidate = await ProcessChannel.startVirtual({ artifact: f.artifact!, trust: f.trust,
+      unit: 'pure', heapId: 'pure-heap', ownershipEpoch: '1' });
+    assert.notEqual(candidate.pid, source.pid);
+    assert.notEqual(candidate.pid, process.pid);
+    const beforeSource = await source.snapshot(), beforeCandidate = await candidate.snapshot();
+    const original = await source.call(f.entry, [3n], beforeSource);
+    const rewritten = await candidate.call(f.entry, [3n], beforeCandidate);
+    assert.deepEqual(original.execution, rewritten.execution);
+    assert.deepEqual(rewritten.execution, { ok: true, value: 4n, steps: 0 });
+    await candidate.kill();
+    candidate = await ProcessChannel.startVirtual({ artifact: f.artifact!, trust: f.trust,
+      unit: 'pure', heapId: 'pure-heap', ownershipEpoch: '1' });
+    const reopened = await candidate.call(f.entry, [3n], await candidate.snapshot());
+    assert.deepEqual(reopened.execution, original.execution);
+  } finally {
+    await candidate?.close(); await source?.close();
+    rmSync(f.directory, { recursive: true, force: true });
+  }
+});
+
+test('Artifact/3 virtual worker preserves source production guard denial order', async () => {
+  const f = fixture({ realWorker: true });
+  try {
+    for (const budget of [0, 1, 2, 3]) {
+      let checked = 0;
+      const source = ProductionRuntime.compile(f.source, { registry: new CapabilityRegistry(),
+        policy: 'enforce', executionGuard: () => checked++ < budget });
+      const expected = source.call(f.entry, [3n]);
+      const worker = await ProcessChannel.startVirtual({ artifact: f.artifact!, trust: f.trust,
+        unit: 'pure', heapId: `guard-heap-${budget}`, ownershipEpoch: '1', maxGuardChecks: budget });
+      try {
+        const observed = await worker.call(f.entry, [3n], await worker.snapshot());
+        if (budget === 3) assert.deepEqual(observed.execution, expected);
+        else assert.deepEqual(JSON.parse(JSON.stringify(observed.execution)), expected);
+        assert.equal(checked, budget < 3 ? budget + 1 : 3);
+        assert.equal(observed.execution.ok, budget === 3);
+        if (!observed.execution.ok) assert.equal(observed.execution.fault.kind, 'step_budget');
+      } finally { await worker.close(); }
+    }
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('Artifact/3 worker denies altered roots, descriptor and executable bytes before dispatch', async () => {
+  const f = fixture({ realWorker: true });
+  let worker: ProcessChannel | undefined;
+  const init = { artifact: f.artifact!, trust: f.trust,
+    unit: 'pure', heapId: 'pure-heap', ownershipEpoch: '1' };
+  try {
+    await assert.rejects(ProcessChannel.startVirtual({ ...init,
+      artifact: { ...init.artifact, sourceIr: init.artifact.candidateIr } }), /root|descriptor|wrapper/);
+    await assert.rejects(ProcessChannel.startVirtual({ ...init,
+      artifact: { ...init.artifact, candidateIr: init.artifact.sourceIr } }), /root|descriptor/);
+    await assert.rejects(ProcessChannel.startVirtual({ ...init,
+      artifact: { ...init.artifact, descriptor: { ...init.artifact.descriptor, sites: [] } } }), /descriptor/);
+    await assert.rejects(ProcessChannel.startVirtual({ ...init,
+      artifact: { ...init.artifact, executableSubject: { ...init.artifact.executableSubject,
+        bundle: { ...init.artifact.executableSubject.bundle, sha256: '0'.repeat(64) } } } }), /measured executable/);
+    worker = await ProcessChannel.startVirtual(init);
+    const snapshot = await worker.snapshot();
+    const packagePath = join(process.cwd(), 'package.json');
+    const original = readFileSync(packagePath);
+    try {
+      writeFileSync(packagePath, Buffer.concat([original, Buffer.from('\n')]));
+      await assert.rejects(worker.call(f.entry, [3n], snapshot), /measured executable/);
+      const raw = worker as unknown as { request(method: string, payload: unknown): Promise<unknown> };
+      await assert.rejects(raw.request('call', { symbol: f.entry,
+        args: [{ tag: 'int', value: '3' }], snapshot, operationId: 'tamper-child' }),
+      /measured executable/);
+    } finally { writeFileSync(packagePath, original); }
+    const recovered = await worker.call(f.entry, [3n], snapshot);
+    assert.deepEqual(recovered.execution, { ok: true, value: 4n, steps: 0 });
+  } finally {
+    await worker?.close();
+    rmSync(f.directory, { recursive: true, force: true });
+  }
+});
+
+test('Artifact/3 init/2 independently rejects tampered child payload before a worker call', async () => {
+  const f = fixture({ realWorker: true });
+  const WorkerConstructor = ProcessChannel as unknown as {
+    new (init: unknown, options: unknown, workerPath: string): ProcessChannel;
+  };
+  const variants = [
+    { ...f.artifact!, sourceIr: f.artifact!.candidateIr },
+    { ...f.artifact!, descriptor: { ...f.artifact!.descriptor, sites: [] } },
+    { ...f.artifact!, executableSubject: { ...f.artifact!.executableSubject,
+      bundle: { ...f.artifact!.executableSubject.bundle, sha256: '0'.repeat(64) } } },
+  ];
+  try {
+    for (const artifact of variants) {
+      const channel = new WorkerConstructor({ module: f.candidate,
+        manifest: f.artifact!.candidateEvidence.manifest, unit: 'pure', includeSymbols: [f.entry, f.target],
+        capabilities: [], heapId: 'raw-heap', ownershipEpoch: '1' }, {},
+      f.artifact!.executableSubject.bundle.path);
+      const raw = channel as unknown as { request(method: string, payload: unknown): Promise<unknown> };
+      try {
+        await assert.rejects(raw.request('init-virtual', {
+          format: 'aether.process-worker-init/2', artifact, trust: f.trust,
+          unit: 'pure', heapId: 'raw-heap', ownershipEpoch: '1',
+          snapshot: null, maxGuardChecks: null,
+        }), /root|descriptor|measured executable/);
+        await assert.rejects(raw.request('call', null), /not initialized/);
+      } finally { await channel.kill(); }
+    }
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
 
 test('Artifact/3 reloads exact source, candidate, wrapper, V3 evidence and measured bytes', () => {
   const f = fixture();

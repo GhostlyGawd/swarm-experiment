@@ -4,7 +4,8 @@ import type { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import type { Term } from '../tier1/ast.ts';
 import type { CapabilityName, NodeRef, SymbolId } from '../tier1/ids.ts';
-import { encode as encodeIR } from '../tier1/agent-ir.ts';
+import { decode as decodeIR, encode as encodeIR } from '../tier1/agent-ir.ts';
+import { CausalLineageLedger } from '../tier1/causal-lineage.ts';
 import { GraphStore } from '../tier1/store.ts';
 import type { CapabilityDescriptor } from '../tier2/ocap.ts';
 import type { ExecutionResult } from '../tier3/runtime.ts';
@@ -14,6 +15,9 @@ import { encodeCanonical, exactObject, identifier, type TaggedValueV1 } from '..
 import { executionManifestDigest, validateExecutionManifest, type ExecutionManifestV1 } from '../fabric/identity.ts';
 import type { RuntimeSnapshotV1 } from '../fabric/snapshot.ts';
 import { ProcessAuthenticator, fromWireSnapshot, encodeProcessValue, decodeProcessValue, type ProcessScope } from './process-values.ts';
+import { validateProcessVirtualArtifactV3, type ProcessVirtualArtifactV3 } from './process-virtual-artifact.ts';
+import { assertProcessVirtualWorkerBundleV1, openProcessVirtualWorkerLineageV1,
+  type ProcessVirtualWorkerTrustV1 } from './process-virtual-worker-contract.ts';
 
 export interface ProcessChannelInit {
   readonly module: Term;
@@ -25,6 +29,18 @@ export interface ProcessChannelInit {
   /** Fixed for this channel's lifetime. Advancing ownership requires a fresh channel. */
   readonly ownershipEpoch: string;
   readonly snapshot?: RuntimeSnapshotV1;
+}
+/** Explicit one-unit Artifact/3 worker profile. It does not authorize
+ * ProcessDeployment promotion, effect callbacks or cross-unit target calls. */
+export interface ProcessVirtualChannelInitV2 {
+  readonly artifact: ProcessVirtualArtifactV3;
+  readonly trust: ProcessVirtualWorkerTrustV1;
+  readonly unit: string;
+  readonly heapId: string;
+  readonly ownershipEpoch: string;
+  readonly snapshot?: RuntimeSnapshotV1;
+  /** Optional host-owned restrictive guard budget for one-worker execution. */
+  readonly maxGuardChecks?: number;
 }
 export interface ProcessCallResult {
   readonly execution: ExecutionResult;
@@ -114,11 +130,14 @@ export class ProcessChannel {
   private exited = false;
   private readonly exitPromise: Promise<void>;
   private readonly callbacks = new Set<string>();
+  private virtualAdmission: { artifact: ProcessVirtualArtifactV3; lineage: CausalLineageLedger } | null = null;
+  private readonly workerPath: string;
   readonly pid: number;
   get isClosed(): boolean { return this.closed || this.exited || this.child.exitCode !== null || this.child.signalCode !== null; }
   get alive(): boolean { return !this.isClosed && !this.child.killed; }
 
-  private constructor(init: ProcessChannelInit, options: ProcessChannelOptions) {
+  private constructor(init: ProcessChannelInit, options: ProcessChannelOptions,
+    virtualWorkerPath?: string) {
     validateExecutionManifest(init.manifest);
     if (new GraphStore().intern(init.module) !== init.manifest.astRoot) throw new TypeError('worker module does not match execution manifest');
     this.options = options;
@@ -129,7 +148,8 @@ export class ProcessChannel {
     const session = { sessionId: randomBytes(24).toString('hex'), executionManifest: this.scope.executionManifest, ownershipEpoch: init.ownershipEpoch, maxFrameBytes: options.maxFrameBytes ?? 8 * 1024 * 1024 };
     this.authenticator = new ProcessAuthenticator(key, session, 'parent');
     const worker = new URL(import.meta.url.endsWith('.ts') ? './process-worker.ts' : './process-worker.js', import.meta.url);
-    this.child = spawn(process.execPath, [...(worker.pathname.endsWith('.ts') ? ['--experimental-strip-types'] : []), fileURLToPath(worker)], { stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'], env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' } });
+    this.workerPath = virtualWorkerPath ?? fileURLToPath(worker);
+    this.child = spawn(process.execPath, [...(this.workerPath.endsWith('.ts') ? ['--experimental-strip-types'] : []), this.workerPath], { stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'], env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' } });
     if (!this.child.pid) throw new ProcessChannelError('closed', 'worker could not start', false);
     this.pid = this.child.pid;
     this.exitPromise = new Promise(resolve => this.child.once('exit', () => { this.exited = true; this.fail(new ProcessChannelError('eof', 'worker exited before completing pending operations', this.pending.size > 0)); resolve(); }));
@@ -158,7 +178,46 @@ export class ProcessChannel {
       return channel;
     } catch (error) { await channel.kill(); throw error; }
   }
+  static async startVirtual(init: ProcessVirtualChannelInitV2,
+    options: ProcessChannelOptions = {}): Promise<ProcessChannel> {
+    if (options.onCall || options.onEffect)
+      throw new TypeError('pure virtual worker does not admit remote calls or effects');
+    if (init.maxGuardChecks !== undefined && (!Number.isSafeInteger(init.maxGuardChecks)
+      || init.maxGuardChecks < 0 || init.maxGuardChecks > 1_000_000))
+      throw new RangeError('invalid virtual worker guard budget');
+    const trust = structuredClone(init.trust);
+    const lineage = openProcessVirtualWorkerLineageV1(trust);
+    const artifact = validateProcessVirtualArtifactV3(init.artifact, lineage);
+    assertProcessVirtualWorkerBundleV1(artifact, artifact.executableSubject.bundle.path);
+    const module = decodeIR(artifact.candidateIr);
+    if (module.kind !== 'Module') throw new TypeError('Artifact/3 candidate is not a module');
+    const includeSymbols = module.members.filter(member => member.kind === 'FunctionDecl')
+      .map(member => member.symbol);
+    if (!includeSymbols.includes(artifact.descriptor.target))
+      throw new TypeError('virtual target must be compiled locally');
+    const channel = new ProcessChannel({ module, manifest: artifact.candidateEvidence.manifest,
+      unit: init.unit, includeSymbols, capabilities: [], heapId: init.heapId,
+      ownershipEpoch: init.ownershipEpoch, snapshot: init.snapshot }, options,
+    artifact.executableSubject.bundle.path);
+    channel.virtualAdmission = { artifact, lineage };
+    try {
+      assertProcessVirtualWorkerBundleV1(artifact, channel.workerPath);
+      if (init.snapshot) fromWireSnapshot(init.snapshot, channel.scope);
+      const ready = await channel.request('init-virtual', {
+        format: 'aether.process-worker-init/2', artifact, trust,
+        unit: init.unit, heapId: init.heapId, ownershipEpoch: init.ownershipEpoch,
+        snapshot: init.snapshot ?? null, maxGuardChecks: init.maxGuardChecks ?? null,
+      });
+      const message = exactObject(ready, ['pid']);
+      if (message.pid !== channel.pid) throw new TypeError('worker PID handshake mismatch');
+      return channel;
+    } catch (error) { await channel.kill(); throw error; }
+  }
   async call(symbol: SymbolId, args: readonly Value[], snapshot: RuntimeSnapshotV1, options: { operationId?: string; timeoutMs?: number } = {}): Promise<ProcessCallResult> {
+    if (this.virtualAdmission) {
+      validateProcessVirtualArtifactV3(this.virtualAdmission.artifact, this.virtualAdmission.lineage);
+      assertProcessVirtualWorkerBundleV1(this.virtualAdmission.artifact, this.workerPath);
+    }
     fromWireSnapshot(snapshot, this.scope);
     const operationId = options.operationId ?? `${this.authenticator.session.sessionId}/call-${this.requestSequence + 1}`;
     identifier(operationId);
