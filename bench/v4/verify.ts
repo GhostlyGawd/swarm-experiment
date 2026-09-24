@@ -7,7 +7,7 @@ import { arch, cpus, platform, release, totalmem } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { digest, enforcementFailures, evaluate, measureCorpus, profile, type BenchmarkRunV1, type Measurement } from './manifest.ts';
-import { TOKENIZER, type TokenWorkload } from './tokens.ts';
+import { TOKENIZER, ledgerV6Corpus, type TokenWorkload } from './tokens.ts';
 
 const MAX_ARTIFACT_BYTES = 16 * 1024 * 1024;
 function readCanonical(path: string): unknown {
@@ -42,7 +42,10 @@ export function verifyBenchmarkEvidence(directory: string, options: { sourceRoot
     || manifest.samplesArtifact !== 'samples.json' || manifest.samplesDigest !== digest(samples)) throw new TypeError('benchmark manifest/sample binding mismatch');
   if (samples?.format !== 'aether.benchmark.samples/1' || !same(samples.tokenizer, TOKENIZER)
     || !Array.isArray(samples.corpus) || !Array.isArray(samples.sourceFiles)) throw new TypeError('invalid benchmark samples');
-  if (!['ledger-baseline/1', 'v4-release/1'].includes(manifest.profile.id)) throw new TypeError('unknown benchmark target profile');
+  if (!['ledger-baseline/1', 'ledger-warm-v6/1', 'v4-release/1', 'v4-release/2'].includes(manifest.profile.id))
+    throw new TypeError('unknown benchmark target profile');
+  if ((manifest.profile.id === 'ledger-warm-v6/1' || manifest.profile.id === 'v4-release/2')
+    && !same(samples.corpus, ledgerV6Corpus())) throw new TypeError('Agent-IR6 benchmark corpus differs from executable fixture');
   const selected = profile(manifest.profile.id, samples.corpus.map(item => item.id));
   if (!same(manifest.profile, selected) || manifest.targetProfileDigest !== digest(selected)
     || manifest.workloadDigest !== digest(samples.corpus)) throw new TypeError('benchmark target/corpus changed');

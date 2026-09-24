@@ -14,7 +14,7 @@ export interface Target {
   minimum?: number;
 }
 export interface Profile {
-  id: 'ledger-baseline/1' | 'v4-release/1';
+  id: 'ledger-baseline/1' | 'ledger-warm-v6/1' | 'v4-release/1' | 'v4-release/2';
   scope: string;
   targets: Target[];
 }
@@ -60,6 +60,9 @@ const remainingNfr = [
 ] as const;
 
 export function profile(id: Profile['id'], workloadIds: readonly string[]): Profile {
+  if ((id === 'ledger-warm-v6/1' || id === 'v4-release/2')
+    && (workloadIds.length !== 1 || workloadIds[0] !== 'ledger-warm-v6/1'))
+    throw new TypeError('Agent-IR6 benchmark profile requires its declared workload');
   const tokenTarget = (metric: string, required: boolean): Target => ({
     requirement: 'V4-NFR-11', metric, unit: 'baseline/candidate tokens', bound: '≥4×', minimum: 4, required,
   });
@@ -69,13 +72,13 @@ export function profile(id: Profile['id'], workloadIds: readonly string[]): Prof
     tokenTarget(`${workload}:cold`, false),
     tokenTarget(`${workload}:fullSession`, false),
   ]);
-  if (id === 'v4-release/1') targets.push(...remainingNfr.map(([suffix, metric, unit, bound]) => ({
+  if (id === 'v4-release/1' || id === 'v4-release/2') targets.push(...remainingNfr.map(([suffix, metric, unit, bound]) => ({
     requirement: `V4-NFR-${suffix}`, metric, unit, bound, required: true,
   })));
   return {
     id,
-    scope: id === 'ledger-baseline/1'
-      ? 'Baseline token accounting only. Required ≥4× applies to complete warm messages per workload and aggregate; cold, body and complete-session ratios are diagnostics. This fixture does not qualify V4-Q03.'
+    scope: id === 'ledger-baseline/1' || id === 'ledger-warm-v6/1'
+      ? 'Ledger token accounting only. Required ≥4× applies to complete warm wires per workload and aggregate; cold, body and complete-session ratios are diagnostics. This fixture does not qualify V4-Q03.'
       : 'Provisional v4 measurement inventory. Includes every NFR; missing target-specific workloads/hardware profiles remain not_measured. A successful run cannot alone close a release or establish KPI/governance obligations.',
     targets,
   };

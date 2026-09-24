@@ -5,7 +5,8 @@ import { countTokens } from '../../src/util/tokens.ts';
 import type { Term } from '../../src/tier1/ast.ts';
 import * as b from '../../src/tier1/build.ts';
 import { Runtime } from '../../src/tier3/runtime.ts';
-import { isDeepStrictEqual } from 'node:util';
+import { AgentIrSessionV6 } from '../../src/tier1/agent-ir-v6.ts';
+import { GraphStore } from '../../src/tier1/store.ts';
 
 export const TOKENIZER = { package: 'js-tiktoken', version: '1.0.21', encoding: 'cl100k_base' } as const;
 
@@ -76,14 +77,23 @@ export function measureWorkload(workload: TokenWorkload) {
  * records an executed failing attempt and the corrected result. Candidate
  * generation is deterministic, with no model/API costs claimed. Representative
  * autonomous change campaigns belong to V4-Q03/Q06. */
-export function ledgerCorpus(): TokenWorkload[] {
+function ledgerWorkload(protocol: 'AE1' | 'AE6'): TokenWorkload {
   const ex = buildLedgerExample();
   const ctx = new IrContext();
   const cold = { baseline: projectTypeScript(ex.module, ex.syms, {}), candidate: encode(ex.module, ctx).text };
+  const sender = protocol === 'AE6' ? new AgentIrSessionV6(cold.candidate) : null;
+  const receiver = protocol === 'AE6' ? new AgentIrSessionV6(cold.candidate) : null;
+  if (sender && receiver && sender.baseRoot !== receiver.baseRoot) throw new Error('AE6 cold roots differ');
+  const members = (ex.module as Extract<Term, { kind: 'Module' }>).members;
   const changes = (ex.module as Extract<Term, { kind: 'Module' }>).members
     .filter(member => member.kind === 'FunctionDecl').map(member => {
       const ir = encode(member, ctx);
-      return { id: ex.syms.nameOf(member.symbol), baseline: projectTypeScript(member, ex.syms, {}), candidate: ir.text, body: ir.body };
+      const index = members.indexOf(member);
+      const wire = sender ? sender.encode(index, member) : ir.text;
+      if (receiver && new GraphStore().intern(receiver.decode(wire).declaration) !== new GraphStore().intern(member))
+        throw new Error('AE6 warm declaration failed round trip');
+      return { id: ex.syms.nameOf(member.symbol), baseline: projectTypeScript(member, ex.syms, {}), candidate: wire,
+        body: sender ? wire : ir.body };
     });
   const same = (content: string) => ({ baseline: content, candidate: content });
   const session: SessionMessage[] = [
@@ -99,9 +109,9 @@ export function ledgerCorpus(): TokenWorkload[] {
   decode(encode(ex.module, sessionEncoder).text, sessionDecoder);
   for (const [index, divisor] of [100, 200].entries()) {
     const candidate: typeof original = { ...original, body: b.block(b.ret(b.div(b.v(original.params[0].symbol), b.int(divisor)))) };
-    const wire = encode(candidate, sessionEncoder).text;
-    const decoded = decode(wire, sessionDecoder);
-    if (!isDeepStrictEqual(decoded, candidate)) throw new Error('Change fixture failed IR round trip');
+    const wire = sender ? sender.encode(members.indexOf(original), candidate) : encode(candidate, sessionEncoder).text;
+    const decoded = receiver ? receiver.decode(wire).declaration : decode(wire, sessionDecoder);
+    if (new GraphStore().intern(decoded) !== new GraphStore().intern(candidate)) throw new Error('Change fixture failed IR round trip');
     const runtime = new Runtime({ registry: ex.capabilities, symbols: ex.syms });
     runtime.load({ ...module, members: module.members.map(member => member === original ? decoded : member) });
     const result = runtime.call(ex.symbols.feeFor, [1000n]);
@@ -112,11 +122,21 @@ export function ledgerCorpus(): TokenWorkload[] {
     session.push({ role: 'assistant', purpose: index === 0 ? 'failed_attempt' : 'repair', baseline: projectTypeScript(candidate, ex.syms, {}), candidate: wire });
     session.push({ role: 'tool', purpose: 'response', ...same(JSON.stringify({ input: '1000', expected: '5', actual: String(actual), accepted })) });
   }
-  return [{
-    id: 'ledger-baseline/1',
-    description: 'Default buildLedgerExample(), unmodified TypeScript projections, AE1 streams, four warm declarations.',
+  return {
+    id: protocol === 'AE6' ? 'ledger-warm-v6/1' : 'ledger-baseline/1',
+    description: protocol === 'AE6'
+      ? 'Default buildLedgerExample(), unmodified TypeScript projections, cold AE1 module, four R6 warm references and checked R6/E6 change attempts.'
+      : 'Default buildLedgerExample(), unmodified TypeScript projections, AE1 streams, four warm declarations.',
     cold, changes, session,
-    sessionScope: 'Complete offline JSONL change transcript. Includes initial instructions/context, feeFor change request, one executed failing attempt (10 instead of 5), repair and successful response (5). Deterministic candidate generator; no model inference, API billing, or training performed. Warm declaration diagnostics are measured separately.',
+    sessionScope: protocol === 'AE6'
+      ? 'Complete offline JSONL change transcript. Includes initial instructions/context, feeFor change request, one executed failing attempt (10 instead of 5), repair and successful response (5). Cold module and all failures/repairs are paid. Deterministic candidate generator; no model inference, API billing, or training performed. Warm declaration diagnostics are measured separately.'
+      : 'Complete offline JSONL change transcript. Includes initial instructions/context, feeFor change request, one executed failing attempt (10 instead of 5), repair and successful response (5). Deterministic candidate generator; no model inference, API billing, or training performed. Warm declaration diagnostics are measured separately.',
     training: { performed: false, tokens: 0, cost: 0 },
-  }];
+  };
 }
+
+/** Historical AE1 fixture, kept byte-for-byte comparable for prior evidence. */
+export function ledgerCorpus(): TokenWorkload[] { return [ledgerWorkload('AE1')]; }
+
+/** AE6 changes only the candidate protocol, never the baseline or message boundary. */
+export function ledgerV6Corpus(): TokenWorkload[] { return [ledgerWorkload('AE6')]; }

@@ -21,6 +21,7 @@ export { proposeSemanticSinkRetirementV2, verifySemanticSinkRetirementV2,
   type SemanticSinkRetirementProposalV2 } from './tier1/semantic-gc-sink-retirement.ts';
 export { agentIr3Snapshot, encodeAgentIr3, decodeAgentIr3, AGENT_IR3_PROFILE, AGENT_IR3_LIMITS, type AgentIr3Snapshot, type AgentIr3Format } from './tier1/agent-ir-v3.ts';
 export { AgentIrWarmReferenceV5, AGENT_IR5_REFERENCE_PROFILE } from './tier1/agent-ir-v5.ts';
+export { AgentIrSessionV6, AGENT_IR6_PROFILE, type AgentIrV6Decoded } from './tier1/agent-ir-v6.ts';
 export { DurableTreeWorkspace, type TreeWorkspaceOptions, type TreePlacement, type TreeMutation, type TreeFence, type TreeCheckpoint, type TreeCheckpointAck, type TreeCheckpointCertificate } from './tier1/tree-workspace.ts';
 export { allocateFractionalPosition, compareFractionalPositions, parseFractionalPosition } from './tier1/fractional-position.ts';
 export { projectOccurrences, occurrenceIdForInsert, type OccurrenceNode, type OccurrenceProjection, type TreeDiagnostic } from './tier1/occurrence-tree.ts';

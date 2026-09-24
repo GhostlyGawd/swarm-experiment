@@ -2,11 +2,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRun, enforcementFailures, profile, type Profile } from './manifest.ts';
-import { ledgerCorpus } from './tokens.ts';
+import { ledgerCorpus, ledgerV6Corpus } from './tokens.ts';
 
 const args = process.argv.slice(2);
 let mode: '--measure' | '--enforce' = '--measure';
-let selected: Profile['id'] = 'v4-release/1';
+let selected: Profile['id'] = 'v4-release/2';
 let output = '.aether-store/benchmarks/v4/latest';
 let modeSeen = false;
 for (let i = 0; i < args.length; i++) {
@@ -16,7 +16,8 @@ for (let i = 0; i < args.length; i++) {
     modeSeen = true; mode = arg;
   } else if (arg === '--profile') {
     const name = args[++i];
-    if (name !== 'ledger-baseline/1' && name !== 'v4-release/1') throw new Error(`Unknown profile: ${name}`);
+    if (name !== 'ledger-baseline/1' && name !== 'ledger-warm-v6/1'
+      && name !== 'v4-release/1' && name !== 'v4-release/2') throw new Error(`Unknown profile: ${name}`);
     selected = name;
   } else if (arg === '--output') {
     if (!args[i + 1] || args[i + 1].startsWith('--')) throw new Error('--output requires a directory');
@@ -24,7 +25,7 @@ for (let i = 0; i < args.length; i++) {
   } else throw new Error(`Unknown option ${arg}`);
 }
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const corpus = ledgerCorpus();
+const corpus = selected === 'ledger-baseline/1' || selected === 'v4-release/1' ? ledgerCorpus() : ledgerV6Corpus();
 const selectedProfile = profile(selected, corpus.map(workload => workload.id));
 const { run, samples } = createRun(corpus, selectedProfile, 'samples.json', root);
 const directory = resolve(output);
