@@ -1,0 +1,50 @@
+{
+  "verified": true,
+  "sourceMatches": true,
+  "stageProfile": "aether.proof-check-stage-profile/1",
+  "statistics": {
+    "full": {
+      "minimumNs": 1873625,
+      "medianNs": 1988667,
+      "p95Ns": 2473083,
+      "maximumNs": 2827000
+    },
+    "encode": {
+      "minimumNs": 51833,
+      "medianNs": 54416,
+      "p95Ns": 76000,
+      "maximumNs": 183791
+    },
+    "executionDigest": {
+      "minimumNs": 30500,
+      "medianNs": 31791,
+      "p95Ns": 39375,
+      "maximumNs": 91417
+    },
+    "derive": {
+      "minimumNs": 882417,
+      "medianNs": 961458,
+      "p95Ns": 1100875,
+      "maximumNs": 1185458
+    },
+    "obligationDigest": {
+      "minimumNs": 190584,
+      "medianNs": 202958,
+      "p95Ns": 280750,
+      "maximumNs": 443250
+    },
+    "formulaProofs": {
+      "minimumNs": 420292,
+      "medianNs": 453375,
+      "p95Ns": 599666,
+      "maximumNs": 852167
+    },
+    "certificateDigest": {
+      "minimumNs": 120583,
+      "medianNs": 124833,
+      "p95Ns": 174917,
+      "maximumNs": 194500
+    }
+  }
+}
+
