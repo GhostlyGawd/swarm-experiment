@@ -1,0 +1,36 @@
+✔ live ProcessDeployment refuses Artifact/3 before worker or effect dispatch (579.152333ms)
+✔ strict process deployment carries scoped grants through the production host and sink (2126.211292ms)
+✔ process deployment factory serves a signed effect resource policy bound to the admitted artifact (1183.176042ms)
+✔ fresh production deployment serves exact loader-admitted adapter bytes under signed v2 policy (7407.722042ms)
+✔ default effectful deployment pins independent signer across real sink, candidate and restart (9807.418792ms)
+✔ explicit anchored-v4 compatibility reopens old adapter-policy bytes without silent upgrade (4644.752042ms)
+✔ anchored promotion binds signer identity and refuses key substitution before activation (18201.191625ms)
+✔ F08 process deployment: rejected composition, approved migration/body change and rollback preserve real ledger state (4384.475291ms)
+✔ F08 process deployment: forged/stale approvals and changed schemas preserve serving state (1194.486084ms)
+✔ F08 process deployment: preparation freezes source calls and postcommit activation failure blocks old-root serving until recovery (1410.565708ms)
+✔ F08 process deployment: in-flight source writes drain before preparation and invalidate stale snapshot approval (1186.012458ms)
+✔ F08 process deployment: actual coordinator death before/after commit reloads artifacts and follows only durable decision (16871.202292ms)
+✔ F08 process deployment: receipt loss after inner durable commit recovers original invocation without another append (3069.406875ms)
+✔ F08 process deployment: outer intent without inner execution needs authorized abort, while committed receipt survives observer failure (1899.721125ms)
+✔ F08 review: invalid typed allocations and calls are rejected before outer intents and do not wedge the deployment (1797.174458ms)
+✔ F08 review: cached receipts and fresh intents recheck revocation after the awaited source snapshot (752.638125ms)
+✔ F08 review: recovery freezes strategy and rechecks permission after awaits and before receipt publication (824.208583ms)
+✔ asynchronous deployment recovery policy is denied before host recovery or receipt publication (573.878083ms)
+✔ F08 review: repeated manifest activation rejects historical ABA handles without changing workers or serving generation (2733.197708ms)
+✔ deployment cached receipts retain historical capability authority when a later declaration weakens (974.203791ms)
+✔ deployment legacy profile adoption is explicit and preserves durable receipts (1173.21075ms)
+✔ fresh production deployment requires an independent signer anchor and preserves explicit legacy histories (494.410292ms)
+✔ fresh signed deployment refuses unsigned effect services before durable genesis (89.261458ms)
+✔ v2 capability history needs explicit legacy adoption and retains settled calls (1156.700958ms)
+✔ Artifact/3 reloads exact source, candidate, wrapper, V3 evidence and measured bytes (1030.015042ms)
+✔ Artifact/3 rejects altered source, candidate, descriptor, wrapper, profile and executable bytes (817.039417ms)
+✔ Artifact/3 rejects unrelated signed lineage and forged admission authority (2001.7845ms)
+✔ Artifact/3 rejects effectful subjects, malformed IR and legacy version substitution (1959.984125ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 90723.030375
