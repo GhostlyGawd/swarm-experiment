@@ -1,0 +1,5 @@
+
+> @ghostlygawd/aether@0.1.0 worker:bundle:verify
+> node --experimental-strip-types scripts/process-worker-bundle.ts verify
+
+{"format":"aether.process-worker-bundle/1","bundle":{"path":"/Users/rhenmcleod/Repositories/swarm-experiment/dist/process-worker.bundle.mjs","bytes":751545,"sha256":"d501a784f3744402be82427f405d2ef1c6926050901c59c416c2126ae3418943"},"node":{"path":"/opt/homebrew/Cellar/node/26.7.0/bin/node","bytes":50320,"sha256":"1ef99ea25fe70c9b67e7efe768ef8ee22148d3cabc703db6131b57aeb617d040"},"inputCount":68,"externalNodeImports":["node:child_process","node:crypto","node:fs","node:net","node:path","node:perf_hooks","node:url","node:util"],"toolVersion":"0.28.2"}
