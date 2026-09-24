@@ -11,5 +11,6 @@ export type { ProductionSnapshot } from './heap-state.ts';
 export { BrokerEffectRouter, EffectInvocationError, type RuntimeEffectRouter, type RuntimeEffectRouterOptions } from './effects.ts';
 export { ResumableRuntime, type ResumableRuntimeOptions, type ResumableRunResult, type ResumableRef, type ResumableEffects, type PackedCandidateSubject, type PackedCandidateNativeBinding } from './resumable-runtime.ts';
 export { ResumableCheckpointStore, type ResumableCheckpointOptions, type CheckpointHead, type CheckpointPersistenceFault } from './resumable-checkpoint.ts';
+export { CheckpointSemanticRetention } from './checkpoint-semantic-retention.ts';
 export { compileResumableProgram, virtualForwardResumableProfileDigest, type ResumableProgram, type ResumableCode, type ResumableProgramOptions } from './resumable-program.ts';
 export { checkpointDigest, type ResumableSnapshot, type MachineCore, type MachineEvent, type MachineValue } from './resumable-state.ts';

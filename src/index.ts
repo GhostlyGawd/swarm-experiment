@@ -74,6 +74,7 @@ export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec
 // --- Tier 3: execution and simulation ---------------------------------------
 export { ResumableRuntime, type ResumableRuntimeOptions, type ResumableRunResult, type ResumableRef, type ResumableEffects, type PackedCandidateSubject, type PackedCandidateNativeBinding } from './tier3/resumable-runtime.ts';
 export { ResumableCheckpointStore, type ResumableCheckpointOptions, type CheckpointHead, type CheckpointPersistenceFault } from './tier3/resumable-checkpoint.ts';
+export { CheckpointSemanticRetention } from './tier3/checkpoint-semantic-retention.ts';
 export { compileResumableProgram, type ResumableProgram, type ResumableCode } from './tier3/resumable-program.ts';
 export { checkpointDigest, type ResumableSnapshot, type MachineCore, type MachineEvent, type MachineValue } from './tier3/resumable-state.ts';
 export { AetherFault, Runtime, type Checkpoint, type ExecutionResult, type Fault, type FaultKind, type TraceEvent } from './tier3/runtime.ts';
