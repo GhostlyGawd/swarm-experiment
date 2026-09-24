@@ -7,6 +7,7 @@ import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { deriveVirtualForwardDescriptor } from '../../src/tier1/semantic-gc-virtual-forward.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { Runtime } from '../../src/tier3/runtime.ts';
+import type { RuntimeEffectRouter } from '../../src/tier3/effects.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
 
@@ -94,4 +95,13 @@ test('a target fault retains the archived wrapper frame and fault bindings', () 
   const result = run(f.candidate, true, 32);
   assert.equal(result.result.ok, false);
   if (!result.result.ok) assert.equal(result.result.fault.kind, 'division_by_zero');
+});
+
+test('virtual forwarding refuses an effect router until its manifest binds the sidecar', () => {
+  const f = fixture();
+  const router: RuntimeEffectRouter = {
+    mode: 'live', bind() {}, invoke() { return null; }, fork() { return this; },
+  };
+  assert.throws(() => new Runtime({ registry: f.registry, effectRouter: router,
+    virtualForward: { source: f.source, descriptor: f.descriptor } }), /effect router execution manifest/);
 });

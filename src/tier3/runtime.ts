@@ -173,6 +173,8 @@ export class Runtime {
   private readonly effectLog: Array<{ step: number; capability: CapabilityName; args: Value[] }> = [];
 
   constructor(opts: RuntimeOptions) {
+    if (opts.virtualForward && opts.effectRouter)
+      throw new TypeError('virtual forwarding is not bound to an effect router execution manifest');
     this.opts = opts;
   }
 
