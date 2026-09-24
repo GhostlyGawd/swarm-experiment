@@ -4,6 +4,7 @@ export * from './snapshot.ts';
 export * from './effects.ts';
 export * from './effect-journal-witness.ts';
 export * from './sink-receipt.ts';
+export * from './sink-state-witness.ts';
 export * from './attested-sink-adapter.ts';
 export * from './attested-sink-service.ts';
 export * from './host-journal-witness.ts';
