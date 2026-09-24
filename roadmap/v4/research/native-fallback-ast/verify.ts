@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Term } from '../../../../src/tier1/ast.ts';
+import type { LogicalRefV1 } from '../../../../src/fabric/encoding.ts';
+import { runtimeSnapshotDigest, validateRuntimeSnapshot, type RuntimeSnapshotV1 } from '../../../../src/fabric/snapshot.ts';
 import { GraphStore } from '../../../../src/tier1/store.ts';
 import { FallbackTreeRuntime } from '../../../../src/tier3/fallback-tree.ts';
 import { fallbackFixture } from '../../../../test/tier3/fallback-tree-fixture.ts';
@@ -36,6 +38,21 @@ function run(program: string, args: readonly string[]): string {
   if (child.status !== 0) throw new Error(`${program} failed (${child.status}): ${child.stderr}`);
   return child.stdout.trim();
 }
+function runCheckedSnapshotProgram(program: BuiltProgram, args: readonly string[]): string {
+  const bytes = readFileSync(program.binary);
+  if (bytes.length < 1 || bytes.length > 16 * 1024 * 1024
+    || sha(bytes) !== program.binarySha256)
+    throw new TypeError('native fallback executable digest mismatch');
+  const privateDirectory = mkdtempSync(join(tmpdir(), 'aether-native-fallback-run-'));
+  try {
+    const executable = join(privateDirectory, 'exact-native');
+    writeFileSync(executable, bytes, { flag: 'wx', mode: 0o700 });
+    const child = spawnSync(executable, [...args],
+      { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 5000 });
+    if (child.status !== 0) throw new Error(`checked native fallback failed (${child.status}): ${child.stderr}`);
+    return child.stdout.trim();
+  } finally { rmSync(privateDirectory, { recursive: true, force: true }); }
+}
 function reference(testCase: Case, changed?: Readonly<{ module: Term; manifest: ReturnType<typeof fallbackFixture>['options']['manifest'] }>) {
   const directory = mkdtempSync(join(tmpdir(), 'aether-native-fallback-reference-'));
   try {
@@ -61,6 +78,63 @@ function reference(testCase: Case, changed?: Readonly<{ module: Term; manifest: 
       left: Number(left.objectId), right: Number(right.objectId), nextObjectId: Number(snapshot.nextObjectId),
       records: snapshot.records.map(row => [Number(row.objectId), recordValue(row)]) };
   } finally { rmSync(directory, { recursive: true, force: true }); }
+}
+/** Exact projection of a real runtime snapshot into the bounded native frame.
+ * The native program receives values and aliases only after the complete
+ * manifest, object table and reference ownership have been checked here. */
+export function snapshotCaseArgs(snapshot: RuntimeSnapshotV1, manifestDigest: string,
+  left: LogicalRefV1, right: LogicalRefV1, grant2: boolean, revokeAtFault: boolean): string[] {
+  validateRuntimeSnapshot(snapshot);
+  if (snapshot.executionManifest !== manifestDigest) throw new TypeError('native fallback snapshot/manifest mismatch');
+  const nextId = Number(snapshot.nextObjectId);
+  // This exact compiler profile may allocate one new record after rollback.
+  // Reserve that slot before entering native code; otherwise a valid Aether
+  // invocation could succeed in the reference runtime but trap in Frame[4].
+  if (!Number.isSafeInteger(nextId) || nextId < 2 || nextId > 3
+    || snapshot.records.length !== nextId - 1 || snapshot.ownership.length !== nextId - 1)
+    throw new RangeError('native fallback snapshot exceeds bounded frame');
+  const ownership = new Map(snapshot.ownership.map(row => [row.objectId, row.epoch]));
+  const checkedRef = (ref: LogicalRefV1): string => {
+    if (ref.heapId !== snapshot.heapId || ownership.get(ref.objectId) !== ref.ownerEpoch
+      || !snapshot.records.some(row => row.objectId === ref.objectId))
+      throw new TypeError('native fallback reference ownership mismatch');
+    return ref.objectId;
+  };
+  const values = snapshot.records.map((row, index) => {
+    if (row.objectId !== String(index + 1) || row.fields.length !== 1
+      || row.fields[0][0] !== 'value' || row.fields[0][1].tag !== 'int')
+      throw new TypeError('native fallback requires contiguous one-field Int records');
+    const value = BigInt(row.fields[0][1].value);
+    if (value < -1_000_000n || value > 1_000_100n)
+      throw new RangeError('native fallback snapshot integer outside qualified range');
+    return String(value);
+  });
+  return ['--snapshot-case', String(nextId), checkedRef(left), checkedRef(right),
+    '1', String(Number(grant2)), String(Number(revokeAtFault)), ...values];
+}
+export function snapshotDifferential(programs: ReadonlyMap<Mode, BuiltProgram>,
+  testCases: readonly Case[] = cases) {
+  return testCases.map((testCase, index) => {
+    const program = programs.get(testCase.mode);
+    if (!program) throw new Error('native fallback mode binary missing');
+    const directory = mkdtempSync(join(tmpdir(), 'aether-native-fallback-snapshot-'));
+    try {
+      const f = fallbackFixture(directory, testCase.mode);
+      const left = f.runtime.allocateRecord(f.record,
+        { value: { tag: 'int', value: String(testCase.initial) } }, 'left');
+      const right = testCase.alias ? left : f.runtime.allocateRecord(f.record,
+        { value: { tag: 'int', value: String(testCase.initial + 100) } }, 'right');
+      const before = f.runtime.snapshot();
+      const args = snapshotCaseArgs(before, program.lowered.manifestDigest,
+        left, right, testCase.grant2, testCase.revokeAtFault);
+      const native = JSON.parse(runCheckedSnapshotProgram(program, args));
+      const expected = reference(testCase);
+      assert.deepEqual(native, expected,
+        `native snapshot case ${index}: ${JSON.stringify(testCase)}`);
+      return { index, input: testCase, beforeSnapshot: runtimeSnapshotDigest(before),
+        native, reference: expected };
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
 }
 export function buildProgram(directory: string, mode: Mode | 'edited', changed?: Readonly<{
   module: Term; manifest: ReturnType<typeof fallbackFixture>['options']['manifest'] }>): BuiltProgram {

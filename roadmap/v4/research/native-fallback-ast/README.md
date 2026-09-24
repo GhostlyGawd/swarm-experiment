@@ -23,3 +23,15 @@ node --experimental-strip-types roadmap/v4/research/native-fallback-ast/audit.ts
 ```
 
 The full T3-07 path still needs broader Aether values and effects, authenticated sink status, portable proof admission in native artifacts, exact ProcessHost state/recovery handoff and a timer/qualification method capable of supporting the unchanged in-frame 50 ns maximum.
+
+## Snapshot-fed native input
+
+The opt-in snapshot-case driver entry now consumes a projection of an actual RuntimeSnapshotV1 rather than constructing its own initial frame. The snapshot bridge checks the execution manifest, complete object table, logical-reference heap/epoch ownership, contiguous one-field Int records and a free allocation slot before passing object IDs, aliases and values to the native executable. The research runner hashes the binary and executes a private copy of those checked bytes. Fourteen real-snapshot differential cases match the reference fallback outcome, including aliases, rollback, permission denial and Tier 3 abort. Stale refs, malformed native frames, full frame capacity and changed executable bytes are refused.
+
+This remains a bounded research ABI. It is not a ProcessHost checkpoint lease or production state publication, and it does not add full Aether values/effects or a portable proof of the native Tier 2. The validated snapshot projection and checked executable are necessary handoff pieces, not T3-07 admission.
+
+## Clock qualification
+
+The reproducible [clock probe](clock-probe.c) samples 100,000 adjacent reads per clock on the target Mac. On the local Apple M4 Pro, mach_timebase_info reported 125/3 ns per tick. The uptime and monotonic raw nanosecond clocks mostly advanced in 41/42 ns steps; ordered CNTVCT_EL0 reported a nominal 1 GHz counter but also mostly advanced by 41/42 count units after zero deltas. [Apple's timing documentation](https://developer.apple.com/documentation/apple-silicon/addressing-architectural-differences-in-your-macos-code) requires applying the Mach timebase and points to the nanosecond clock API. [Arm's Generic Timer guide](https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/Generic%20Timer.pdf) explains counter update jumps and the ordering barrier for timestamp reads.
+
+The probe does not time a fallback switch. It shows why the prior one-tick observed switch maximum cannot prove a hard 50 ns limit: an interval recorded as one 41.667 ns tick can approach two ticks. PMCCNTR_EL0 trapped in a separate local probe, and this Mac currently lacks Xcode/Instruments. A controlled target with a demonstrably finer timing source and explicit scheduling profile is needed after the admitted native path exists. The old result remains inconclusive; no threshold changes.

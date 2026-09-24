@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
+#include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdint.h>
@@ -91,6 +92,57 @@ static Frame initial_frame(int64_t initial, uint32_t alias, uint32_t *left,
   if (fault) abort();
   return frame;
 }
+static void emit_case(const Frame *frame, Result result, uint32_t left,
+                      uint32_t right) {
+  printf("{\"tier\":%u,\"code\":%u,\"value\":%" PRId64
+         ",\"left\":%u,\"right\":%u,\"nextObjectId\":%u,\"records\":[",
+         result.tier, result.code, result.value, left, right, frame->next_id);
+  for (uint32_t id = 1; id < frame->next_id; id++)
+    printf("%s[%u,%" PRId64 "]", id == 1 ? "" : ",", id,
+           frame->records[id].value);
+  printf("]}\n");
+}
+static int parse_u32(const char *text, uint32_t *out) {
+  if (!text || !*text) return 0;
+  errno = 0; char *end = NULL;
+  unsigned long long value = strtoull(text, &end, 10);
+  if (errno || !end || *end || value > UINT32_MAX) return 0;
+  char canonical[32];
+  snprintf(canonical, sizeof(canonical), "%u", (uint32_t)value);
+  if (strcmp(text, canonical) != 0) return 0;
+  *out = (uint32_t)value; return 1;
+}
+static int parse_i64(const char *text, int64_t *out) {
+  if (!text || !*text) return 0;
+  errno = 0; char *end = NULL;
+  long long value = strtoll(text, &end, 10);
+  if (errno || !end || *end) return 0;
+  char canonical[32];
+  snprintf(canonical, sizeof(canonical), "%lld", value);
+  if (strcmp(text, canonical) != 0) return 0;
+  *out = (int64_t)value; return 1;
+}
+/* This mode consumes a validated real-runtime snapshot projection, rather
+ * than calling initial_frame(). The caller must separately check the full
+ * snapshot's manifest, ownership, reference epochs and canonical fields. */
+static int snapshot_case_main(int argc, char **argv) {
+  uint32_t next_id, left, right, grant1, grant2, revoke;
+  if (argc < 9 || !parse_u32(argv[2], &next_id) || next_id < 2 || next_id > 3
+      || argc != (int)(8 + next_id - 1)
+      || !parse_u32(argv[3], &left) || !parse_u32(argv[4], &right)
+      || !parse_u32(argv[5], &grant1) || !parse_u32(argv[6], &grant2)
+      || !parse_u32(argv[7], &revoke) || left < 1 || left >= next_id
+      || right < 1 || right >= next_id || grant1 > 1 || grant2 > 1
+      || revoke > 1) return 2;
+  Frame frame = {.next_id = next_id};
+  for (uint32_t id = 1; id < next_id; id++)
+    if (!parse_i64(argv[7 + id], &frame.records[id].value)) return 2;
+  uint64_t switch_ticks;
+  Result result = invoke(&frame, left, right, grant1, grant2, revoke,
+                         &switch_ticks);
+  emit_case(&frame, result, left, right);
+  return 0;
+}
 static int case_main(int argc, char **argv) {
   if (argc != 7) return 2;
   uint32_t alias = (uint32_t)strtoul(argv[2], NULL, 10);
@@ -105,13 +157,7 @@ static int case_main(int argc, char **argv) {
   uint64_t switch_ticks;
   Result result = invoke(&frame, left, right, grant1, grant2, revoke,
                          &switch_ticks);
-  printf("{\"tier\":%u,\"code\":%u,\"value\":%" PRId64
-         ",\"left\":%u,\"right\":%u,\"nextObjectId\":%u,\"records\":[",
-         result.tier, result.code, result.value, left, right, frame.next_id);
-  for (uint32_t id = 1; id < frame.next_id; id++)
-    printf("%s[%u,%" PRId64 "]", id == 1 ? "" : ",", id,
-           frame.records[id].value);
-  printf("]}\n");
+  emit_case(&frame, result, left, right);
   return 0;
 }
 static int benchmark_main(int argc, char **argv) {
@@ -166,6 +212,8 @@ static int benchmark_main(int argc, char **argv) {
 }
 int main(int argc, char **argv) {
   if (argc > 1 && strcmp(argv[1], "--case") == 0) return case_main(argc, argv);
+  if (argc > 1 && strcmp(argv[1], "--snapshot-case") == 0)
+    return snapshot_case_main(argc, argv);
   if (argc > 1 && strcmp(argv[1], "--benchmark") == 0)
     return benchmark_main(argc, argv);
   return 2;
