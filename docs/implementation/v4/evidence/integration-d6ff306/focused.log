@@ -1,0 +1,23 @@
+✔ controlled service close releases the Unix socket and durable service ticket (41.388625ms)
+✔ separate witness process authenticates bounded CAS and survives SIGKILL (4570.890542ms)
+✔ signed sink receipt reconciles a real postcommit controller SIGKILL without another external decision (2947.022708ms)
+✔ operator process commits exactly once and retains identical signed receipt after SIGKILL/restart (765.941042ms)
+✔ near-limit accepted payload retains a recoverable signed response after restart (433.741209ms)
+✔ status makes a durable signed noncommit fence that permanently refuses execute (395.909083ms)
+✔ lost wire response remains a committed decision; wrong auth and forged stored receipt fail closed (355.265041ms)
+✔ CLI refuses a group-readable signing key before opening the sink (92.358292ms)
+✔ separate sink witness restores deleted/older local state and fails closed on outage or equivocation (2909.95925ms)
+✔ sink witness binds operator, exact anchor and adapter; advances one signed decision per revision (12.234959ms)
+✔ sink witness rejects stale writers, rollback and same-revision equivocation (4.612ms)
+✔ sink witness adopts an existing matching head but rejects a changed anchor or adapter at startup (2.280458ms)
+✔ sink witness refuses changed identity, wrong revision/count, invalid rows and noncanonical bytes before CAS (6.988334ms)
+✔ sink witness rejects repeated effect, decision and commit identities (5.177333ms)
+✔ sink witness rejects false CAS success and missing post-CAS retention (2.207375ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4741.995583
