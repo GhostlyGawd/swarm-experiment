@@ -38,7 +38,12 @@ candidate and generated plan on both workers.
 
 The broken variant changes the Aether update declaration and therefore has a
 different signed root. It finds four lost-update interleavings and persists
-shrunk witnesses; a reopened executor replays each failure. Separate regression
+shrunk witnesses; the four records contain eight shrink proposal executions and
+four accepted reductions, with no shrink limit exhausted. The timed run also
+replays both original and shrunk witnesses for all four failures (eight further
+executions). The broken rate uses only the 15 declared original cases as its
+numerator while including shrink and replay work in elapsed time. A reopened
+executor replays each failure again during verification. Separate regression
 tests show unknown post-sink disposition, forged case identity, tampered sink
 bytes and a legacy `/2` crash-mode substitution fail closed.
 
