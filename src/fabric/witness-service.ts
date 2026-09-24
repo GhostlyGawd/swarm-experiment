@@ -171,7 +171,7 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
   const value = parse(bytes);
   const record = value as Record<string, unknown>;
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw new TypeError('invalid witness journal');
-  const expectedFormat = id.kind === 'effect' ? ['aether.effect-journal/2', 'aether.effect-journal/3']
+  const expectedFormat = id.kind === 'effect' ? ['aether.effect-journal/2', 'aether.effect-journal/3', 'aether.effect-journal/4']
     : id.kind === 'host' ? 'aether.process-host/4'
       : id.kind === 'sink' ? 'aether.attested-sink-state/2' : 'aether.process-deployment/9';
   // The service owns transport, identity, CAS and durable custody. Runtime
@@ -183,13 +183,15 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
     const body = { format: 'aether.effect-journal-witness/2', ...parts };
     if (record.revision !== revision || record.witnessDigest !== domainDigest(body.format, body)
       || record.clockDomain !== id.clockDomain) throw new TypeError('effect journal witness binding mismatch');
-    if (record.format === 'aether.effect-journal/3') {
+    if (record.format === 'aether.effect-journal/3' || record.format === 'aether.effect-journal/4') {
       identifier(record.deploymentId);
       validateDigest(record.approvedAdapterArtifactDigest);
       validateSinkPublicAnchor(record.sinkAnchor);
       if (record.deploymentId !== id.catalogDeploymentId
         || (record.sinkAnchor as { repositoryId: string }).repositoryId !== id.repositoryId)
         throw new TypeError('attested effect journal identity mismatch');
+      if (record.format === 'aether.effect-journal/4')
+        validateDigest(record.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
     }
   }
   if (id.kind === 'deployment') {
@@ -242,11 +244,14 @@ function validateRetention(id: WitnessIdentity, priorBytes: string | null, nextB
       || !graph[oldState]?.includes(newState)) throw new Error('witnessed operation state regressed');
   };
   if (id.kind === 'effect') {
-    if (prior.format === 'aether.effect-journal/3'
+    if ((prior.format === 'aether.effect-journal/3' || prior.format === 'aether.effect-journal/4')
       && (!same(prior.sinkAnchor, next.sinkAnchor)
         || !same(prior.deploymentId, next.deploymentId)
         || !same(prior.approvedAdapterArtifactDigest, next.approvedAdapterArtifactDigest)))
       throw new Error('witnessed sink authority or artifact changed');
+    if (prior.format === 'aether.effect-journal/4'
+      && !same(prior.sinkStateWitnessDigest, next.sinkStateWitnessDigest))
+      throw new Error('witnessed sink decision authority changed');
     prefix('records', (oldRow, newRow) => {
       fixed(oldRow, newRow, ['sequence', 'requestDigest', 'adapterId', 'adapterSemanticsDigest']);
       forward(oldRow.state, newRow.state, {

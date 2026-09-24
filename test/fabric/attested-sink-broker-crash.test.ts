@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { encodeCanonical } from '../../src/fabric/encoding.ts';
@@ -12,6 +12,7 @@ import { createAttestedSinkClient } from '../../src/fabric/attested-sink-service
 import { verifySinkReceipt, type SinkPublicAnchorV1 } from '../../src/fabric/sink-receipt.ts';
 import { createProcessWitnessClient } from '../../src/fabric/witness-service.ts';
 import { readWitnessHead, selectEffectJournalWitness } from '../../src/fabric/effect-journal-witness.ts';
+import { readSinkStateHead } from '../../src/fabric/sink-state-witness.ts';
 
 const root = resolve(import.meta.dirname, '../..');
 const sourceUrl = (path: string) => JSON.stringify(new URL(path, import.meta.url).href);
@@ -55,6 +56,10 @@ const witness = createProcessWitnessClient({ socketPath: f.witnessSocket,
 const catalog = witness.effectCatalog({ authorityId: 'witness-operator', repositoryId: f.repositoryId,
   deploymentId: f.deploymentId, clockDomain: f.clockDomain });
 const head = selectEffectJournalWitness(catalog, 'attested-broker-head');
+const sinkWitness = f.witnessed ? createProcessWitnessClient({ socketPath: f.sinkWitnessSocket,
+  key: readFileSync(f.sinkWitnessKeyFile), timeoutMs: 10000 }).sinkStateWitness({
+    authorityId: 'sink-witness-operator', anchor: f.anchor,
+    adapterArtifactDigest: f.adapterArtifactDigest }) : null;
 const client = createAttestedSinkClient({ socketPath: f.sinkSocket, authKey: readFileSync(f.sinkAuthKeyFile),
   anchor: f.anchor, adapterArtifactDigest: f.adapterArtifactDigest,
   repositoryId: f.repositoryId, deploymentId: f.deploymentId, timeoutMs: 10000 });
@@ -63,9 +68,19 @@ const adapter = createAttestedSinkAdapter({ id: 'adapter:attested_sink', client,
   approvedAdapterArtifactDigest: f.adapterArtifactDigest, anchor: f.anchor });
 const broker = new DurableEffectBroker({ directory: f.brokerDirectory, clockDomain: f.clockDomain,
   clock: () => 100n, authorize: () => true, authorizeReconciliation: () => true, witness: head,
-  attestedSink: { anchor: f.anchor, deploymentId: f.deploymentId,
-    approvedAdapterArtifactDigest: f.adapterArtifactDigest },
+  ...(sinkWitness && mode !== 'legacy' ? { attestedSinkV4: { anchor: f.anchor, deploymentId: f.deploymentId,
+    approvedAdapterArtifactDigest: f.adapterArtifactDigest, sinkStateWitness: sinkWitness } }
+    : { attestedSink: { anchor: f.anchor, deploymentId: f.deploymentId,
+      approvedAdapterArtifactDigest: f.adapterArtifactDigest } }),
   beforePersist: event => { if (mode === 'crash' && event.state === 'committed') process.kill(process.pid, 'SIGKILL'); } });
+if (mode === 'legacy') throw new Error('V4 journal was silently opened under V3 authority');
+if (mode === 'head-outage') {
+  process.kill(f.sinkWitnessPid, 'SIGKILL');
+  await new Promise(resolve => setTimeout(resolve, 150));
+  assert.throws(() => broker.inspectRecorded(f.request, adapter), /witness|sink decision/i);
+  process.stdout.write('sink head outage refused cached success\\n');
+  process.exit(0);
+}
 if (mode === 'crash') {
   broker.dispatch(f.request, adapter);
   throw new Error('expected controller SIGKILL after sink commit before broker terminal publication');
@@ -91,18 +106,25 @@ process.stdout.write(JSON.stringify({ reconciled, cached }) + '\\n');
 `;
 }
 
-test('signed sink receipt reconciles a real postcommit controller SIGKILL without another external decision', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'aether-attested-broker-'));
-  let witnessService: ChildProcess | undefined, sinkService: ChildProcess | undefined;
+for (const witnessed of [false, true] as const) test(
+  witnessed ? 'V4 broker requires independent sink head across real postcommit controller SIGKILL and replay'
+    : 'signed sink receipt reconciles a real postcommit controller SIGKILL without another external decision', async () => {
+  const directory = mkdtempSync(join(tmpdir(), witnessed ? 'aether-witnessed-broker-' : 'aether-attested-broker-'));
+  let witnessService: ChildProcess | undefined, sinkService: ChildProcess | undefined,
+    sinkWitnessService: ChildProcess | undefined;
   try {
     const repositoryId = 'attested-repository', deploymentId = 'attested-deployment',
       clockDomain = 'attested-clock/1';
     const witnessSocket = join(directory, 'w.sock'), sinkSocket = join(directory, 's.sock');
+    const sinkWitnessSocket = join(directory, 'sw.sock');
     const witnessKeyFile = join(directory, 'w.key'), sinkAuthKeyFile = join(directory, 's.key');
+    const sinkWitnessKeyFile = join(directory, 'sw.key');
     const sinkSignerFile = join(directory, 's.pem'), witnessConfig = join(directory, 'w.json'),
       sinkConfig = join(directory, 's.json');
+    const sinkWitnessConfig = join(directory, 'sw.json');
     writeFileSync(witnessKeyFile, randomBytes(32), { mode: 0o600 });
     writeFileSync(sinkAuthKeyFile, randomBytes(32), { mode: 0o600 });
+    if (witnessed) writeFileSync(sinkWitnessKeyFile, randomBytes(32), { mode: 0o600 });
     const keys = generateKeyPairSync('ed25519');
     writeFileSync(sinkSignerFile, keys.privateKey.export({ format: 'pem', type: 'pkcs8' }), { mode: 0o600 });
     const anchor: SinkPublicAnchorV1 = { format: 'aether.sink-anchor/1', repositoryId,
@@ -113,10 +135,22 @@ test('signed sink receipt reconciles a real postcommit controller SIGKILL withou
       storageDir: join(directory, 'witness-store'), keyFile: witnessKeyFile,
       namespaces: [{ kind: 'effect-scope', authorityId: 'witness-operator', repositoryId,
         catalogDeploymentId: deploymentId, clockDomain }] }), { mode: 0o600 });
-    writeFileSync(sinkConfig, encodeCanonical({ socketPath: sinkSocket,
-      storageDir: join(directory, 'sink-store'), authKeyFile: sinkAuthKeyFile,
-      signingKeyFile: sinkSignerFile, anchor, adapterArtifactDigest }), { mode: 0o600 });
+    if (witnessed) writeFileSync(sinkWitnessConfig, encodeCanonical({ socketPath: sinkWitnessSocket,
+      storageDir: join(directory, 'sink-witness-store'), keyFile: sinkWitnessKeyFile,
+      namespaces: [{ kind: 'sink-scope', authorityId: 'sink-witness-operator', anchor,
+        adapterArtifactDigest }] }), { mode: 0o600 });
+    writeFileSync(sinkConfig, encodeCanonical(witnessed
+      ? { format: 'aether.attested-sink-config/2', socketPath: sinkSocket,
+        storageDir: join(directory, 'sink-store'), authKeyFile: sinkAuthKeyFile,
+        signingKeyFile: sinkSignerFile, anchor, adapterArtifactDigest,
+        witnessSocketPath: sinkWitnessSocket, witnessKeyFile: sinkWitnessKeyFile,
+        witnessAuthorityId: 'sink-witness-operator' }
+      : { socketPath: sinkSocket, storageDir: join(directory, 'sink-store'),
+        authKeyFile: sinkAuthKeyFile, signingKeyFile: sinkSignerFile, anchor,
+        adapterArtifactDigest }), { mode: 0o600 });
     witnessService = await launch('src/fabric/witness-service-cli.ts', witnessConfig, 'witness service ready');
+    if (witnessed) sinkWitnessService = await launch('src/fabric/witness-service-cli.ts',
+      sinkWitnessConfig, 'witness service ready');
     sinkService = await launch('src/fabric/attested-sink-service-cli.ts', sinkConfig, 'attested sink service ready');
     const payload = { tag: 'sequence' as const,
       items: [{ tag: 'string' as const, value: 'append-once' }, { tag: 'int' as const, value: '7' }] };
@@ -126,7 +160,8 @@ test('signed sink receipt reconciles a real postcommit controller SIGKILL withou
       payloadDigest: effectPayloadDigest(payload), budgetReservationId: null, deadline: '1000' };
     const fixtureFile = join(directory, 'controller.json'), controllerFile = join(directory, 'controller.ts');
     writeFileSync(fixtureFile, encodeCanonical({ repositoryId, deploymentId, clockDomain, witnessSocket,
-      sinkSocket, witnessKeyFile, sinkAuthKeyFile, anchor, adapterArtifactDigest,
+      sinkSocket, witnessKeyFile, sinkAuthKeyFile, sinkWitnessSocket, sinkWitnessKeyFile,
+      sinkWitnessPid: sinkWitnessService?.pid ?? 0, witnessed, anchor, adapterArtifactDigest,
       brokerDirectory: join(directory, 'broker'), request }), { mode: 0o600 });
     writeFileSync(controllerFile, controllerSource(fixtureFile));
     const run = (mode: string) => spawnSync(process.execPath,
@@ -143,6 +178,17 @@ test('signed sink receipt reconciles a real postcommit controller SIGKILL withou
     assert.equal(verifySinkReceipt(committed.receipt, anchor, { repositoryId, deploymentId, request,
       sinkAuthorityId: anchor.sinkAuthorityId, sinkId: anchor.sinkId,
       adapterArtifactDigest, disposition: 'committed', value: committed.value }), true);
+    if (witnessed) {
+      const sinkWitness = createProcessWitnessClient({ socketPath: sinkWitnessSocket,
+        key: readFileSync(sinkWitnessKeyFile), timeoutMs: 10_000 }).sinkStateWitness({
+          authorityId: 'sink-witness-operator', anchor, adapterArtifactDigest });
+      const decisionHead = readSinkStateHead(sinkWitness);
+      assert.equal(decisionHead.revision, '1');
+      assert.equal(canonical(JSON.parse(decisionHead.journal!).decisions[0].receipt), canonical(committed.receipt));
+      await kill(sinkService); sinkService = undefined;
+      unlinkSync(join(directory, 'sink-store', 'sink-state-v2.json'));
+      sinkService = await launch('src/fabric/attested-sink-service-cli.ts', sinkConfig, 'attested sink service ready');
+    }
     const operator = createProcessWitnessClient({ socketPath: witnessSocket,
       key: readFileSync(witnessKeyFile), timeoutMs: 10_000 });
     const witness = selectEffectJournalWitness(operator.effectCatalog({ authorityId: 'witness-operator',
@@ -161,7 +207,17 @@ test('signed sink receipt reconciles a real postcommit controller SIGKILL withou
     const after = readWitnessHead(witness), terminal = JSON.parse(after.journal!).records[0];
     assert.equal(terminal.state, 'committed');
     assert.equal(canonical(terminal.signedSinkReceipt), canonical(committed.receipt));
-    const sinkState = JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state.json'), 'utf8'));
+    if (witnessed) {
+      const legacy = run('legacy');
+      assert.notEqual(legacy.status, 0, 'V3 must refuse a V4 broker journal');
+      assert.match(legacy.stderr, /V4 attested effect journal requires its original authority/);
+      const unavailable = run('head-outage');
+      assert.equal(unavailable.status, 0, unavailable.stderr || unavailable.error?.message);
+      await kill(sinkWitnessService!); sinkWitnessService = undefined;
+      sinkWitnessService = await launch('src/fabric/witness-service-cli.ts', sinkWitnessConfig, 'witness service ready');
+    }
+    const sinkState = JSON.parse(readFileSync(join(directory, 'sink-store',
+      witnessed ? 'sink-state-v2.json' : 'sink-state.json'), 'utf8'));
     assert.equal(sinkState.decisions.length, 1);
     assert.equal(canonical(sinkState.decisions[0].receipt), canonical(committed.receipt));
 
@@ -183,11 +239,13 @@ test('signed sink receipt reconciles a real postcommit controller SIGKILL withou
     assert.equal(afterFence.records.length, 2);
     assert.equal(afterFence.records[1].state, 'aborted');
     assert.equal(canonical(afterFence.records[1].signedSinkReceipt), canonical(fence.receipt));
-    const finalSinkState = JSON.parse(readFileSync(join(directory, 'sink-store', 'sink-state.json'), 'utf8'));
+    const finalSinkState = JSON.parse(readFileSync(join(directory, 'sink-store',
+      witnessed ? 'sink-state-v2.json' : 'sink-state.json'), 'utf8'));
     assert.equal(finalSinkState.decisions.length, 2);
     assert.equal(finalSinkState.decisions[1].receipt.body.disposition, 'not_committed');
   } finally {
     if (sinkService) await kill(sinkService); if (witnessService) await kill(witnessService);
+    if (sinkWitnessService) await kill(sinkWitnessService);
     rmSync(directory, { recursive: true, force: true });
   }
 });
