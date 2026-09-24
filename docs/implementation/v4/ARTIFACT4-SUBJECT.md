@@ -91,6 +91,10 @@ deployment witness publishes the candidate as ready. `open()` first asks the
 governor to reconcile an interrupted decision; a precommit death aborts the
 prepared candidate, while a postcommit death finishes activation. The
 candidate host and deployment journal are separate witnessed domains.
+The serving gate asks the strict governor to recheck current signed lineage
+for the active manifest on token issuance, call, snapshot and recovery. A
+superseding signed source specification after open refuses these operations
+before a host call intent and prevents reopening under the stale artifact.
 
 Every call writes a deployment-wide operation ID before host dispatch. A
 completed call is retained in the witnessed journal and checked against the

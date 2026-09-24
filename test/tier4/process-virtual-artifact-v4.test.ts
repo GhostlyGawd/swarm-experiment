@@ -817,6 +817,60 @@ test('pure Artifact/4 governor deployment promotes a real host and pins same-ID 
   } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
 });
 
+test('pure Artifact/4 deployment refuses superseded source spec before any call intent', async () => {
+  const f = fixture(manifest), artifact = f.artifact!;
+  const sourceManifest = executionManifestDigest(artifact.sourceEvidence.manifest);
+  const governorKeys = generateKeyPairSync('ed25519');
+  const coordinator = new PromotionCoordinator({ profile: 'strict-lineage-v1',
+    directory: join(f.directory, 'governor'), repositoryId: f.trust.repositoryId,
+    genesisManifest: sourceManifest,
+    authority: () => ({ repositoryId: f.trust.repositoryId,
+      membershipEpoch: '1', policyEpoch: '0', eligibleGovernors: ['governor'] }),
+    governorKey: () => governorKeys.publicKey, clock: () => 100n,
+    lineage: f.lineage.admissionAdapter() });
+  let deploymentHead: { revision: string; journal: string | null } = {
+    revision: '0', journal: null };
+  const namespace = { authorityId: 'operator', repositoryId: f.trust.repositoryId,
+    deploymentId: 'superseded-source' };
+  const deploymentWitness = createPureVirtualDeploymentWitnessV1({ ...namespace,
+    read: () => deploymentHead, advance: (expected, journal) => {
+      if (deploymentHead.revision !== expected) throw new Error('deployment CAS conflict');
+      deploymentHead = { revision: String(BigInt(expected) + 1n), journal };
+      return deploymentHead;
+    } });
+  const hostCatalog = createHostJournalWitnessCatalog({ ...namespace,
+    witnessFor: () => { throw new Error('candidate witness must not be selected'); } });
+  const candidatePlan = hostOptions(f).plan;
+  const sourcePlan: TopologyPlan = { ...candidatePlan,
+    units: [{ ...candidatePlan.units[0], members: f.source.members
+      .filter(member => member.kind === 'FunctionDecl').map(member => member.symbol) }] };
+  const options = { directory: join(f.directory, 'virtual-deployment'), coordinator,
+    artifact, trust: f.trust, sourcePlan, candidatePlan,
+    sealer: new CapabilitySealer(new Uint8Array(32).fill(7), () => 100),
+    hostWitnessCatalog: hostCatalog, deploymentWitness, authorizeRecovery: () => true };
+  let deployment: PureVirtualProcessDeployment | undefined;
+  try {
+    deployment = await PureVirtualProcessDeployment.open(options);
+    const tokens = await deployment.issueTokens(f.entry);
+    f.lineage.publishSpec(signSpecRevision({ repositoryId: f.trust.repositoryId,
+      id: 'behavior', revision: 2, previous: f.revision, parents: [],
+      text: 'Superseded active source promise.', requirements: [], author: 'author',
+      policyEpoch: '0', nonce: 'source-superseded-after-open' }, f.keys.privateKey));
+    const denied = /strict lineage|InvalidatedSpec|stale|current/i;
+    await assert.rejects(deployment.issueTokens(f.entry), denied);
+    await assert.rejects(deployment.call(f.entry, [{ tag: 'int', value: '3' }],
+      { operationId: 'stale-source-call', tokens }), denied);
+    await assert.rejects(deployment.snapshot(), denied);
+    await assert.rejects(deployment.recoverOperation('stale-source-call'), denied);
+    const hostJournal = JSON.parse(readFileSync(join(options.directory,
+      'source-host', 'host.json'), 'utf8'));
+    assert.equal(hostJournal.calls.length, 0);
+    assert.equal((JSON.parse(deploymentHead.journal!) as { invocations: unknown[] }).invocations.length, 0);
+    await deployment.close(); deployment = undefined;
+    await assert.rejects(PureVirtualProcessDeployment.open(options), denied);
+  } finally { await deployment?.close(); rmSync(f.directory, { recursive: true, force: true }); }
+});
+
 for (const crashPhase of ['prepared', 'before-activation'] as const) {
   test(`pure Artifact/4 deployment reconciles real controller SIGKILL at ${crashPhase}`, async () => {
     const f = fixture(manifest), artifact = f.artifact!;
