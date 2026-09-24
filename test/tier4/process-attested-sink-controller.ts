@@ -47,16 +47,20 @@ interface Fixture {
   readonly governorKeyFile: string;
   readonly resourceScoped?: boolean;
   readonly revoked?: boolean;
+  readonly targetRevoked?: boolean;
+  readonly broadTargetGrant?: boolean;
 }
 
 const fixture = JSON.parse(readFileSync(process.argv[2]!, 'utf8')) as Fixture;
 const mode = process.argv[3];
 assert.ok(['crash', 'recover', 'crash-pre-sink', 'recover-abort',
-  'crash-before-sink-entry', 'recover-fenced', 'recover-revoked'].includes(mode ?? ''));
+  'crash-before-sink-entry', 'recover-fenced', 'recover-revoked',
+  'recover-target-revoked-fence', 'probe-abort-before-fence'].includes(mode ?? ''));
 const f = fixture;
 const resourceScoped = f.resourceScoped === true;
 const operationId = resourceScoped ? 'v11-resource-crash' : 'v10-crash';
 const target = resourceScoped ? 'alice' : 'append-once';
+const alicePath = (path: readonly string[]) => path.slice(-2).join('/') === 'account/alice';
 const symbols = new SymbolSpace('attested-sink-controller-crash');
 const entry = symbols.define('entry'), valueSymbol = symbols.define('value');
 const CAP = capability('cap:test:attested_sink_controller_crash');
@@ -125,9 +129,12 @@ const clock = createTrustedClockAnchor({ authorityId: 'clock:operator',
   clockDomain: f.clockDomain, nowMs: () => 100, revision: () => '0' });
 const grants = new ScopedGrantAuthority({ key: readFileSync(f.grantKeyFile),
   repositoryId: f.repositoryId, clock: () => 100, policyEpoch: () => '0',
-  revocationEpoch: () => f.revoked === true ? '1' : '0',
-  isRevoked: () => f.revoked === true,
-  authorizeIssue: () => f.revoked !== true,
+  revocationEpoch: (cap, path) => f.revoked === true
+    || f.targetRevoked === true && cap === CAP && alicePath(path) ? '1' : '0',
+  isRevoked: (cap, path) => f.revoked === true
+    || f.targetRevoked === true && cap === CAP && alicePath(path),
+  authorizeIssue: request => f.revoked !== true
+    && !(f.targetRevoked === true && request.capability === CAP && alicePath(request.path)),
   authorizeDelegate: () => f.revoked !== true });
 const sealer = new CapabilitySealer(readFileSync(f.sealerKeyFile), () => 100);
 const coordinator = new PromotionCoordinator({ profile: 'baseline-governor-v1',
@@ -173,7 +180,7 @@ let deployment: ProcessDeployment | null = null;
 try {
   deployment = await ProcessDeployment.open(options);
   const tokens = () => deployment!.issueScopedTokens(entry, 60_000,
-    new Map([[CAP, resourceScoped ? ['account', 'alice'] : ['sink']]]));
+    new Map([[CAP, resourceScoped ? f.broadTargetGrant ? ['account'] : ['account', 'alice'] : ['sink']]]));
   if (['crash', 'crash-pre-sink', 'crash-before-sink-entry'].includes(mode ?? '')) {
     process.stdout.write(JSON.stringify({ event: 'worker-ready', controllerPid: process.pid,
       workerPids: deployment.status().workerPids }) + '\n');
@@ -181,7 +188,11 @@ try {
       { operationId, tokens: tokens() });
     throw new Error('expected controller SIGKILL at the selected effect boundary');
   }
-  if (mode === 'recover-abort') {
+  if (mode === 'probe-abort-before-fence') {
+    await assert.rejects(deployment.recoverOperation(operationId,
+      { strategy: 'abort-before-effects' }), /cannot abort committed or indeterminate external effects/);
+    process.stdout.write(JSON.stringify({ pid: process.pid, abortDenied: true }) + '\n');
+  } else if (mode === 'recover-abort') {
     const recovered = await deployment.recoverOperation(operationId,
       { strategy: 'abort-before-effects' });
     assert.equal(recovered.state, 'aborted', JSON.stringify(recovered));
@@ -209,6 +220,28 @@ try {
       { operationId, tokens: tokens() });
     assert.deepEqual(cached, recovered);
     process.stdout.write(JSON.stringify({ pid: process.pid, recovered, cached }) + '\n');
+  } else if (mode === 'recover-target-revoked-fence') {
+    assert.equal(resourceScoped, true);
+    assert.equal(f.targetRevoked, true);
+    await assert.rejects(deployment.recoverOperation(operationId,
+      { strategy: 'abort-before-effects' }), /cannot abort committed or indeterminate external effects/);
+    const recovered = await deployment.recoverOperation(operationId, { strategy: 'isolated-replay' });
+    assert.equal(recovered.state, 'completed', JSON.stringify(recovered));
+    assert.equal(recovered.execution.ok, false);
+    const currentTokens = tokens();
+    const effectGrant = currentTokens.find(token => token.body.capability === CAP)!;
+    assert.ok(effectGrant, 'the current broad grant must exist');
+    assert.deepEqual(effectGrant.body.path.slice(-1), ['account']);
+    assert.equal(grants.verify(effectGrant, { capability: CAP, audience: entry,
+      path: effectGrant.body.path }), true, 'the broad grant is valid at invocation');
+    assert.equal(grants.verify(effectGrant, { capability: CAP, audience: entry,
+      path: [...effectGrant.body.path, 'alice'] }), false,
+    'Alice was revoked after the crash even though the broad grant remains valid');
+    await assert.rejects(deployment.call(entry, [{ tag: 'string', value: target }],
+      { operationId, tokens: currentTokens }), /authority_denied: cached effect target/,
+    'the retained Alice target must be checked before a cached outcome is served');
+    process.stdout.write(JSON.stringify({ pid: process.pid, recovered,
+      targetRevoked: true, cachedDenied: true }) + '\n');
   } else {
     await assert.rejects(deployment.recoverOperation(operationId,
       { strategy: 'abort-before-effects' }), /cannot abort committed or indeterminate external effects/);

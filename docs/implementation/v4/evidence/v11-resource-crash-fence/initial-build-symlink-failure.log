@@ -1,0 +1,18 @@
+
+> @ghostlygawd/aether@0.1.0 build
+> tsc -p tsconfig.json && node scripts/copy-native-fallback-driver.mjs && node --experimental-strip-types scripts/process-worker-bundle.ts build
+
+file:///private/tmp/aether-v11-crash-fence/scripts/process-worker-bundle.ts:34
+    throw new TypeError(`executable input escaped project root: ${path}`);
+          ^
+
+TypeError: executable input escaped project root: /Users/rhenmcleod/Repositories/swarm-experiment/node_modules/base64-js/index.js
+    at withinRoot (file:///private/tmp/aether-v11-crash-fence/scripts/process-worker-bundle.ts:34:11)
+    at assertClosedImportGraph (file:///private/tmp/aether-v11-crash-fence/scripts/process-worker-bundle.ts:66:24)
+    at compileWorker (file:///private/tmp/aether-v11-crash-fence/scripts/process-worker-bundle.ts:136:20)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async expectedManifest (file:///private/tmp/aether-v11-crash-fence/scripts/process-worker-bundle.ts:144:20)
+    at async writeWorkerBundle (file:///private/tmp/aether-v11-crash-fence/scripts/process-worker-bundle.ts:173:34)
+    at async file:///private/tmp/aether-v11-crash-fence/scripts/process-worker-bundle.ts:194:7
+
+Node.js v26.7.0

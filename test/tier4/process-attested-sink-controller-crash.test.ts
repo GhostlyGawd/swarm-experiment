@@ -42,10 +42,17 @@ async function kill(child: ChildProcess | undefined): Promise<void> {
 // This exercises the service boundary under one UID; separate-user custody is a
 // distinct acceptance gate.
 for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-postcommit',
-  'v11-revoked-postcommit'] as const) test(
+  'v11-revoked-postcommit', 'v11-resource-pre-sink', 'v11-resource-signed-fence',
+  'v11-target-revoked-fence'] as const) test(
   `${scenario.startsWith('v11-') ? 'V11' : 'V10'} Deployment ${scenario} recovery across real controller SIGKILL`, async t => {
-  const resourceScoped = scenario === 'v11-resource-postcommit' || scenario === 'v11-revoked-postcommit';
+  const resourceScoped = scenario.startsWith('v11-');
   const revokedRecovery = scenario === 'v11-revoked-postcommit';
+  const targetRevokedRecovery = scenario === 'v11-target-revoked-fence';
+  const postcommit = scenario === 'postcommit' || scenario === 'v11-resource-postcommit'
+    || revokedRecovery;
+  const preSink = scenario === 'pre-sink' || scenario === 'v11-resource-pre-sink';
+  const signedFence = scenario === 'signed-fence' || scenario === 'v11-resource-signed-fence'
+    || targetRevokedRecovery;
   const operationId = resourceScoped ? 'v11-resource-crash' : 'v10-crash';
   const target = resourceScoped ? 'alice' : 'append-once';
   const directory = mkdtempSync(join(tmpdir(), 'aether-v10-crash-'));
@@ -102,15 +109,17 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-
     writeFileSync(fixtureFile, encodeCanonical({ directory, repositoryId, deploymentId, clockDomain,
       anchor, adapterArtifactDigest, sinkSocket, sinkAuthKeyFile, sinkWitnessSocket,
       sinkWitnessKeyFile, operatorSocket, operatorKeyFile, policySignerKeyFile,
-      grantKeyFile, sealerKeyFile, governorKeyFile, resourceScoped }), { mode: 0o600 });
+      grantKeyFile, sealerKeyFile, governorKeyFile, resourceScoped,
+      broadTargetGrant: targetRevokedRecovery }), { mode: 0o600 });
     const controllerFile = join(root, 'test/tier4/process-attested-sink-controller.ts');
     const run = (mode: 'crash' | 'recover' | 'crash-pre-sink' | 'recover-abort'
-      | 'crash-before-sink-entry' | 'recover-fenced' | 'recover-revoked') => spawnSync(process.execPath,
+      | 'crash-before-sink-entry' | 'recover-fenced' | 'recover-revoked'
+      | 'recover-target-revoked-fence' | 'probe-abort-before-fence') => spawnSync(process.execPath,
       ['--experimental-strip-types', controllerFile, fixtureFile, mode],
       { cwd: root, encoding: 'utf8', timeout: 90_000,
         env: { PATH: process.env.PATH ?? '', NODE_NO_WARNINGS: '1' } });
-    const crashed = run(scenario === 'postcommit' || resourceScoped ? 'crash'
-      : scenario === 'pre-sink' ? 'crash-pre-sink' : 'crash-before-sink-entry');
+    const crashed = run(postcommit ? 'crash'
+      : preSink ? 'crash-pre-sink' : 'crash-before-sink-entry');
     assert.equal(crashed.signal, 'SIGKILL', crashed.stderr || crashed.error?.message);
     const ready = JSON.parse(crashed.stdout.trim().split('\n').find(line => line.includes('worker-ready'))!);
     const workerPids = Object.values(ready.workerPids) as number[];
@@ -121,8 +130,8 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-
       key: readFileSync(sinkWitnessKeyFile), timeoutMs: 10_000 }).sinkStateWitness({
         authorityId: 'operator:sink', anchor, adapterArtifactDigest });
     let sinkHeadBefore = readSinkStateHead(sinkWitness);
-    assert.equal(sinkHeadBefore.revision, scenario === 'postcommit' || resourceScoped ? '1' : '0');
-    if (scenario === 'postcommit' || resourceScoped) {
+    assert.equal(sinkHeadBefore.revision, postcommit ? '1' : '0');
+    if (postcommit) {
       const sinkJournalBefore = JSON.parse(sinkHeadBefore.journal!);
       assert.equal(sinkJournalBefore.decisions.length, 1);
       assert.equal(sinkJournalBefore.decisions[0].receipt.body.disposition, 'committed');
@@ -135,10 +144,16 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-
       'genesis', 'host', 'host.json'), 'utf8'));
     const hostCall = hostJournal.calls.find((row: { operationId: string }) => row.operationId === operationId);
     const hostEffect = hostCall.effects[0];
+    if (resourceScoped) {
+      assert.equal(hostJournal.configuration.split(':')[0], 'aether.process-host-config/9');
+      assert.equal(hostCall.args[0].value, target, 'the host retained the exact target argument');
+      assert.equal(hostEffect.args[0].value, target,
+        'the effect row retained the selected resource argument even before broker dispatch');
+    }
     const effectId = hostEffect.id as string;
     const effectWitness = selectEffectJournalWitness(effectCatalog, effectId);
     const effectHeadBefore = readWitnessHead(effectWitness);
-    if (scenario === 'pre-sink') {
+    if (preSink) {
       assert.equal(hostEffect.state, 'requested');
       assert.equal(effectHeadBefore.revision, '0', 'broker dispatch never began');
       assert.equal(effectHeadBefore.journal, null);
@@ -147,8 +162,6 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-
       assert.equal(event.state, 'prepared');
       assert.equal(event.dispatchStarted, true);
       if (resourceScoped) {
-        assert.equal(hostJournal.configuration.split(':')[0], 'aether.process-host-config/9');
-        assert.equal(hostCall.args[0].value, target, 'the host retained the exact target argument');
         assert.equal(event.request.capabilityGrantRef,
           domainDigest('aether.process-effect-grant-ref/2', {
             configuration: hostJournal.configuration, operationId: effectId,
@@ -161,7 +174,14 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-
           }), 'the signed request binds the selected Alice resource path');
         assert.match(event.request.capabilityGrantRef, /^aether\.process-effect-grant-ref\/2:b3:/);
       }
-      if (scenario === 'signed-fence') {
+      if (signedFence) {
+        const probe = run('probe-abort-before-fence');
+        assert.equal(probe.status, 0, probe.stderr || probe.error?.message);
+        assert.equal(JSON.parse(probe.stdout.trim().split('\n').at(-1)!).abortDenied, true);
+        assert.deepEqual(readSinkStateHead(sinkWitness), sinkHeadBefore,
+          'the failed abort must not create a sink decision before status establishes a fence');
+        assert.deepEqual(readWitnessHead(effectWitness), effectHeadBefore,
+          'the failed abort must not change the witnessed broker preparation');
         const request = event.request as EffectRequestV1;
         const sinkClient = createAttestedSinkClient({ socketPath: sinkSocket,
           authKey: readFileSync(sinkAuthKeyFile), anchor, adapterArtifactDigest,
@@ -181,32 +201,41 @@ for (const scenario of ['postcommit', 'pre-sink', 'signed-fence', 'v11-resource-
         assert.equal(sinkJournal.decisions[0].receipt.body.disposition, 'not_committed');
       }
     }
-    if (revokedRecovery) writeFileSync(fixtureFile, encodeCanonical({
-      ...JSON.parse(readFileSync(fixtureFile, 'utf8')), revoked: true,
+    if (revokedRecovery || targetRevokedRecovery) writeFileSync(fixtureFile, encodeCanonical({
+      ...JSON.parse(readFileSync(fixtureFile, 'utf8')),
+      ...(targetRevokedRecovery ? { targetRevoked: true } : { revoked: true }),
     }), { mode: 0o600 });
     const recovered = run(revokedRecovery ? 'recover-revoked'
-      : scenario === 'postcommit' || resourceScoped ? 'recover'
-        : scenario === 'pre-sink' ? 'recover-abort' : 'recover-fenced');
+      : targetRevokedRecovery ? 'recover-target-revoked-fence'
+        : postcommit ? 'recover' : preSink ? 'recover-abort' : 'recover-fenced');
     assert.equal(recovered.status, 0, recovered.stderr || recovered.error?.message);
     const result = JSON.parse(recovered.stdout.trim().split('\n').at(-1)!);
     assert.notEqual(result.pid, crashed.pid);
-    assert.equal(result.recovered.state, scenario === 'pre-sink' ? 'aborted' : 'completed');
-    if (scenario === 'signed-fence') assert.equal(result.recovered.execution.ok, false);
+    assert.equal(result.recovered.state, preSink ? 'aborted' : 'completed');
+    if (signedFence) assert.equal(result.recovered.execution.ok, false);
     if (resourceScoped) {
-      assert.equal(result.recovered.execution.ok, true);
-      assert.equal(result.recovered.execution.value.value, target);
+      if (preSink) assert.equal(result.recovered.reason,
+        'authorized abort before any possible external effect commit');
+      else if (postcommit) {
+        assert.equal(result.recovered.execution.ok, true);
+        assert.equal(result.recovered.execution.value.value, target);
+      }
       assert.equal(JSON.parse(readFileSync(join(directory, 'deployment', 'deployment.json'), 'utf8')).format,
         'aether.process-deployment/11');
     }
     if (revokedRecovery) assert.equal(result.revoked, true);
+    else if (targetRevokedRecovery) {
+      assert.equal(result.targetRevoked, true);
+      assert.equal(result.cachedDenied, true);
+    }
     else assert.deepEqual(result.cached, result.recovered);
     assert.deepEqual(readSinkStateHead(sinkWitness), sinkHeadBefore,
       'recovery must not append or redispatch a sink decision');
     const effectHeadAfter = readWitnessHead(effectWitness);
-    if (scenario === 'pre-sink') assert.deepEqual(effectHeadAfter, effectHeadBefore);
+    if (preSink) assert.deepEqual(effectHeadAfter, effectHeadBefore);
     else assert.equal(JSON.parse(effectHeadAfter.journal!).records[0].state,
-      scenario === 'postcommit' || resourceScoped ? 'committed' : 'aborted');
-    if (scenario !== 'pre-sink') assert.equal(JSON.parse(readFileSync(join(directory,
+      postcommit ? 'committed' : 'aborted');
+    if (!preSink) assert.equal(JSON.parse(readFileSync(join(directory,
       'sink-store', 'sink-state-v2.json'), 'utf8')).decisions.length, 1);
     t.diagnostic(JSON.stringify({ crashSignal: crashed.signal, controllerPid: result.pid,
       servicePids: [sink.pid, sinkWitnessProcess.pid, operatorWitnessProcess.pid], workerPids,

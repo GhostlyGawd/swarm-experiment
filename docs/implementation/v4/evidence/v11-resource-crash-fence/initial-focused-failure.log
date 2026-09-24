@@ -1,0 +1,45 @@
+✔ V10 Deployment postcommit recovery across real controller SIGKILL (12633.253292ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":81992,"servicePids":[81858,81856,81857],"workerPids":[81900],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V10 Deployment pre-sink recovery across real controller SIGKILL (7224.939709ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":82833,"servicePids":[82257,82252,82255],"workerPids":[82311],"sinkRevision":"0","effectRevisionBefore":"0","effectRevisionAfter":"0"}
+✔ V10 Deployment signed-fence recovery across real controller SIGKILL (12471.201917ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":83127,"servicePids":[82913,82911,82912],"workerPids":[82976],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V11 Deployment v11-resource-postcommit recovery across real controller SIGKILL (13883.637209ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":83492,"servicePids":[83335,83333,83334],"workerPids":[83394],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V11 Deployment v11-revoked-postcommit recovery across real controller SIGKILL (9364.920042ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":87471,"servicePids":[84172,84010,84081],"workerPids":[85340],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✖ V11 Deployment v11-resource-pre-sink recovery across real controller SIGKILL (7336.819625ms)
+✔ V11 Deployment v11-resource-signed-fence recovery across real controller SIGKILL (13896.611375ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":88870,"servicePids":[88719,88717,88718],"workerPids":[88768],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V11 Deployment v11-target-revoked-fence recovery across real controller SIGKILL (13059.253583ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":89758,"servicePids":[89609,89607,89608],"workerPids":[89651],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 89967.897709
+
+✖ failing tests:
+
+test at test/tier4/process-attested-sink-controller-crash.test.ts:46:41
+✖ V11 Deployment v11-resource-pre-sink recovery across real controller SIGKILL (7336.819625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'authorized abort before any possible external effect commit'
+  - 'authorized abort: durable host journal confirms no external effect dispatch began'
+  
+      at TestContext.<anonymous> (file:///private/tmp/aether-v11-crash-fence/test/tier4/process-attested-sink-controller-crash.test.ts:210:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'authorized abort before any possible external effect commit',
+    expected: 'authorized abort: durable host journal confirms no external effect dispatch began',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

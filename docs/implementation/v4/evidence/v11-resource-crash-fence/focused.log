@@ -1,0 +1,24 @@
+✔ V10 Deployment postcommit recovery across real controller SIGKILL (12760.962791ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":20599,"servicePids":[20453,20451,20452],"workerPids":[20495],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V10 Deployment pre-sink recovery across real controller SIGKILL (7350.769125ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":21138,"servicePids":[20920,20913,20918],"workerPids":[20992],"sinkRevision":"0","effectRevisionBefore":"0","effectRevisionAfter":"0"}
+✔ V10 Deployment signed-fence recovery across real controller SIGKILL (14505.154167ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":23486,"servicePids":[21291,21289,21290],"workerPids":[21333],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V11 Deployment v11-resource-postcommit recovery across real controller SIGKILL (14209.578666ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":26380,"servicePids":[26254,26252,26253],"workerPids":[26297],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V11 Deployment v11-revoked-postcommit recovery across real controller SIGKILL (9443.726875ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":27336,"servicePids":[26936,26931,26934],"workerPids":[27083],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V11 Deployment v11-resource-pre-sink recovery across real controller SIGKILL (7211.530709ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":28517,"servicePids":[28202,28184,28192],"workerPids":[28340],"sinkRevision":"0","effectRevisionBefore":"0","effectRevisionAfter":"0"}
+✔ V11 Deployment v11-resource-signed-fence recovery across real controller SIGKILL (15995.762083ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":28948,"servicePids":[28696,28694,28695],"workerPids":[28738],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+✔ V11 Deployment v11-target-revoked-fence recovery across real controller SIGKILL (14652.520458ms)
+ℹ {"crashSignal":"SIGKILL","controllerPid":33397,"servicePids":[29621,29605,29613],"workerPids":[29744],"sinkRevision":"1","effectRevisionBefore":"4","effectRevisionAfter":"5"}
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 96228.588583
