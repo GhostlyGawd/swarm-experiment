@@ -4,21 +4,24 @@
  * No live effects, native-thread/rack failure, or unbounded coverage is claimed.
  * Admission is evidence about exactly the declared campaign, never production
  * deployment authority or proof of correctness outside that campaign. */
-import { closeSync, existsSync, fsyncSync, linkSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, linkSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, type KeyObject } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { decodeCanonical, decimal, encodeCanonical, exactObject, identifier } from '../fabric/encoding.ts';
-import { domainDigest, validateDigest, type Digest } from '../fabric/identity.ts';
-import type { Term, Ty } from '../tier1/ast.ts';
-import type { NodeRef, SymbolId } from '../tier1/ids.ts';
+import { domainDigest, executionManifestDigest, validateDigest, type Digest } from '../fabric/identity.ts';
+import { effectAdapterDigest, DurableEffectBroker, type EffectAdapter } from '../fabric/effects.ts';
+import { walk, type Term, type Ty } from '../tier1/ast.ts';
+import type { CapabilityName, NodeRef, SymbolId } from '../tier1/ids.ts';
 import { GraphStore } from '../tier1/store.ts';
 import { typecheck, underlying, tyEqual } from '../tier2/typecheck.ts';
+import { assertEffectResourceAdapter, effectResourcePath } from '../tier2/effect-resource-policy.ts';
 import type { CapabilityRegistry } from '../tier2/ocap.ts';
 import { Runtime } from './runtime.ts';
-import type { RuntimeEffectRouter } from './effects.ts';
+import { BrokerEffectRouter, type RuntimeEffectRouter } from './effects.ts';
 import type { Value, Ref } from './values.ts';
 import { rng } from '../util/rng.ts';
+import { assertLivingEffectAuthorizationV2, type LivingEffectAuthorizationV2 } from './living-effect-authorization.ts';
 
 export const LIVING_CAMPAIGN_PROFILE = 'aether.living-cooperative-campaign/1' as const;
 export type CampaignScalar = { readonly tag: 'int'; readonly value: string } | { readonly tag: 'bool'; readonly value: boolean } | { readonly tag: 'string'; readonly value: string } | { readonly tag: 'null' };
@@ -63,6 +66,9 @@ export interface LivingCounterexample {
   readonly shrunk: LivingCase; readonly shrunkResult: LivingCaseResult;
   readonly shrinkAttempts: number; readonly reductions: number; readonly shrinkLimitReached: boolean;
 }
+export interface LivingEffectCounterexampleV2 extends Omit<LivingCounterexample, 'format'> {
+  readonly format: 'aether.living-effect-counterexample/2'; readonly effectAuthorizationDigest: Digest;
+}
 export interface LivingCampaignReport {
   readonly format: 'aether.living-campaign-report/1'; readonly manifestDigest: Digest; readonly candidateRoot: NodeRef;
   readonly declared: number; readonly generated: number; readonly executed: number; readonly filtered: number;
@@ -71,6 +77,16 @@ export interface LivingCampaignReport {
   readonly counterexamples: readonly Digest[]; readonly elapsedMs: string; readonly executedCasesPerSecond: string;
   readonly evaluatedOperations: number; readonly evaluatedOperationsPerSecond: string;
   readonly productionAuthorized: false;
+}
+export interface LivingEffectCaseResultV2 extends LivingCaseResult {
+  readonly effects: { readonly journalDigest: Digest; readonly sinkDigest: Digest; readonly eventCount: number;
+    readonly sinkWrites: number; readonly indeterminate: number };
+}
+export interface LivingEffectCampaignReportV2 extends Omit<LivingCampaignReport, 'format' | 'cases'> {
+  readonly format: 'aether.living-effect-campaign-report/2';
+  readonly effectAuthorizationDigest: Digest;
+  readonly cases: readonly { readonly input: LivingCase; readonly result: LivingEffectCaseResultV2 }[];
+  readonly effectEvents: number; readonly indeterminateEffects: number;
 }
 const limits = { maxFrameBytes: 32 * 1024 * 1024, maxDecompressedBytes: 32 * 1024 * 1024, maxObjects: 1_000_000 };
 const clone = <T>(value: T): T => decodeCanonical(encodeCanonical(value, limits), limits) as T;
@@ -150,16 +166,36 @@ export class LivingCampaign {
   private readonly registry: CapabilityRegistry;
   private readonly directory: string;
   private readonly declarations: Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>;
+  private readonly effectAuthorization: LivingEffectAuthorizationV2 | null;
+  private readonly effectAuthorizationDigest: Digest | null;
   private readonly acceptedReports = new WeakMap<object, Digest>();
-  constructor(options: { manifest: LivingCampaignManifest; module: Term; registry: CapabilityRegistry; directory: string }) {
+  constructor(options: { manifest: LivingCampaignManifest; module: Term; registry: CapabilityRegistry; directory: string;
+    effectAuthorization?: LivingEffectAuthorizationV2; effectTrust?: { repositoryId: string; policyEpoch: string; signer: string; key: KeyObject | string } }) {
     this.manifest = clone(options.manifest); this.registry = options.registry; this.directory = resolve(options.directory);
     const store = new GraphStore(), root = store.intern(options.module); this.module = store.hydrate(root);
     if (root !== this.manifest.candidateRoot) throw new TypeError('campaign candidate root mismatch');
     if (this.module.kind !== 'Module') throw new TypeError('campaign requires complete module');
     if (!typecheck(this.module, { registry: this.registry }).ok) throw new TypeError('campaign candidate fails static type checking');
     this.declarations = new Map(this.module.members.filter((node): node is Extract<Term, { kind: 'FunctionDecl' }> => node.kind === 'FunctionDecl').map(node => [node.symbol, node]));
-    this.validateManifest(); this.manifestId = digest(LIVING_CAMPAIGN_PROFILE, this.manifest);
-    persist(join(this.directory, 'manifests'), LIVING_CAMPAIGN_PROFILE, this.manifest);
+    this.validateManifest();
+    if (options.effectAuthorization || options.effectTrust) {
+      if (!options.effectAuthorization || !options.effectTrust) throw new TypeError('effectful campaign requires signed authority and independent trust');
+      const campaignDigest = digest(LIVING_CAMPAIGN_PROFILE, this.manifest);
+      assertLivingEffectAuthorizationV2(options.effectAuthorization, { candidateRoot: root, campaignDigest, ...options.effectTrust });
+      const used = new Set<CapabilityName>();
+      for (const node of walk(this.module)) if (node.kind === 'Invoke') used.add(node.capability);
+      const signed = options.effectAuthorization.signedPolicy.body.rules.map(rule => rule.capability);
+      if (used.size !== signed.length || signed.some(capability => !used.has(capability)))
+        throw new TypeError('signed effect capability set does not cover exact module');
+      this.effectAuthorization = clone(options.effectAuthorization);
+      this.effectAuthorizationDigest = digest('aether.living-effect-authorization/2', this.effectAuthorization);
+      this.manifestId = digest('aether.living-effect-campaign/2', { manifest: this.manifest, authorization: this.effectAuthorization });
+      persist(join(this.directory, 'manifests'), 'aether.living-effect-campaign/2', { manifest: this.manifest, authorization: this.effectAuthorization });
+    } else {
+      this.effectAuthorization = null; this.effectAuthorizationDigest = null;
+      this.manifestId = digest(LIVING_CAMPAIGN_PROFILE, this.manifest);
+      persist(join(this.directory, 'manifests'), LIVING_CAMPAIGN_PROFILE, this.manifest);
+    }
   }
   private validateManifest(): void {
     const m = this.manifest; exactObject(m, ['format', 'candidateRoot', 'seed', 'maxStepsPerCall', 'shrinkAttempts', 'scenarios']);
@@ -226,7 +262,51 @@ export class LivingCampaign {
         variables: Object.fromEntries(scenario.variables.map(variable => [variable.name, ordinal === 0 ? variable.minimum : ordinal === 1 ? variable.maximum : random.int(variable.minimum, variable.maximum)])) };
     }));
   }
-  execute(input: LivingCase): LivingCaseResult {
+  private effectCase(input: LivingCase): { router: RuntimeEffectRouter; broker: DurableEffectBroker; sinkDirectory: string } {
+    const authorization = this.effectAuthorization;
+    if (!authorization) throw new TypeError('no effectful campaign authorization');
+    const sinkDirectory = join(this.directory, 'effect-sinks', caseDigest(input).split(':').at(-1)!);
+    ensureDirectory(sinkDirectory);
+    const manifestDigest = executionManifestDigest(authorization.executionManifest);
+    const policy = authorization.signedPolicy;
+    const allowed = (request: Parameters<NonNullable<ConstructorParameters<typeof DurableEffectBroker>[0]['authorize']>>[0]): boolean => {
+      if (request.executionManifest !== manifestDigest || request.policyEpoch !== policy.body.policyEpoch
+        || request.capabilityGrantRef !== 'grant:living-effect') return false;
+      const payload = request.payload;
+      if (payload.tag !== 'sequence' || payload.items[0]?.tag !== 'string') return false;
+      try { effectResourcePath(policy, payload.items[0].value as CapabilityName, payload.items.slice(1)); return true; }
+      catch { return false; }
+    };
+    const broker = new DurableEffectBroker({ directory: join(this.directory, 'effect-journals', caseDigest(input).split(':').at(-1)!),
+      clockDomain: 'living-effect-clock/2', clock: () => 100n, authorize: allowed, authorizeReconciliation: allowed,
+      beforePersist: event => { if (authorization.faultMode === 'unknown-after-dispatch' && event.state === 'committed')
+        throw new Error('campaign receipt persistence fault after sink dispatch'); },
+    });
+    const adapters = new Map<CapabilityName, EffectAdapter>();
+    for (const [index, response] of authorization.responses.entries()) {
+      const rule = policy.body.rules[index], adapter: EffectAdapter = {
+        id: rule.adapterId,
+        semantics: { readOnly: false, atomicIdempotency: true, transactional: false, reconciliation: true },
+        execute: request => {
+          persist(sinkDirectory, 'aether.living-effect-sink/2', { request, value: response.value });
+          return response.value;
+        },
+        reconcile: request => {
+          if (authorization.faultMode === 'unknown-after-dispatch') return { state: 'unknown' };
+          const id = digest('aether.living-effect-sink/2', { request, value: response.value });
+          const path = join(sinkDirectory, `${id.split(':').at(-1)}.json`);
+          return existsSync(path) ? { state: 'committed', value: response.value } : { state: 'not_committed' };
+        },
+      };
+      assertEffectResourceAdapter(policy, response.capability, { id: adapter.id, digest: effectAdapterDigest(adapter) });
+      adapters.set(response.capability, adapter);
+    }
+    const router = new BrokerEffectRouter({ broker, manifest: authorization.executionManifest,
+      executionId: `living-effect:${caseDigest(input).split(':').at(-1)}`, policyEpoch: policy.body.policyEpoch,
+      deadline: '1000', adapters, grant: () => 'grant:living-effect' });
+    return { router, broker, sinkDirectory };
+  }
+  execute(input: LivingCase): LivingCaseResult | LivingEffectCaseResultV2 {
     const value = clone(input); exactObject(value, ['format', 'manifestDigest', 'scenario', 'ordinal', 'seed', 'schedule', 'variables']);
     if (value.format !== 'aether.living-case/1' || value.manifestDigest !== this.manifestId) throw new TypeError('case manifest mismatch');
     const scenario = this.manifest.scenarios.find(item => item.id === value.scenario); if (!scenario) throw new TypeError('unknown scenario');
@@ -235,7 +315,9 @@ export class LivingCampaign {
     const positions = new Map(scenario.actors.map(actor => [actor.id, 0]));
     for (const actor of value.schedule) { if (!positions.has(actor)) throw new TypeError('unknown scheduled actor'); positions.set(actor, positions.get(actor)! + 1); }
     if (scenario.actors.some(actor => positions.get(actor.id) !== actor.steps.length)) throw new TypeError('case omits or duplicates actor operations');
-    const runtime = new Runtime({ registry: this.registry, maxSteps: this.manifest.maxStepsPerCall, trace: true, effectRouter: denyEffects }).load(this.module);
+    const effect = this.effectAuthorization ? this.effectCase(value) : null;
+    const runtime = new Runtime({ registry: this.registry, maxSteps: this.manifest.maxStepsPerCall,
+      trace: true, effectRouter: effect?.router ?? denyEffects }).load(this.module);
     const references = new Map<string, Ref>(), types = new Map<number, Ty>(), slots = new Map<string, Value>(), reservations = new Map<string, Uint8Array>();
     for (const record of scenario.records) { const ref = runtime.allocateRecord(record.ty, Object.fromEntries(Object.entries(record.fields).map(([name, field]) => [name, fromScalar(field)]))); references.set(record.name, ref); types.set(ref.addr, record.ty); }
     let calls = 0, evaluatedOperations = 0, allocatedBytes = 0, peakAllocatedBytes = 0, allocationChecksum = 0, networkFrames = 0, deliveredFrames = 0, rejectedFrames = 0, droppedFrames = 0, filtered = false;
@@ -297,8 +379,22 @@ export class LivingCampaign {
     if (!failure) for (const check of scenario.checks) { executeStep('$checks', check); if (failure) break; }
     for (const observed of runtime.trace) coverage.add(`runtime:${observed.kind}`);
     if (!failure && queue.length) fail('network/undelivered', `${queue.length} materialized frames remain undelivered`);
-    return { caseDigest: caseDigest(value), passed: failure === null, failure, filtered, calls, steps: runtime.steps, evaluatedOperations, allocatedBytes, peakAllocatedBytes, allocationChecksum,
+    const effectEvents = effect?.broker.events() ?? [];
+    const indeterminate = effectEvents.filter(item => item.outcome === null || item.outcome.state === 'indeterminate').length;
+    if (effect && indeterminate) fail('effect/indeterminate', `${indeterminate} effect outcomes remain unknown`);
+    if (effect) {
+      for (const item of effectEvents) coverage.add(`effect:${item.outcome?.state ?? 'unknown'}`);
+      coverage.add('effect:broker-journal');
+    }
+    const base = { caseDigest: caseDigest(value), passed: failure === null, failure, filtered, calls, steps: runtime.steps, evaluatedOperations, allocatedBytes, peakAllocatedBytes, allocationChecksum,
       networkFrames, deliveredFrames, rejectedFrames, droppedFrames, coverage: [...coverage].sort(), trace, heapDigest: digest('aether.living-heap/1', runtime.inspect().heap) };
+    if (!effect) return base;
+    const sinkFiles = readdirSync(effect.sinkDirectory).filter(file => file.endsWith('.json')).sort();
+    return { ...base, effects: {
+      journalDigest: digest('aether.living-effect-journal/2', effectEvents),
+      sinkDigest: digest('aether.living-effect-sink-set/2', sinkFiles.map(file => ({ file, bytes: readFileSync(join(effect.sinkDirectory, file), 'utf8') }))),
+      eventCount: effectEvents.length, sinkWrites: sinkFiles.length, indeterminate,
+    } };
   }
   private shrink(original: LivingCase, originalResult: LivingCaseResult): LivingCounterexample {
     let shrunk = original, shrunkResult = originalResult, attempts = 0, reductions = 0, changed = true;
@@ -320,6 +416,7 @@ export class LivingCampaign {
     return { format: 'aether.living-counterexample/1', manifest: this.manifest, original, originalResult, shrunk, shrunkResult, shrinkAttempts: attempts, reductions, shrinkLimitReached: attempts === this.manifest.shrinkAttempts };
   }
   run(): LivingCampaignReport {
+    if (this.effectAuthorization) throw new TypeError('effectful campaign requires version 2 report and admission');
     const started = performance.now(), generated = this.generate(), cases: { input: LivingCase; result: LivingCaseResult }[] = [], counterexamples: Digest[] = [];
     for (const input of generated) {
       const result = this.execute(input); cases.push({ input, result });
@@ -341,17 +438,105 @@ export class LivingCampaign {
   /** Only an unmodified report from this executor can be admitted. Durable JSON
    * is audit data; a new process must replay, not promote supplied success bits. */
   admit(report: LivingCampaignReport): { readonly manifestDigest: Digest; readonly reportDigest: Digest; readonly productionAuthorized: false } {
+    if (this.effectAuthorization) throw new TypeError('effectful campaign cannot use pure admission');
     const stamp = this.acceptedReports.get(report);
     if (!stamp || stamp !== digest('aether.living-campaign-report/1', report) || !report.accepted || report.survival !== '1' || report.filtered !== 0 || report.executed !== report.declared || report.generated !== report.declared || report.missingCoverage.length) throw new Error('campaign admission requires complete, unmodified 100% survival evidence');
     return { manifestDigest: this.manifestId, reportDigest: stamp, productionAuthorized: false };
   }
-  replayCounterexample(id: Digest): LivingCounterexample {
-    validateDigest(id, 'aether.living-counterexample/1');
-    const value = decodeCanonical(readFileSync(join(this.directory, 'counterexamples', `${id.split(':').at(-1)}.json`)), limits) as unknown as LivingCounterexample;
-    exactObject(value, ['format', 'manifest', 'original', 'originalResult', 'shrunk', 'shrunkResult', 'shrinkAttempts', 'reductions', 'shrinkLimitReached']);
-    if (value.format !== 'aether.living-counterexample/1' || digest('aether.living-counterexample/1', value) !== id || digest(LIVING_CAMPAIGN_PROFILE, value.manifest) !== this.manifestId) throw new TypeError('counterexample manifest/digest mismatch');
+  runEffectful(): LivingEffectCampaignReportV2 {
+    if (!this.effectAuthorization || !this.effectAuthorizationDigest) throw new TypeError('signed effectful campaign authority required');
+    const reportsDirectory = join(this.directory, 'reports');
+    if (existsSync(reportsDirectory) && readdirSync(reportsDirectory).some(file => file.endsWith('.json')))
+      throw new Error('effectful campaign report already exists; use a new directory for a fresh run');
+    for (const path of [join(this.directory, 'effect-journals'), join(this.directory, 'effect-sinks')])
+      if (existsSync(path) && readdirSync(path).length)
+        throw new Error('effectful campaign has prior effect executions; use a new directory for a fresh run');
+    const started = performance.now(), generated = this.generate();
+    const cases: { input: LivingCase; result: LivingEffectCaseResultV2 }[] = [], counterexamples: Digest[] = [];
+    for (const input of generated) {
+      const result = this.execute(input) as LivingEffectCaseResultV2;
+      if (!result.effects) throw new Error('effectful case lacks broker evidence');
+      cases.push({ input, result });
+      persist(join(this.directory, 'cases'), 'aether.living-effect-case-evidence/2', { input, result });
+      if (!result.passed) {
+        const { format: _format, ...witness } = this.shrink(input, result);
+        counterexamples.push(persist(join(this.directory, 'counterexamples'), 'aether.living-effect-counterexample/2',
+          { ...witness, format: 'aether.living-effect-counterexample/2', effectAuthorizationDigest: this.effectAuthorizationDigest }));
+      }
+    }
+    const missingCoverage = this.manifest.scenarios.flatMap(scenario => {
+      const covered = new Set(cases.filter(item => item.input.scenario === scenario.id).flatMap(item => item.result.coverage));
+      return scenario.requiredCoverage.filter(label => !covered.has(label)).map(label => `${scenario.id}/${label}`);
+    });
+    const declared = this.manifest.scenarios.reduce((sum, item) => sum + item.scheduling.cases, 0),
+      passed = cases.filter(item => item.result.passed).length, filtered = cases.filter(item => item.result.filtered).length,
+      effectEvents = cases.reduce((sum, item) => sum + item.result.effects.eventCount, 0),
+      indeterminateEffects = cases.reduce((sum, item) => sum + item.result.effects.indeterminate, 0);
+    const elapsedMs = performance.now() - started, evaluatedOperations = cases.reduce((sum, item) => sum + item.result.evaluatedOperations, 0);
+    const report: LivingEffectCampaignReportV2 = { format: 'aether.living-effect-campaign-report/2',
+      manifestDigest: this.manifestId, effectAuthorizationDigest: this.effectAuthorizationDigest,
+      candidateRoot: this.manifest.candidateRoot, declared, generated: generated.length, executed: cases.length, filtered,
+      passed, failed: cases.length - passed, survival: String(passed / declared),
+      accepted: passed === declared && cases.length === declared && filtered === 0 && missingCoverage.length === 0
+        && indeterminateEffects === 0 && effectEvents > 0,
+      missingCoverage, cases, counterexamples, elapsedMs: String(elapsedMs),
+      executedCasesPerSecond: String(cases.length / (elapsedMs / 1000)), evaluatedOperations,
+      evaluatedOperationsPerSecond: String(evaluatedOperations / (elapsedMs / 1000)),
+      effectEvents, indeterminateEffects, productionAuthorized: false };
+    const id = persist(reportsDirectory, 'aether.living-effect-campaign-report/2', report);
+    this.acceptedReports.set(report, id); return report;
+  }
+  admitEffectful(report: LivingEffectCampaignReportV2): { readonly manifestDigest: Digest; readonly reportDigest: Digest;
+    readonly effectAuthorizationDigest: Digest; readonly productionAuthorized: false } {
+    if (!this.effectAuthorization || !this.effectAuthorizationDigest) throw new TypeError('signed effectful campaign authority required');
+    const stamp = this.acceptedReports.get(report);
+    if (!stamp || stamp !== digest('aether.living-effect-campaign-report/2', report)
+      || report.format !== 'aether.living-effect-campaign-report/2'
+      || report.manifestDigest !== this.manifestId || report.effectAuthorizationDigest !== this.effectAuthorizationDigest
+      || !report.accepted || report.survival !== '1' || report.filtered !== 0
+      || report.executed !== report.declared || report.generated !== report.declared
+      || report.missingCoverage.length || report.indeterminateEffects !== 0 || report.effectEvents < 1
+      || report.cases.some(item => !item.result.passed || item.result.effects.indeterminate !== 0))
+      throw new Error('effectful campaign admission requires complete exact signed subject and terminal effects');
+    const reportPath = join(this.directory, 'reports', `${stamp.split(':').at(-1)}.json`);
+    if (!existsSync(reportPath) || !readFileSync(reportPath).equals(Buffer.from(encodeCanonical(report, limits))))
+      throw new Error('effectful campaign durable report changed before admission');
+    for (const item of report.cases) {
+      const caseEvidence = { input: item.input, result: item.result };
+      const caseId = digest('aether.living-effect-case-evidence/2', caseEvidence);
+      const casePath = join(this.directory, 'cases', `${caseId.split(':').at(-1)}.json`);
+      if (!existsSync(casePath) || !readFileSync(casePath).equals(Buffer.from(encodeCanonical(caseEvidence, limits))))
+        throw new Error('effectful campaign durable case changed before admission');
+      const evidence = this.effectCase(item.input), events = evidence.broker.events();
+      const files = readdirSync(evidence.sinkDirectory).filter(file => file.endsWith('.json')).sort();
+      const current = { journalDigest: digest('aether.living-effect-journal/2', events),
+        sinkDigest: digest('aether.living-effect-sink-set/2', files.map(file => ({ file, bytes: readFileSync(join(evidence.sinkDirectory, file), 'utf8') }))),
+        eventCount: events.length, sinkWrites: files.length,
+        indeterminate: events.filter(event => event.outcome === null || event.outcome.state === 'indeterminate').length };
+      if (digest('aether.living-effect-case-effects/2', current)
+        !== digest('aether.living-effect-case-effects/2', item.result.effects))
+        throw new Error('effectful campaign durable broker/sink evidence changed before admission');
+    }
+    return { manifestDigest: this.manifestId, reportDigest: stamp,
+      effectAuthorizationDigest: this.effectAuthorizationDigest, productionAuthorized: false };
+  }
+  replayCounterexample(id: Digest): LivingCounterexample | LivingEffectCounterexampleV2 {
+    validateDigest(id);
+    const effectful = id.startsWith('aether.living-effect-counterexample/2:');
+    if (!effectful) validateDigest(id, 'aether.living-counterexample/1');
+    const value = decodeCanonical(readFileSync(join(this.directory, 'counterexamples', `${id.split(':').at(-1)}.json`)), limits) as unknown as LivingCounterexample | LivingEffectCounterexampleV2;
+    exactObject(value, ['format', 'manifest', 'original', 'originalResult', 'shrunk', 'shrunkResult', 'shrinkAttempts', 'reductions', 'shrinkLimitReached',
+      ...(effectful ? ['effectAuthorizationDigest'] : [])]);
+    if (effectful ? !this.effectAuthorizationDigest || value.format !== 'aether.living-effect-counterexample/2'
+      || value.effectAuthorizationDigest !== this.effectAuthorizationDigest
+      || digest('aether.living-effect-counterexample/2', value) !== id
+      || digest('aether.living-effect-campaign/2', { manifest: value.manifest, authorization: this.effectAuthorization }) !== this.manifestId
+      : value.format !== 'aether.living-counterexample/1' || digest('aether.living-counterexample/1', value) !== id
+      || digest(LIVING_CAMPAIGN_PROFILE, value.manifest) !== this.manifestId)
+      throw new TypeError('counterexample manifest/digest mismatch');
     for (const [input, result] of [[value.original, value.originalResult], [value.shrunk, value.shrunkResult]] as const) {
-      if (result.passed || digest('aether.living-case-result/1', this.execute(input)) !== digest('aether.living-case-result/1', result)) throw new Error('counterexample does not replay exactly');
+      const resultDomain = effectful ? 'aether.living-effect-case-result/2' : 'aether.living-case-result/1';
+      if (result.passed || digest(resultDomain, this.execute(input)) !== digest(resultDomain, result)) throw new Error('counterexample does not replay exactly');
     }
     if (value.originalResult.failure!.property !== value.shrunkResult.failure!.property) throw new Error('shrinker changed failure property'); return value;
   }

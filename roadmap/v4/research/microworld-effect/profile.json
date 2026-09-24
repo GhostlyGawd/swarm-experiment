@@ -1,0 +1,9 @@
+{
+  "format": "aether.living-effect-campaign-profile/2",
+  "seed": "20260924-effect-admission",
+  "cases": 5,
+  "candidate": "Exact signed Aether ledger module with resource steps, scalar/record calls, declared postconditions and one broker effect per case",
+  "faults": "Signed clean campaign for throughput; separate regression injects unknown-after-dispatch and requires failed admission",
+  "minimumBoundaryPermutationsPerSecond": 2000000,
+  "qualification": "Complete signed effectful local campaign rate, including constructor, all cases, durable evidence and admission; no distributed or process/socket rate substitution"
+}
