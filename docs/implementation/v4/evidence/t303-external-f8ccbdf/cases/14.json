@@ -1,0 +1,67 @@
+{
+  "input": {
+    "format": "aether.living-case/1",
+    "manifestDigest": "aether.living-effect-campaign/4:b3:23bf0f744d7beee845b13165434b6584f047e77c63087f6a1642f8fc74432ff5",
+    "ordinal": 2,
+    "scenario": "out-of-order-events",
+    "schedule": [
+      "events",
+      "events",
+      "events",
+      "events"
+    ],
+    "seed": "20260924-integrated/out-of-order-events/2",
+    "variables": {}
+  },
+  "result": {
+    "caseDigest": "aether.living-case/1:b3:40267f9acbf4751ca77928d2f4e7c05e5f1ba6586ff53d5ca35a011bd6a626ca",
+    "passed": true,
+    "failure": null,
+    "filtered": false,
+    "calls": 3,
+    "steps": 51,
+    "evaluatedOperations": 5,
+    "allocatedBytes": 0,
+    "peakAllocatedBytes": 0,
+    "allocationChecksum": 0,
+    "networkFrames": 2,
+    "deliveredFrames": 2,
+    "rejectedFrames": 0,
+    "droppedFrames": 0,
+    "coverage": [
+      "candidate-call",
+      "effect:broker-journal",
+      "effect:committed",
+      "event:ordered",
+      "event:reordered",
+      "event:sequence",
+      "ingress:delivered",
+      "network:none",
+      "runtime:assign",
+      "runtime:branch",
+      "runtime:call",
+      "runtime:invoke",
+      "runtime:return",
+      "step:$checks/final-value",
+      "step:events/first",
+      "step:events/late-first",
+      "step:events/second",
+      "step:events/second-before-first"
+    ],
+    "trace": [
+      "events/second-before-first",
+      "events/second",
+      "events/late-first",
+      "events/first",
+      "$checks/final-value"
+    ],
+    "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+    "externalEffects": {
+      "journalDigest": "aether.living-external-journal/4:b3:62a207be25561280407d32ff4bf5811ec0d93b6d61af52c485779b273c02fba5",
+      "receiptDigest": "aether.living-external-receipts/4:b3:25c670b694583e48043e6fd4e52430d46a1c3f82e9aaa709877a49ef86e00bd7",
+      "eventCount": 1,
+      "committedReceipts": 1,
+      "indeterminate": 0
+    }
+  }
+}

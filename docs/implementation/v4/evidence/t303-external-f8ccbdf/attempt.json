@@ -1,0 +1,37 @@
+{
+  "format": "aether.living-external-attempt/1",
+  "registrationSha256": "48c3a88a1462367f3766a36062506ec62fb2b4d9748adaa8dcf59e19bfe47e0f",
+  "before": {
+    "at": "2026-09-24T22:13:39.572Z",
+    "node": "v26.7.0",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "arch": "arm64",
+    "cpus": [
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro"
+    ],
+    "load": [
+      4.83203125,
+      5.96630859375,
+      5.2509765625
+    ],
+    "memory": {
+      "rss": 119406592,
+      "heapTotal": 21757952,
+      "heapUsed": 14944448,
+      "external": 8621404,
+      "arrayBuffers": 2292937
+    }
+  }
+}

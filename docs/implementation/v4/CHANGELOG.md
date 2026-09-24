@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Witnessed external living campaign and same-host partition — 2026-09-24
+
+- Added signed effect authorization `/4` with a distinct signature/campaign domain. It binds the exact Aether root and generated plan to signed V2 resource policy, approved adapter artifact, preselected sink anchor and two externally supplied witness identities. The executor uses a broker V4 journal and attested sink adapter; unknown transport/status cannot become success, and V4 cannot mint a V2 local admission receipt. Prior V2/V3 bytes and behavior remain explicit. [Contract](LIVING-EFFECT-CAMPAIGN.md).
+- [Clean-source external campaign](evidence/t303-external-f8ccbdf/REVIEW.md) at `f8ccbdf`: separate sink, witness, gateway and candidate processes execute/pass all 15 generated cases with zero filters, one separately counted failed partition attempt, signed recovery after rejoin, nine witnessed append decisions, 48 coverage labels and **1.1126 complete cases/s**. This same-host transport partition and same-UID research custody do not establish cross-machine fault coverage or independent production operator custody. Native races, actual RSS pressure, ProcessHost admission and a new external-sink shrink campaign remain open; the fixed 2M/s target fails. T3-03 remains in progress and the tracker stays **20/62**.
+
 ## Portable certificate check latency preflight — 2026-09-24
 
 - Added a versioned, raw-sample NFR-05 preflight for a complete seven-obligation portable AST certificate check. The clean `5ce3447` campaign measured 200 checks on Apple M4 Pro: 1,903.583 µs median, 2,203.166 µs maximum, all above the unchanged 50 µs bound. The independent verifier checks source pins, certificate and sample verdict. This bounded fixture does not qualify NFR-05 for release; it stays unmeasured in the default inventory. [Evidence and limits](evidence/nfr05-proof-check-5ce3447/REVIEW.md).
