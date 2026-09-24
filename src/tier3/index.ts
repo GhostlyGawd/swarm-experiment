@@ -5,10 +5,11 @@ export { MicroWorld, exploreSchedules, formatMicroWorld, materializeCounterexamp
 export { FallbackTreeRuntime, FALLBACK_INVOKE, type FallbackTreeOptions, type FallbackRepairEvent, type FallbackResult } from './fallback-tree.ts';
 export { checkConservativeFallbackProof, type ConservativeFallbackProofInput } from './fallback-proof.ts';
 export { PackedHeap, migratePackedHeap, packResumableCheckpoint, unpackResumableCheckpoint, migratePackedResumableCheckpoint, type PackedField, type PackedLayout, type PackedRowHeader, type PackedHeapImage, type PackedResumableCheckpoint } from './packed-heap.ts';
-export { LivingCampaign, LIVING_CAMPAIGN_PROFILE, measureR04JsonEvents, type CampaignScalar, type CampaignInput, type CampaignEvent, type CampaignStep, type CampaignScenario, type LivingCampaignManifest, type LivingCase, type LivingCaseResult, type LivingCounterexample, type LivingCampaignReport, type LivingEffectCaseResultV2, type LivingEffectCounterexampleV2, type LivingEffectCampaignReportV2, type R04JsonObservation } from './living-campaign.ts';
+export { LivingCampaign, LIVING_CAMPAIGN_PROFILE, measureR04JsonEvents, type CampaignScalar, type CampaignInput, type CampaignEvent, type CampaignStep, type CampaignScenario, type LivingCampaignManifest, type LivingCase, type LivingCaseResult, type LivingCounterexample, type LivingCampaignReport, type LivingEffectCaseResultV2, type LivingExternalCaseResultV4, type LivingExternalEffectServicesV4, type LivingEffectCounterexampleV2, type LivingEffectCampaignReportV2, type R04JsonObservation } from './living-campaign.ts';
 export { signLivingEffectAuthorizationV2, assertLivingEffectAuthorizationV2,
   signLivingEffectAuthorizationV3, assertLivingEffectAuthorizationV3,
-  type LivingEffectAuthorizationV2, type LivingEffectAuthorizationV3,
+  signLivingEffectAuthorizationV4, assertLivingEffectAuthorizationV4,
+  type LivingEffectAuthorizationV2, type LivingEffectAuthorizationV3, type LivingEffectAuthorizationV4,
   type AnyLivingEffectAuthorization, type LivingEffectResponseV2 } from './living-effect-authorization.ts';
 export { generateCase, materialise, shrinkPlain, type Plain } from './generate.ts';
 export type { ProductionSnapshot } from './heap-state.ts';

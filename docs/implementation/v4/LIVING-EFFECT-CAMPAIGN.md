@@ -69,3 +69,28 @@ checks all declared cases after recovery. Its result is research evidence with
 `productionAuthorized: false`. The marker and sink share one UID and local
 filesystem, so they do not establish independent external sink custody or a
 production noncommit/commit proof.
+
+## V4 witnessed external sink profile
+
+Authorization `/4` has a separate signing domain and binds the same Aether
+module/campaign roots to signed resource policy `/2`, an approved adapter
+artifact digest, a preselected Ed25519 sink anchor, deployment ID, sink-state
+witness identity and effect-journal witness catalog identity. It has no
+synthetic response table. Construction requires independently supplied,
+branded witness objects and a synchronous attested sink client that match
+those signed identities. The executor's exact case uses a broker V4 journal,
+an `AttestedSinkAdapterV1`, signed receipts and both external witnesses.
+Unknown transport/status results stay indeterminate. `recoverEffectCase`
+accepts only an exact generated case and may reconcile only through the
+original adapter's signed status; a missing response never implies noncommit.
+
+V4 returns a versioned `externalEffects` summary with exact journal and signed
+receipt digests. Its `execute` path is available to an independent process
+campaign, while `runEffectful` and `admitEffectful` refuse to mint a V2 local
+admission receipt. The [external campaign](../../../roadmap/v4/research/microworld-external/README.md)
+uses separate sink, witness, gateway and candidate processes. It drops one
+response after the sink's witnessed append, observes unknown during a real
+gateway outage, rejoins, verifies the signed commit and then executes every
+declared case. The service processes and local private stores still share one
+UID in this fixture; distinct operator custody and production ProcessHost
+admission remain open.

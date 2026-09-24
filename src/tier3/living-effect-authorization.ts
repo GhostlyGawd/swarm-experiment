@@ -2,7 +2,9 @@
 import { createPrivateKey, createPublicKey, sign, verify, type KeyObject } from 'node:crypto';
 import { encodeCanonical, exactObject, identifier, validateTaggedValue, type TaggedValueV1 } from '../fabric/encoding.ts';
 import { executionManifestDigest, validateDigest, validateExecutionManifest, type Digest, type ExecutionManifestV1 } from '../fabric/identity.ts';
-import { assertSignedEffectResourcePolicy, type SignedEffectResourcePolicyV1 } from '../tier2/effect-resource-policy.ts';
+import { assertSignedEffectResourcePolicy, assertSignedEffectResourcePolicyV2,
+  type SignedEffectResourcePolicyV1, type SignedEffectResourcePolicyV2 } from '../tier2/effect-resource-policy.ts';
+import { validateSinkAdapterArtifactDigest, validateSinkPublicAnchor, type SinkPublicAnchorV1 } from '../fabric/sink-receipt.ts';
 import type { CapabilityName } from '../tier1/ids.ts';
 
 export interface LivingEffectResponseV2 { readonly capability: CapabilityName; readonly value: TaggedValueV1 }
@@ -22,10 +24,28 @@ export interface LivingEffectAuthorizationV3 extends Omit<LivingEffectAuthorizat
   readonly format: 'aether.living-effect-authorization/3';
   readonly faultMode: 'sigkill-once-after-dispatch';
 }
-export type AnyLivingEffectAuthorization = LivingEffectAuthorizationV2 | LivingEffectAuthorizationV3;
+/** V4 selects a separately witnessed, signed external sink. Its receipt is
+ * derived from the sink, not from a synthetic response table. */
+export interface LivingEffectAuthorizationV4 {
+  readonly format: 'aether.living-effect-authorization/4';
+  readonly executionManifest: ExecutionManifestV1;
+  readonly signedPolicy: SignedEffectResourcePolicyV2;
+  readonly campaignDigest: Digest;
+  readonly externalSink: {
+    readonly anchor: SinkPublicAnchorV1;
+    readonly deploymentId: string;
+    readonly approvedAdapterArtifactDigest: Digest;
+    readonly sinkStateWitnessDigest: Digest;
+    readonly effectCatalogDigest: Digest;
+  };
+  readonly signer: string;
+  readonly signature: string;
+}
+export type AnyLivingEffectAuthorization = LivingEffectAuthorizationV2 | LivingEffectAuthorizationV3 | LivingEffectAuthorizationV4;
 type BodyV2 = Omit<LivingEffectAuthorizationV2, 'signature'>;
 type BodyV3 = Omit<LivingEffectAuthorizationV3, 'signature'>;
-function signedBytes(body: BodyV2 | BodyV3, version: 2 | 3): Uint8Array {
+type BodyV4 = Omit<LivingEffectAuthorizationV4, 'signature'>;
+function signedBytes(body: BodyV2 | BodyV3 | BodyV4, version: 2 | 3 | 4): Uint8Array {
   return encodeCanonical({ domain: `aether.living-effect-authorization-signature/${version}`, body });
 }
 function unsupportedResponse(value: TaggedValueV1): boolean {
@@ -43,6 +63,11 @@ export function signLivingEffectAuthorizationV3(body: BodyV3, key: KeyObject | s
   const privateKey = typeof key === 'string' ? createPrivateKey(key) : key;
   if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'ed25519') throw new TypeError('Ed25519 campaign key required');
   return { ...body, signature: sign(null, signedBytes(body, 3), privateKey).toString('base64') };
+}
+export function signLivingEffectAuthorizationV4(body: BodyV4, key: KeyObject | string): LivingEffectAuthorizationV4 {
+  const privateKey = typeof key === 'string' ? createPrivateKey(key) : key;
+  if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'ed25519') throw new TypeError('Ed25519 campaign key required');
+  return { ...body, signature: sign(null, signedBytes(body, 4), privateKey).toString('base64') };
 }
 interface ExpectedAuthorization {
   readonly candidateRoot: Digest; readonly campaignDigest: Digest; readonly repositoryId: string;
@@ -88,4 +113,38 @@ export function assertLivingEffectAuthorizationV2(value: unknown, expected: Expe
 }
 export function assertLivingEffectAuthorizationV3(value: unknown, expected: ExpectedAuthorization): asserts value is LivingEffectAuthorizationV3 {
   assertVersion(value, expected, 3);
+}
+export function assertLivingEffectAuthorizationV4(value: unknown, expected: ExpectedAuthorization): asserts value is LivingEffectAuthorizationV4 {
+  encodeCanonical(value);
+  const authorization = exactObject(value, ['format', 'executionManifest', 'signedPolicy', 'campaignDigest',
+    'externalSink', 'signer', 'signature']);
+  if (authorization.format !== 'aether.living-effect-authorization/4') throw new TypeError('unsupported external campaign authority');
+  validateExecutionManifest(authorization.executionManifest);
+  const manifest = authorization.executionManifest as ExecutionManifestV1;
+  validateDigest(authorization.campaignDigest, 'aether.living-cooperative-campaign/1');
+  if (manifest.astRoot !== expected.candidateRoot || authorization.campaignDigest !== expected.campaignDigest
+    || manifest.specRoot !== expected.campaignDigest || manifest.semanticsVersion !== 'aether-reference/1'
+    || manifest.target.abiVersion !== 'local/1' || manifest.dependencies.length !== 0)
+    throw new TypeError('external campaign exact execution subject mismatch');
+  assertSignedEffectResourcePolicyV2(authorization.signedPolicy, manifest,
+    expected.repositoryId, expected.policyEpoch, expected.key);
+  const sink = exactObject(authorization.externalSink, ['anchor', 'deploymentId', 'approvedAdapterArtifactDigest',
+    'sinkStateWitnessDigest', 'effectCatalogDigest']);
+  validateSinkPublicAnchor(sink.anchor); identifier(sink.deploymentId);
+  validateSinkAdapterArtifactDigest(sink.approvedAdapterArtifactDigest);
+  validateDigest(sink.sinkStateWitnessDigest, 'aether.sink-state-witness/1');
+  validateDigest(sink.effectCatalogDigest, 'aether.effect-journal-witness-catalog/2');
+  const anchor = sink.anchor as SinkPublicAnchorV1;
+  if (anchor.repositoryId !== expected.repositoryId) throw new TypeError('external sink repository mismatch');
+  const policy = authorization.signedPolicy as SignedEffectResourcePolicyV2;
+  if (policy.body.rules.length !== 1 || policy.body.rules[0].adapterArtifactDigest !== sink.approvedAdapterArtifactDigest)
+    throw new TypeError('external sink artifact outside signed policy');
+  identifier(authorization.signer);
+  if (authorization.signer !== expected.signer || typeof authorization.signature !== 'string'
+    || !/^[A-Za-z0-9+/]{86}==$/.test(authorization.signature)) throw new TypeError('untrusted external campaign signer');
+  const signature = Buffer.from(authorization.signature as string, 'base64');
+  const key = typeof expected.key === 'string' ? createPublicKey(expected.key) : expected.key.type === 'private' ? createPublicKey(expected.key) : expected.key;
+  const { signature: _signature, ...body } = authorization as unknown as LivingEffectAuthorizationV4;
+  if (key.asymmetricKeyType !== 'ed25519' || signature.toString('base64') !== authorization.signature
+    || !verify(null, signedBytes(body, 4), key, signature)) throw new TypeError('forged external campaign authorization');
 }

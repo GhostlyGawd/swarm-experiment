@@ -11,17 +11,22 @@ import { performance } from 'node:perf_hooks';
 import { decodeCanonical, decimal, encodeCanonical, exactObject, identifier } from '../fabric/encoding.ts';
 import { domainDigest, executionManifestDigest, validateDigest, type Digest } from '../fabric/identity.ts';
 import { effectAdapterDigest, DurableEffectBroker, type EffectAdapter } from '../fabric/effects.ts';
+import { createAttestedSinkAdapter, type AttestedSinkClientV1 } from '../fabric/attested-sink-adapter.ts';
+import { assertSinkStateWitness, type SinkStateWitnessV1 } from '../fabric/sink-state-witness.ts';
+import { assertEffectJournalWitnessCatalog, selectEffectJournalWitness,
+  type NamespacedEffectJournalWitnessCatalog } from '../fabric/effect-journal-witness.ts';
 import { walk, type Term, type Ty } from '../tier1/ast.ts';
 import type { CapabilityName, NodeRef, SymbolId } from '../tier1/ids.ts';
 import { GraphStore } from '../tier1/store.ts';
 import { typecheck, underlying, tyEqual } from '../tier2/typecheck.ts';
-import { assertEffectResourceAdapter, effectResourcePath } from '../tier2/effect-resource-policy.ts';
+import { assertEffectResourceAdapter, assertEffectResourceAdapterV2,
+  effectResourcePath, effectResourcePathV2 } from '../tier2/effect-resource-policy.ts';
 import type { CapabilityRegistry } from '../tier2/ocap.ts';
 import { Runtime } from './runtime.ts';
 import { BrokerEffectRouter, type RuntimeEffectRouter } from './effects.ts';
 import type { Value, Ref } from './values.ts';
 import { rng } from '../util/rng.ts';
-import { assertLivingEffectAuthorizationV2, assertLivingEffectAuthorizationV3,
+import { assertLivingEffectAuthorizationV2, assertLivingEffectAuthorizationV3, assertLivingEffectAuthorizationV4,
   type AnyLivingEffectAuthorization } from './living-effect-authorization.ts';
 
 export const LIVING_CAMPAIGN_PROFILE = 'aether.living-cooperative-campaign/1' as const;
@@ -82,6 +87,15 @@ export interface LivingCampaignReport {
 export interface LivingEffectCaseResultV2 extends LivingCaseResult {
   readonly effects: { readonly journalDigest: Digest; readonly sinkDigest: Digest; readonly eventCount: number;
     readonly sinkWrites: number; readonly indeterminate: number };
+}
+export interface LivingExternalCaseResultV4 extends LivingCaseResult {
+  readonly externalEffects: { readonly journalDigest: Digest; readonly receiptDigest: Digest;
+    readonly eventCount: number; readonly committedReceipts: number; readonly indeterminate: number };
+}
+export interface LivingExternalEffectServicesV4 {
+  readonly client: AttestedSinkClientV1;
+  readonly sinkStateWitness: SinkStateWitnessV1;
+  readonly effectCatalog: NamespacedEffectJournalWitnessCatalog;
 }
 export interface LivingEffectCampaignReportV2 extends Omit<LivingCampaignReport, 'format' | 'cases'> {
   readonly format: 'aether.living-effect-campaign-report/2';
@@ -169,9 +183,11 @@ export class LivingCampaign {
   private readonly declarations: Map<SymbolId, Extract<Term, { kind: 'FunctionDecl' }>>;
   private readonly effectAuthorization: AnyLivingEffectAuthorization | null;
   private readonly effectAuthorizationDigest: Digest | null;
+  private readonly externalEffectServices: LivingExternalEffectServicesV4 | null;
   private readonly acceptedReports = new WeakMap<object, Digest>();
   constructor(options: { manifest: LivingCampaignManifest; module: Term; registry: CapabilityRegistry; directory: string;
-    effectAuthorization?: AnyLivingEffectAuthorization; effectTrust?: { repositoryId: string; policyEpoch: string; signer: string; key: KeyObject | string } }) {
+    effectAuthorization?: AnyLivingEffectAuthorization; effectTrust?: { repositoryId: string; policyEpoch: string; signer: string; key: KeyObject | string };
+    externalEffectServices?: LivingExternalEffectServicesV4 }) {
     this.manifest = clone(options.manifest); this.registry = options.registry; this.directory = resolve(options.directory);
     const store = new GraphStore(), root = store.intern(options.module); this.module = store.hydrate(root);
     if (root !== this.manifest.candidateRoot) throw new TypeError('campaign candidate root mismatch');
@@ -182,7 +198,9 @@ export class LivingCampaign {
     if (options.effectAuthorization || options.effectTrust) {
       if (!options.effectAuthorization || !options.effectTrust) throw new TypeError('effectful campaign requires signed authority and independent trust');
       const campaignDigest = digest(LIVING_CAMPAIGN_PROFILE, this.manifest);
-      if (options.effectAuthorization.format === 'aether.living-effect-authorization/3')
+      if (options.effectAuthorization.format === 'aether.living-effect-authorization/4')
+        assertLivingEffectAuthorizationV4(options.effectAuthorization, { candidateRoot: root, campaignDigest, ...options.effectTrust });
+      else if (options.effectAuthorization.format === 'aether.living-effect-authorization/3')
         assertLivingEffectAuthorizationV3(options.effectAuthorization, { candidateRoot: root, campaignDigest, ...options.effectTrust });
       else assertLivingEffectAuthorizationV2(options.effectAuthorization, { candidateRoot: root, campaignDigest, ...options.effectTrust });
       const used = new Set<CapabilityName>();
@@ -191,11 +209,30 @@ export class LivingCampaign {
       if (used.size !== signed.length || signed.some(capability => !used.has(capability)))
         throw new TypeError('signed effect capability set does not cover exact module');
       this.effectAuthorization = clone(options.effectAuthorization);
-      const version = this.effectAuthorization.format.endsWith('/3') ? 3 : 2;
+      const version = this.effectAuthorization.format.endsWith('/4') ? 4 : this.effectAuthorization.format.endsWith('/3') ? 3 : 2;
+      if (this.effectAuthorization.format === 'aether.living-effect-authorization/4') {
+        const services = options.externalEffectServices;
+        if (!services) throw new TypeError('external sink services required for V4 campaign');
+        assertSinkStateWitness(services.sinkStateWitness);
+        assertEffectJournalWitnessCatalog(services.effectCatalog);
+        const selected = this.effectAuthorization.externalSink;
+        if (services.sinkStateWitness.digest !== selected.sinkStateWitnessDigest
+          || services.effectCatalog.digest !== selected.effectCatalogDigest
+          || services.effectCatalog.repositoryId !== selected.anchor.repositoryId
+          || services.effectCatalog.deploymentId !== selected.deploymentId
+          || services.effectCatalog.clockDomain !== 'living-effect-clock/4')
+          throw new TypeError('external witness services differ from signed campaign');
+        this.externalEffectServices = services;
+      } else {
+        if (options.externalEffectServices) throw new TypeError('external sink services require V4 authority');
+        this.externalEffectServices = null;
+      }
       this.effectAuthorizationDigest = digest(`aether.living-effect-authorization/${version}`, this.effectAuthorization);
       this.manifestId = digest(`aether.living-effect-campaign/${version}`, { manifest: this.manifest, authorization: this.effectAuthorization });
       persist(join(this.directory, 'manifests'), `aether.living-effect-campaign/${version}`, { manifest: this.manifest, authorization: this.effectAuthorization });
     } else {
+      if (options.externalEffectServices) throw new TypeError('external sink services require signed V4 authority');
+      this.externalEffectServices = null;
       this.effectAuthorization = null; this.effectAuthorizationDigest = null;
       this.manifestId = digest(LIVING_CAMPAIGN_PROFILE, this.manifest);
       persist(join(this.directory, 'manifests'), LIVING_CAMPAIGN_PROFILE, this.manifest);
@@ -266,10 +303,15 @@ export class LivingCampaign {
         variables: Object.fromEntries(scenario.variables.map(variable => [variable.name, ordinal === 0 ? variable.minimum : ordinal === 1 ? variable.maximum : random.int(variable.minimum, variable.maximum)])) };
     }));
   }
-  private effectCase(input: LivingCase): { router: RuntimeEffectRouter; broker: DurableEffectBroker;
-    sinkDirectory: string; adapters: ReadonlyMap<CapabilityName, EffectAdapter> } {
+  private effectCase(input: LivingCase):
+    | { router: RuntimeEffectRouter; broker: DurableEffectBroker; sinkDirectory: string;
+      adapters: ReadonlyMap<CapabilityName, EffectAdapter>; external: false }
+    | { router: RuntimeEffectRouter; broker: DurableEffectBroker; sinkDirectory: null;
+      adapters: ReadonlyMap<CapabilityName, EffectAdapter>; external: true } {
     const authorization = this.effectAuthorization;
     if (!authorization) throw new TypeError('no effectful campaign authorization');
+    if (authorization.format === 'aether.living-effect-authorization/4')
+      return this.externalEffectCase(input, authorization);
     if (authorization.format === 'aether.living-effect-authorization/3'
       && process.env.AETHER_LIVING_CRASH_WORKER !== '1')
       throw new TypeError('V3 crash fault requires explicit isolated worker opt-in');
@@ -325,7 +367,43 @@ export class LivingCampaign {
     const router = new BrokerEffectRouter({ broker, manifest: authorization.executionManifest,
       executionId: `living-effect:${caseDigest(input).split(':').at(-1)}`, policyEpoch: policy.body.policyEpoch,
       deadline: '1000', adapters, grant: () => 'grant:living-effect' });
-    return { router, broker, sinkDirectory, adapters };
+    return { router, broker, sinkDirectory, adapters, external: false };
+  }
+  private externalEffectCase(input: LivingCase,
+    authorization: Extract<AnyLivingEffectAuthorization, { format: 'aether.living-effect-authorization/4' }>):
+    { router: RuntimeEffectRouter; broker: DurableEffectBroker; sinkDirectory: null;
+      adapters: ReadonlyMap<CapabilityName, EffectAdapter>; external: true } {
+    const services = this.externalEffectServices;
+    if (!services) throw new TypeError('external sink services absent');
+    const policy = authorization.signedPolicy, rule = policy.body.rules[0], selected = authorization.externalSink;
+    const adapter = createAttestedSinkAdapter({ id: rule.adapterId, repositoryId: selected.anchor.repositoryId,
+      deploymentId: selected.deploymentId, approvedAdapterArtifactDigest: selected.approvedAdapterArtifactDigest,
+      anchor: selected.anchor, client: services.client });
+    assertEffectResourceAdapterV2(policy, rule.capability, { id: adapter.id,
+      digest: effectAdapterDigest(adapter), artifactDigest: selected.approvedAdapterArtifactDigest });
+    const suffix = caseDigest(input).split(':').at(-1)!;
+    const witness = selectEffectJournalWitness(services.effectCatalog, `living-effect:${suffix}`);
+    const manifestDigest = executionManifestDigest(authorization.executionManifest);
+    const allowed = (request: Parameters<NonNullable<ConstructorParameters<typeof DurableEffectBroker>[0]['authorize']>>[0]): boolean => {
+      if (request.executionManifest !== manifestDigest || request.policyEpoch !== policy.body.policyEpoch
+        || request.capabilityGrantRef !== 'grant:living-effect') return false;
+      const payload = request.payload;
+      if (payload.tag !== 'sequence' || payload.items[0]?.tag !== 'string') return false;
+      try { effectResourcePathV2(policy, payload.items[0].value as CapabilityName, payload.items.slice(1)); return true; }
+      catch { return false; }
+    };
+    const broker = new DurableEffectBroker({ directory: join(this.directory, 'external-effect-journals', suffix),
+      clockDomain: 'living-effect-clock/4', clock: () => 100n,
+      authorize: allowed, authorizeReconciliation: allowed, witness,
+      attestedSinkV4: { anchor: selected.anchor, deploymentId: selected.deploymentId,
+        approvedAdapterArtifactDigest: selected.approvedAdapterArtifactDigest,
+        sinkStateWitness: services.sinkStateWitness },
+    });
+    const adapters = new Map<CapabilityName, EffectAdapter>([[rule.capability, adapter]]);
+    const router = new BrokerEffectRouter({ broker, manifest: authorization.executionManifest,
+      executionId: `living-effect:${suffix}`, policyEpoch: policy.body.policyEpoch,
+      deadline: '1000', adapters, grant: () => 'grant:living-effect' });
+    return { router, broker, sinkDirectory: null, adapters, external: true };
   }
   /** Recover an exact generated case after an independent worker died while
    * holding its broker ticket. Unknown sink status remains an explicit refusal. */
@@ -348,7 +426,7 @@ export class LivingCampaign {
     }
     return { reconciled, unknown };
   }
-  execute(input: LivingCase): LivingCaseResult | LivingEffectCaseResultV2 {
+  execute(input: LivingCase): LivingCaseResult | LivingEffectCaseResultV2 | LivingExternalCaseResultV4 {
     const value = clone(input); exactObject(value, ['format', 'manifestDigest', 'scenario', 'ordinal', 'seed', 'schedule', 'variables']);
     if (value.format !== 'aether.living-case/1' || value.manifestDigest !== this.manifestId) throw new TypeError('case manifest mismatch');
     const scenario = this.manifest.scenarios.find(item => item.id === value.scenario); if (!scenario) throw new TypeError('unknown scenario');
@@ -431,6 +509,16 @@ export class LivingCampaign {
     const base = { caseDigest: caseDigest(value), passed: failure === null, failure, filtered, calls, steps: runtime.steps, evaluatedOperations, allocatedBytes, peakAllocatedBytes, allocationChecksum,
       networkFrames, deliveredFrames, rejectedFrames, droppedFrames, coverage: [...coverage].sort(), trace, heapDigest: digest('aether.living-heap/1', runtime.inspect().heap) };
     if (!effect) return base;
+    if (effect.external) {
+      const receipts = effectEvents.map(item => item.signedSinkReceipt ?? null);
+      return { ...base, externalEffects: {
+        journalDigest: digest('aether.living-external-journal/4', effectEvents),
+        receiptDigest: digest('aether.living-external-receipts/4', receipts),
+        eventCount: effectEvents.length,
+        committedReceipts: effectEvents.filter(item => item.outcome?.state === 'committed' && item.signedSinkReceipt).length,
+        indeterminate,
+      } };
+    }
     const sinkFiles = readdirSync(effect.sinkDirectory).filter(file => file.endsWith('.json')).sort();
     return { ...base, effects: {
       journalDigest: digest('aether.living-effect-journal/2', effectEvents),
@@ -487,8 +575,8 @@ export class LivingCampaign {
   }
   runEffectful(): LivingEffectCampaignReportV2 {
     if (!this.effectAuthorization || !this.effectAuthorizationDigest) throw new TypeError('signed effectful campaign authority required');
-    if (this.effectAuthorization.format === 'aether.living-effect-authorization/3')
-      throw new TypeError('V3 process-crash campaign requires external complete-run audit, not local admission');
+    if (this.effectAuthorization.format !== 'aether.living-effect-authorization/2')
+      throw new TypeError('V3/V4 external campaign requires external complete-run audit, not local admission');
     const reportsDirectory = join(this.directory, 'reports');
     if (existsSync(reportsDirectory) && readdirSync(reportsDirectory).some(file => file.endsWith('.json')))
       throw new Error('effectful campaign report already exists; use a new directory for a fresh run');
@@ -533,8 +621,8 @@ export class LivingCampaign {
   admitEffectful(report: LivingEffectCampaignReportV2): { readonly manifestDigest: Digest; readonly reportDigest: Digest;
     readonly effectAuthorizationDigest: Digest; readonly productionAuthorized: false } {
     if (!this.effectAuthorization || !this.effectAuthorizationDigest) throw new TypeError('signed effectful campaign authority required');
-    if (this.effectAuthorization.format === 'aether.living-effect-authorization/3')
-      throw new TypeError('V3 process-crash campaign cannot issue local admission');
+    if (this.effectAuthorization.format !== 'aether.living-effect-authorization/2')
+      throw new TypeError('V3/V4 external campaign cannot issue local admission');
     const stamp = this.acceptedReports.get(report);
     if (!stamp || stamp !== digest('aether.living-effect-campaign-report/2', report)
       || report.format !== 'aether.living-effect-campaign-report/2'
@@ -554,6 +642,7 @@ export class LivingCampaign {
       if (!existsSync(casePath) || !readFileSync(casePath).equals(Buffer.from(encodeCanonical(caseEvidence, limits))))
         throw new Error('effectful campaign durable case changed before admission');
       const evidence = this.effectCase(item.input), events = evidence.broker.events();
+      if (evidence.external) throw new TypeError('external campaign cannot issue local admission');
       const files = readdirSync(evidence.sinkDirectory).filter(file => file.endsWith('.json')).sort();
       const current = { journalDigest: digest('aether.living-effect-journal/2', events),
         sinkDigest: digest('aether.living-effect-sink-set/2', files.map(file => ({ file, bytes: readFileSync(join(evidence.sinkDirectory, file), 'utf8') }))),
