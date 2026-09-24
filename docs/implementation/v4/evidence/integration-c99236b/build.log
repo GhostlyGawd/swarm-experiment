@@ -1,0 +1,3 @@
+
+> @ghostlygawd/aether@0.1.0 build
+> tsc -p tsconfig.json && node scripts/copy-native-fallback-driver.mjs
