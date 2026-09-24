@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -53,6 +54,53 @@ test('new retention before publication and unsigned candidate policy refuse adva
     retain = () => f.retentionLedger.retain({ kind: 'active-task', reference: 'arrived-during-preparation', root: f.root });
     assert.throws(() => f.manager.advance(proposal, candidate.evidence.manifest), /retention changed/); assert.equal(f.manager.snapshot().generation, 0);
   } finally { f.cleanup(); }
+});
+test('retention publication fence serializes a task pin from another process', async () => {
+  const f = adapterGcFixture();
+  const ready = join(f.directory, 'retention-child-ready');
+  const trigger = join(f.directory, 'retention-child-trigger');
+  const childFile = join(f.directory, 'retention-child.ts');
+  const definitions = f.configuration.registry.names.map(name => [name, f.configuration.registry.get(name)]);
+  writeFileSync(childFile, `
+import { existsSync, writeFileSync } from 'node:fs';
+import { setTimeout } from 'node:timers/promises';
+import { DurableGraphStore } from ${JSON.stringify(pathToFileURL(resolve('src/tier1/durable-store.ts')).href)};
+import { SemanticGarbageCollector } from ${JSON.stringify(pathToFileURL(resolve('src/tier1/semantic-gc.ts')).href)};
+import { CapabilityRegistry } from ${JSON.stringify(pathToFileURL(resolve('src/tier2/ocap.ts')).href)};
+const registry = new CapabilityRegistry();
+for (const [name, definition] of ${JSON.stringify(definitions)}) registry.define(definition);
+const store = new DurableGraphStore({ directory: ${JSON.stringify(join(f.directory, 'ast'))} });
+const collector = new SemanticGarbageCollector({ directory: ${JSON.stringify(join(f.directory, 'gc-retention'))},
+  repositoryId: 'adapter-gc', store, lineage: null, registry, policy: ${JSON.stringify(f.configuration.policy)} });
+writeFileSync(${JSON.stringify(ready)}, 'ready');
+while (!existsSync(${JSON.stringify(trigger)})) await setTimeout(5);
+collector.retain({ kind: 'active-task', reference: 'concurrent-task', root: ${JSON.stringify(f.root)} });
+`);
+  const child = spawn(process.execPath, ['--experimental-strip-types', childFile], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = ''; child.stderr?.on('data', chunk => { stderr += String(chunk); });
+  try {
+    const deadline = Date.now() + 10_000;
+    while (!existsSync(ready)) {
+      if (Date.now() > deadline || child.exitCode !== null) throw new Error(`retention child did not initialize: ${stderr}`);
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    const lockDir = join(f.directory, 'gc-retention', 'lock');
+    const ticketCount = () => readdirSync(lockDir).filter(name => name.startsWith('ticket-')).length;
+    const initial = ticketCount();
+    f.retentionLedger.withStableRetentions([], () => {
+      writeFileSync(trigger, 'go');
+      const waited = Date.now() + 5_000;
+      while (ticketCount() < initial + 2) {
+        if (Date.now() > waited) throw new Error(`concurrent retain did not request the fence: ${stderr}`);
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+      }
+      assert.equal(f.retentionLedger.retentions().length, 0,
+        'new task pin cannot publish after the final snapshot check but before table publication');
+    });
+    const exitCode = await new Promise<number | null>(resolve => child.once('exit', resolve));
+    assert.equal(exitCode, 0, stderr);
+    assert.deepEqual(f.retentionLedger.retentions().map(record => record.reference), ['concurrent-task']);
+  } finally { child.kill('SIGKILL'); f.cleanup(); }
 });
 test('altered mapping, incomplete certificate and rehashed dishonest liveness fail independent validation', () => {
   const f = adapterGcFixture(); try {

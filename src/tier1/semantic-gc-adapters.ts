@@ -239,10 +239,14 @@ export class SemanticAdapterGarbageCollector {
           row.ancestry[0]?.body.executionManifest === child && row.ancestry[0].body.parents.some(intent => sourceIntents.has(intent))))
           throw new Error('adapter retirement requires new signed descendant intent');
       };
-      check(); this.options.beforePublish?.(); check();
-      if (!journal.proposals.some(item => item.id === proposal.id)) journal.proposals.push(clone(proposal));
-      if (!journal.tables.some(table => declarativeAdapterTableDigest(table) === target)) journal.tables.push(clone(proposal.after));
-      journal.head = { generation: journal.head.generation + 1, table: target, manifest: candidate }; this.pin(journal); this.write(journal);
+      check(); this.options.beforePublish?.();
+      this.options.retentionLedger.withStableRetentions(proposal.retained, () => {
+        check();
+        if (!journal.proposals.some(item => item.id === proposal.id)) journal.proposals.push(clone(proposal));
+        if (!journal.tables.some(table => declarativeAdapterTableDigest(table) === target)) journal.tables.push(clone(proposal.after));
+        journal.head = { generation: journal.head.generation + 1, table: target, manifest: candidate };
+        this.pin(journal); this.write(journal);
+      });
     }, 5000);
   }
   snapshot(): { generation: number; manifest: ExecutionManifestV1; table: DeclarativeAdapterTable; productionAuthorized: false } {

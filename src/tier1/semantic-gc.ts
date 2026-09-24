@@ -171,6 +171,26 @@ export class SemanticGarbageCollector {
       if (value.format !== 'aether.semantic-retention/1' || value.configuration !== this.configuration || value.id !== id || file !== `${id.split(':').at(-1)}.json`) throw new Error('corrupt semantic retention'); return clone(record);
     });
   }
+  /** Serialize an adapter retirement publication with new replay, task and
+   * replica pins. The snapshot check and caller's durable publication share
+   * this lock, so retain() cannot arrive after the last check but before the
+   * table decision. The callback must be synchronous. */
+  withStableRetentions<T>(expected: readonly SemanticRetention[], publish: () => T): T {
+    if (!Array.isArray(expected) || typeof publish !== 'function')
+      throw new TypeError('stable retention publication requires a snapshot and callback');
+    const snapshot = clone(expected);
+    snapshot.forEach(record => this.validateRetention(record));
+    const ordered = (records: readonly SemanticRetention[]) =>
+      [...records].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    return this.lock.run(() => {
+      if (!same(ordered(this.retentions()), ordered(snapshot)))
+        throw new Error('retention changed; candidate must be reproved');
+      const result = publish();
+      if (result && typeof result === 'object' && 'then' in result)
+        throw new TypeError('stable retention publication must be synchronous');
+      return result;
+    }, 5_000);
+  }
   collect(): DurableCollectionResult {
     return this.lock.run(() => { for (const record of this.retentions()) this.options.store.retain(this.retentionLease(record), [record.root]); return this.options.store.collectGarbage(); }, 5000);
   }
