@@ -5,8 +5,10 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GraphStore } from '../../src/tier1/store.ts';
+import { domainDigest } from '../../src/fabric/identity.ts';
 import { fallbackFixture } from './fallback-tree-fixture.ts';
-import { lowerFallbackAst } from '../../roadmap/v4/research/native-fallback-ast/compiler.ts';
+import { generateRecordFallbackCertificate } from '../../src/tier2/record-fallback-proof-producer.ts';
+import { lowerFallbackAst, lowerProvedFallbackAst } from '../../roadmap/v4/research/native-fallback-ast/compiler.ts';
 import { buildProgram, cases, differential, editedFallback, editWitness,
   snapshotCaseArgs, snapshotDifferential } from '../../roadmap/v4/research/native-fallback-ast/verify.ts';
 
@@ -35,7 +37,8 @@ test('native snapshot bridge rejects stale refs and malformed direct frames', ()
     const before = f.runtime.snapshot();
     const valid = snapshotCaseArgs(before, program.lowered.manifestDigest, left, left, true, false);
     assert.equal(spawnSync(program.binary, valid).status, 0);
-    assert.throws(() => snapshotCaseArgs(before, 'wrong-manifest', left, left, true, false),
+    assert.throws(() => snapshotCaseArgs(before,
+      domainDigest('aether.execution/1', 'wrong-manifest'), left, left, true, false),
       /snapshot\/manifest mismatch/);
     assert.throws(() => snapshotCaseArgs(before, program.lowered.manifestDigest,
       { ...left, ownerEpoch: '999' }, left, true, false), /reference ownership mismatch/);
@@ -52,6 +55,32 @@ test('native snapshot bridge rejects stale refs and malformed direct frames', ()
     assert.throws(() => snapshotDifferential(new Map([['fallback', program]]),
       [cases.find(value => value.mode === 'fallback')!]), /executable digest mismatch/,
     'a changed binary cannot execute after the approved digest is recorded');
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('checked record proof changes exact native artifact identity and preserves snapshot outcomes', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'aether-proved-native-fallback-'));
+  try {
+    const f = fallbackFixture(join(directory, 'fixture'), 'fallback');
+    const context = { module: f.options.module, manifest: f.options.manifest,
+      tier2: f.options.tier2 };
+    const certificate = generateRecordFallbackCertificate(context);
+    assert(certificate);
+    const ordinary = buildProgram(join(directory, 'ordinary'), 'fallback');
+    const proved = buildProgram(join(directory, 'proved'), 'fallback', undefined, certificate);
+    assert.notEqual(proved.lowered.sourceSha256, ordinary.lowered.sourceSha256);
+    assert.notEqual(proved.binarySha256, ordinary.binarySha256,
+      'portable proof subject must be retained in executable bytes');
+    assert.equal(lowerProvedFallbackAst({ ...context, tier1: f.options.tier1,
+      conservativeCertificate: certificate }).sourceSha256, proved.lowered.sourceSha256);
+    assert.equal(snapshotDifferential(new Map([['fallback', proved]]),
+      cases.filter(value => value.mode === 'fallback')).length,
+    cases.filter(value => value.mode === 'fallback').length);
+    assert.throws(() => lowerProvedFallbackAst({ ...context, tier1: f.options.tier1,
+      conservativeCertificate: { ...certificate, certificates: [] } }),
+    /incomplete or changed obligations/);
+    assert.throws(() => buildProgram(join(directory, 'wrong'), 'primary', undefined, certificate),
+      /stale certificate context|AST root or typecheck/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 

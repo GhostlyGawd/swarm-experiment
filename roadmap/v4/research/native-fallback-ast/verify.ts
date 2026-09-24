@@ -6,12 +6,16 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Term } from '../../../../src/tier1/ast.ts';
+import type { RecordFallbackCertificateV1 } from '../../../../src/tier2/record-fallback-proof-checker.ts';
 import type { LogicalRefV1 } from '../../../../src/fabric/encoding.ts';
-import { runtimeSnapshotDigest, validateRuntimeSnapshot, type RuntimeSnapshotV1 } from '../../../../src/fabric/snapshot.ts';
+import { runtimeSnapshotDigest, type RuntimeSnapshotV1 } from '../../../../src/fabric/snapshot.ts';
+import { assertProcessNativeFallbackBinding, projectNativeFallbackFrame,
+  type ProcessNativeFallbackBindingInput,
+  type ProcessNativeFallbackBindingV1 } from '../../../../src/tier4/native-fallback-contract.ts';
 import { GraphStore } from '../../../../src/tier1/store.ts';
 import { FallbackTreeRuntime } from '../../../../src/tier3/fallback-tree.ts';
 import { fallbackFixture } from '../../../../test/tier3/fallback-tree-fixture.ts';
-import { lowerFallbackAst, type NativeFallbackOutput } from './compiler.ts';
+import { lowerFallbackAst, lowerProvedFallbackAst, type NativeFallbackOutput } from './compiler.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const driver = join(here, 'driver.c');
@@ -84,33 +88,36 @@ function reference(testCase: Case, changed?: Readonly<{ module: Term; manifest: 
  * manifest, object table and reference ownership have been checked here. */
 export function snapshotCaseArgs(snapshot: RuntimeSnapshotV1, manifestDigest: string,
   left: LogicalRefV1, right: LogicalRefV1, grant2: boolean, revokeAtFault: boolean): string[] {
-  validateRuntimeSnapshot(snapshot);
-  if (snapshot.executionManifest !== manifestDigest) throw new TypeError('native fallback snapshot/manifest mismatch');
-  const nextId = Number(snapshot.nextObjectId);
-  // This exact compiler profile may allocate one new record after rollback.
-  // Reserve that slot before entering native code; otherwise a valid Aether
-  // invocation could succeed in the reference runtime but trap in Frame[4].
-  if (!Number.isSafeInteger(nextId) || nextId < 2 || nextId > 3
-    || snapshot.records.length !== nextId - 1 || snapshot.ownership.length !== nextId - 1)
-    throw new RangeError('native fallback snapshot exceeds bounded frame');
-  const ownership = new Map(snapshot.ownership.map(row => [row.objectId, row.epoch]));
-  const checkedRef = (ref: LogicalRefV1): string => {
-    if (ref.heapId !== snapshot.heapId || ownership.get(ref.objectId) !== ref.ownerEpoch
-      || !snapshot.records.some(row => row.objectId === ref.objectId))
-      throw new TypeError('native fallback reference ownership mismatch');
-    return ref.objectId;
-  };
-  const values = snapshot.records.map((row, index) => {
-    if (row.objectId !== String(index + 1) || row.fields.length !== 1
-      || row.fields[0][0] !== 'value' || row.fields[0][1].tag !== 'int')
-      throw new TypeError('native fallback requires contiguous one-field Int records');
-    const value = BigInt(row.fields[0][1].value);
-    if (value < -1_000_000n || value > 1_000_100n)
-      throw new RangeError('native fallback snapshot integer outside qualified range');
-    return String(value);
-  });
-  return ['--snapshot-case', String(nextId), checkedRef(left), checkedRef(right),
-    '1', String(Number(grant2)), String(Number(revokeAtFault)), ...values];
+  const frame = projectNativeFallbackFrame(snapshot, manifestDigest, left, right);
+  return ['--snapshot-case', frame.nextObjectId, frame.left.objectId, frame.right.objectId,
+    '1', String(Number(grant2)), String(Number(revokeAtFault)), ...frame.values];
+}
+/** Executes the exact checked native image against a caller-owned runtime
+ * snapshot projection. The result is still a research candidate; the host
+ * must independently admit and durably publish any state transition. */
+export function executeSnapshotFallback(program: BuiltProgram, snapshot: RuntimeSnapshotV1,
+  left: LogicalRefV1, right: LogicalRefV1, grant2: boolean, revokeAtFault: boolean): unknown {
+  const args = snapshotCaseArgs(snapshot, program.lowered.manifestDigest,
+    left, right, grant2, revokeAtFault);
+  return JSON.parse(runCheckedSnapshotProgram(program, args));
+}
+/** Research executor with one exact host/proof/artifact subject. Native output
+ * remains a candidate until ProcessHost validates and durably publishes it. */
+export function executeBoundSnapshotFallback(binding: ProcessNativeFallbackBindingV1,
+  input: ProcessNativeFallbackBindingInput, program: BuiltProgram,
+  grant2: boolean, revokeAtFault: boolean): unknown {
+  assertProcessNativeFallbackBinding(binding, input);
+  const lowered = program.lowered;
+  if (!('conservativeProofDigest' in lowered)
+    || lowered.conservativeProofDigest !== binding.proofDigest
+    || !('compilerProfileDigest' in lowered)
+    || lowered.compilerProfileDigest !== binding.compilerProfileDigest
+    || lowered.root !== binding.astRoot || lowered.manifestDigest !== binding.manifestDigest
+    || lowered.sourceSha256 !== binding.sourceSha256
+    || program.binarySha256 !== binding.executableSha256)
+    throw new TypeError('native fallback executable/proof differs from host binding');
+  return executeSnapshotFallback(program, input.snapshot, input.left, input.right,
+    grant2, revokeAtFault);
 }
 export function snapshotDifferential(programs: ReadonlyMap<Mode, BuiltProgram>,
   testCases: readonly Case[] = cases) {
@@ -125,9 +132,8 @@ export function snapshotDifferential(programs: ReadonlyMap<Mode, BuiltProgram>,
       const right = testCase.alias ? left : f.runtime.allocateRecord(f.record,
         { value: { tag: 'int', value: String(testCase.initial + 100) } }, 'right');
       const before = f.runtime.snapshot();
-      const args = snapshotCaseArgs(before, program.lowered.manifestDigest,
+      const native = executeSnapshotFallback(program, before,
         left, right, testCase.grant2, testCase.revokeAtFault);
-      const native = JSON.parse(runCheckedSnapshotProgram(program, args));
       const expected = reference(testCase);
       assert.deepEqual(native, expected,
         `native snapshot case ${index}: ${JSON.stringify(testCase)}`);
@@ -137,12 +143,15 @@ export function snapshotDifferential(programs: ReadonlyMap<Mode, BuiltProgram>,
   });
 }
 export function buildProgram(directory: string, mode: Mode | 'edited', changed?: Readonly<{
-  module: Term; manifest: ReturnType<typeof fallbackFixture>['options']['manifest'] }>): BuiltProgram {
+  module: Term; manifest: ReturnType<typeof fallbackFixture>['options']['manifest'] }>,
+  conservativeCertificate?: RecordFallbackCertificateV1): BuiltProgram {
   const fixtureDirectory = mkdtempSync(join(tmpdir(), 'aether-native-fallback-build-'));
   try {
     const f = fallbackFixture(fixtureDirectory, mode === 'edited' ? 'fallback' : mode);
-    const lowered = lowerFallbackAst({ module: changed?.module ?? f.options.module,
-      manifest: changed?.manifest ?? f.options.manifest, tier1: f.options.tier1, tier2: f.options.tier2 });
+    const input = { module: changed?.module ?? f.options.module,
+      manifest: changed?.manifest ?? f.options.manifest, tier1: f.options.tier1, tier2: f.options.tier2 };
+    const lowered = conservativeCertificate
+      ? lowerProvedFallbackAst({ ...input, conservativeCertificate }) : lowerFallbackAst(input);
     const output = join(directory, mode); mkdirSync(output, { recursive: true });
     writeFileSync(join(output, 'generated.h'), lowered.source);
     const binary = join(output, 'native-fallback'), assembly = join(output, 'native-fallback.s');

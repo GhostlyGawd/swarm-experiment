@@ -8,6 +8,9 @@ import { GraphStore } from '../../../../src/tier1/store.ts';
 import { CapabilityRegistry } from '../../../../src/tier2/ocap.ts';
 import { typecheck } from '../../../../src/tier2/typecheck.ts';
 import { executionManifestDigest, type ExecutionManifestV1 } from '../../../../src/fabric/identity.ts';
+import { checkRecordFallbackCertificate, RECORD_FALLBACK_PROFILE_DIGEST,
+  type RecordFallbackCertificateV1 } from '../../../../src/tier2/record-fallback-proof-checker.ts';
+import { NATIVE_FALLBACK_COMPILER_PROFILE_DIGEST } from '../../../../src/tier4/native-fallback-contract.ts';
 
 type Function = Extract<Term, { kind: 'FunctionDecl' }>;
 type Binding = { readonly code: string; readonly type: 'record' | 'int' };
@@ -37,6 +40,12 @@ export interface NativeFallbackOutput {
   readonly manifestDigest: string;
   readonly source: string;
   readonly sourceSha256: string;
+}
+export interface ProvedNativeFallbackOutput extends NativeFallbackOutput {
+  readonly format: 'aether.proved-native-fallback-lowering/1';
+  readonly conservativeProofDigest: string;
+  readonly proofProfileDigest: string;
+  readonly compilerProfileDigest: string;
 }
 
 export function lowerFallbackAst(input: NativeFallbackInput): NativeFallbackOutput {
@@ -160,4 +169,28 @@ export function lowerFallbackAst(input: NativeFallbackInput): NativeFallbackOutp
     + `static int precondition(const Frame*before,uint32_t left,uint32_t right){uint32_t fault=0;(void)before;(void)left;(void)right;${requires.map(code => `if(!(${code})||fault)return 0;`).join('')}return !fault;}\n`
     + `static int postcondition(const Frame*before,const Frame*after,uint32_t left,uint32_t right,int64_t result){uint32_t fault=0;(void)left;(void)right;(void)result;for(uint32_t id=1;id<before->next_id;id++)if(id!=left&&before->records[id].value!=after->records[id].value)return 0;${ensures.map(code => `if(!(${code})||fault)return 0;`).join('')}return !fault;}\n`;
   return { root, manifestDigest, source, sourceSha256: hash(source) };
+}
+
+/** Versioned proof-bearing lowering. The certificate is independently
+ * rederived against the exact full module before the legacy bounded compiler
+ * runs. The proof subject is emitted into native bytes so a different valid
+ * certificate cannot silently reuse the same executable identity. */
+export function lowerProvedFallbackAst(input: NativeFallbackInput & {
+  readonly conservativeCertificate: RecordFallbackCertificateV1;
+}): ProvedNativeFallbackOutput {
+  const proof = checkRecordFallbackCertificate({ module: input.module,
+    manifest: input.manifest, tier2: input.tier2 }, input.conservativeCertificate);
+  const lowered = lowerFallbackAst(input);
+  if (proof.astRoot !== lowered.root || proof.manifestDigest !== lowered.manifestDigest)
+    throw new TypeError('proved native fallback lowering subject mismatch');
+  const proofSubject = '__attribute__((used)) static const char aether_record_fallback_proof[] = '
+    + JSON.stringify(proof.certificateDigest) + ';\n'
+    + '__attribute__((used)) static const char aether_native_fallback_profile[] = '
+    + JSON.stringify(NATIVE_FALLBACK_COMPILER_PROFILE_DIGEST) + ';\n';
+  const source = proofSubject + lowered.source;
+  return { format: 'aether.proved-native-fallback-lowering/1',
+    root: lowered.root, manifestDigest: lowered.manifestDigest, source,
+    sourceSha256: hash(source), conservativeProofDigest: proof.certificateDigest,
+    proofProfileDigest: RECORD_FALLBACK_PROFILE_DIGEST,
+    compilerProfileDigest: NATIVE_FALLBACK_COMPILER_PROFILE_DIGEST };
 }

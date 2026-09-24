@@ -27,3 +27,8 @@ export {
 export { compileSpec, parseSpec, type CompiledSpec, type Layer, type ProductSpec, type SpecRule } from './spec.ts';
 export { checkPortableCertificate, encodePortableCertificate, decodePortableCertificate, validateCheckedPortableCertificate, type PortableCertificateV1, type CheckedPortableCertificate, type PortableDerivationOptions } from './portable-proof-checker.ts';
 export { generatePortableCertificate } from './portable-proof-producer.ts';
+export { deriveRecordFallbackObligations, checkRecordFallbackCertificate, validateCheckedRecordFallbackProof,
+  RECORD_FALLBACK_PROFILE, RECORD_FALLBACK_PROFILE_DIGEST, type RecordFallbackContext,
+  type RecordFallbackCertificateV1, type CheckedRecordFallbackProof,
+  type RecordFallbackObligation, type RecordFallbackDerivation } from './record-fallback-proof-checker.ts';
+export { generateRecordFallbackCertificate } from './record-fallback-proof-producer.ts';

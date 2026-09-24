@@ -1,0 +1,27 @@
+# D13 — Native fallback host transaction
+
+Status: implementation design for V4-T3-07; no production admission or task gate is claimed. Specification 0.1.0 and the FR-3.7 ≤50 ns in-frame hard maximum remain unchanged.
+
+## Decision
+
+An AST-derived native fallback must enter ProcessHost as a versioned invocation transaction. The current packed-v2 checkpoint control changes fields inside a resumable frame; it cannot attest an entire fallback call, its result, a new allocation, or the tier chosen. The standalone native-fallback-ast driver is a research executable. A native candidate becomes authoritative only after the host validates and durably publishes it.
+
+The first admissible profile is pure and bounded to the currently specified one-field Int record ABI. The host must bind one operation ID to the exact manifest/AST root, Tier 1 and Tier 2 symbols, their common contract, a checked record-fragment Tier 2 certificate, compiler and ABI version, generated source digest, executable-byte digest, arguments, policy epoch, current generation/head and retained source snapshot digest. A signed sink effect is outside this first native profile. The existing V8 process fallback supervisor continues to reconcile effectful Tier 1 through the authenticated broker/sink path and cannot start Tier 2 while commit is possible or unknown. This separation is temporary: full T3-07 still requires native effect boundaries and broader values.
+
+## Publication and recovery contract
+
+1. Under the ProcessHost state lock, validate the current grants, snapshot, generation and witnessed host head. Persist a complete native intent with the retained pre-call snapshot before launching any native code.
+2. Independently check the Tier 2 proof against the exact executed declaration and both alias cases. Rebuild or attest the executable from the exact compiler input; read bounded binary bytes once, verify their digest and run a private copy. A source hash label alone is insufficient.
+3. Decode the native result with strict bounds. Check argument and result types against the host's retained allocation/type history; the snapshot value envelope alone does not carry those types. Compare all original object IDs, fields, ownership epochs, aliases and unchanged objects; account for every new allocation from the original next-object ID. A Tier 3 trap must retain the exact pre-call state. Check the returned value, declared frame and contract against the executed Aether semantics.
+4. Recheck grants/revocation and source generation/head before one durable publication of candidate snapshot, call receipt and witnessed state head. Same-ID retry reads the exact receipt; a different request under that ID conflicts.
+5. A controller death before publication leaves an unresolved intent. Recovery requires explicit authority and replays a **pure** native invocation from the retained source or records a safe abort. It never guesses that a missing receipt means success. A postcommit death returns the cached result without another state transition.
+
+Tests must kill the controller at intent, native launch, candidate validation and pre/post-publication boundaries; restore older local state under the witness; change executable bytes, proof, grants, refs, ownership epochs and generation; and race a competing host writer and revocation. Distinct-UID custody and a real third-party effect transaction remain separate full-task obligations.
+
+## Current evidence and limits
+
+The [snapshot-fed native research path](../../../../roadmap/v4/research/native-fallback-ast/README.md) consumes validated RuntimeSnapshotV1 projections, executes checked binary bytes and matches 14 reference cases. A [ProcessHost shadow comparison](../../../../test/tier4/process-native-fallback-snapshot.test.ts) also matches native tier and heap outcomes against real host calls for alias and distinct-reference inputs. Neither path publishes the native candidate.
+
+The generic portable scalar checker rejects record/heap writes and a nonempty modifies frame. It cannot be relabeled as proof for the native Tier 2. A separate [bounded record certificate](../../../../src/tier2/record-fallback-proof-checker.ts) now rederives alias and distinct-reference obligations from the exact source. The [proof-bearing compiler path](../../../../roadmap/v4/research/native-fallback-ast/compiler.ts) embeds its checked certificate digest and compiler profile in executable bytes. A versioned [native fallback binding](../../../../src/tier4/native-fallback-contract.ts) pins the actual ProcessHost source snapshot/head, proof and artifact identities; the research executor checks that binding against the selected native bytes before launch. An actual host snapshot matches the proved native candidate for alias and distinct-reference inputs, but the host still runs its ordinary worker for the authoritative call. The versioned host journal/witness transition and native candidate publication remain open.
+
+The record proof is conditional on the bounded one-field Int domain, a free allocation slot and signed-i64 arithmetic. It proves Tier 2 success for aliases and the exact distinct-reference postcondition classification; other distinct cases safely abort and restore the entry frame. It is source-level evidence, not a proof of the C compiler or execution platform. The Apple M4 Pro timing source currently updates at roughly 41.667 ns; its one-tick observed maximum cannot qualify the FR-3.7 hard maximum. T3-07 and the tracker count remain open.

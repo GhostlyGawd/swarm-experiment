@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Bounded record proof and native host binding — 2026-09-24
+
+- Added a portable certificate checker for the selected one-field Int record Tier 2. It rederives obligations from the exact full AST/manifest, proves signed-i64 arithmetic, one bounded allocation, total return and frame preservation for alias and distinct-reference cases, and checks the precise postcondition condition for distinct inputs. Changed declarations, incomplete/forged proofs, unsupported syntax and possible overflow fail closed.
+- Added proof-bearing native lowering that embeds the checked certificate and compiler-profile digests in executable bytes. A versioned native binding pins the actual ProcessHost source snapshot/head, generation, two tier symbols, checked proof and artifact hashes. A real host-state comparison matches native outcomes to durable worker results for alias and distinct inputs. Focused proof/native/host tests pass 10/10.
+- The binding is a checked admission subject, not a host publication. The versioned witnessed host transaction, combined native effects, full values and FR-3.7 ≤50 ns qualification remain open. T3-07 and 20/62 status do not change. [Decision and limits](decisions/D13-native-fallback-host-transaction.md).
+
 ## Native snapshot bridge and signed fallback crash recovery — 2026-09-24
 
 - Added a real-controller SIGKILL test after a separately witnessed signed sink commit and before the fallback terminal receipt. A fresh controller reopens the same signed V8 host and proved Tier 2 profile, returns the original Tier 1 result, and observes one sink decision and no Tier 2 host operation.

@@ -35,6 +35,11 @@ export * as build from './tier1/build.ts';
 // --- Tier 2: semantics, security, contracts ---------------------------------
 export { checkPortableCertificate, encodePortableCertificate, decodePortableCertificate, validateCheckedPortableCertificate, type PortableCertificateV1, type CheckedPortableCertificate, type PortableDerivationOptions } from './tier2/portable-proof-checker.ts';
 export { generatePortableCertificate } from './tier2/portable-proof-producer.ts';
+export { deriveRecordFallbackObligations, checkRecordFallbackCertificate, validateCheckedRecordFallbackProof,
+  RECORD_FALLBACK_PROFILE, RECORD_FALLBACK_PROFILE_DIGEST, type RecordFallbackContext,
+  type RecordFallbackCertificateV1, type CheckedRecordFallbackProof,
+  type RecordFallbackObligation, type RecordFallbackDerivation } from './tier2/record-fallback-proof-checker.ts';
+export { generateRecordFallbackCertificate } from './tier2/record-fallback-proof-producer.ts';
 export * from './tier2/ocap.ts';
 export { ScopedGrantAuthority, validateScopedGrant, type ScopedGrantV2, type GrantBodyV2, type GrantRequestV2, type GrantAuthorityOptions } from './tier2/scoped-grants.ts';
 export { DurableGrantEpochs, type GrantEpochOptions } from './tier2/grant-epochs.ts';
