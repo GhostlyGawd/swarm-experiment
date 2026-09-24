@@ -11,18 +11,19 @@ import { SymbolSpace } from '../../src/tier1/symbols.ts';
 import { capability, type NodeRef, type SymbolId, type CapabilityName } from '../../src/tier1/ids.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import { DurableGraphStore } from '../../src/tier1/durable-store.ts';
-import { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, SEMANTIC_GC_CALL_SHIM_PROFILE, type SemanticGcOptions, type SemanticGcProposal, type SemanticRetentionKind } from '../../src/tier1/semantic-gc.ts';
+import { SemanticGarbageCollector, SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, SEMANTIC_GC_CALL_SHIM_PROFILE, SEMANTIC_GC_FUEL_PROFILE, type SemanticGcOptions, type SemanticGcProposal, type SemanticRetentionKind } from '../../src/tier1/semantic-gc.ts';
 import { CausalLineageLedger, signIntent, signSpecRevision, fenceRequirement } from '../../src/tier1/causal-lineage.ts';
 import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { mintLocalEvidence, type EvidenceContext } from '../../src/fabric/evidence.ts';
 import { domainDigest, executionManifestDigest } from '../../src/fabric/identity.ts';
 import { approvePromotion, createPromotionHandle, evidenceBundleDigest, effectPlanDigest, migrationPlanDigest, PromotionCoordinator, type PromotionDriver, type PromotionInput, type PromotionCoordinatorOptions } from '../../src/fabric/promotion.ts';
 import { ProductionRuntime } from '../../src/tier3/compile.ts';
+import { Runtime } from '../../src/tier3/runtime.ts';
 import { encodeCanonical } from '../../src/fabric/encoding.ts';
 
 type Module = Extract<Term, { kind: 'Module' }>;
 type FixtureNames = { target: SymbolId; wrapper: SymbolId; entry: SymbolId; sink: SymbolId; dead: SymbolId; fenced: SymbolId; x: SymbolId; w: SymbolId; n: SymbolId; message: SymbolId; log: CapabilityName };
-function fixture(options: { shimProfile?: boolean; callShimProfile?: boolean; protectTarget?: boolean; protectWrapper?: boolean; exportWrapper?: boolean; branchProfile?: boolean; transform?: (module: Module, names: FixtureNames, symbols: SymbolSpace) => Module; nonlinear?: boolean; opaque?: boolean; fenceWrapper?: boolean; booleanWrapper?: boolean } = {}) {
+function fixture(options: { shimProfile?: boolean; callShimProfile?: boolean; fuelBranchProfile?: boolean; protectTarget?: boolean; protectWrapper?: boolean; exportWrapper?: boolean; branchProfile?: boolean; transform?: (module: Module, names: FixtureNames, symbols: SymbolSpace) => Module; nonlinear?: boolean; opaque?: boolean; fenceWrapper?: boolean; booleanWrapper?: boolean } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'aether-semantic-gc-')), store = new DurableGraphStore({ directory: join(directory, 'ast') });
   const symbols = new SymbolSpace('semantic-gc-fixture'), target = symbols.define('increment'), wrapper = symbols.define('forward'), entry = symbols.define('compute'), sink = symbols.define('append'), dead = symbols.define('unused'), fenced = symbols.define('protected');
   const x = symbols.define('x'), w = symbols.define('w'), n = symbols.define('n'), message = symbols.define('message'), log = capability('cap:test:append');
@@ -52,7 +53,7 @@ function fixture(options: { shimProfile?: boolean; callShimProfile?: boolean; pr
     return { root, context, evidence, manifest, intent };
   };
   const genesis = artifact(module, []); store.commit('production', genesis.root, null);
-  const gcOptions: SemanticGcOptions = { profile: options.callShimProfile ? SEMANTIC_GC_CALL_SHIM_PROFILE : options.shimProfile ? SEMANTIC_GC_SHIM_PROFILE : options.branchProfile ? SEMANTIC_GC_BRANCH_PROFILE : SEMANTIC_GC_PROFILE, directory: join(directory, 'gc'), repositoryId: 'semantic-gc', store, lineage, registry, policy: { epoch: 'closed-exports/1', exports: [entry, sink, ...(options.exportWrapper ? [wrapper] : [])], protectedSymbols: [...(options.protectTarget ? [target] : []), ...(options.protectWrapper ? [wrapper] : [])] } };
+  const gcOptions: SemanticGcOptions = { profile: options.fuelBranchProfile ? SEMANTIC_GC_FUEL_PROFILE : options.callShimProfile ? SEMANTIC_GC_CALL_SHIM_PROFILE : options.shimProfile ? SEMANTIC_GC_SHIM_PROFILE : options.branchProfile ? SEMANTIC_GC_BRANCH_PROFILE : SEMANTIC_GC_PROFILE, directory: join(directory, 'gc'), repositoryId: 'semantic-gc', store, lineage, registry, policy: { epoch: 'closed-exports/1', exports: [entry, sink, ...(options.exportWrapper ? [wrapper] : [])], protectedSymbols: [...(options.protectTarget ? [target] : []), ...(options.protectWrapper ? [wrapper] : [])] } };
   const gc = new SemanticGarbageCollector(gcOptions);
   const coordinatorOptions: PromotionCoordinatorOptions = { directory: join(directory, 'governor'), repositoryId: 'semantic-gc', genesisManifest: genesis.manifest, lineage: lineage.admissionAdapter(), authority: () => ({ repositoryId: 'semantic-gc', membershipEpoch: '1', policyEpoch: '1', eligibleGovernors: ['governor'] }), governorKey: () => governor.publicKey, clock: () => 100n };
   const coordinator = new PromotionCoordinator(coordinatorOptions);
@@ -68,7 +69,7 @@ function fixture(options: { shimProfile?: boolean; callShimProfile?: boolean; pr
     async recover(binding, handle, decision) { if (decision === 'commit') { if (!handle) throw new Error('committed preparation handle missing'); await this.activate(binding, handle); } else await this.abort(binding, handle); },
   });
   const execute = (root: NodeRef) => { const effects: unknown[][] = []; const runtime = ProductionRuntime.compile(store.hydrate(root), { registry, effects: new Map([[log, args => { effects.push([...args]); return null; }]]) }); const values = (options.booleanWrapper ? [false, true] : [-100n, -1n, 0n, 1n, 50000000000000000000000000000000000n]).map(value => runtime.call(entry, [value])); const appended = runtime.call(sink, ['preserved effect']); return { values, appended, effects }; };
-  return { directory, store, symbols, module, target, wrapper, entry, sink, dead, fenced, registry, author, authority, lineage, genesis, artifact, gc, gcOptions, coordinator, coordinatorOptions, input, driver, execute, cleanup: () => rmSync(directory, { recursive: true, force: true }) };
+  return { directory, store, symbols, module, target, wrapper, entry, sink, dead, fenced, log, registry, author, authority, lineage, genesis, artifact, gc, gcOptions, coordinator, coordinatorOptions, input, driver, execute, cleanup: () => rmSync(directory, { recursive: true, force: true }) };
 }
 
 test('semantic GC proposes real dead declaration removal and pure wrapper collapse with portable equivalence and unchanged exports/effects/contracts', () => {
@@ -89,7 +90,7 @@ test('semantic GC proposes real dead declaration removal and pure wrapper collap
 });
 
 test('semantic GC requires signed exact lineage and governor promotion; rollback is a newly authorized reverse operation', async () => {
-  const f = fixture();
+  const f = fixture({ protectWrapper: true });
   try {
     const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
     const unsigned = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!], false);
@@ -171,7 +172,7 @@ test('semantic GC refuses unsupported nonlinear equivalence without changing the
 });
 
 test('semantic GC revocation during prepared promotion aborts the staged target; no commit is guessed', async () => {
-  const f = fixture();
+  const f = fixture({ protectWrapper: true });
   try {
     const proposal = f.gc.propose(f.genesis.evidence.manifest)!, candidate = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!]);
     await assert.rejects(f.gc.promote(proposal.id, f.input(candidate), f.coordinator, f.driver(proposal, () => { f.authority.eligibleAuthors = []; })), /revoked|lineage|authorization|author/i);
@@ -186,7 +187,9 @@ test('semantic GC activation recovery follows the committed governor decision an
   try {
     const proposal = f.gc.propose(f.genesis.evidence.manifest)!, candidate = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!]);
     const interrupted = new PromotionCoordinator({ ...f.coordinatorOptions, fault(point) { if (point === 'after-commit') throw new Error('simulated activation interruption'); } });
-    await assert.rejects(f.gc.promote(proposal.id, f.input(candidate), interrupted, f.driver(proposal)), /activation interruption/);
+    // Model a decision committed by the historical profile before the new
+    // quota gate existed. Recovery must still be able to finish that decision.
+    await assert.rejects(interrupted.promote(f.input(candidate), f.driver(proposal)), /activation interruption/);
     assert.equal(interrupted.state().committedManifest, candidate.manifest); assert.equal(interrupted.state().activationPending, true); assert.equal(f.store.head('production')!.root, proposal.sourceRoot);
     const reopened = new PromotionCoordinator(f.coordinatorOptions), collector = new SemanticGarbageCollector(f.gcOptions);
     f.authority.eligibleAuthors = [];
@@ -218,7 +221,7 @@ function terms(root: Term): Term[] {
   while (pending.length) { const term = pending.pop()!; output.push(term); for (const group of linkGroups(term)) pending.push(...group.links); }
   return output;
 }
-const branchFixture = (enabled = true) => fixture({ branchProfile: enabled, transform(module, names) {
+const branchFixture = (enabled = true, fuel = false) => fixture({ branchProfile: enabled, fuelBranchProfile: fuel, transform(module, names) {
   let result = changeFunction(module, names.entry, decl => ({ ...decl, body: b.if_(b.eq(b.sub(b.v(names.n), b.v(names.n)), b.int(0)), b.block(b.ret(b.add(b.call(names.wrapper, b.v(names.n)), b.int(10)))), b.block(b.ret(b.int(-999)))) }));
   result = changeFunction(result, names.sink, decl => ({ ...decl, body: b.block(b.if_(b.bool(false), b.block(b.exprStmt(b.call(names.dead))), b.block(b.exprStmt(b.invoke(names.log, b.v(names.message))))), b.ret(b.unit())) }));
   return result;
@@ -248,6 +251,82 @@ test('legacy forwarder profile keeps branch syntax and cannot reopen a new branc
     assert.ok(terms(f.store.hydrate(proposal.targetRoot)).some(term => term.kind === 'If'));
     assert.ok(!proposal.removed.includes(f.dead), 'syntactic call in the unpruned branch keeps the declaration live');
     assert.throws(() => new SemanticGarbageCollector({ ...f.gcOptions, profile: SEMANTIC_GC_BRANCH_PROFILE }), /configuration changed/);
+  } finally { f.cleanup(); }
+});
+
+test('legacy forwarder and flattened-branch proposals remain readable but cannot start new promotions', async () => {
+  const factories = [
+    () => fixture(),
+    () => fixture({ branchProfile: true, protectWrapper: true, transform(module, names) {
+      return changeFunction(module, names.entry, decl => ({ ...decl,
+        body: b.if_(b.eq(b.sub(b.v(names.n), b.v(names.n)), b.int(0)),
+          b.ret(b.add(b.v(names.n), b.int(11))), b.ret(b.int(-1))) }));
+    } }),
+  ];
+  for (const make of factories) {
+    const f = make();
+    try {
+      const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+      assert.ok(proposal.collapsed.length || proposal.branches?.length);
+      const candidate = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!]);
+      const state = f.coordinator.state(), head = f.store.head('production');
+      await assert.rejects(f.gc.promote(proposal.id, f.input(candidate), f.coordinator, f.driver(proposal)), /step-quota behavior/);
+      assert.deepEqual(f.coordinator.state(), state);
+      assert.deepEqual(f.store.head('production'), head);
+      assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(proposal.id).id, proposal.id);
+    } finally { f.cleanup(); }
+  }
+});
+
+test('fuel-preserving branch profile removes cold If calls but keeps exact reference-runtime effects and quota faults', () => {
+  const f = branchFixture(true, true);
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.profile, SEMANTIC_GC_FUEL_PROFILE);
+    assert.equal(proposal.branches!.length, 2);
+    assert.deepEqual(proposal.collapsed, []);
+    assert.ok(proposal.removed.includes(f.dead));
+    assert.ok(!proposal.removed.includes(f.wrapper));
+    const candidate = f.store.hydrate(proposal.targetRoot);
+    assert.equal(terms(candidate).filter(term => term.kind === 'If').length, 2);
+    const run = (root: NodeRef, maxSteps: number) => {
+      const effects: unknown[][] = [];
+      const runtime = new Runtime({ registry: f.registry, maxSteps, trace: true,
+        effects: new Map([[f.log, args => { effects.push([...args]); return null; }]]) });
+      runtime.load(f.store.hydrate(root));
+      const result = runtime.call(f.sink, ['chosen-effect']);
+      return { result, effects, trace: runtime.trace, effectLog: runtime.effects };
+    };
+    for (let maxSteps = 1; maxSteps <= 24; maxSteps++)
+      assert.deepEqual(run(proposal.targetRoot, maxSteps), run(proposal.sourceRoot, maxSteps), `maxSteps=${maxSteps}`);
+    assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(proposal.id).id, proposal.id);
+    assert.throws(() => new SemanticGarbageCollector({ ...f.gcOptions, profile: SEMANTIC_GC_BRANCH_PROFILE }), /configuration changed/);
+  } finally { f.cleanup(); }
+});
+
+test('fuel-preserving Cond profile removes the cold effect expression without moving its guard or chosen arm', () => {
+  const f = fixture({ fuelBranchProfile: true, transform(module, names) {
+    return changeFunction(module, names.sink, decl => ({ ...decl, body: b.block(
+      b.exprStmt(b.cond(b.bool(true), b.invoke(names.log, b.str('chosen')), b.invoke(names.log, b.str('cold')))),
+      b.ret(b.unit()),
+    ) }));
+  } });
+  try {
+    const proposal = f.gc.propose(f.genesis.evidence.manifest)!;
+    assert.equal(proposal.branches!.length, 1);
+    assert.equal(proposal.branches![0].selection.kind, 'Cond');
+    const candidate = f.store.hydrate(proposal.targetRoot);
+    assert.equal(terms(candidate).filter(term => term.kind === 'Cond').length, 1);
+    assert.ok(!terms(candidate).some(term => term.kind === 'Lit' && term.value === 'cold'));
+    const run = (root: NodeRef, maxSteps: number) => {
+      const effects: unknown[][] = [];
+      const runtime = new Runtime({ registry: f.registry, maxSteps, trace: true,
+        effects: new Map([[f.log, args => { effects.push([...args]); return null; }]]) });
+      runtime.load(f.store.hydrate(root));
+      return { result: runtime.call(f.sink, ['ignored']), effects, trace: runtime.trace, effectLog: runtime.effects };
+    };
+    for (let maxSteps = 1; maxSteps <= 18; maxSteps++)
+      assert.deepEqual(run(proposal.targetRoot, maxSteps), run(proposal.sourceRoot, maxSteps), `maxSteps=${maxSteps}`);
   } finally { f.cleanup(); }
 });
 
@@ -295,7 +374,7 @@ test('branch pruning does not treat an entry precondition or an earlier assigned
 });
 
 test('dead-branch cleanup and inverse rollback require fresh signed F08 authority and retain condition certificates through GC', async () => {
-  const f = branchFixture();
+  const f = branchFixture(true, true);
   try {
     const proposal = f.gc.propose(f.genesis.evidence.manifest)!, candidate = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!]);
     await f.gc.promote(proposal.id, f.input(candidate), f.coordinator, f.driver(proposal));
@@ -461,19 +540,16 @@ test('scalar shim retirement is opt-in; the branch-only profile retains non-forw
   } finally { f.cleanup(); }
 });
 
-test('scalar shim cleanup and reverse rollback remain bound to newly signed lineage, governor approval and retained proof roots', async () => {
+test('legacy scalar shim proof remains readable but a new quota-changing promotion is refused before preparation', async () => {
   const f = scalarShimFixture();
   try {
     const proposal = f.gc.propose(f.genesis.evidence.manifest)!, candidate = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!]);
-    await f.gc.promote(proposal.id, f.input(candidate), f.coordinator, f.driver(proposal));
-    const rollback = f.gc.proposeRollback(proposal.id, candidate.evidence.manifest);
-    assert.equal(rollback.shims!.length, 1); assert.notEqual(rollback.shims![0].manifest.specRoot, proposal.shims![0].manifest.specRoot);
-    const restored = f.artifact(f.module, [candidate.intent!]);
-    await f.gc.promote(rollback.id, f.input(restored), f.coordinator, f.driver(rollback));
+    await assert.rejects(f.gc.promote(proposal.id, f.input(candidate), f.coordinator, f.driver(proposal)), /step-quota behavior/);
+    assert.equal(f.coordinator.state().committedManifest, f.genesis.manifest);
     assert.equal(f.store.head('production')!.root, proposal.sourceRoot); f.gc.collect();
-    for (const witness of [...proposal.shims!, ...rollback.shims!]) assert.ok(f.store.get(witness.root));
+    for (const witness of proposal.shims!) assert.ok(f.store.get(witness.root));
     assert.deepEqual(f.execute(proposal.targetRoot), f.execute(proposal.sourceRoot));
-    assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(rollback.id).id, rollback.id);
+    assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(proposal.id).id, proposal.id);
   } finally { f.cleanup(); }
 });
 
@@ -511,11 +587,7 @@ test('V2 call-bearing scalar shim proves a closed helper expansion before redire
     assert.equal(new SemanticGarbageCollector(f.gcOptions).readProposal(proposal.id).id, proposal.id);
     assert.throws(() => new SemanticGarbageCollector({ ...f.gcOptions, profile: SEMANTIC_GC_SHIM_PROFILE }), /configuration changed/);
     const candidate = f.artifact(f.store.hydrate(proposal.targetRoot), [f.genesis.intent!]);
-    await f.gc.promote(proposal.id, f.input(candidate), f.coordinator, f.driver(proposal));
-    assert.equal(f.store.head('production')!.root, proposal.targetRoot);
-    const rollback = f.gc.proposeRollback(proposal.id, candidate.evidence.manifest);
-    const restored = f.artifact(f.module, [candidate.intent!]);
-    await f.gc.promote(rollback.id, f.input(restored), f.coordinator, f.driver(rollback));
+    await assert.rejects(f.gc.promote(proposal.id, f.input(candidate), f.coordinator, f.driver(proposal)), /step-quota behavior/);
     assert.equal(f.store.head('production')!.root, proposal.sourceRoot);
   } finally { f.cleanup(); }
 });

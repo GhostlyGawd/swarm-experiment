@@ -12,6 +12,9 @@
  * equivalence checking, refusing partial arguments that expansion could erase.
  * Both versions change only callee identities, retaining call-site argument
  * expression order/count. Both compared frames are empty.
+ * The fuel-preserving branch profile retains each proved guard and executed
+ * arm while replacing only cold code. Historical step-changing proposals
+ * remain readable and recoverable, but cannot start a new promotion.
  * The trusted export allowlist must match the externally callable surface.
  *
  * Remaining FR-1.5 coverage: broader path-dependent/opaque branch reasoning,
@@ -45,7 +48,9 @@ export const SEMANTIC_GC_PROFILE = 'aether.semantic-gc-closed-forwarders/1';
 export const SEMANTIC_GC_BRANCH_PROFILE = 'aether.semantic-gc-closed-branches/1';
 export const SEMANTIC_GC_SHIM_PROFILE = 'aether.semantic-gc-closed-scalar-shims/1';
 export const SEMANTIC_GC_CALL_SHIM_PROFILE = 'aether.semantic-gc-closed-scalar-shims/2';
-export type SemanticGcProfile = typeof SEMANTIC_GC_PROFILE | typeof SEMANTIC_GC_BRANCH_PROFILE | typeof SEMANTIC_GC_SHIM_PROFILE | typeof SEMANTIC_GC_CALL_SHIM_PROFILE;
+/** Retains the executed guard and arm, including their reference-runtime fuel. */
+export const SEMANTIC_GC_FUEL_PROFILE = 'aether.semantic-gc-fuel-preserving-branches/1';
+export type SemanticGcProfile = typeof SEMANTIC_GC_PROFILE | typeof SEMANTIC_GC_BRANCH_PROFILE | typeof SEMANTIC_GC_SHIM_PROFILE | typeof SEMANTIC_GC_CALL_SHIM_PROFILE | typeof SEMANTIC_GC_FUEL_PROFILE;
 const isShimProfile = (profile: SemanticGcProfile): boolean => profile === SEMANTIC_GC_SHIM_PROFILE || profile === SEMANTIC_GC_CALL_SHIM_PROFILE;
 type FunctionDecl = Extract<Term, { kind: 'FunctionDecl' }>;
 type Module = Extract<Term, { kind: 'Module' }>;
@@ -122,7 +127,7 @@ export class SemanticGarbageCollector {
   constructor(options: SemanticGcOptions) {
     this.options = { ...options }; identifier(options.repositoryId);
     this.profile = options.profile ?? SEMANTIC_GC_PROFILE;
-    if (![SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, SEMANTIC_GC_CALL_SHIM_PROFILE].includes(this.profile)) throw new Error('unsupported semantic GC profile');
+    if (![SEMANTIC_GC_PROFILE, SEMANTIC_GC_BRANCH_PROFILE, SEMANTIC_GC_SHIM_PROFILE, SEMANTIC_GC_CALL_SHIM_PROFILE, SEMANTIC_GC_FUEL_PROFILE].includes(this.profile)) throw new Error('unsupported semantic GC profile');
     this.maxShimComparisons = options.maxShimComparisons ?? 64;
     if (!Number.isSafeInteger(this.maxShimComparisons) || this.maxShimComparisons < 1 || this.maxShimComparisons > 1024 || !isShimProfile(this.profile) && options.maxShimComparisons !== undefined) throw new Error('invalid shim comparison profile');
     this.maxBranchProofs = options.maxBranchProofs ?? 64;
@@ -245,6 +250,20 @@ export class SemanticGarbageCollector {
         const location: BranchLocation = { declaration, term: node, path, environment: new Map(environment) }, selected = choose(location);
         if (selected !== null) {
           const chosen = selected ? node.then : node.otherwise;
+          if (this.profile === SEMANTIC_GC_FUEL_PROFILE) {
+            // The cold arm is unreachable by the checked total-condition proof.
+            // Keep the original guard/control node and the executed arm so ticks,
+            // branch telemetry, contract checks and effect order remain exact.
+            // Duplicating the selected arm in the cold slot removes its old
+            // dependencies while keeping both paths typed, including Return.
+            // The proof establishes that only the original selected slot runs.
+            if (chosen === null) {
+              if (node.kind !== 'If') throw new Error('conditional expression has no selected arm');
+              return { ...node, then: b.block(), otherwise: null };
+            }
+            const retained = child(chosen, selected ? 'then' : 'otherwise', 0);
+            return { ...node, then: retained, otherwise: retained };
+          }
           return chosen === null ? b.block() : child(chosen, selected ? 'then' : 'otherwise', 0);
         }
         const cond = child(node.cond, 'cond', 0), yes = new Map(environment), no = new Map(environment);
@@ -452,6 +471,7 @@ export class SemanticGarbageCollector {
     source = this.applyBranches(source, branches).module;
     const functions = this.declarations(source), wrappers = new Map<SymbolId, SymbolId>();
     for (const decl of functions.values()) {
+      if (this.profile === SEMANTIC_GC_FUEL_PROFILE) break;
       if (this.policy.exports.includes(decl.symbol) || this.policy.protectedSymbols.includes(decl.symbol) || fences.has(decl.symbol) || !emptyContract(decl.contract) || decl.surfaces.length || decl.purity !== 'pure' || decl.capabilities.length || decl.typeParams.length || !scalar(decl.returns) || decl.params.some(param => !scalar(param.ty))) continue;
       let expression: Term; try { expression = returnExpression(decl); } catch { continue; }
       if (expression.kind !== 'Call' || expression.callee === decl.symbol || expression.args.length !== decl.params.length || expression.args.some((arg, index) => arg.kind !== 'Var' || arg.symbol !== decl.params[index].symbol)) continue;
@@ -624,18 +644,22 @@ export class SemanticGarbageCollector {
    * and governor approval remain independently mandatory. No root is committed here. */
   async promote(id: Digest, input: PromotionInput, coordinator: PromotionCoordinator, driver: PromotionDriver) {
     if (coordinator.admissionProfile !== 'strict-lineage-v1') throw new Error('semantic GC requires strict signed-lineage promotion');
-    const proposal = this.readProposal(id); this.verify(proposal, true); this.bind(proposal, input.proposal.expectedParent, input.evidence.manifest);
+    const proposal = this.readProposal(id); this.verify(proposal, true); this.assertFuelSafePromotion(proposal); this.bind(proposal, input.proposal.expectedParent, input.evidence.manifest);
     this.options.lineage.assertCurrent(executionManifestDigest(input.evidence.manifest));
     return coordinator.promote(input, this.guardedDriver(id, driver));
   }
   guardedDriver(id: Digest, driver: PromotionDriver): PromotionDriver {
     const checked = (binding: PromotionBindingV1, current: boolean) => { const proposal = this.readProposal(id); this.verify(proposal, current); this.bind(proposal, binding.proposal.expectedParent, binding.manifest); return proposal; };
     return {
-      prepare: async (binding, evidence) => { checked(binding, true); this.options.lineage.assertCurrent(binding.proposal.candidateManifest); const handle = await driver.prepare(binding, evidence); checked(binding, true); this.options.lineage.assertCurrent(binding.proposal.candidateManifest); return handle; },
+      prepare: async (binding, evidence) => { this.assertFuelSafePromotion(checked(binding, true)); this.options.lineage.assertCurrent(binding.proposal.candidateManifest); const handle = await driver.prepare(binding, evidence); checked(binding, true); this.options.lineage.assertCurrent(binding.proposal.candidateManifest); return handle; },
       activate: async (binding, handle) => { checked(binding, false); await driver.activate(binding, handle); },
       abort: async (binding, handle) => { checked(binding, false); await driver.abort(binding, handle); },
       recover: async (binding, handle, decision) => { checked(binding, false); await driver.recover(binding, handle, decision); },
     };
+  }
+  private assertFuelSafePromotion(proposal: SemanticGcProposal): void {
+    if (proposal.collapsed.length || proposal.shims?.length || proposal.profile !== SEMANTIC_GC_FUEL_PROFILE && proposal.branches?.length)
+      throw new Error('semantic GC rewrite changes step-quota behavior; new promotion requires exact fuel equivalence');
   }
   private bind(proposal: SemanticGcProposal, parent: Digest, candidate: ExecutionManifestV1): void {
     validateExecutionManifest(candidate);
