@@ -1,0 +1,16 @@
+✔ V12 witnessed sink retirement survives controller SIGKILL before durable promotion commit (28958.027208ms)
+ℹ {"boundary":"before","controllerCrash":"SIGKILL","services":[68000,67998,68446],"candidateWorkerPids":[68252,68341],"deploymentWitnessRevision":"6","sinkRevision":"1"}
+✔ V12 witnessed sink retirement survives controller SIGKILL after durable promotion commit (46135.070083ms)
+ℹ {"boundary":"after","controllerCrash":"SIGKILL","services":[71547,71417,74228],"candidateWorkerPids":[73416,73506],"deploymentWitnessRevision":"8","sinkRevision":"2"}
+✔ V12 semantic deployment artifact and effect plan preserve exact V1/V2 domains (1918.401125ms)
+✔ V12 witnessed deployment retires one dead signed sink, preserves live dispatch and old receipt (23340.1995ms)
+✔ V12 commit fence rejects a new active-task pin after candidate preparation (6320.346917ms)
+✔ V12 rejects semantic checkpoint custody smuggled through a reloadable factory (1936.935042ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 108875.109875

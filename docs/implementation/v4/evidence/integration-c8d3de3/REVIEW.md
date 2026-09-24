@@ -1,0 +1,20 @@
+# Governor-admitted signed sink retirement checkpoint
+
+Exact tested source: `c8d3de30d6e2e856dcab0a292c9fe4d1959376bd`, specification 0.1.0. The worktree was clean during the complete serial suite and exact-source benchmark; these evidence files were added afterward.
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `caffeinate -i npm test` | **1,048 tests: 1,047 pass, 0 fail, 1 existing opt-in skip** | [full suite](aether-v12-gc-full-serial.log) |
+| Direct and real-process V12 retirement campaigns | **6/6 pass**, including controller SIGKILL before/after governor commit and fresh recovery | [focused campaign](aether-v12-semantic-focused.log) |
+| Historical V10/V11 sink host | **1/1 combined real-process campaign passes** | [historical host](aether-v13-legacy-host.log) |
+| V2 proof, V7 policy/table, private broker map, deployment witness and promotion fence | **6/6**, **7/7**, **9/9**, **12/12**, **13/13** pass in focused runs | [proof](aether-sink-retirement-historical-tests.log), [table](aether-v7-table-tests.log), [broker](aether-v7-router-map-tests.log), [witness](aether-deployment-v12-witness-tests.log), [governor](aether-promotion-retention-fence.log) |
+| Build, typecheck, roadmaps and package dry run | pass; v4 graph tracks 62 tasks and 71 obligations | [build](aether-v12-build.log), [typecheck](aether-v12-typecheck.log), [roadmap](aether-v12-roadmap.log), [v4 roadmap](aether-v12-roadmap-v4.log), [package files](aether-v12-package-dry-run.json) |
+| v4 release benchmark | independent exact-source verification passes; enforcement exits 1 with **17 required targets failed or unmeasured** | [measure](aether-v12-bench-measure.log), [verify](aether-v12-bench-verify.log), [enforce](aether-v12-bench-enforce.log), [manifest](bench/manifest.json), [samples](bench/samples.json) |
+
+The [D15 decision](../../decisions/D15-signed-sink-adapter-retirement.md) records Artifact `/2`, signed effect policy `/7`, declarative sink table `/2`, independent retirement proof `/2`, deployment state `/12`, prepared record `/10`, effect plan `/10`, and ProcessHost config `/13`. Strict signed lineage and governor approval choose the live table. Broker admission reads its private complete adapter map, including registrations for dead/unplaced functions. A late task pin between preparation and commit invalidates the proposed retirement under a synchronous retention fence. Historical receipt inspection uses the predecessor artifact and does not grant old live dispatch.
+
+The direct campaign makes a real worker/signed sink call, rotates policy epoch, reopens the stale source for inspection and promotion without serving new calls, retires one unused registration, dispatches the remaining live sink, then reopens and reads the exact predecessor receipt without another dispatch. A later active-task pin does not invalidate the already committed historical proof. The separate-process campaign runs a sink service, sink witness and operator witness with short-lived controllers. SIGKILL before the durable governor commit recovers an abort; SIGKILL after commit recovers activation. It also refuses missing witness custody and a same-revision local table edit. The services share one UID, and the approved adapter digest remains a label rather than a measurement of executable bytes.
+
+This is a bounded signed sink registration profile. New V13 checkpoint leases require an independently selected semantic-retention authority; V12 deployment currently has no shared authority for them and rejects a factory-supplied substitute. Full T1-05 still needs fuel-equivalent live wrapper/shim collapse, general adapter retirement, complete task/replay/audit/unstable-replica retention and safe eventual reclamation. T2-04's independent custody and general hostile adapter boundary also remain open. The warm-message compression ratio is **1.861×** against 4×; 17 release targets are failed or unmeasured. The tracker stays **20/62 verified**.
+
+SHA-256 digests for retained artifacts are in [hashes.json](hashes.json).

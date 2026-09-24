@@ -1,0 +1,20 @@
+✔ deployment witness pins operator and namespace with exact durable CAS bytes (2.818709ms)
+✔ deployment witness rejects stale writers, rollback and same-revision equivocation (0.5915ms)
+✔ deployment witness rejects incomplete, wrong-revision, wrong-identity and noncanonical journals before CAS (3.683208ms)
+✔ deployment witness rejects false CAS acknowledgments and can recover a lost response (1.27375ms)
+✔ deployment witness rejects malformed source heads (0.270375ms)
+✔ deployment witness admits exact /10 sink identity and retains canonical CAS bytes (1.221125ms)
+✔ deployment witness V12 pins signed sink table fields and immutable export authority (2.945375ms)
+✔ deployment witness rejects malformed /10 sink fields and profile before CAS (0.680041ms)
+✔ deployment witness forbids sink identity drift and /9↔/10 switch before CAS (2.315542ms)
+✔ deployment witness admits exact /11 resource-scoped sink journal and durable CAS bytes (0.598875ms)
+✔ deployment witness rejects malformed /11 sink fields, namespace, and profile before CAS (0.615458ms)
+✔ deployment witness prevents /11 sink identity changes and cross-version adoption before CAS (2.967416ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 101.866959

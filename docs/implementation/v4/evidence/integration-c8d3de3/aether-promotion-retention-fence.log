@@ -1,0 +1,21 @@
+✔ F08 core: exact governor-approved subject commits and filesystem activation is idempotent (184.332209ms)
+✔ production commit fence holds the final decision before activation and can recover a postcommit interruption (260.827042ms)
+✔ production commit fence refuses omitted, late, repeated and stale-authority decisions (374.469ms)
+✔ F08 core: individually valid literal edits fail when their composed root violates a+b >= 18 (91.171708ms)
+✔ F08 core: forged signatures, changed effect/migration context and stale policy/expiration cannot authorize (562.756625ms)
+✔ F08 core: failed prepare, cross-subject handles and policy changes during prepare preserve old state (395.665291ms)
+✔ F08 core: activation failure after commit blocks serving and recovers the committed new target (248.363042ms)
+✔ F08 core: two coordinator instances racing the same parent commit at most one candidate (199.3145ms)
+✔ F08 core: malformed approvals are rejected before mutation and corrupt readiness/history fails closed (155.861042ms)
+✔ F08 core: real process death at each durable phase recovers before/after the commit boundary (1399.294042ms)
+✔ admission profiles: strict lineage is the default and baseline is explicit and durable (191.760916ms)
+✔ admission profiles: explicit legacy adoption validates and preserves exact signed history (214.047458ms)
+✔ admission profiles: malformed legacy identity or approval refuses migration without rewriting bytes (241.730792ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4673.851416

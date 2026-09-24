@@ -1,0 +1,14 @@
+✔ V2 sink retirement proves exact unused registration and rule removal without live mutation (1318.921583ms)
+✔ exported, protected, fenced and retained sink consumers cannot retire (4912.529583ms)
+✔ changed retention and dishonest liveness or table/rule edits fail independent verification (1088.984458ms)
+✔ committed retirement proof remains auditable after later task pins but cannot be reused for a new commit (1658.942708ms)
+✔ changed source/candidate roots, epochs and portable proof fail closed (1422.806ms)
+✔ independent verifier checks a portable proof when proof production is unavailable (1445.296291ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11962.505959

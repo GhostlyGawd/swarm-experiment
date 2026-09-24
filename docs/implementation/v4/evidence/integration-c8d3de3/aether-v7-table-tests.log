@@ -1,0 +1,15 @@
+✔ V2 sink table and signed V7 policy bind the same complete branded live map (11.274791ms)
+✔ V2 sink table refuses forged, unmatched and re-signed registration identities (4.6005ms)
+✔ empty V2 table admits only an exact-root module without any Invoke (4.314333ms)
+✔ V7 signs the table digest and preserves V6 dynamic sink rule semantics (13.421125ms)
+✔ V7 rejects stale table, AST, epoch, signer and V6 domain substitution (8.266417ms)
+✔ V7 empty rules require a checked exact-root module with no Invoke anywhere (17.168459ms)
+✔ V7 keeps V6 rule bounds and rejects malformed table identities (4.135875ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 154.699833

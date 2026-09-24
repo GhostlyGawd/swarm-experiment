@@ -1,0 +1,12 @@
+✔ V12 semantic deployment artifact and effect plan preserve exact V1/V2 domains (1863.078125ms)
+✔ V12 witnessed deployment retires one dead signed sink, preserves live dispatch and old receipt (23276.344375ms)
+✔ V12 commit fence rejects a new active-task pin after candidate preparation (5586.867625ms)
+✔ V12 rejects semantic checkpoint custody smuggled through a reloadable factory (1883.377042ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32778.326584

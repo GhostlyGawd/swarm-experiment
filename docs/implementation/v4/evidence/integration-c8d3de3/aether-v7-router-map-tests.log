@@ -1,0 +1,17 @@
+✔ V5 predispatch denial holds funds until an exact signed witnessed noncommit fence (853.190458ms)
+✔ V5 recovers a reserve that reached the bridge before broker publication (553.608208ms)
+✔ V5 keeps funds encumbered when the bridge loses its reserve receipt (763.831125ms)
+✔ V5 router pins operator bridge, grant and full recorded reservation identity (759.389833ms)
+✔ signed V7 router checks its private complete adapter map before any live dispatch (293.142791ms)
+✔ V5 witness outage leaves an authorized reservation encumbered (412.125917ms)
+✔ V5 predispatch status can only charge an exact signed witnessed commit once (652.514417ms)
+✔ V5 rejects forged budget hooks and exact bridge substitution (815.151042ms)
+✔ V5 cached commits fail closed on local or witness rollback of bridge and ledger (3019.01125ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8232.762625

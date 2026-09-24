@@ -1,0 +1,2391 @@
+[
+  {
+    "id": "@ghostlygawd/aether@0.1.0",
+    "name": "@ghostlygawd/aether",
+    "version": "0.1.0",
+    "size": 1089740,
+    "unpackedSize": 5736203,
+    "shasum": "1e1f96bf50d54a25a9ec26d96d1501c9a381c34f",
+    "integrity": "sha512-D6VeKhhfv6VkuhfUzgKKfnl10w027w4fU6I9K02SfhUt9Kw1YlAA1jBe1Z/cnGejKnT5wQx8qDGIR3GmLrUyKw==",
+    "filename": "ghostlygawd-aether-0.1.0.tgz",
+    "files": [
+      {
+        "path": "LICENSE",
+        "size": 10258,
+        "mode": 420
+      },
+      {
+        "path": "README.md",
+        "size": 15215,
+        "mode": 420
+      },
+      {
+        "path": "dist/agent/index.d.ts",
+        "size": 139,
+        "mode": 420
+      },
+      {
+        "path": "dist/agent/index.js",
+        "size": 121,
+        "mode": 420
+      },
+      {
+        "path": "dist/agent/index.js.map",
+        "size": 181,
+        "mode": 420
+      },
+      {
+        "path": "dist/agent/protocol.d.ts",
+        "size": 2235,
+        "mode": 420
+      },
+      {
+        "path": "dist/agent/protocol.js",
+        "size": 4431,
+        "mode": 420
+      },
+      {
+        "path": "dist/agent/protocol.js.map",
+        "size": 5069,
+        "mode": 420
+      },
+      {
+        "path": "dist/cli.d.ts",
+        "size": 298,
+        "mode": 420
+      },
+      {
+        "path": "dist/cli.js",
+        "size": 18645,
+        "mode": 420
+      },
+      {
+        "path": "dist/cli.js.map",
+        "size": 21393,
+        "mode": 420
+      },
+      {
+        "path": "dist/examples/ledger.d.ts",
+        "size": 1998,
+        "mode": 420
+      },
+      {
+        "path": "dist/examples/ledger.js",
+        "size": 11319,
+        "mode": 420
+      },
+      {
+        "path": "dist/examples/ledger.js.map",
+        "size": 12174,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/attested-sink-adapter.d.ts",
+        "size": 3869,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/attested-sink-adapter.js",
+        "size": 9370,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/attested-sink-adapter.js.map",
+        "size": 7453,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/attested-sink-service-cli.d.ts",
+        "size": 91,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/attested-sink-service-cli.js",
+        "size": 4479,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/attested-sink-service-cli.js.map",
+        "size": 3958,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/attested-sink-service.d.ts",
+        "size": 2116,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/attested-sink-service.js",
+        "size": 21868,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/attested-sink-service.js.map",
+        "size": 21725,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/budget-journal-witness.d.ts",
+        "size": 1217,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/budget-journal-witness.js",
+        "size": 4606,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/budget-journal-witness.js.map",
+        "size": 4319,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/deployment-journal-witness.d.ts",
+        "size": 1319,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/deployment-journal-witness.js",
+        "size": 10020,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/deployment-journal-witness.js.map",
+        "size": 8113,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/effect-journal-witness.d.ts",
+        "size": 4277,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/effect-journal-witness.js",
+        "size": 7753,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/effect-journal-witness.js.map",
+        "size": 6793,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/effects.d.ts",
+        "size": 12429,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/effects.js",
+        "size": 63316,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/effects.js.map",
+        "size": 54690,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/encoding.d.ts",
+        "size": 2548,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/encoding.js",
+        "size": 11411,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/encoding.js.map",
+        "size": 11760,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/evidence.d.ts",
+        "size": 4445,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/evidence.js",
+        "size": 26551,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/evidence.js.map",
+        "size": 26311,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/host-journal-witness.d.ts",
+        "size": 2189,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/host-journal-witness.js",
+        "size": 7406,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/host-journal-witness.js.map",
+        "size": 6525,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/identity.d.ts",
+        "size": 3475,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/identity.js",
+        "size": 6723,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/identity.js.map",
+        "size": 6491,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/index.d.ts",
+        "size": 709,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/index.js",
+        "size": 742,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/index.js.map",
+        "size": 537,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/journal-lock.d.ts",
+        "size": 1601,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/journal-lock.js",
+        "size": 8226,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/journal-lock.js.map",
+        "size": 7727,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/promotion.d.ts",
+        "size": 6833,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/promotion.js",
+        "size": 28864,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/promotion.js.map",
+        "size": 26042,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-crypto.d.ts",
+        "size": 3259,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-crypto.js",
+        "size": 11267,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-crypto.js.map",
+        "size": 11428,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-node.d.ts",
+        "size": 6072,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-node.js",
+        "size": 28525,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-node.js.map",
+        "size": 30616,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-threshold.d.ts",
+        "size": 3996,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-threshold.js",
+        "size": 17805,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-threshold.js.map",
+        "size": 20241,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-votes.d.ts",
+        "size": 1253,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-votes.js",
+        "size": 8267,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/quorum-votes.js.map",
+        "size": 8845,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/replication.d.ts",
+        "size": 7318,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/replication.js",
+        "size": 30875,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/replication.js.map",
+        "size": 30768,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/sink-receipt.d.ts",
+        "size": 4012,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/sink-receipt.js",
+        "size": 8578,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/sink-receipt.js.map",
+        "size": 7330,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/sink-state-witness.d.ts",
+        "size": 2741,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/sink-state-witness.js",
+        "size": 8211,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/sink-state-witness.js.map",
+        "size": 7418,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/snapshot.d.ts",
+        "size": 1207,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/snapshot.js",
+        "size": 3517,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/snapshot.js.map",
+        "size": 3862,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/witness-service-cli.d.ts",
+        "size": 86,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/witness-service-cli.js",
+        "size": 2344,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/witness-service-cli.js.map",
+        "size": 2330,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/witness-service.d.ts",
+        "size": 3335,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/witness-service.js",
+        "size": 45028,
+        "mode": 420
+      },
+      {
+        "path": "dist/fabric/witness-service.js.map",
+        "size": 41748,
+        "mode": 420
+      },
+      {
+        "path": "dist/index.d.ts",
+        "size": 17170,
+        "mode": 420
+      },
+      {
+        "path": "dist/index.js",
+        "size": 11283,
+        "mode": 420
+      },
+      {
+        "path": "dist/index.js.map",
+        "size": 6713,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/coverage.d.ts",
+        "size": 451,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/coverage.js",
+        "size": 769,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/coverage.js.map",
+        "size": 1037,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/diff.d.ts",
+        "size": 604,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/diff.js",
+        "size": 2300,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/diff.js.map",
+        "size": 2993,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-atomic.d.ts",
+        "size": 109,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-atomic.js",
+        "size": 8655,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-atomic.js.map",
+        "size": 1985,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-bindings.d.ts",
+        "size": 236,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-bindings.js",
+        "size": 1152,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-bindings.js.map",
+        "size": 359,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-composites.d.ts",
+        "size": 112,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-composites.js",
+        "size": 25794,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-composites.js.map",
+        "size": 1121,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-continuation-plan.d.ts",
+        "size": 444,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-continuation-plan.js",
+        "size": 4588,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-continuation-plan.js.map",
+        "size": 5269,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-continuations.d.ts",
+        "size": 115,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-continuations.js",
+        "size": 19523,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-continuations.js.map",
+        "size": 1738,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-declarations.d.ts",
+        "size": 237,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-declarations.js",
+        "size": 566,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-declarations.js.map",
+        "size": 367,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-generic-plan.d.ts",
+        "size": 330,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-generic-plan.js",
+        "size": 2748,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-generic-plan.js.map",
+        "size": 3560,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-generics.d.ts",
+        "size": 110,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-generics.js",
+        "size": 10852,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-generics.js.map",
+        "size": 519,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-link.d.ts",
+        "size": 760,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-link.js",
+        "size": 3003,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-link.js.map",
+        "size": 3621,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-runtime.d.ts",
+        "size": 684,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-runtime.js",
+        "size": 16841,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-runtime.js.map",
+        "size": 1871,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-string-data.d.ts",
+        "size": 68560,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-string-data.js",
+        "size": 55146,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-string-data.js.map",
+        "size": 210,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-strings.d.ts",
+        "size": 109,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-strings.js",
+        "size": 6474,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable-strings.js.map",
+        "size": 768,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable.d.ts",
+        "size": 17673,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable.js",
+        "size": 104508,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/executable.js.map",
+        "size": 127577,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/index.d.ts",
+        "size": 1935,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/index.js",
+        "size": 1680,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/index.js.map",
+        "size": 1177,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/lexer.d.ts",
+        "size": 769,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/lexer.js",
+        "size": 3390,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/lexer.js.map",
+        "size": 4027,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/lsp.d.ts",
+        "size": 1599,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/lsp.js",
+        "size": 5366,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/lsp.js.map",
+        "size": 5951,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/names.d.ts",
+        "size": 794,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/names.js",
+        "size": 1517,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/names.js.map",
+        "size": 1609,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/parse.d.ts",
+        "size": 4102,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/parse.js",
+        "size": 34468,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/parse.js.map",
+        "size": 35578,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/python.d.ts",
+        "size": 378,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/python.js",
+        "size": 3176,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/python.js.map",
+        "size": 4350,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/rust.d.ts",
+        "size": 374,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/rust.js",
+        "size": 3432,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/rust.js.map",
+        "size": 4847,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/typescript.d.ts",
+        "size": 2211,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/typescript.js",
+        "size": 14311,
+        "mode": 420
+      },
+      {
+        "path": "dist/projection/typescript.js.map",
+        "size": 17074,
+        "mode": 420
+      },
+      {
+        "path": "dist/synthesis/enumerative.d.ts",
+        "size": 3552,
+        "mode": 420
+      },
+      {
+        "path": "dist/synthesis/enumerative.js",
+        "size": 11699,
+        "mode": 420
+      },
+      {
+        "path": "dist/synthesis/enumerative.js.map",
+        "size": 10513,
+        "mode": 420
+      },
+      {
+        "path": "dist/synthesis/loop.d.ts",
+        "size": 5833,
+        "mode": 420
+      },
+      {
+        "path": "dist/synthesis/loop.js",
+        "size": 12325,
+        "mode": 420
+      },
+      {
+        "path": "dist/synthesis/loop.js.map",
+        "size": 9789,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v2.d.ts",
+        "size": 489,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v2.js",
+        "size": 17869,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v2.js.map",
+        "size": 20628,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v3-bounds.d.ts",
+        "size": 536,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v3-bounds.js",
+        "size": 5112,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v3-bounds.js.map",
+        "size": 5921,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v3-compact.d.ts",
+        "size": 117,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v3-compact.js",
+        "size": 1876,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v3-compact.js.map",
+        "size": 2328,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v3.d.ts",
+        "size": 920,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v3.js",
+        "size": 13947,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v3.js.map",
+        "size": 19334,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v5.d.ts",
+        "size": 960,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v5.js",
+        "size": 2764,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir-v5.js.map",
+        "size": 2591,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir.d.ts",
+        "size": 4403,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir.js",
+        "size": 42334,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/agent-ir.js.map",
+        "size": 47393,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/ast.d.ts",
+        "size": 10342,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/ast.js",
+        "size": 7466,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/ast.js.map",
+        "size": 8362,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/blake3.d.ts",
+        "size": 1753,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/blake3.js",
+        "size": 9894,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/blake3.js.map",
+        "size": 12946,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/build.d.ts",
+        "size": 6127,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/build.js",
+        "size": 6670,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/build.js.map",
+        "size": 10496,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/canonical.d.ts",
+        "size": 1215,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/canonical.js",
+        "size": 4252,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/canonical.js.map",
+        "size": 3583,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/causal-lineage.d.ts",
+        "size": 6700,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/causal-lineage.js",
+        "size": 36518,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/causal-lineage.js.map",
+        "size": 37176,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/cognitive-blackboard.d.ts",
+        "size": 3942,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/cognitive-blackboard.js",
+        "size": 16774,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/cognitive-blackboard.js.map",
+        "size": 17557,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/durable-store.d.ts",
+        "size": 5100,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/durable-store.js",
+        "size": 35043,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/durable-store.js.map",
+        "size": 36373,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/embedding-input.d.ts",
+        "size": 1991,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/embedding-input.js",
+        "size": 10401,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/embedding-input.js.map",
+        "size": 11735,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/fractional-position.d.ts",
+        "size": 392,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/fractional-position.js",
+        "size": 2812,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/fractional-position.js.map",
+        "size": 4036,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/ids.d.ts",
+        "size": 2840,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/ids.js",
+        "size": 2668,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/ids.js.map",
+        "size": 2586,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/index.d.ts",
+        "size": 3917,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/index.js",
+        "size": 2191,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/index.js.map",
+        "size": 1661,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/merge.d.ts",
+        "size": 2019,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/merge.js",
+        "size": 10336,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/merge.js.map",
+        "size": 11324,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/modules.d.ts",
+        "size": 509,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/modules.js",
+        "size": 3332,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/modules.js.map",
+        "size": 3336,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/occurrence-tree.d.ts",
+        "size": 2310,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/occurrence-tree.js",
+        "size": 8852,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/occurrence-tree.js.map",
+        "size": 9562,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/persistence.d.ts",
+        "size": 598,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/persistence.js",
+        "size": 2779,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/persistence.js.map",
+        "size": 3103,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/provenance.d.ts",
+        "size": 6703,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/provenance.js",
+        "size": 13818,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/provenance.js.map",
+        "size": 13943,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/repository.d.ts",
+        "size": 2207,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/repository.js",
+        "size": 8422,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/repository.js.map",
+        "size": 9584,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-gc-adapters.d.ts",
+        "size": 4108,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-gc-adapters.js",
+        "size": 25865,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-gc-adapters.js.map",
+        "size": 26307,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-gc-sink-retirement.d.ts",
+        "size": 2879,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-gc-sink-retirement.js",
+        "size": 16379,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-gc-sink-retirement.js.map",
+        "size": 16354,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-gc.d.ts",
+        "size": 8137,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-gc.js",
+        "size": 72122,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-gc.js.map",
+        "size": 71091,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-index.d.ts",
+        "size": 6281,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-index.js",
+        "size": 33747,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/semantic-index.js.map",
+        "size": 36425,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/store.d.ts",
+        "size": 5734,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/store.js",
+        "size": 16384,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/store.js.map",
+        "size": 14691,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/symbols.d.ts",
+        "size": 1243,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/symbols.js",
+        "size": 2580,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/symbols.js.map",
+        "size": 2652,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/tree-materialization.d.ts",
+        "size": 1733,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/tree-materialization.js",
+        "size": 7337,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/tree-materialization.js.map",
+        "size": 7423,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/tree-workspace.d.ts",
+        "size": 4936,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/tree-workspace.js",
+        "size": 35969,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier1/tree-workspace.js.map",
+        "size": 36158,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/adapter-artifact.d.ts",
+        "size": 3424,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/adapter-artifact.js",
+        "size": 12227,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/adapter-artifact.js.map",
+        "size": 9419,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/attested-sink-budget-evidence.d.ts",
+        "size": 2323,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/attested-sink-budget-evidence.js",
+        "size": 11593,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/attested-sink-budget-evidence.js.map",
+        "size": 10119,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/budget-journal-mirror.d.ts",
+        "size": 822,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/budget-journal-mirror.js",
+        "size": 5706,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/budget-journal-mirror.js.map",
+        "size": 5257,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/budgeted-sink-authority.d.ts",
+        "size": 2549,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/budgeted-sink-authority.js",
+        "size": 6675,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/budgeted-sink-authority.js.map",
+        "size": 5538,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/declarative-sink-table.d.ts",
+        "size": 2282,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/declarative-sink-table.js",
+        "size": 5873,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/declarative-sink-table.js.map",
+        "size": 4445,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/effect-resource-policy.d.ts",
+        "size": 13474,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/effect-resource-policy.js",
+        "size": 39292,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/effect-resource-policy.js.map",
+        "size": 36387,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/effect-signer-anchor.d.ts",
+        "size": 1974,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/effect-signer-anchor.js",
+        "size": 4862,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/effect-signer-anchor.js.map",
+        "size": 3730,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/external-solver.d.ts",
+        "size": 837,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/external-solver.js",
+        "size": 1793,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/external-solver.js.map",
+        "size": 1888,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/grant-epochs.d.ts",
+        "size": 862,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/grant-epochs.js",
+        "size": 9284,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/grant-epochs.js.map",
+        "size": 9924,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/hard-solver.d.ts",
+        "size": 387,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/hard-solver.js",
+        "size": 10409,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/hard-solver.js.map",
+        "size": 9609,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/incremental.d.ts",
+        "size": 668,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/incremental.js",
+        "size": 2485,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/incremental.js.map",
+        "size": 3121,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/index.d.ts",
+        "size": 5596,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/index.js",
+        "size": 3558,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/index.js.map",
+        "size": 2130,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/isolated-wasm-adapter.d.ts",
+        "size": 1063,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/isolated-wasm-adapter.js",
+        "size": 5756,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/isolated-wasm-adapter.js.map",
+        "size": 5352,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/isolated-wasm-worker.d.ts",
+        "size": 11,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/isolated-wasm-worker.js",
+        "size": 8983,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/isolated-wasm-worker.js.map",
+        "size": 9781,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/ocap.d.ts",
+        "size": 5228,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/ocap.js",
+        "size": 9500,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/ocap.js.map",
+        "size": 8830,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-formula-checker.d.ts",
+        "size": 916,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-formula-checker.js",
+        "size": 1852,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-formula-checker.js.map",
+        "size": 1655,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-formula-producer.d.ts",
+        "size": 380,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-formula-producer.js",
+        "size": 973,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-formula-producer.js.map",
+        "size": 905,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-formula.d.ts",
+        "size": 1259,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-formula.js",
+        "size": 15008,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-formula.js.map",
+        "size": 18864,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-linear-kernel.d.ts",
+        "size": 1567,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-linear-kernel.js",
+        "size": 4132,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-linear-kernel.js.map",
+        "size": 4340,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-linear-producer.d.ts",
+        "size": 374,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-linear-producer.js",
+        "size": 2439,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-linear-producer.js.map",
+        "size": 2666,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-obligations.d.ts",
+        "size": 1826,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-obligations.js",
+        "size": 46717,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-obligations.js.map",
+        "size": 48641,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-proof-checker.d.ts",
+        "size": 2495,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-proof-checker.js",
+        "size": 4577,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-proof-checker.js.map",
+        "size": 3733,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-proof-producer.d.ts",
+        "size": 408,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-proof-producer.js",
+        "size": 1414,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/portable-proof-producer.js.map",
+        "size": 1220,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/proof-cache.d.ts",
+        "size": 640,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/proof-cache.js",
+        "size": 1458,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/proof-cache.js.map",
+        "size": 1676,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/record-fallback-proof-checker.d.ts",
+        "size": 3146,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/record-fallback-proof-checker.js",
+        "size": 14796,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/record-fallback-proof-checker.js.map",
+        "size": 15862,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/record-fallback-proof-producer.d.ts",
+        "size": 326,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/record-fallback-proof-producer.js",
+        "size": 1082,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/record-fallback-proof-producer.js.map",
+        "size": 941,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/resource-budget-bridge.d.ts",
+        "size": 5073,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/resource-budget-bridge.js",
+        "size": 25080,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/resource-budget-bridge.js.map",
+        "size": 23671,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/resource-budget.d.ts",
+        "size": 7307,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/resource-budget.js",
+        "size": 28301,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/resource-budget.js.map",
+        "size": 28663,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/scoped-grants.d.ts",
+        "size": 2242,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/scoped-grants.js",
+        "size": 8330,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/scoped-grants.js.map",
+        "size": 8277,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/smt.d.ts",
+        "size": 4578,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/smt.js",
+        "size": 10337,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/smt.js.map",
+        "size": 13435,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/solver.d.ts",
+        "size": 3164,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/solver.js",
+        "size": 27931,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/solver.js.map",
+        "size": 29769,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/spec.d.ts",
+        "size": 3899,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/spec.js",
+        "size": 12852,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/spec.js.map",
+        "size": 11412,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/trusted-clock-anchor.d.ts",
+        "size": 1264,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/trusted-clock-anchor.js",
+        "size": 3924,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/trusted-clock-anchor.js.map",
+        "size": 3197,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/typecheck.d.ts",
+        "size": 3644,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/typecheck.js",
+        "size": 37136,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/typecheck.js.map",
+        "size": 40680,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/verify.d.ts",
+        "size": 6223,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/verify.js",
+        "size": 38712,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier2/verify.js.map",
+        "size": 38501,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/compile.d.ts",
+        "size": 9968,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/compile.js",
+        "size": 55103,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/compile.js.map",
+        "size": 52395,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/effects.d.ts",
+        "size": 8593,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/effects.js",
+        "size": 24053,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/effects.js.map",
+        "size": 19902,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/fallback-proof.d.ts",
+        "size": 1011,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/fallback-proof.js",
+        "size": 2927,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/fallback-proof.js.map",
+        "size": 2613,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/fallback-tree.d.ts",
+        "size": 3589,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/fallback-tree.js",
+        "size": 19176,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/fallback-tree.js.map",
+        "size": 20859,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/generate.d.ts",
+        "size": 3698,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/generate.js",
+        "size": 8672,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/generate.js.map",
+        "size": 9768,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/heap-state.d.ts",
+        "size": 896,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/heap-state.js",
+        "size": 3180,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/heap-state.js.map",
+        "size": 3555,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/index.d.ts",
+        "size": 2566,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/index.js",
+        "size": 1183,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/index.js.map",
+        "size": 962,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/living-campaign.d.ts",
+        "size": 7307,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/living-campaign.js",
+        "size": 34766,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/living-campaign.js.map",
+        "size": 34996,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/microworld.d.ts",
+        "size": 7237,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/microworld.js",
+        "size": 18018,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/microworld.js.map",
+        "size": 14855,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/packed-heap.d.ts",
+        "size": 3771,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/packed-heap.js",
+        "size": 24241,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/packed-heap.js.map",
+        "size": 26817,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-checkpoint.d.ts",
+        "size": 1479,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-checkpoint.js",
+        "size": 9457,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-checkpoint.js.map",
+        "size": 9665,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-program.d.ts",
+        "size": 1941,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-program.js",
+        "size": 34062,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-program.js.map",
+        "size": 34442,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-runtime.d.ts",
+        "size": 6485,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-runtime.js",
+        "size": 54434,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-runtime.js.map",
+        "size": 59041,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-state.d.ts",
+        "size": 5256,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-state.js",
+        "size": 27230,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-state.js.map",
+        "size": 27946,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-types.d.ts",
+        "size": 1335,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-types.js",
+        "size": 17096,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/resumable-types.js.map",
+        "size": 20542,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/runtime.d.ts",
+        "size": 7439,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/runtime.js",
+        "size": 37492,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/runtime.js.map",
+        "size": 38506,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/values.d.ts",
+        "size": 1552,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/values.js",
+        "size": 2035,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier3/values.js.map",
+        "size": 2443,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/host.d.ts",
+        "size": 3758,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/host.js",
+        "size": 18957,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/host.js.map",
+        "size": 20656,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/index.d.ts",
+        "size": 2572,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/index.js",
+        "size": 1188,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/index.js.map",
+        "size": 878,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/native-fallback-compiler-v1.d.ts",
+        "size": 1865,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/native-fallback-compiler-v1.js",
+        "size": 13627,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/native-fallback-compiler-v1.js.map",
+        "size": 12160,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/native-fallback-contract.d.ts",
+        "size": 3635,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/native-fallback-contract.js",
+        "size": 7738,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/native-fallback-contract.js.map",
+        "size": 6640,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/native-fallback-driver-v1.c",
+        "size": 8712,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/native-fallback-runner.d.ts",
+        "size": 2549,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/native-fallback-runner.js",
+        "size": 16916,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/native-fallback-runner.js.map",
+        "size": 16081,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/packed-native-process.d.ts",
+        "size": 4153,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/packed-native-process.js",
+        "size": 18928,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/packed-native-process.js.map",
+        "size": 18766,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-channel.d.ts",
+        "size": 4659,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-channel.js",
+        "size": 15994,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-channel.js.map",
+        "size": 16711,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-checkpoint-contract.d.ts",
+        "size": 6685,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-checkpoint-contract.js",
+        "size": 26678,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-checkpoint-contract.js.map",
+        "size": 26750,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-deployment.d.ts",
+        "size": 16493,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-deployment.js",
+        "size": 130581,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-deployment.js.map",
+        "size": 110121,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-fallback.d.ts",
+        "size": 3538,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-fallback.js",
+        "size": 23563,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-fallback.js.map",
+        "size": 23102,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-host.d.ts",
+        "size": 20979,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-host.js",
+        "size": 208430,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-host.js.map",
+        "size": 184064,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-resumable.d.ts",
+        "size": 4014,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-resumable.js",
+        "size": 23563,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-resumable.js.map",
+        "size": 23149,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-semantic-retention.d.ts",
+        "size": 1611,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-semantic-retention.js",
+        "size": 8081,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-semantic-retention.js.map",
+        "size": 7417,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-type-validation.d.ts",
+        "size": 1091,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-type-validation.js",
+        "size": 14613,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-type-validation.js.map",
+        "size": 15854,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-values.d.ts",
+        "size": 2004,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-values.js",
+        "size": 8243,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-values.js.map",
+        "size": 8846,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-worker.d.ts",
+        "size": 11,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-worker.js",
+        "size": 15246,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/process-worker.js.map",
+        "size": 14781,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/surfaces.d.ts",
+        "size": 5025,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/surfaces.js",
+        "size": 9502,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/surfaces.js.map",
+        "size": 8202,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/topology.d.ts",
+        "size": 6822,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/topology.js",
+        "size": 13269,
+        "mode": 420
+      },
+      {
+        "path": "dist/tier4/topology.js.map",
+        "size": 12619,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/rng.d.ts",
+        "size": 820,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/rng.js",
+        "size": 2151,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/rng.js.map",
+        "size": 2322,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/tokens.d.ts",
+        "size": 1949,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/tokens.js",
+        "size": 3292,
+        "mode": 420
+      },
+      {
+        "path": "dist/util/tokens.js.map",
+        "size": 2382,
+        "mode": 420
+      },
+      {
+        "path": "package.json",
+        "size": 3318,
+        "mode": 420
+      }
+    ],
+    "entryCount": 475,
+    "bundled": []
+  }
+]

@@ -1,0 +1,923 @@
+{
+  "format": "aether.benchmark.samples/1",
+  "tokenizer": {
+    "package": "js-tiktoken",
+    "version": "1.0.21",
+    "encoding": "cl100k_base"
+  },
+  "corpus": [
+    {
+      "id": "ledger-baseline/1",
+      "description": "Default buildLedgerExample(), unmodified TypeScript projections, AE1 streams, four warm declarations.",
+      "cold": {
+        "baseline": "// @module ledger\n// @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\n\n/** @nominal type:currency:cents\n * @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\n */\ntype Cents = bigint;\n\n/** @nominal type:ledger:account\n * @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\n */\ninterface Account {\n  id: string;\n  balance: Cents;\n}\n\n/**\n * @provenance prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\n * @capability cap:db:ledger_append\n * @requires [sufficient_funds] sender.balance >= amount\n * @requires [positive_amount] amount > (0n as Cents)\n * @requires [distinct_accounts] sender.id !== receiver.id\n * @ensures [debit_exact] sender.balance === old(sender.balance) - amount\n * @ensures [credit_exact] receiver.balance === old(receiver.balance) + amount\n * @ensures [conservation] sender.balance + receiver.balance === old(sender.balance) + old(receiver.balance)\n * @modifies sender.balance, receiver.balance\n */\nfunction transfer(sender: Account, receiver: Account, amount: Cents): void {\n  sender.balance = sender.balance - amount;\n  receiver.balance = receiver.balance + amount;\n  invoke(\"cap:db:ledger_append\", sender.id, receiver.id, amount);\n  return undefined;\n}\n\n/**\n * @requires [non_negative_gross] gross >= (0n as Cents)\n * @ensures [non_negative_fee] result >= (0n as Cents)\n * @ensures [fee_within_gross] result <= gross\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\n */\npure function feeFor(gross: Cents): Cents {\n  return gross / 100n;\n}\n\n/**\n * @requires [non_negative_principal] principal >= (0n as Cents)\n * @requires [non_negative_periods] periods >= 0n\n * @requires [bounded_periods] periods <= 1200n\n * @ensures [never_shrinks] @property result >= principal\n */\npure function accrue(principal: Cents, periods: bigint): Cents {\n  let total: Cents = principal;\n  let i: bigint = 0n;\n  /**\n   * @invariant total >= principal\n   * @invariant i >= 0n\n   * @variant periods - i\n   */\n  while (i < periods) {\n    total = total + total / 100n;\n    i = i + 1n;\n  }\n  return total;\n}\n\n/**\n * @provenance prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\n * @capability cap:db:ledger_append\n * @requires [sufficient_funds] payer.balance >= grossAmount\n * @requires [positive_amount] grossAmount > (0n as Cents)\n * @requires [distinct_accounts] payer.id !== payee.id\n * @modifies payer.balance, payee.balance\n * @surface cachePolicy: choice(lru, lfu, arc, none) minimize_latency = none\n */\nfunction settle(payer: Account, payee: Account, grossAmount: Cents): void {\n  let fee: Cents = feeFor(grossAmount);\n  transfer(payer, payee, grossAmount - fee);\n  return undefined;\n}\n",
+        "candidate": "AE1\n§w 1\n§n type:currency:cents|type:ledger:account|id|balance|total|transfer|grossAmount|batchSize|receiver|payee|payer|ledger|amount|fee|feeFor|principal|accrue|gross|settle|cachePolicy|sender|periods|i\n§y N0<I>|R1<2:S,3:N0<I>>|U|I\n§s none|lru|lfu|arc\n§c cap:db:ledger_append\n§l sufficient_funds|positive_amount|distinct_accounts|debit_exact|credit_exact|conservation|non_negative_gross|non_negative_fee|fee_within_gross|fee_below_gross|non_negative_principal|non_negative_periods|bounded_periods|never_shrinks\n§p prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd|prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\n§v sym:sitdqrgtrib6b7khtjfpt3|sym:gxvwhemeeyitzf4burcfiw|sym:dmseeqo6cejqvuxomete4b|sym:bcz4hmc4vvsirbf2wqgtn7|sym:oao4tvq6kueoboe6pd5f4d|sym:djlczpsht73zru6nsx3geo|sym:kgzttpudbhgcvydmcwoxnv|sym:liyarolnqyxifmhiwuoryc|sym:wl2zkahmydr7mm6vy5zqfe|sym:ag3whzz2wkavu4lifneu5e|sym:ytxibxdgcc2ermthjewzsw|sym:melnhaow6cx43oypn6jpdp|sym:dtybv6h3c5tkwcn6tlxakp|sym:cgku6l5xasc6wddpqkmbod|sym:doacoyjuuejdjyvr4baybs|sym:jm3qboiia2sqjcduzwflyl|sym:p2o5omalka7spiqnomievh|sym:oqtvzb4xt46xl3ufn7fa3i|sym:gm22naesotymumeohb2ws7\nY001 Y111 v0 F3 v1 >= Q00 v1 j00 > Q10 v0 F2 v2 F2 != Q20 v0 F3 v0 F3 @ v1 - == Q30 v2 F3 v2 F3 @ v1 + == Q40 v0 F3 v2 F3 + v0 F3 @ v2 F3 @ + == Q50 P013 P213 K332 P013 v0 F3 v1 - = P213 v2 F3 v1 + = v0 F2 v2 F2 v1 X03 E u N B4 D32111020301211010 v4 j00 >= Q60 $ j00 >= Q70 $ v4 <= Q80 v4 j00 > ! $ v4 < | Q90 K130 v4 i100 / N B1 Z50 r1x64x1 h8 D600111001400 v7 j00 >= Qa0 v8 i0 >= Qb0 v8 i1200 <= Qc0 $ v7 >= Qd1 K310 v7 L90 i0 La3 va v8 < v9 v7 >= va i0 >= v8 va - P90 v9 v9 i100 / + = Pa0 va i1 + = B2 W21 v9 N B4 Db0011000270830 vc F3 vd >= Q00 vd j00 > Q10 vc F2 ve F2 != Q20 Pc13 Pe13 K302 vd C61 Lf0 vc ve vd vf - C33 E u N B3 Zg0 c1230 m0 Dh21111203c1e1d010 Gj9435d65728e9caib1cfd6e7fbg4hhigj0k8lam Mi61"
+      },
+      "changes": [
+        {
+          "id": "transfer",
+          "baseline": "/**\n * @provenance prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\n * @capability cap:db:ledger_append\n * @requires [sufficient_funds] sender.balance >= amount\n * @requires [positive_amount] amount > (0n as Cents)\n * @requires [distinct_accounts] sender.id !== receiver.id\n * @ensures [debit_exact] sender.balance === old(sender.balance) - amount\n * @ensures [credit_exact] receiver.balance === old(receiver.balance) + amount\n * @ensures [conservation] sender.balance + receiver.balance === old(sender.balance) + old(receiver.balance)\n * @modifies sender.balance, receiver.balance\n */\nfunction transfer(sender: Account, receiver: Account, amount: Cents): void {\n  sender.balance = sender.balance - amount;\n  receiver.balance = receiver.balance + amount;\n  invoke(\"cap:db:ledger_append\", sender.id, receiver.id, amount);\n  return undefined;\n}",
+          "candidate": "AE1\n§w 1\nv0 F3 v1 >= Q00 v1 j00 > Q10 v0 F2 v2 F2 != Q20 v0 F3 v0 F3 @ v1 - == Q30 v2 F3 v2 F3 @ v1 + == Q40 v0 F3 v2 F3 + v0 F3 @ v2 F3 @ + == Q50 P013 P213 K332 P013 v0 F3 v1 - = P213 v2 F3 v1 + = v0 F2 v2 F2 v1 X03 E u N B4 D32111020301211010",
+          "body": "v0 F3 v1 >= Q00 v1 j00 > Q10 v0 F2 v2 F2 != Q20 v0 F3 v0 F3 @ v1 - == Q30 v2 F3 v2 F3 @ v1 + == Q40 v0 F3 v2 F3 + v0 F3 @ v2 F3 @ + == Q50 P013 P213 K332 P013 v0 F3 v1 - = P213 v2 F3 v1 + = v0 F2 v2 F2 v1 X03 E u N B4 D32111020301211010"
+        },
+        {
+          "id": "feeFor",
+          "baseline": "/**\n * @requires [non_negative_gross] gross >= (0n as Cents)\n * @ensures [non_negative_fee] result >= (0n as Cents)\n * @ensures [fee_within_gross] result <= gross\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\n */\npure function feeFor(gross: Cents): Cents {\n  return gross / 100n;\n}",
+          "candidate": "AE1\n§w 1\nv4 j00 >= Q60 $ j00 >= Q70 $ v4 <= Q80 v4 j00 > ! $ v4 < | Q90 K130 v4 i100 / N B1 Z50 r1x64x1 h8 D600111001400",
+          "body": "v4 j00 >= Q60 $ j00 >= Q70 $ v4 <= Q80 v4 j00 > ! $ v4 < | Q90 K130 v4 i100 / N B1 Z50 r1x64x1 h8 D600111001400"
+        },
+        {
+          "id": "accrue",
+          "baseline": "/**\n * @requires [non_negative_principal] principal >= (0n as Cents)\n * @requires [non_negative_periods] periods >= 0n\n * @requires [bounded_periods] periods <= 1200n\n * @ensures [never_shrinks] @property result >= principal\n */\npure function accrue(principal: Cents, periods: bigint): Cents {\n  let total: Cents = principal;\n  let i: bigint = 0n;\n  /**\n   * @invariant total >= principal\n   * @invariant i >= 0n\n   * @variant periods - i\n   */\n  while (i < periods) {\n    total = total + total / 100n;\n    i = i + 1n;\n  }\n  return total;\n}",
+          "candidate": "AE1\n§w 1\nv7 j00 >= Qa0 v8 i0 >= Qb0 v8 i1200 <= Qc0 $ v7 >= Qd1 K310 v7 L90 i0 La3 va v8 < v9 v7 >= va i0 >= v8 va - P90 v9 v9 i100 / + = Pa0 va i1 + = B2 W21 v9 N B4 Db0011000270830",
+          "body": "v7 j00 >= Qa0 v8 i0 >= Qb0 v8 i1200 <= Qc0 $ v7 >= Qd1 K310 v7 L90 i0 La3 va v8 < v9 v7 >= va i0 >= v8 va - P90 v9 v9 i100 / + = Pa0 va i1 + = B2 W21 v9 N B4 Db0011000270830"
+        },
+        {
+          "id": "settle",
+          "baseline": "/**\n * @provenance prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\n * @capability cap:db:ledger_append\n * @requires [sufficient_funds] payer.balance >= grossAmount\n * @requires [positive_amount] grossAmount > (0n as Cents)\n * @requires [distinct_accounts] payer.id !== payee.id\n * @modifies payer.balance, payee.balance\n * @surface cachePolicy: choice(lru, lfu, arc, none) minimize_latency = none\n */\nfunction settle(payer: Account, payee: Account, grossAmount: Cents): void {\n  let fee: Cents = feeFor(grossAmount);\n  transfer(payer, payee, grossAmount - fee);\n  return undefined;\n}",
+          "candidate": "AE1\n§w 1\nvc F3 vd >= Q00 vd j00 > Q10 vc F2 ve F2 != Q20 Pc13 Pe13 K302 vd C61 Lf0 vc ve vd vf - C33 E u N B3 Zg0 c1230 m0 Dh21111203c1e1d010",
+          "body": "vc F3 vd >= Q00 vd j00 > Q10 vc F2 ve F2 != Q20 Pc13 Pe13 K302 vd C61 Lf0 vc ve vd vf - C33 E u N B3 Zg0 c1230 m0 Dh21111203c1e1d010"
+        }
+      ],
+      "session": [
+        {
+          "role": "system",
+          "purpose": "instructions",
+          "baseline": "Return complete updated declarations preserving contracts. Correct failed attempts using the reported execution results.",
+          "candidate": "Return complete updated declarations preserving contracts. Correct failed attempts using the reported execution results."
+        },
+        {
+          "role": "user",
+          "purpose": "initial_context",
+          "baseline": "// @module ledger\n// @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\n\n/** @nominal type:currency:cents\n * @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\n */\ntype Cents = bigint;\n\n/** @nominal type:ledger:account\n * @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\n */\ninterface Account {\n  id: string;\n  balance: Cents;\n}\n\n/**\n * @provenance prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\n * @capability cap:db:ledger_append\n * @requires [sufficient_funds] sender.balance >= amount\n * @requires [positive_amount] amount > (0n as Cents)\n * @requires [distinct_accounts] sender.id !== receiver.id\n * @ensures [debit_exact] sender.balance === old(sender.balance) - amount\n * @ensures [credit_exact] receiver.balance === old(receiver.balance) + amount\n * @ensures [conservation] sender.balance + receiver.balance === old(sender.balance) + old(receiver.balance)\n * @modifies sender.balance, receiver.balance\n */\nfunction transfer(sender: Account, receiver: Account, amount: Cents): void {\n  sender.balance = sender.balance - amount;\n  receiver.balance = receiver.balance + amount;\n  invoke(\"cap:db:ledger_append\", sender.id, receiver.id, amount);\n  return undefined;\n}\n\n/**\n * @requires [non_negative_gross] gross >= (0n as Cents)\n * @ensures [non_negative_fee] result >= (0n as Cents)\n * @ensures [fee_within_gross] result <= gross\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\n */\npure function feeFor(gross: Cents): Cents {\n  return gross / 100n;\n}\n\n/**\n * @requires [non_negative_principal] principal >= (0n as Cents)\n * @requires [non_negative_periods] periods >= 0n\n * @requires [bounded_periods] periods <= 1200n\n * @ensures [never_shrinks] @property result >= principal\n */\npure function accrue(principal: Cents, periods: bigint): Cents {\n  let total: Cents = principal;\n  let i: bigint = 0n;\n  /**\n   * @invariant total >= principal\n   * @invariant i >= 0n\n   * @variant periods - i\n   */\n  while (i < periods) {\n    total = total + total / 100n;\n    i = i + 1n;\n  }\n  return total;\n}\n\n/**\n * @provenance prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\n * @capability cap:db:ledger_append\n * @requires [sufficient_funds] payer.balance >= grossAmount\n * @requires [positive_amount] grossAmount > (0n as Cents)\n * @requires [distinct_accounts] payer.id !== payee.id\n * @modifies payer.balance, payee.balance\n * @surface cachePolicy: choice(lru, lfu, arc, none) minimize_latency = none\n */\nfunction settle(payer: Account, payee: Account, grossAmount: Cents): void {\n  let fee: Cents = feeFor(grossAmount);\n  transfer(payer, payee, grossAmount - fee);\n  return undefined;\n}\n",
+          "candidate": "AE1\n§w 1\n§n type:currency:cents|type:ledger:account|id|balance|total|transfer|grossAmount|batchSize|receiver|payee|payer|ledger|amount|fee|feeFor|principal|accrue|gross|settle|cachePolicy|sender|periods|i\n§y N0<I>|R1<2:S,3:N0<I>>|U|I\n§s none|lru|lfu|arc\n§c cap:db:ledger_append\n§l sufficient_funds|positive_amount|distinct_accounts|debit_exact|credit_exact|conservation|non_negative_gross|non_negative_fee|fee_within_gross|fee_below_gross|non_negative_principal|non_negative_periods|bounded_periods|never_shrinks\n§p prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd|prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\n§v sym:sitdqrgtrib6b7khtjfpt3|sym:gxvwhemeeyitzf4burcfiw|sym:dmseeqo6cejqvuxomete4b|sym:bcz4hmc4vvsirbf2wqgtn7|sym:oao4tvq6kueoboe6pd5f4d|sym:djlczpsht73zru6nsx3geo|sym:kgzttpudbhgcvydmcwoxnv|sym:liyarolnqyxifmhiwuoryc|sym:wl2zkahmydr7mm6vy5zqfe|sym:ag3whzz2wkavu4lifneu5e|sym:ytxibxdgcc2ermthjewzsw|sym:melnhaow6cx43oypn6jpdp|sym:dtybv6h3c5tkwcn6tlxakp|sym:cgku6l5xasc6wddpqkmbod|sym:doacoyjuuejdjyvr4baybs|sym:jm3qboiia2sqjcduzwflyl|sym:p2o5omalka7spiqnomievh|sym:oqtvzb4xt46xl3ufn7fa3i|sym:gm22naesotymumeohb2ws7\nY001 Y111 v0 F3 v1 >= Q00 v1 j00 > Q10 v0 F2 v2 F2 != Q20 v0 F3 v0 F3 @ v1 - == Q30 v2 F3 v2 F3 @ v1 + == Q40 v0 F3 v2 F3 + v0 F3 @ v2 F3 @ + == Q50 P013 P213 K332 P013 v0 F3 v1 - = P213 v2 F3 v1 + = v0 F2 v2 F2 v1 X03 E u N B4 D32111020301211010 v4 j00 >= Q60 $ j00 >= Q70 $ v4 <= Q80 v4 j00 > ! $ v4 < | Q90 K130 v4 i100 / N B1 Z50 r1x64x1 h8 D600111001400 v7 j00 >= Qa0 v8 i0 >= Qb0 v8 i1200 <= Qc0 $ v7 >= Qd1 K310 v7 L90 i0 La3 va v8 < v9 v7 >= va i0 >= v8 va - P90 v9 v9 i100 / + = Pa0 va i1 + = B2 W21 v9 N B4 Db0011000270830 vc F3 vd >= Q00 vd j00 > Q10 vc F2 ve F2 != Q20 Pc13 Pe13 K302 vd C61 Lf0 vc ve vd vf - C33 E u N B3 Zg0 c1230 m0 Dh21111203c1e1d010 Gj9435d65728e9caib1cfd6e7fbg4hhigj0k8lam Mi61"
+        },
+        {
+          "role": "user",
+          "purpose": "change_request",
+          "baseline": "Change feeFor to gross/200. For gross=1000 the fee must be 5. Preserve existing contracts.",
+          "candidate": "Change feeFor to gross/200. For gross=1000 the fee must be 5. Preserve existing contracts."
+        },
+        {
+          "role": "assistant",
+          "purpose": "failed_attempt",
+          "baseline": "/**\n * @requires [non_negative_gross] gross >= (0n as Cents)\n * @ensures [non_negative_fee] result >= (0n as Cents)\n * @ensures [fee_within_gross] result <= gross\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\n */\npure function feeFor(gross: Cents): Cents {\n  return gross / 100n;\n}",
+          "candidate": "AE1\n§w 1\nv4 j00 >= Q60 $ j00 >= Q70 $ v4 <= Q80 v4 j00 > ! $ v4 < | Q90 K130 v4 i100 / N B1 Z50 r1x64x1 h8 D600111001400"
+        },
+        {
+          "role": "tool",
+          "purpose": "response",
+          "baseline": "{\"input\":\"1000\",\"expected\":\"5\",\"actual\":\"10\",\"accepted\":false}",
+          "candidate": "{\"input\":\"1000\",\"expected\":\"5\",\"actual\":\"10\",\"accepted\":false}"
+        },
+        {
+          "role": "assistant",
+          "purpose": "repair",
+          "baseline": "/**\n * @requires [non_negative_gross] gross >= (0n as Cents)\n * @ensures [non_negative_fee] result >= (0n as Cents)\n * @ensures [fee_within_gross] result <= gross\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\n */\npure function feeFor(gross: Cents): Cents {\n  return gross / 200n;\n}",
+          "candidate": "AE1\n§w 1\nv4 j00 >= Q60 $ j00 >= Q70 $ v4 <= Q80 v4 j00 > ! $ v4 < | Q90 K130 v4 i200 / N B1 Z50 r1x64x1 h8 D600111001400"
+        },
+        {
+          "role": "tool",
+          "purpose": "response",
+          "baseline": "{\"input\":\"1000\",\"expected\":\"5\",\"actual\":\"5\",\"accepted\":true}",
+          "candidate": "{\"input\":\"1000\",\"expected\":\"5\",\"actual\":\"5\",\"accepted\":true}"
+        }
+      ],
+      "sessionScope": "Complete offline JSONL change transcript. Includes initial instructions/context, feeFor change request, one executed failing attempt (10 instead of 5), repair and successful response (5). Deterministic candidate generator; no model inference, API billing, or training performed. Warm declaration diagnostics are measured separately.",
+      "training": {
+        "performed": false,
+        "tokens": 0,
+        "cost": 0
+      }
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "bench/nfr.bench.ts",
+      "digest": "sha256:6c18145ff5b56ff0a36ff0b458535e07b0f185d062bcfdb52464613d10bb3f56"
+    },
+    {
+      "path": "bench/v4/README.md",
+      "digest": "sha256:19d9133b876bd164b10e965f5296537aab7ff56b14f27a0c612c35e4dd872268"
+    },
+    {
+      "path": "bench/v4/cli.ts",
+      "digest": "sha256:6ef56e901291ab1840c419f46051ba5e168fcf2b49dff8cd840c2ae5763d5676"
+    },
+    {
+      "path": "bench/v4/manifest.ts",
+      "digest": "sha256:cc47d9f4560984d331bf08bdcf7d617fd4334a0aea0d39289cf837b7ce99accb"
+    },
+    {
+      "path": "bench/v4/tokens.ts",
+      "digest": "sha256:253e5a9309bdd6aeec749c790fefc9fbb6fcd794def2c1d23c72db97c9ef75a8"
+    },
+    {
+      "path": "bench/v4/verify.ts",
+      "digest": "sha256:cd43e3d2e02fae1221cbf2a06bb8358f310e42e2bde64afff51e523b8cec35e8"
+    },
+    {
+      "path": "package-lock.json",
+      "digest": "sha256:f96e100bbdef53a11234643d35804a8b35b62a5179d9527e17c30e4bd065e952"
+    },
+    {
+      "path": "package.json",
+      "digest": "sha256:8a1169d49d1ea79c905443334a0b62e4144f1ffd43216edc5f6b0e38d08cfbdf"
+    },
+    {
+      "path": "src/agent/index.ts",
+      "digest": "sha256:2bafa458a651f0955b9ca263ed83246c3fd059239617938a0e9b6ca811be0147"
+    },
+    {
+      "path": "src/agent/protocol.ts",
+      "digest": "sha256:8030637457da4c36da9da03c5b22e315a4f28ea873b655c1cec43d0da66be93c"
+    },
+    {
+      "path": "src/cli.ts",
+      "digest": "sha256:43f63bdde2029c641bb148c1572183b3a0916fdff7877bd895169a61ea39872d"
+    },
+    {
+      "path": "src/examples/ledger.ts",
+      "digest": "sha256:321cff049d31d25a02d4aace2add07208dcf1501e3d14d816245792743ba2985"
+    },
+    {
+      "path": "src/fabric/attested-sink-adapter.ts",
+      "digest": "sha256:8aa2bdc85aa83d7da0fd41a112fc7548a51b88d8d6b4954a95f6141a170cec0e"
+    },
+    {
+      "path": "src/fabric/attested-sink-service-cli.ts",
+      "digest": "sha256:a301e45c17403ac50a02e31955306489cea2a6feb2d61b69c413346bcc863783"
+    },
+    {
+      "path": "src/fabric/attested-sink-service.ts",
+      "digest": "sha256:80628420058dbcac683f9b3e204741e83f56696b2d7cdf1d4816629e9e3862cc"
+    },
+    {
+      "path": "src/fabric/budget-journal-witness.ts",
+      "digest": "sha256:1614d45b8280945eb36680a96e57e7f2c7051e081ab1d34e1dd62aa4cce88183"
+    },
+    {
+      "path": "src/fabric/deployment-journal-witness.ts",
+      "digest": "sha256:36ff89ca441a160669499775c95f14a432e285205ec077583ae0f7867b587dce"
+    },
+    {
+      "path": "src/fabric/effect-journal-witness.ts",
+      "digest": "sha256:9ddc3b4bfbf41afe64181250da9875e134f103a83821ad1e05b9b7236a2182ba"
+    },
+    {
+      "path": "src/fabric/effects.ts",
+      "digest": "sha256:d56d9feb4796605e2769c3a38ba642f99d714d401f117af35e175d1f44194150"
+    },
+    {
+      "path": "src/fabric/encoding.ts",
+      "digest": "sha256:996950ec82d71ba941f2ae7362917aea62a4c5c0199923cd40ac09efecaa4b76"
+    },
+    {
+      "path": "src/fabric/evidence.ts",
+      "digest": "sha256:459655e570ced774813cf6d59e46df9c7c3128eb281e800c7842fb525de3ac13"
+    },
+    {
+      "path": "src/fabric/host-journal-witness.ts",
+      "digest": "sha256:171cb940eb3f9ffc325b87e6dbd68daaf63ebc1bdc6fc0499a35094db15f07ed"
+    },
+    {
+      "path": "src/fabric/identity.ts",
+      "digest": "sha256:582f7ab81667f6486a219847982f14f5619a079428ba8d6c605d9f23d1832682"
+    },
+    {
+      "path": "src/fabric/index.ts",
+      "digest": "sha256:fb674e36cff308c36950c1ac638f3a1cf27411dc302252db83a94ad0f5f246a3"
+    },
+    {
+      "path": "src/fabric/journal-lock.ts",
+      "digest": "sha256:0be730fe30d8fba39c3fd4bdb1f23cf817da616e6118efd81fec6f05dfecbe72"
+    },
+    {
+      "path": "src/fabric/promotion.ts",
+      "digest": "sha256:ea2f65f4d3023470164b4e537213db9431e42a9e99ea7701b340f88667ee3e75"
+    },
+    {
+      "path": "src/fabric/quorum-crypto.ts",
+      "digest": "sha256:d5e9c7b90c8bbd1aa38754f6f2a82d08dc842b51ae7dbd529b15e3fef640438d"
+    },
+    {
+      "path": "src/fabric/quorum-node.ts",
+      "digest": "sha256:c903c5e8b8ac5a9a07d94d0b78853814349c912772bd0ffba8461a6cc854c52e"
+    },
+    {
+      "path": "src/fabric/quorum-threshold.ts",
+      "digest": "sha256:82bd54c93521cc99ea99c121fe6b721fd0bec39d9377a4b3c3587b02f4bb7318"
+    },
+    {
+      "path": "src/fabric/quorum-votes.ts",
+      "digest": "sha256:36a95f860584a13e1aefe7f69914059a0feb04c71fded1bc0d40f4a47724ed3d"
+    },
+    {
+      "path": "src/fabric/replication.ts",
+      "digest": "sha256:1cf2c4f6248b273b1bc667507bf7ef29cfa70eab90d62f8a51bc1e9aa2f06b28"
+    },
+    {
+      "path": "src/fabric/sink-receipt.ts",
+      "digest": "sha256:6ca60111f4cc16bc5bb76bc122674855ec27bc420adc354495ae1cb99094d23a"
+    },
+    {
+      "path": "src/fabric/sink-state-witness.ts",
+      "digest": "sha256:2ebdbce6c04b1d4870085cc712ec08440b35df3a542bb360389dfe67f4e84153"
+    },
+    {
+      "path": "src/fabric/snapshot.ts",
+      "digest": "sha256:9fe6241d0bdf8783ed095bc5c8518e02fdf1ac1b2499e7e8b98b57b56c73a091"
+    },
+    {
+      "path": "src/fabric/witness-service-cli.ts",
+      "digest": "sha256:5081c9b54c66895c028ceec0944ea50934b8ad1ed4684973bb793690859c3576"
+    },
+    {
+      "path": "src/fabric/witness-service.ts",
+      "digest": "sha256:9918ac5b07aa2a40da16302c75ac95a2dacbf782f61103b7d11fc89e2f2e1d28"
+    },
+    {
+      "path": "src/index.ts",
+      "digest": "sha256:e36936b17e7fc27af4453d250e1c0e16189a3de7891008814aa9e4fdcde0ae0f"
+    },
+    {
+      "path": "src/projection/coverage.ts",
+      "digest": "sha256:8a6f12d4d072ab4f73518c18588e09bbee5b75b12f93621603374d976e3bc206"
+    },
+    {
+      "path": "src/projection/diff.ts",
+      "digest": "sha256:5bf2a720a7bba8746114ed0d242487ef9c899b3a4234d9d93ae577ac1f55ff4f"
+    },
+    {
+      "path": "src/projection/executable-atomic.ts",
+      "digest": "sha256:0f1f18e45c7743fe2163d30a15f807c131f4b512547ac6c8a0ff5a8a547d7c28"
+    },
+    {
+      "path": "src/projection/executable-bindings.ts",
+      "digest": "sha256:9058d5ed7cb2781279b5c76df7b5eabd25ce0802a7f80807863b35e9a51a5d4f"
+    },
+    {
+      "path": "src/projection/executable-composites.ts",
+      "digest": "sha256:6e566b8836ddf114d73f00b863a601166c08db5ca6c9a6a90102d71d33545f41"
+    },
+    {
+      "path": "src/projection/executable-continuation-plan.ts",
+      "digest": "sha256:89c59a9020fb7f215d625554c6a8538f9f251cb8ea846e6d7d3013ce6298a797"
+    },
+    {
+      "path": "src/projection/executable-continuations.ts",
+      "digest": "sha256:381398b783eaadcb9de094074ace21ee1727073c53a5347f2ebce2af08f870e2"
+    },
+    {
+      "path": "src/projection/executable-declarations.ts",
+      "digest": "sha256:1eb3b5234eeed4305d66febedc89925a3f2b25413f9b1796df9c4941f746f8ec"
+    },
+    {
+      "path": "src/projection/executable-generic-plan.ts",
+      "digest": "sha256:e718d6eb332a63c28e303bbdbebb753e0d3bbca73718d8b343a14a097492dc21"
+    },
+    {
+      "path": "src/projection/executable-generics.ts",
+      "digest": "sha256:a87a6d78dbf364ec4e01db12c6dc11a143592d697d8e0ef32784bee65f4c0b6c"
+    },
+    {
+      "path": "src/projection/executable-link.ts",
+      "digest": "sha256:8698b6a4f7dbefa7951dd0566640144fa36040af911542806717f70160d33080"
+    },
+    {
+      "path": "src/projection/executable-runtime.ts",
+      "digest": "sha256:1af1fca1d4d213802f28548aaf5566a7400740c19a4a1cf9356c2d462923e21d"
+    },
+    {
+      "path": "src/projection/executable-string-data.ts",
+      "digest": "sha256:a7b05dde2199428a144af9fcb46ea063a6589e7c75981303ad8752cf46390ecf"
+    },
+    {
+      "path": "src/projection/executable-strings.ts",
+      "digest": "sha256:3b4ca3679fe63f4c1af91d6cb940b090fd1abac6c8ff7388cfc025f64a3b68df"
+    },
+    {
+      "path": "src/projection/executable.ts",
+      "digest": "sha256:f5a1ca5ec17d0136c1b6df6ee1afe435845ce8caa0458404d79efdbacbf39aa6"
+    },
+    {
+      "path": "src/projection/index.ts",
+      "digest": "sha256:b134b58ab6b681517d73b098d6d96be4d3b8c7f6875161e54be3f31e435cd81d"
+    },
+    {
+      "path": "src/projection/lexer.ts",
+      "digest": "sha256:9cfc990ec60c84aa268e863527d92e942ed56fc35c6aaedb73f9ab17aafe2650"
+    },
+    {
+      "path": "src/projection/lsp.ts",
+      "digest": "sha256:52977a34bd67efb699446955e1de967a4c15854b7205e2b90a70ec403669fa36"
+    },
+    {
+      "path": "src/projection/names.ts",
+      "digest": "sha256:1c34c41da1a77dc21e1dabaa3ccd3a50d5f17c3218552b64eeedc798eb89a015"
+    },
+    {
+      "path": "src/projection/parse.ts",
+      "digest": "sha256:797a6ed5b576a7dddc489b1c3b400927111a9040d030cfb5d054945de389a1b8"
+    },
+    {
+      "path": "src/projection/python.ts",
+      "digest": "sha256:998cdf3f4022198c251aaa4e40d1ac1e7f4b25ff0e59f81f9ce3d2f164760bd0"
+    },
+    {
+      "path": "src/projection/rust.ts",
+      "digest": "sha256:97a630594c069445cae52815ed3a1565540318b3f84508a15795b5052a48de5e"
+    },
+    {
+      "path": "src/projection/typescript.ts",
+      "digest": "sha256:d4b50072b2c3124aa6fab9c58a4b9d9ea7e33e7683e6253b5bb18f54ee8e2343"
+    },
+    {
+      "path": "src/synthesis/enumerative.ts",
+      "digest": "sha256:944c7f113730d7200f152edd5b21c3e796a4a2fbf8018ddc83a73aa313a9f3ba"
+    },
+    {
+      "path": "src/synthesis/loop.ts",
+      "digest": "sha256:23a02976fe4d77b7d100e7faed0180370f807093a7c33291db07db2d5b62f6c7"
+    },
+    {
+      "path": "src/tier1/agent-ir-v2.ts",
+      "digest": "sha256:9b83f594c160adda9385c7afd711ea5299c618c01b12bf5a7a7a524184007c5b"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3-bounds.ts",
+      "digest": "sha256:3ae25e1e8213f669879fa332123cf3a479aefa7f4e2888b8a29e5e7c3a2e53e1"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3-compact.ts",
+      "digest": "sha256:ac160a6e396144d21c574eff2a9444bd7292a231c98c919b4eb47a866b5e472e"
+    },
+    {
+      "path": "src/tier1/agent-ir-v3.ts",
+      "digest": "sha256:e64e09fddacc8a8dfda511b416da81f2e6908c55c94adc1f478063e8395932db"
+    },
+    {
+      "path": "src/tier1/agent-ir-v5.ts",
+      "digest": "sha256:8d6e5b827e82dd7a8dd550050229cf5409a9b1b83419189d7a9f1498ecefabe8"
+    },
+    {
+      "path": "src/tier1/agent-ir.ts",
+      "digest": "sha256:24937a37548140bd0c7eb0f803c4ef26e88384212df62328da5c3f572525839b"
+    },
+    {
+      "path": "src/tier1/ast.ts",
+      "digest": "sha256:4641897678219e5f9e1a24a7e879856e6edde509ab761cc5e47170c83b7b926b"
+    },
+    {
+      "path": "src/tier1/blake3.ts",
+      "digest": "sha256:984b503672ba33ae42976aec19c7979ea2f5099cabfcd4710e8005117f7c7684"
+    },
+    {
+      "path": "src/tier1/build.ts",
+      "digest": "sha256:05aff6e153c7204ff35fb2a51f28a5892e4e3e785b8caed31a8640306332b1f6"
+    },
+    {
+      "path": "src/tier1/canonical.ts",
+      "digest": "sha256:8f10a0a15167be12c6a3b01dcfffaa9ffd1213a7883b15e483fe8b05b32933de"
+    },
+    {
+      "path": "src/tier1/causal-lineage.ts",
+      "digest": "sha256:69a254a79cc47fe2c363ac1c536fcc293326a41836ae91739ce579e00171174e"
+    },
+    {
+      "path": "src/tier1/cognitive-blackboard.ts",
+      "digest": "sha256:a11edd440cd8489f68e0524b09d5fb9ee56c134c60d3d7a94d4adfdb9a7d6498"
+    },
+    {
+      "path": "src/tier1/durable-store.ts",
+      "digest": "sha256:5871f5230a210f1b41280dba50b5a8a0d07559e35caa51495ccc1bce6e63fd05"
+    },
+    {
+      "path": "src/tier1/embedding-input.ts",
+      "digest": "sha256:cf68ddf552c60246b45b6275645d6a509a8f7b8dec09f680fbfd9c5f4d90ad59"
+    },
+    {
+      "path": "src/tier1/fractional-position.ts",
+      "digest": "sha256:fc81b768cd3ac8b588723f855f0b83047b5cbe7cb3a43a9bc32635e187f5a5d4"
+    },
+    {
+      "path": "src/tier1/ids.ts",
+      "digest": "sha256:6d2d72d3ed58cef2cc0bc2e2800a49ba7bf1873ab4e8bf67666f12b298e6076b"
+    },
+    {
+      "path": "src/tier1/index.ts",
+      "digest": "sha256:ca14ac42e27dd81a2b5d7aa35dcff3e9f8d9035dcb9c6f855b9724030a3403fd"
+    },
+    {
+      "path": "src/tier1/merge.ts",
+      "digest": "sha256:f241c778d5aff174b39635f7fed4ebe6a5e80234f0494f5efbd27e01a619815b"
+    },
+    {
+      "path": "src/tier1/modules.ts",
+      "digest": "sha256:e15bccba217e931186289862110c6cbc0885262d7fb956d91c8793bb25bbcb0f"
+    },
+    {
+      "path": "src/tier1/occurrence-tree.ts",
+      "digest": "sha256:54aad8e8078f33f2657981bb09b221982e386de0fbbb25e5ce5356891eeba276"
+    },
+    {
+      "path": "src/tier1/persistence.ts",
+      "digest": "sha256:3ae8dc11b9331da9d4b9618395c74425e281093b167208f91f866e555c16cc55"
+    },
+    {
+      "path": "src/tier1/provenance.ts",
+      "digest": "sha256:ed640ff2e438e224fe8acd547ac04133e08280ef292eb05410c44ec786ca5e68"
+    },
+    {
+      "path": "src/tier1/repository.ts",
+      "digest": "sha256:148721704834c0a1ffd16bfcf5c7688220ade048212055b5e43b34aff59a4a6b"
+    },
+    {
+      "path": "src/tier1/semantic-gc-adapters.ts",
+      "digest": "sha256:a1cb4826e9526cdad52ba11160bf58ee8709b3ce14d2a298afc4d17cada7afc9"
+    },
+    {
+      "path": "src/tier1/semantic-gc-sink-retirement.ts",
+      "digest": "sha256:8d58acd8b5e9eaa6c9dd3a0f71e4a7b7fb1875f500ad00670bfca7d4f8eb4702"
+    },
+    {
+      "path": "src/tier1/semantic-gc.ts",
+      "digest": "sha256:bd1398f6025ceaade10401db225588f424dcde5e40e8b14c629ac41d47f0a487"
+    },
+    {
+      "path": "src/tier1/semantic-index.ts",
+      "digest": "sha256:06e381ed0e9adf41ab5a0d3f089a602f324aeee7b23b7be25c735656417f4c83"
+    },
+    {
+      "path": "src/tier1/store.ts",
+      "digest": "sha256:db0c5779486313b94c628532f4a85c7e4cc3b8d0246bb2b9faf75c11f3de6baa"
+    },
+    {
+      "path": "src/tier1/symbols.ts",
+      "digest": "sha256:bb2f2863f6d283566ed9f2e13a2f60d6b5ebf842c6b100e2ce4cc557cbaa3046"
+    },
+    {
+      "path": "src/tier1/tree-materialization.ts",
+      "digest": "sha256:79c4c6c51bf524fed240ff80119a4477bdf134fd775f37f209b48dddd8df3f35"
+    },
+    {
+      "path": "src/tier1/tree-workspace.ts",
+      "digest": "sha256:4265d2b88e8741d1ff1abcbbf6991702033658c6fb3a24a0f9e5b8ae69cbf08d"
+    },
+    {
+      "path": "src/tier2/adapter-artifact.ts",
+      "digest": "sha256:a01e7f588a94b112cd62506f06c8fb4604906cc879d5176b460c88a1f66ed822"
+    },
+    {
+      "path": "src/tier2/attested-sink-budget-evidence.ts",
+      "digest": "sha256:1fa4e44e7cf658da2a657b4ebcbb8e5fa1e7fa747f61cd10b1b53cbfb1fbfd2c"
+    },
+    {
+      "path": "src/tier2/budget-journal-mirror.ts",
+      "digest": "sha256:47039460968a10ce45d18822698b8f0d478d2633c624f1f80e7d9f4367522e63"
+    },
+    {
+      "path": "src/tier2/budgeted-sink-authority.ts",
+      "digest": "sha256:a7b6ff81b1e68a5d4f42c8a23dcb468e8db0cc63cd4a64854dc868b343a8a2ef"
+    },
+    {
+      "path": "src/tier2/declarative-sink-table.ts",
+      "digest": "sha256:bc71b9d8b67f8cf4fd513279d7246770936171b376e3aeb09eabc00bf19f35c0"
+    },
+    {
+      "path": "src/tier2/effect-resource-policy.ts",
+      "digest": "sha256:4f2782b69d745f7add9d725ace2f179166afb5c7c7156abf5788538b34d8850a"
+    },
+    {
+      "path": "src/tier2/effect-signer-anchor.ts",
+      "digest": "sha256:d8c203ee55264532b220eaf54019c74b3e3f3a2923d5ba4bd1c0193b3d814e33"
+    },
+    {
+      "path": "src/tier2/external-solver.ts",
+      "digest": "sha256:dafe0a4741a33008c3074ad682b37f6ec7894ac5f973c79ddcc8b2a397d29f1e"
+    },
+    {
+      "path": "src/tier2/grant-epochs.ts",
+      "digest": "sha256:58386418138b376a8981ba94cefbb0d87456bd054705626a9204a6f6ba308038"
+    },
+    {
+      "path": "src/tier2/hard-solver.ts",
+      "digest": "sha256:c6a9514f576d340d62552cc22dce966019b28823b3590cac512eaf2c1dd622bb"
+    },
+    {
+      "path": "src/tier2/incremental.ts",
+      "digest": "sha256:2a1a235a5ff38a8f5bf69b79d935009d5b990fc04f7b1f23bcf1ccf9904cda13"
+    },
+    {
+      "path": "src/tier2/index.ts",
+      "digest": "sha256:00eb5e8075fc61b9a5582f841f74dfbc7a697f79fd4400e97d2f95b6d2f29eee"
+    },
+    {
+      "path": "src/tier2/isolated-wasm-adapter.ts",
+      "digest": "sha256:6de79c05c2f8f50ed92a6cdd199e0c0e265548cfc63e5bb6916604d70e00a925"
+    },
+    {
+      "path": "src/tier2/isolated-wasm-worker.ts",
+      "digest": "sha256:bd4f9f97e860672105d34564529e21628507d57b66c33b4f77896e7dd4a24db0"
+    },
+    {
+      "path": "src/tier2/ocap.ts",
+      "digest": "sha256:8a0b184aa460cb3fab7a7847dd073db5cf0ef567600233c57abc77049fa83db1"
+    },
+    {
+      "path": "src/tier2/portable-formula-checker.ts",
+      "digest": "sha256:8638e67fd4eb01fdc25d98ffa3360d846c97563cc95d55026294bd0ea2caea90"
+    },
+    {
+      "path": "src/tier2/portable-formula-producer.ts",
+      "digest": "sha256:abbb563f825f8df8ff5d4a270230596b735b5db4901067e41b30b21feb2b4012"
+    },
+    {
+      "path": "src/tier2/portable-formula.ts",
+      "digest": "sha256:4501200aac3c5df9061a3a6278a1ee5a02105f6c922dc9d3b5e77834e751a8fe"
+    },
+    {
+      "path": "src/tier2/portable-linear-kernel.ts",
+      "digest": "sha256:b6c8e6d6daae52b5e06e4eba9891a56c594961cd9adaca104a7d029c192c78f9"
+    },
+    {
+      "path": "src/tier2/portable-linear-producer.ts",
+      "digest": "sha256:b2d3b606534cec63f813cd26ea801f0b135aff0edef8f80673262ab8b1d01867"
+    },
+    {
+      "path": "src/tier2/portable-obligations.ts",
+      "digest": "sha256:13625b319e0c9542e5e511675b32a0409e5a8f0e1c219739f822ef63ad158047"
+    },
+    {
+      "path": "src/tier2/portable-proof-checker.ts",
+      "digest": "sha256:5c097c5d9c3b45ccad4059c5216a0b2bfba047d693396e29b3d61700d5cc7d4b"
+    },
+    {
+      "path": "src/tier2/portable-proof-producer.ts",
+      "digest": "sha256:3d2333d2910f7859c03a6428e544ea219fa2719fa40bdd0a68443b45b3460706"
+    },
+    {
+      "path": "src/tier2/proof-cache.ts",
+      "digest": "sha256:75d17f2ad84e8fe69601e1bc13eb42346f3431fab8f410390d9e0d57e22f13dd"
+    },
+    {
+      "path": "src/tier2/record-fallback-proof-checker.ts",
+      "digest": "sha256:d7ab3009c53f112f986a57d7d29ab26976c05e29cdb0948141b3b5b00810eaf0"
+    },
+    {
+      "path": "src/tier2/record-fallback-proof-producer.ts",
+      "digest": "sha256:9de8738c72676e2324c0fc6b30a9be05c7710908d02f1e3e51980c8be8677821"
+    },
+    {
+      "path": "src/tier2/resource-budget-bridge.ts",
+      "digest": "sha256:6d01eaa1b4a7e9d92a4a409349a49ea04295b28485c8df6c4e621ad75de5c850"
+    },
+    {
+      "path": "src/tier2/resource-budget.ts",
+      "digest": "sha256:88f5248aa28f75050f2dcd86979286ad9337260091580bb630bf6b68bb646f60"
+    },
+    {
+      "path": "src/tier2/scoped-grants.ts",
+      "digest": "sha256:8f34f940b75ca942e39dfcc087fd3c9fa159e11278367b580b0e8e30da7440fa"
+    },
+    {
+      "path": "src/tier2/smt.ts",
+      "digest": "sha256:803efdbe75a83efbf34b71b40933ce86df4fd438d12667e885e4106d011c19bc"
+    },
+    {
+      "path": "src/tier2/solver.ts",
+      "digest": "sha256:e21ffa675842a8ba1d9a72018dff67dc5f2e7e6b914da2340eda37b88f6a836b"
+    },
+    {
+      "path": "src/tier2/spec.ts",
+      "digest": "sha256:34ce11462c5df26433354afa17dbf0cefc82219ee17c8a23a4784df43be8bc9c"
+    },
+    {
+      "path": "src/tier2/trusted-clock-anchor.ts",
+      "digest": "sha256:1b919826e0f9a9bf49721d0ffb64bba7ac4dfa5b220633da9de5996fd63c4a12"
+    },
+    {
+      "path": "src/tier2/typecheck.ts",
+      "digest": "sha256:2bd77bbdf05ddb6d37a080aa95e06dafe460f51f14306de60c1af924545281b8"
+    },
+    {
+      "path": "src/tier2/verify.ts",
+      "digest": "sha256:f080e917bffb6d9cca2c14ee19ade21d4fb1aee02041eb5f943bd0c4462a7df7"
+    },
+    {
+      "path": "src/tier3/compile.ts",
+      "digest": "sha256:9371f15a16b495cd67dec50a103732a86ea31ed34162e531d03cc66d33fb0d5b"
+    },
+    {
+      "path": "src/tier3/effects.ts",
+      "digest": "sha256:a59d56d38e530f3d947117a8afa1506e831c2d44c992b73667d451b67de53cc2"
+    },
+    {
+      "path": "src/tier3/fallback-proof.ts",
+      "digest": "sha256:8d0c36ffa1e53f20a73debb5b380eeb6431d44b2ff5baf02e52ec1ce009cd344"
+    },
+    {
+      "path": "src/tier3/fallback-tree.ts",
+      "digest": "sha256:f9e69b2f4c08e6c111dcfb07edd349180c562e2dc866fb3ef7e9f9c7ab380fb5"
+    },
+    {
+      "path": "src/tier3/generate.ts",
+      "digest": "sha256:0329304a5511c083494fbf03fceb513cd7c77413de8b5fd088afd62aa0b1b875"
+    },
+    {
+      "path": "src/tier3/heap-state.ts",
+      "digest": "sha256:8c4d6cab1a252b57fc2748723524d432a5b58126d0b641ca26748f14a39a6510"
+    },
+    {
+      "path": "src/tier3/index.ts",
+      "digest": "sha256:39a98f72a0d461b0d65654954c679182971f3b0306cd82329e45fe25c8dc33c1"
+    },
+    {
+      "path": "src/tier3/living-campaign.ts",
+      "digest": "sha256:538ec53320f0a707570eedbd6023914426aa0e8ac9b4b2e7ac573f4c13afbd73"
+    },
+    {
+      "path": "src/tier3/microworld.ts",
+      "digest": "sha256:55f2c5826fd21b273475ee526c6408fb37bbc4b5fb9c466efc560f693fbafc64"
+    },
+    {
+      "path": "src/tier3/packed-heap.ts",
+      "digest": "sha256:05958df8894a0daa5660332afcccd1c011fad99bafce9bc54b70ecc7d7b15f9a"
+    },
+    {
+      "path": "src/tier3/resumable-checkpoint.ts",
+      "digest": "sha256:8e722639b3f99402a15f43ec787e5ca7ebb6b7768a7072b7a4e3b2a49c17bb3a"
+    },
+    {
+      "path": "src/tier3/resumable-program.ts",
+      "digest": "sha256:630effc7f8a28271a72512966c82f02c17f47eb356b72aa68f94df2d0b539ccd"
+    },
+    {
+      "path": "src/tier3/resumable-runtime.ts",
+      "digest": "sha256:186e03cccb90c6db4354a8cbe77c0c89bbec1ae3f24b04724ea01d104793d197"
+    },
+    {
+      "path": "src/tier3/resumable-state.ts",
+      "digest": "sha256:2aec19cbfd416792b9d2c0e6d4d310c0a7a68b6e53eee0e227b5e6535fbc8770"
+    },
+    {
+      "path": "src/tier3/resumable-types.ts",
+      "digest": "sha256:b89dd99942fc46db27f8c8888afe5c8f7c70242dc59581465ac01209fbf2018c"
+    },
+    {
+      "path": "src/tier3/runtime.ts",
+      "digest": "sha256:e0c80ac75a8f9e03238ddc3dfe845b8aead848d81d9de96a047e020f25572c5b"
+    },
+    {
+      "path": "src/tier3/values.ts",
+      "digest": "sha256:689bf72ab2bc836c2e3d9ea23f8cee0baa6e6a4c16f319c8af68c03d73a81e9a"
+    },
+    {
+      "path": "src/tier4/host.ts",
+      "digest": "sha256:ceaa2cf9b20e0a5d7eb30117c043eebfdaed9418f5b9e53f0542d9b99abd59e2"
+    },
+    {
+      "path": "src/tier4/index.ts",
+      "digest": "sha256:8ba7e5d1e3ccf4a2d5fac5a6af46185ad8f16210eb768d19540737d5110961e8"
+    },
+    {
+      "path": "src/tier4/native-fallback-compiler-v1.ts",
+      "digest": "sha256:4816b0f1f7b43ba3d1728714349c4858ef8e6dc1072cf902be5f68ccb742c14c"
+    },
+    {
+      "path": "src/tier4/native-fallback-contract.ts",
+      "digest": "sha256:aca42dfc7e29beb6d487495b260bc4c5f2099b94e289cc7712ad31746ba2e45e"
+    },
+    {
+      "path": "src/tier4/native-fallback-driver-v1.c",
+      "digest": "sha256:458ac96900c4f01a36544bb98932984830de1801edb6f30a2e3891b7d6ec346f"
+    },
+    {
+      "path": "src/tier4/native-fallback-runner.ts",
+      "digest": "sha256:a96d886e4d8179bd6aa835ea3e090cef5ad1ba6204cb33c9711ce3c5e237fc43"
+    },
+    {
+      "path": "src/tier4/packed-native-process.ts",
+      "digest": "sha256:3703eadf1a1cf822a4ac1589fcba48dba1fd59b2a582c06a83e1abf01fcd56b6"
+    },
+    {
+      "path": "src/tier4/process-channel.ts",
+      "digest": "sha256:5e4058ebc291c1f7217cd5ec86dc9e704926b92a6b6da7647c57b3f7227046bf"
+    },
+    {
+      "path": "src/tier4/process-checkpoint-contract.ts",
+      "digest": "sha256:771f2e0e2de0644478ca9e1885330e31543c7d328ce995dbaeb29b5ab71a1f00"
+    },
+    {
+      "path": "src/tier4/process-deployment.ts",
+      "digest": "sha256:99a01d394be418bae53f107c5eba1047ac2025e58c21c7d5f82d5dbb4e0035b5"
+    },
+    {
+      "path": "src/tier4/process-fallback.ts",
+      "digest": "sha256:4d3d1eb64fb881fc343df7cc49bc6260e865ce38de38e1b75c8c11aaa7b577bd"
+    },
+    {
+      "path": "src/tier4/process-host.ts",
+      "digest": "sha256:a395198abfcd67337035d57a41310b8b77f58f6ae331eb58549acfa582179100"
+    },
+    {
+      "path": "src/tier4/process-resumable.ts",
+      "digest": "sha256:72bc3ec570cdaa00599574f0c9b2994a384579c9c2074d839fecf994d6c8dcb2"
+    },
+    {
+      "path": "src/tier4/process-semantic-retention.ts",
+      "digest": "sha256:a1b2ce315ee6e3e828af156f2bf49ee7e4d5df192adca1395580f84febd5f045"
+    },
+    {
+      "path": "src/tier4/process-type-validation.ts",
+      "digest": "sha256:bf7b209a8d91809cb59ccc6e77e611bbf3207f47d2b0231043e5e01558471f32"
+    },
+    {
+      "path": "src/tier4/process-values.ts",
+      "digest": "sha256:05a026f377286dcfcbe0fa3e1f2ec20b340fb81d8932320ebc1d4f6846230879"
+    },
+    {
+      "path": "src/tier4/process-worker.ts",
+      "digest": "sha256:6ee3781926f846ff125dca8cb1cd6ad9e236b5d70d53e8419ea395ad15297e42"
+    },
+    {
+      "path": "src/tier4/surfaces.ts",
+      "digest": "sha256:242074e299532fee7b6a2b5393a60aa0e20e790d66302789bb5114c75f89c8b1"
+    },
+    {
+      "path": "src/tier4/topology.ts",
+      "digest": "sha256:92c27cd023193187446fd43cae56ea849796bd9fa40c262c18eaea480dd3024d"
+    },
+    {
+      "path": "src/util/rng.ts",
+      "digest": "sha256:32bb057831ce8b87e846a01b6ce5f3386b78cdedc7f880303484bdfb25a8d4f0"
+    },
+    {
+      "path": "src/util/tokens.ts",
+      "digest": "sha256:83f909cd9d433ee9a6e9a02e5af4ea1e3bbb780ae6f824b46d6b0f4c6169cff9"
+    },
+    {
+      "path": "tsconfig.json",
+      "digest": "sha256:e125d6f18cc9c533ab5ff0bae7fb9d9b7642ac6aae6889a8ec47e89002b572cc"
+    }
+  ],
+  "workloads": [
+    {
+      "id": "ledger-baseline/1",
+      "cold": {
+        "baseline": 878,
+        "candidate": 933,
+        "ratio": 0.9410503751339764
+      },
+      "changes": [
+        {
+          "id": "transfer",
+          "body": {
+            "baseline": 226,
+            "candidate": 130,
+            "ratio": 1.7384615384615385
+          },
+          "message": {
+            "baseline": 226,
+            "candidate": 138,
+            "ratio": 1.6376811594202898
+          }
+        },
+        {
+          "id": "feeFor",
+          "body": {
+            "baseline": 120,
+            "candidate": 57,
+            "ratio": 2.1052631578947367
+          },
+          "message": {
+            "baseline": 120,
+            "candidate": 65,
+            "ratio": 1.8461538461538463
+          }
+        },
+        {
+          "id": "accrue",
+          "body": {
+            "baseline": 166,
+            "candidate": 92,
+            "ratio": 1.8043478260869565
+          },
+          "message": {
+            "baseline": 166,
+            "candidate": 100,
+            "ratio": 1.66
+          }
+        },
+        {
+          "id": "settle",
+          "body": {
+            "baseline": 186,
+            "candidate": 64,
+            "ratio": 2.90625
+          },
+          "message": {
+            "baseline": 186,
+            "candidate": 72,
+            "ratio": 2.5833333333333335
+          }
+        }
+      ],
+      "warmBody": {
+        "baseline": 698,
+        "candidate": 343,
+        "ratio": 2.0349854227405246
+      },
+      "warmMessage": {
+        "baseline": 698,
+        "candidate": 375,
+        "ratio": 1.8613333333333333
+      },
+      "session": [
+        {
+          "index": 0,
+          "role": "system",
+          "purpose": "instructions",
+          "baseline": 28,
+          "candidate": 28,
+          "ratio": 1
+        },
+        {
+          "index": 1,
+          "role": "user",
+          "purpose": "initial_context",
+          "baseline": 955,
+          "candidate": 946,
+          "ratio": 1.0095137420718816
+        },
+        {
+          "index": 2,
+          "role": "user",
+          "purpose": "change_request",
+          "baseline": 37,
+          "candidate": 37,
+          "ratio": 1
+        },
+        {
+          "index": 3,
+          "role": "assistant",
+          "purpose": "failed_attempt",
+          "baseline": 141,
+          "candidate": 78,
+          "ratio": 1.8076923076923077
+        },
+        {
+          "index": 4,
+          "role": "tool",
+          "purpose": "response",
+          "baseline": 30,
+          "candidate": 30,
+          "ratio": 1
+        },
+        {
+          "index": 5,
+          "role": "assistant",
+          "purpose": "repair",
+          "baseline": 140,
+          "candidate": 77,
+          "ratio": 1.8181818181818181
+        },
+        {
+          "index": 6,
+          "role": "tool",
+          "purpose": "response",
+          "baseline": 30,
+          "candidate": 30,
+          "ratio": 1
+        }
+      ],
+      "fullSession": {
+        "baseline": 1361,
+        "candidate": 1226,
+        "ratio": 1.1101141924959217
+      }
+    }
+  ],
+  "aggregates": {
+    "warmBody": {
+      "baseline": 698,
+      "candidate": 343,
+      "ratio": 2.0349854227405246
+    },
+    "warmMessage": {
+      "baseline": 698,
+      "candidate": 375,
+      "ratio": 1.8613333333333333
+    },
+    "cold": {
+      "baseline": 878,
+      "candidate": 933,
+      "ratio": 0.9410503751339764
+    },
+    "fullSession": {
+      "baseline": 1361,
+      "candidate": 1226,
+      "ratio": 1.1101141924959217
+    }
+  }
+}
