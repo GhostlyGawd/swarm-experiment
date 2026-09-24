@@ -29,7 +29,7 @@ const body = { format: 'aether.process-native-fallback-binding/1', operationId: 
 const binding = { ...body, id: domainDigest('aether.process-native-fallback-binding/1', body) };
 const pending = { binding, before, state: 'requested', result: null, resultDigest: null };
 const result = { state: 'completed', value: { tag: 'int', value: '7' } };
-const resultDigest = domainDigest('aether.test-native-result/1', result);
+const resultDigest = domainDigest('aether.process-native-fallback-outcome/1', result);
 function journal(revision: string, nativeFallbacks: readonly unknown[]): string {
   return Buffer.from(encodeCanonical({ format: 'aether.process-host/5', configuration,
     generation: '0', plan: '{}', snapshot: {}, calls: [], migrations: [], allocations: [],
@@ -110,6 +110,10 @@ test('v5 host witness retains native fallback binding, before snapshot, state an
       ['deleted', []],
       ['substituted binding', [{ ...pending, binding: { ...binding, operationId: 'native:other',
         id: domainDigest('aether.process-native-fallback-binding/1', { ...body, operationId: 'native:other' }) } }]],
+      ['cross-configuration binding', [{ ...pending, binding: { ...binding,
+        configuration: domainDigest('aether.process-host-configuration/1', 'other'),
+        id: domainDigest('aether.process-native-fallback-binding/1', { ...body,
+          configuration: domainDigest('aether.process-host-configuration/1', 'other') }) } }]],
       ['altered before snapshot', [{ ...pending, before: { ...before, eventCursor: '1' } }]],
       ['premature result', [{ ...pending, result, resultDigest }]],
     ];
@@ -120,6 +124,9 @@ test('v5 host witness retains native fallback binding, before snapshot, state an
     }
     head = advanceHostJournalHead(witness, head.revision, next(head, [{ ...pending, state: 'running' }]));
     assert.throws(() => advanceHostJournalHead(witness, head.revision, next(head, [pending])), /witness INVALID/);
+    assert.throws(() => advanceHostJournalHead(witness, head.revision, next(head,
+      [{ ...pending, state: 'committed', result,
+        resultDigest: domainDigest('aether.process-native-fallback-outcome/1', 'wrong') }])), /witness INVALID/);
     const terminal = { ...pending, state: 'committed', result, resultDigest };
     head = advanceHostJournalHead(witness, head.revision, next(head, [terminal]));
     const frozenHead = head;
@@ -137,7 +144,8 @@ test('v5 host witness retains native fallback binding, before snapshot, state an
     const storedHeadFile = join(store, readdirSync(store).find(name => name.endsWith('.json'))!);
     const frozenStoredBytes = readFileSync(storedHeadFile);
     assert.throws(() => advanceHostJournalHead(reopened, frozenHead.revision,
-      next(frozenHead, [{ ...terminal, resultDigest: domainDigest('aether.test-native-result/1', 'altered') }])), /witness INVALID/);
+      next(frozenHead, [{ ...terminal,
+        resultDigest: domainDigest('aether.process-native-fallback-outcome/1', 'altered') }])), /witness INVALID/);
     assert.deepEqual(readHostJournalHead(reopened), frozenHead);
     const second = { ...pending, binding: { ...binding, operationId: 'native:two',
       id: domainDigest('aether.process-native-fallback-binding/1', { ...body, operationId: 'native:two' }) } };

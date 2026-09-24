@@ -236,6 +236,8 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
       const { id: _id, ...body } = binding;
       if (binding.id !== domainDigest('aether.process-native-fallback-binding/1', body))
         throw new TypeError('invalid native fallback binding digest');
+      if (binding.configuration !== record.configuration)
+        throw new TypeError('native fallback binding differs from host configuration');
       if (seen.has(binding.id as string)) throw new TypeError('duplicate native fallback binding');
       seen.add(binding.id as string);
       validateRuntimeSnapshot(row.before);
@@ -250,7 +252,9 @@ function validateJournal(id: WitnessIdentity, revision: string, journal: string,
       } else {
         if (row.result === null || row.resultDigest === null)
           throw new TypeError('terminal native fallback requires a result and digest');
-        validateDigest(row.resultDigest);
+        validateDigest(row.resultDigest, 'aether.process-native-fallback-outcome/1');
+        if (row.resultDigest !== domainDigest('aether.process-native-fallback-outcome/1', row.result))
+          throw new TypeError('native fallback result digest mismatch');
       }
     }
   }
