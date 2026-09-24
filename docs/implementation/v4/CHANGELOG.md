@@ -5,6 +5,7 @@
 - Exercised V2 fallback against a witnessed V8 ProcessHost and separate signed `/2` sink/witness processes. A signed Tier 1 commit is returned once across reopen; a signed noncommit fence allows independently proved pure Tier 2; outage prevents fallback until witnessed status is available. The focused signed-sink and process-fallback tests pass 28/28.
 - The supervisor now rechecks authority after the host result and before its own receipt, refuses a terminal abort that conflicts with a later successful or unresolved host operation under the same tier identity, and checks the original host snapshot at terminal publication. Revocation, alias and concurrent-writer regressions pass.
 - These are bounded same-UID process results. Native active-frame lowering, portable native proof, distinct-UID custody, full combined crash recovery and the FR-3.7 ≤50 ns hard maximum remain open. The task count stays 20/62. [Research and limits](../../../roadmap/v4/research/process-fallback/README.md).
+- [Exact-source checkpoint](evidence/integration-8b92d14/REVIEW.md) at `8b92d14`: 974/975 tests pass with one existing opt-in skip; build, typecheck and both roadmap checks pass. The exact-source benchmark remains ineligible with 1.861× warm-message compression and 17 required targets failed or unmeasured.
 
 ## Bounded signed sink budget settlement — 2026-09-24
 
