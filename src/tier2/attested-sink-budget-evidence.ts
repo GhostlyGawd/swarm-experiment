@@ -3,7 +3,10 @@
  * This provider reads the current, branded /2 sink witness head. It does not
  * trust a broker result, a caller-supplied receipt, or a missing sink row as
  * terminal noncommit. A predispatch refund without a signed sink fence needs
- * a separately qualified broker authority and is outside this helper.
+ * a separately qualified broker authority and is outside this helper. The
+ * full-request inventory is operator pinned; dynamic issuance needs a durable
+ * assignment authority. This verifies evidence, not which pre-split handle
+ * funded an effect: that selection still needs ledger/bridge operator custody.
  */
 import { decodeCanonical, decimal, encodeCanonical, exactObject, identifier,
   type TaggedValueV1 } from '../fabric/encoding.ts';
@@ -36,6 +39,13 @@ function binding(request: EffectRequestV1): ResourceBinding {
     executionManifest: request.executionManifest, payloadDigest: request.payloadDigest,
     policyEpoch: request.policyEpoch };
 }
+function bindingKey(value: ResourceBinding): string {
+  return JSON.stringify([value.executionId, value.effectId, value.executionManifest,
+    value.payloadDigest, value.policyEpoch]);
+}
+function effectKey(request: EffectRequestV1): string {
+  return JSON.stringify([request.executionId, request.effectId]);
+}
 function selected(rows: readonly SinkStateDecisionRowV1[], repositoryId: string,
   request: EffectRequestV1): SinkStateDecisionRowV1 | undefined {
   return rows.find(row => row.repositoryId === repositoryId
@@ -62,13 +72,17 @@ export interface AttestedSinkBudgetEvidenceOptions {
   readonly repositoryId: string;
   readonly deploymentId: string;
   readonly approvedAdapterArtifactDigest: Digest;
-  /** Pin this before reopening a settled ResourceBudgetLedger: its constructor
-   * replays settlements and calls verifySettlement before it returns. A helper
-   * installed only after construction works for fresh genesis, not reopen. */
+  /** Pin this before reopening a settled ResourceBudgetLedger. Historical
+   * evidence is checked on reads only if revalidateSettlementOnRead is enabled;
+   * without it, an earlier settlement is not reverified on reopen. */
   readonly ledgerDigest: Digest;
   readonly owner: string;
   /** Fixed conservative per-commit charge; no caller-supplied metering. */
   readonly charge: ResourceAmounts;
+  /** Operator-assigned full requests, before dispatch. One per five-field
+   * budget binding, effect identity, and non-null reservation ID. This bounded
+   * inventory cannot be inferred from a settlement or sink response. */
+  readonly expectedRequests: readonly EffectRequestV1[];
 }
 export interface AttestedSinkBudgetEvidence {
   observe(request: EffectRequestV1): BudgetObservation;
@@ -82,6 +96,22 @@ export function createAttestedSinkBudgetEvidence(options: AttestedSinkBudgetEvid
   validateSinkAdapterArtifactDigest(options.approvedAdapterArtifactDigest);
   validateDigest(options.ledgerDigest, 'aether.resource-budget/1');
   amount(options.charge);
+  if (!Array.isArray(options.expectedRequests) || options.expectedRequests.length < 1
+    || options.expectedRequests.length > 256)
+    throw new TypeError('bounded expected sink requests required');
+  const expected = new Map<string, Digest>();
+  const effects = new Set<string>();
+  const reservations = new Set<string>();
+  for (const request of options.expectedRequests) {
+    validateEffectRequest(request, SINK_RECEIPT_LIMITS);
+    if (request.budgetReservationId === null) throw new TypeError('expected sink request needs budget reservation ID');
+    const bound = bindingKey(binding(request));
+    const effect = effectKey(request);
+    if (expected.has(bound) || effects.has(effect) || reservations.has(request.budgetReservationId))
+      throw new TypeError('ambiguous expected sink request binding or reservation');
+    expected.set(bound, effectRequestDigest(request, SINK_RECEIPT_LIMITS));
+    effects.add(effect); reservations.add(request.budgetReservationId);
+  }
   const anchor = decodeCanonical(encodeCanonical(options.anchor)) as unknown as SinkPublicAnchorV1;
   const charge = Object.freeze(decodeCanonical(encodeCanonical(options.charge)) as unknown as ResourceAmounts);
   if (anchor.repositoryId !== options.repositoryId || options.witness.repositoryId !== options.repositoryId
@@ -113,8 +143,18 @@ export function createAttestedSinkBudgetEvidence(options: AttestedSinkBudgetEvid
         disposition, value: row.value,
       });
   };
+  const expectedDigest = (request: EffectRequestV1): Digest | undefined =>
+    expected.get(bindingKey(binding(request)));
+  const exactExpected = (request: EffectRequestV1): boolean =>
+    expectedDigest(request) === effectRequestDigest(request, SINK_RECEIPT_LIMITS);
   const observe = (request: EffectRequestV1): BudgetObservation => {
     validateEffectRequest(request, SINK_RECEIPT_LIMITS);
+    const pinned = expectedDigest(request);
+    if (pinned === undefined) throw new Error(effects.has(effectKey(request))
+      ? 'attested sink budget request identity conflict'
+      : 'attested sink budget request is unpinned');
+    if (pinned !== effectRequestDigest(request, SINK_RECEIPT_LIMITS))
+      throw new Error('attested sink budget request identity conflict');
     const rows = currentRows();
     if (rows === null) return { state: 'unknown' };
     const row = selected(rows, options.repositoryId, request);
@@ -132,6 +172,7 @@ export function createAttestedSinkBudgetEvidence(options: AttestedSinkBudgetEvid
       amount(settlement.charge);
       const outer = decodeBudgetSettlementWitness(settlement.evidence);
       const request = outer.request;
+      if (!exactExpected(request)) return false;
       const rows = currentRows();
       if (rows === null) return false;
       const row = selected(rows, options.repositoryId, request);

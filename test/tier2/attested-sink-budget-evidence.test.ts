@@ -39,7 +39,9 @@ function row(anchor: SinkPublicAnchorV1, key: KeyObject, r: EffectRequestV1,
   return { repositoryId: anchor.repositoryId, deploymentId: 'deployment:one', request: r,
     value, receipt: signSinkReceipt(body, key, anchor) };
 }
-function fixture() {
+function fixture(expectedRequests: readonly EffectRequestV1[] = [
+  request('effect:commit'), request('effect:fence'), request('effect:absent'), request('effect:one'),
+]) {
   const key = generateKeyPairSync('ed25519');
   const anchor: SinkPublicAnchorV1 = { format: 'aether.sink-anchor/1', repositoryId: 'repository:one',
     sinkAuthorityId: 'operator:one', sinkId: 'sink:one', keyId: 'key:one', keyEpoch: '1',
@@ -54,7 +56,7 @@ function fixture() {
     } });
   const evidence = createAttestedSinkBudgetEvidence({ witness, anchor, repositoryId: anchor.repositoryId,
     deploymentId: 'deployment:one', approvedAdapterArtifactDigest: artifact,
-    ledgerDigest, owner: 'budget-service', charge });
+    ledgerDigest, owner: 'budget-service', charge, expectedRequests });
   const rows: SinkStateDecisionRowV1[] = [];
   const append = (r: EffectRequestV1, disposition: 'committed' | 'not_committed') => {
     rows.push(row(anchor, key.privateKey, r, rows.length + 1, disposition));
@@ -141,11 +143,40 @@ test('helper requires the branded witness and exact independently pinned identit
   const f = fixture();
   const options = { witness: f.witness, anchor: f.anchor, repositoryId: f.anchor.repositoryId,
     deploymentId: 'deployment:one', approvedAdapterArtifactDigest: artifact,
-    ledgerDigest, owner: 'budget-service', charge };
+    ledgerDigest, owner: 'budget-service', charge, expectedRequests: [request('effect:one')] };
   assert.throws(() => createAttestedSinkBudgetEvidence({ ...options, witness: { ...f.witness } }), /independently supplied/);
   assert.throws(() => createAttestedSinkBudgetEvidence({ ...options,
     approvedAdapterArtifactDigest: domainDigest('aether.effect-adapter-artifact/3', 'other') }), /identity differs/);
   assert.throws(() => createAttestedSinkBudgetEvidence({ ...options, repositoryId: 'other' }), /identity differs/);
   assert.throws(() => createAttestedSinkBudgetEvidence({ ...options,
     charge: { ...charge, tokens: '-1' } }), /canonical decimal/);
+  assert.throws(() => createAttestedSinkBudgetEvidence({ ...options, expectedRequests: [] }), /bounded expected/);
+  assert.throws(() => createAttestedSinkBudgetEvidence({ ...options,
+    expectedRequests: [request('effect:one'), { ...request('effect:one'), capabilityGrantRef: 'other-grant' }] }), /ambiguous expected/);
+  assert.throws(() => createAttestedSinkBudgetEvidence({ ...options,
+    expectedRequests: [request('effect:one'), { ...request('effect:two'), budgetReservationId: 'budget:effect:one' }] }), /ambiguous expected/);
+});
+
+test('direct-ledger alias cannot settle a different signed grant or reservation under the same five-field binding', () => {
+  const authorized = request('effect:one');
+  for (const patch of [
+    { capabilityGrantRef: 'grant:other' },
+    { budgetReservationId: 'budget:other' },
+    { capabilityGrantRef: 'grant:other', budgetReservationId: 'budget:other' },
+  ]) {
+    const f = fixture([authorized]);
+    const alien = { ...authorized, ...patch };
+    f.append(alien, 'committed');
+    assert.throws(() => f.evidence.observe(alien), /identity conflict/);
+    assert.throws(() => f.evidence.observe(authorized), /identity conflict/);
+    const signedReceipt: TaggedValueV1 = { tag: 'string', value: Buffer.from(
+      encodeCanonical(f.rows[0].receipt)).toString('utf8') };
+    const signedAlien = settlement(alien, { state: 'committed', value: payload,
+      charge, evidence: signedReceipt });
+    // ResourceBinding intentionally omits grantRef and reservation ID; those
+    // five fields are equal here. The predeclared full digest rejects the alias.
+    assert.deepEqual(encodeCanonical(signedAlien.binding), encodeCanonical(settlement(authorized,
+      { state: 'committed', value: payload, charge, evidence: signedReceipt }).binding));
+    assert.equal(f.evidence.verifySettlement(signedAlien), false);
+  }
 });
