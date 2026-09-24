@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Typed read-only contract projection V13 — 2026-09-24
+
+- Added `aether.executable-projection/13` for direct composite and generic helpers and pure sequence map/fold callbacks in contracts. A transitive read-only check rejects pure-labeled helpers that mutate caller records, as well as effectful and indirect callees. Actual TypeScript, Python and Rust fixtures check exact roots, edits, pre/postconditions and adversarial refusals. Earlier named V11/V12 producers remain available. [Profile and limits](../../../roadmap/v4/research/projections/TYPED-CONTRACT-CALLS.md).
+- A valid capability-free closure predicate still typechecks and runs in the reference interpreter but lacks an admitted native contract projection. V4-T1-02/G1 remains open. The historic AE6 cold and changed-session misses remain separate FR-1.2/Q03 obligations; no task status or threshold changes.
+
 ## T3-03 process and socket fault campaign — 2026-09-24
 
 - Added a real loopback TCP and independent-worker extension to the living effect-broker campaign. The first worker is SIGKILLed after a durable sink write and before broker receipt; a fresh worker explicitly recovers the dead journal owner, reconciles, accepts a duplicate request, and replays terminal effects without live callbacks. Truncated and malformed socket frames do not dispatch. Stable logical IDs produce one sink write; attempt-derived IDs produce two.
