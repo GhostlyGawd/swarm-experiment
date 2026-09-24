@@ -92,7 +92,8 @@ function assertJournal(journal: unknown, revision: string): asserts journal is s
   if (Buffer.from(encodeCanonical(decoded)).toString('utf8') !== journal)
     throw new TypeError('noncanonical host witness journal');
   const record = exactObject(decoded, Object.keys(decoded ?? {}));
-  if (!['aether.process-host/1', 'aether.process-host/2', 'aether.process-host/3', 'aether.process-host/4'].includes(record.format as string))
+  if (!['aether.process-host/1', 'aether.process-host/2', 'aether.process-host/3', 'aether.process-host/4',
+    'aether.process-host/5'].includes(record.format as string))
     throw new TypeError('invalid host witness journal format');
   for (const field of ['configuration', 'generation', 'plan', 'snapshot', 'calls', 'migrations', 'allocations', 'snapshots', 'heads'])
     if (!Object.hasOwn(record, field)) throw new TypeError('incomplete host witness journal');
@@ -101,10 +102,12 @@ function assertJournal(journal: unknown, revision: string): asserts journal is s
   if (typeof record.plan !== 'string' || !record.snapshot || typeof record.snapshot !== 'object'
     || ![record.calls, record.migrations, record.allocations, record.snapshots, record.heads].every(Array.isArray))
     throw new TypeError('invalid host witness journal envelope');
-  if (record.format === 'aether.process-host/4') {
+  if (record.format === 'aether.process-host/4' || record.format === 'aether.process-host/5') {
     decimal(record.witnessRevision);
     if (record.witnessRevision !== revision) throw new Error('host witness journal revision mismatch');
   }
+  if (record.format === 'aether.process-host/5' && !Array.isArray(record.nativeFallbacks))
+    throw new TypeError('incomplete native fallback host witness journal');
 }
 
 export function createHostJournalWitness(options: Readonly<{
