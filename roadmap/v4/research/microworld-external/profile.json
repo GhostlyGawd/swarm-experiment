@@ -1,12 +1,13 @@
 {
-  "format": "aether.living-external-research-profile/2",
+  "format": "aether.living-external-research-profile/3",
   "declaredCases": 15,
   "minimumBoundaryPermutationsPerSecond": 2000000,
-  "pipeline": "aether.living-boundary-pipeline/1: durably records generation, all 17 execution attempts, two recovery calls, publication samples and final coverage without dropping the failed partition attempt",
+  "pipeline": "Two aether.living-boundary-pipeline/1 phases across an actual candidate-process restart; the first retains the indeterminate partition failure and the second retains unknown status, signed recovery and every final case",
+  "faultShrink": { "format": "aether.living-external-fault-shrink/1", "seed": "20260924-external-fault", "originalActions": ["malformed-command", "truncated-command", "healthy-case"], "limit": 8, "property": "committed sink, unknown host during gateway outage, signed recovery after fresh candidate process restart, 15/15 final cases with zero filters" },
   "r04Kernel": "Unchanged one-warmup/five-trial 20,000 JSON-event profile; reported separately from signed Aether candidate and witnessed sink execution",
   "durabilityProbe": { "warmups": 10, "samples": 100, "bytesPerRecord": 256, "operations": ["exclusive file create/write/fsync", "directory fsync"], "qualification": "Serial lower-level diagnostic only; cannot substitute for the full candidate/sink campaign or prove a parallel hardware ceiling" },
   "candidate": "Same signed Aether module root as the integrated scheduler/resource/corrupted-frame/out-of-order campaign",
   "externalEffect": "Independently launched append-only sink with signed receipts, operator witness of complete sink decisions and separate complete broker journals",
   "partition": "Gateway forwards first execute to sink and drops the post-decision reply, remains absent for one unknown status call, then rejoins for signed reconciliation",
-  "qualification": "Complete external campaign includes 15 generated/executed cases, one failed partition attempt, recovery, duplicate retry, raw copy and audit; four-field JSON kernel is separate"
+  "qualification": "D21 fixes 2M/s on the R04 four-field generator/evaluator only; complete signed external throughput is reported separately with no numerical release target. Every shrink proposal executes all 15 cases and retains the failed partition attempt."
 }

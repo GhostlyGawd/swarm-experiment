@@ -39,18 +39,23 @@ test('same signed candidate uses witnessed external sink and refuses partition s
         ...authorization.externalSink, deploymentId: 'deployment:forged',
       },
     } }), /forged external campaign authorization/);
-  const result = await runExternal(prepared, join(root, 'public'));
+  const result = await runExternal(prepared, join(root, 'public'),
+    ['malformed-command', 'truncated-command', 'healthy-case']);
   assert.equal(result.generated, 15); assert.equal(result.executed, 15);
   assert.equal(result.filtered, 0); assert.equal(result.passed, 15);
   assert.equal(result.partitionAttempt.passed, false);
   assert.equal(result.partitionAttempt.externalEffects.indeterminate, 1);
   assert.equal(result.partitionUnknown, 1); assert.equal(result.reconciled, 1);
   assert.equal(result.sinkDecisions, 9); assert.equal(result.sinkWitnessRevision, '9');
-  assert.equal(result.attempted, 17);
+  assert.equal(result.attempted, 18);
   assert.equal(result.pipeline.generated, 15); assert.equal(result.pipeline.executed, 15);
-  assert.equal(result.pipeline.attemptedExecutions, 17);
+  assert.equal(result.pipeline.attemptedExecutions, 18);
   assert.equal(result.pipeline.failedAttempts, 1); assert.equal(result.pipeline.filteredAttempts, 0);
-  assert.equal(result.pipeline.recoveries, 2); assert.equal(result.pipeline.complete, true);
+  assert.equal(result.pipeline.recoveries, 2);
+  assert.equal(result.pipeline.phases[0].complete, false);
+  assert.equal(result.pipeline.phases[1].complete, true);
+  assert.equal(result.candidateRestarts, 1);
+  assert.equal(result.workerTermination, 'SIGKILL');
   auditExternalRaw(join(root, 'public'), result, prepared.registration);
   const sinkState = join(root, 'public', 'sink-store', 'sink-state-v2.json');
   const originalSink = readFileSync(sinkState, 'utf8');
@@ -58,7 +63,7 @@ test('same signed candidate uses witnessed external sink and refuses partition s
   assert.throws(() => auditExternalRaw(join(root, 'public'), result, prepared.registration),
     /external sink decision outside signed execution|external sink receipt changed|external sink witness head changed/);
   writeFileSync(sinkState, originalSink);
-  const attempts = join(root, 'public', 'pipeline', 'attempts');
+  const attempts = join(root, 'public', 'pipeline', 'phase-1', 'attempts');
   const first = join(attempts, readdirSync(attempts).find(name => name.endsWith('.json'))!);
   writeFileSync(first, readFileSync(first, 'utf8').replace('original', 'forged'));
   assert.throws(() => auditExternalRaw(join(root, 'public'), result, prepared.registration),

@@ -43,6 +43,13 @@ async function stop(service: Service | null): Promise<void> {
   const timer = setTimeout(() => service.child.kill('SIGKILL'), 3000);
   try { await exit; } finally { clearTimeout(timer); }
 }
+async function kill(service: Service): Promise<void> {
+  if (service.child.exitCode !== null || service.child.signalCode !== null) throw new Error('candidate already stopped before crash');
+  const exit = new Promise<NodeJS.Signals | null>(resolveExit =>
+    service.child.once('exit', (_code, signal) => resolveExit(signal)));
+  service.child.kill('SIGKILL');
+  if (await exit !== 'SIGKILL') throw new Error('candidate restart lacked real SIGKILL');
+}
 async function frame(path: string, body: unknown): Promise<any> {
   return await new Promise((resolveValue, reject) => {
     const socket = connect(path); let buffer = '', finished = false;
@@ -61,7 +68,34 @@ async function frame(path: string, body: unknown): Promise<any> {
     socket.once('close', () => { if (!buffer.includes('\n')) done(new Error('external worker closed without response')); });
   });
 }
+async function faultFrame(path: string, payload: string, complete: boolean): Promise<void> {
+  await new Promise<void>((resolveDone, reject) => {
+    const socket = connect(path); let settled = false, response = '';
+    const timer = setTimeout(() => done(new Error('fault frame timeout')), 5000);
+    function done(error?: Error): void {
+      if (settled) return; settled = true; clearTimeout(timer); socket.destroy();
+      if (error) reject(error); else resolveDone();
+    }
+    socket.once('connect', () => { socket.write(payload + (complete ? '\n' : '')); if (!complete) socket.end(); });
+    socket.on('data', chunk => {
+      response += String(chunk);
+      if (response.includes('\n')) {
+        try {
+          const row = JSON.parse(response.slice(0, response.indexOf('\n')));
+          if (!row.error) throw new Error('malformed fault frame was accepted');
+          done();
+        } catch (error) { done(error as Error); }
+      }
+    });
+    socket.once('error', error => done(error));
+    socket.once('close', () => {
+      if (!complete && !response.includes('\n')) done();
+      else if (complete && !response.includes('\n')) done(new Error('fault frame closed without refusal'));
+    });
+  });
+}
 const caseDigest = (input: LivingCase) => domainDigest('aether.living-case/1', input);
+export type ExternalFaultActionV1 = 'malformed-command' | 'truncated-command' | 'healthy-case';
 export interface ExternalRegistration {
   readonly authorization: NonNullable<ConstructorParameters<typeof LivingCampaign>[0]['effectAuthorization']>;
   readonly operatorPublicKeyPem: string;
@@ -77,11 +111,13 @@ export interface ExternalPrepared {
   readonly sinkSocket: string;
   readonly gatewaySocket: string;
   readonly workerSocket: string;
+  readonly workerSocketRestart: string;
   readonly witnessKeyFile: string;
   readonly sinkKeyFile: string;
   readonly witnessConfig: string;
   readonly sinkConfig: string;
   readonly workerConfig: string;
+  readonly workerConfigRestart: string;
   readonly sinkStore: string;
   readonly witnessStore: string;
 }
@@ -91,7 +127,8 @@ export async function prepareExternal(privateDirectory: string, publicDirectory:
     gatewayDir = join(privateDirectory, 'gateway'), workerDir = join(privateDirectory, 'worker');
   for (const path of [witnessDir, sinkDir, gatewayDir, workerDir]) mkdirSync(path, { mode: 0o700 });
   const witnessSocket = join(witnessDir, 'w.sock'), sinkSocket = join(sinkDir, 's.sock'),
-    gatewaySocket = join(gatewayDir, 'g.sock'), workerSocket = join(workerDir, 'c.sock');
+    gatewaySocket = join(gatewayDir, 'g.sock'), workerSocket = join(workerDir, 'c.sock'),
+    workerSocketRestart = join(workerDir, 'c2.sock');
   const witnessKey = randomBytes(32), sinkKey = randomBytes(32);
   const witnessKeyFile = join(witnessDir, 'key'), sinkKeyFile = join(sinkDir, 'key');
   privateFile(witnessKeyFile, witnessKey); privateFile(sinkKeyFile, sinkKey);
@@ -104,7 +141,7 @@ export async function prepareExternal(privateDirectory: string, publicDirectory:
   privateFile(signingKeyFile, sinkKeys.privateKey.export({ format: 'pem', type: 'pkcs8' }).toString());
   const witnessStore = join(witnessDir, 'heads'), sinkStore = join(sinkDir, 'store');
   const witnessConfig = join(witnessDir, 'config.json'), sinkConfig = join(sinkDir, 'config.json'),
-    workerConfig = join(workerDir, 'config.json');
+    workerConfig = join(workerDir, 'config.json'), workerConfigRestart = join(workerDir, 'config-restart.json');
   privateFile(witnessConfig, { socketPath: witnessSocket, storageDir: witnessStore, keyFile: witnessKeyFile,
     namespaces: [
       { kind: 'effect-scope', authorityId: EXTERNAL_WITNESS_AUTHORITY, repositoryId: EXTERNAL_REPOSITORY,
@@ -136,15 +173,19 @@ export async function prepareExternal(privateDirectory: string, publicDirectory:
       adapterArtifactDigest: EXTERNAL_ARTIFACT, witnessSocketPath: witnessSocket,
       witnessKeyFile, witnessAuthorityId: EXTERNAL_WITNESS_AUTHORITY });
     privateFile(workerConfig, { directory: join(privateDirectory, 'candidate'), witnessSocket, witnessKeyFile,
-      gatewaySocket, sinkKeyFile, listenSocket: workerSocket });
+      gatewaySocket, sinkKeyFile, listenSocket: workerSocket,
+      pipelineDirectory: join(privateDirectory, 'candidate', 'pipeline-phase-1') });
+    privateFile(workerConfigRestart, { directory: join(privateDirectory, 'candidate'), witnessSocket, witnessKeyFile,
+      gatewaySocket, sinkKeyFile, listenSocket: workerSocketRestart,
+      pipelineDirectory: join(privateDirectory, 'candidate', 'pipeline-phase-2') });
     return { witnessService, registration: { authorization, operatorPublicKeyPem, anchor,
       generated: JSON.parse(readFileSync(registrationPath, 'utf8')).generated },
-      registrationPath, privateDirectory, witnessSocket, sinkSocket, gatewaySocket, workerSocket,
-      witnessKeyFile, sinkKeyFile, witnessConfig, sinkConfig, workerConfig, sinkStore, witnessStore };
+      registrationPath, privateDirectory, witnessSocket, sinkSocket, gatewaySocket, workerSocket, workerSocketRestart,
+      witnessKeyFile, sinkKeyFile, witnessConfig, sinkConfig, workerConfig, workerConfigRestart, sinkStore, witnessStore };
   } catch (error) { await stop(witnessService); throw error; }
 }
 export interface ExternalCampaignResult {
-  readonly format: 'aether.living-external-campaign/2';
+  readonly format: 'aether.living-external-campaign/3';
   readonly generated: number; readonly executed: number; readonly filtered: number;
   readonly passed: number; readonly failed: number; readonly attempted: number;
   readonly partitionUnknown: number; readonly reconciled: number;
@@ -152,22 +193,54 @@ export interface ExternalCampaignResult {
   readonly seeds: readonly string[]; readonly coverage: readonly string[];
   readonly cases: readonly { input: LivingCase; result: LivingExternalCaseResultV4 }[];
   readonly partitionAttempt: LivingExternalCaseResultV4;
-  readonly pipeline: LivingPipelineReportV1;
+  readonly faultActions: readonly ExternalFaultActionV1[];
+  readonly candidateRestarts: 1;
+  readonly workerTermination: 'SIGKILL';
+  readonly pipeline: {
+    readonly format: 'aether.living-restart-pipeline/1';
+    readonly phases: readonly [LivingPipelineReportV1, LivingPipelineReportV1];
+    readonly generated: number; readonly executed: number; readonly attemptedExecutions: number;
+    readonly failedAttempts: number; readonly filteredAttempts: number; readonly recoveries: number;
+    readonly seeds: readonly string[]; readonly coverage: readonly string[];
+  };
 }
-export async function runExternal(prepared: ExternalPrepared, publicDirectory: string): Promise<ExternalCampaignResult> {
+export async function runExternal(prepared: ExternalPrepared, publicDirectory: string,
+  faultActions: readonly ExternalFaultActionV1[] = []): Promise<ExternalCampaignResult> {
+  if (new Set(faultActions).size !== faultActions.length || faultActions.some(action =>
+    !['malformed-command', 'truncated-command', 'healthy-case'].includes(action)))
+    throw new TypeError('unsupported or duplicate external fault action');
   const services: Service[] = [prepared.witnessService], child = (name: string) => join(sourceRoot, 'src/fabric', name);
-  let gateway: Service | null = null;
+  let gateway: Service | null = null, activeWorker: Service | null = null;
+  let activeSocket = prepared.workerSocket;
   try {
     services.push(await launch(child('attested-sink-service-cli.ts'), ['--config', prepared.sinkConfig], 'attested sink service ready'));
     gateway = await launch(join(dirname(fileURLToPath(import.meta.url)), 'gateway.ts'),
       [prepared.gatewaySocket, prepared.sinkSocket, 'drop-first-response'], 'gateway ready');
-    services.push(await launch(join(dirname(fileURLToPath(import.meta.url)), 'worker.ts'),
-      [prepared.registrationPath, prepared.workerConfig], 'external worker ready'));
+    activeWorker = await launch(join(dirname(fileURLToPath(import.meta.url)), 'worker.ts'),
+      [prepared.registrationPath, prepared.workerConfig], 'external worker ready');
+    services.push(activeWorker);
     const input = prepared.registration.generated.find(item => item.scenario === 'faulted-json-network' && item.ordinal === 0)!;
     let attempted = 0;
     const command = (op: string, caseInput: LivingCase, kind?: 'original' | 'retry' | 'duplicate') => ({ op, input: caseInput, ...(kind ? { kind } : {}) });
+    const witnessClient = createProcessWitnessClient({ socketPath: prepared.witnessSocket,
+      key: readFileSync(prepared.witnessKeyFile), timeoutMs: 3000 });
+    const sinkWitness = witnessClient.sinkStateWitness({ authorityId: EXTERNAL_WITNESS_AUTHORITY,
+      anchor: prepared.registration.anchor, adapterArtifactDigest: EXTERNAL_ARTIFACT });
+    for (const action of faultActions) {
+      if (action === 'malformed-command') await faultFrame(activeSocket, '{malformed', true);
+      else if (action === 'truncated-command') await faultFrame(activeSocket, '{"op":"run-case"', false);
+      else {
+        const healthy = prepared.registration.generated.find(item => item.scenario === 'two-writers' && item.ordinal === 0)!;
+        attempted++;
+        const result = await frame(activeSocket, command('run-case', healthy, 'original')) as LivingExternalCaseResultV4;
+        if (!result.passed || result.filtered || result.externalEffects.eventCount !== 0)
+          throw new Error('healthy preflight case changed sink state');
+      }
+    }
+    if (readSinkStateHead(sinkWitness).revision !== '0')
+      throw new Error('optional fault actions dispatched an external effect');
     attempted++;
-    const partitionAttempt = await frame(prepared.workerSocket, command('run-case', input, 'original')) as LivingExternalCaseResultV4;
+    const partitionAttempt = await frame(activeSocket, command('run-case', input, 'original')) as LivingExternalCaseResultV4;
     if (partitionAttempt.passed || partitionAttempt.filtered || partitionAttempt.externalEffects.indeterminate !== 1)
       throw new Error('post-sink partition did not preserve unknown effect outcome');
     if (gateway.child.exitCode === null && gateway.child.signalCode === null)
@@ -177,10 +250,6 @@ export async function runExternal(prepared: ExternalPrepared, publicDirectory: s
       });
     gateway = null;
     if (existsSync(prepared.gatewaySocket)) throw new Error('partition gateway socket remained reachable');
-    const witnessClient = createProcessWitnessClient({ socketPath: prepared.witnessSocket,
-      key: readFileSync(prepared.witnessKeyFile), timeoutMs: 3000 });
-    const sinkWitness = witnessClient.sinkStateWitness({ authorityId: EXTERNAL_WITNESS_AUTHORITY,
-      anchor: prepared.registration.anchor, adapterArtifactDigest: EXTERNAL_ARTIFACT });
     const partitionHead = readSinkStateHead(sinkWitness);
     if (partitionHead.revision !== '1')
       throw new Error('external sink did not commit before dropped response');
@@ -188,28 +257,36 @@ export async function runExternal(prepared: ExternalPrepared, publicDirectory: s
     const prehealJournal = join(prepared.privateDirectory, 'candidate', 'external-effect-journals',
       caseDigest(input).split(':').at(-1)!, 'effects-v4.json');
     cpSync(prehealJournal, join(publicDirectory, 'partition-preheal-effect.json'));
-    const during = await frame(prepared.workerSocket, command('recover-case', input)) as { reconciled: number; unknown: number };
+    const phase1 = await frame(activeSocket, { op: 'finalize' }) as LivingPipelineReportV1;
+    if (phase1.complete || phase1.generated !== 15 || phase1.failedAttempts !== 1
+      || phase1.filteredAttempts !== 0 || phase1.attemptedExecutions !== attempted
+      || phase1.recoveries !== 0) throw new Error('first worker omitted partition failure');
+    await kill(activeWorker);
+    activeWorker = await launch(join(dirname(fileURLToPath(import.meta.url)), 'worker.ts'),
+      [prepared.registrationPath, prepared.workerConfigRestart], 'external worker ready');
+    services.push(activeWorker); activeSocket = prepared.workerSocketRestart;
+    const during = await frame(activeSocket, command('recover-case', input)) as { reconciled: number; unknown: number };
     if (during.reconciled !== 0 || during.unknown !== 1) throw new Error('partitioned status guessed a terminal outcome');
     gateway = await launch(join(dirname(fileURLToPath(import.meta.url)), 'gateway.ts'),
       [prepared.gatewaySocket, prepared.sinkSocket, 'forward'], 'gateway ready');
-    const healed = await frame(prepared.workerSocket, command('recover-case', input)) as { reconciled: number; unknown: number };
+    const healed = await frame(activeSocket, command('recover-case', input)) as { reconciled: number; unknown: number };
     if (healed.reconciled !== 1 || healed.unknown !== 0)
       throw new Error(`rejoined signed status did not reconcile: ${JSON.stringify(healed)}`);
     const observed = new Map<string, { input: LivingCase; result: LivingExternalCaseResultV4 }>();
     attempted++;
-    const recovered = await frame(prepared.workerSocket, command('run-case', input, 'retry')) as LivingExternalCaseResultV4;
+    const recovered = await frame(activeSocket, command('run-case', input, 'retry')) as LivingExternalCaseResultV4;
     if (!recovered.passed || recovered.filtered || recovered.externalEffects.indeterminate)
       throw new Error('recovered external candidate case failed');
     observed.set(caseDigest(input), { input, result: recovered });
     attempted++;
-    const duplicate = await frame(prepared.workerSocket, command('run-case', input, 'duplicate')) as LivingExternalCaseResultV4;
+    const duplicate = await frame(activeSocket, command('run-case', input, 'duplicate')) as LivingExternalCaseResultV4;
     if (domainDigest('aether.living-external-case-result/4', duplicate)
       !== domainDigest('aether.living-external-case-result/4', recovered))
       throw new Error('duplicate external case changed result');
     for (const next of prepared.registration.generated) {
       if (caseDigest(next) === caseDigest(input)) continue;
       attempted++;
-      const result = await frame(prepared.workerSocket, command('run-case', next, 'original')) as LivingExternalCaseResultV4;
+      const result = await frame(activeSocket, command('run-case', next, 'original')) as LivingExternalCaseResultV4;
       if (!result.passed || result.filtered || result.externalEffects.indeterminate)
         throw new Error(`external candidate case failed: ${next.seed}`);
       observed.set(caseDigest(next), { input: next, result });
@@ -231,27 +308,38 @@ export async function runExternal(prepared: ExternalPrepared, publicDirectory: s
     const coverage = [...new Set(cases.flatMap(item => item.result.coverage))].sort();
     for (const label of ['scheduler:switched', 'resource:exhausted', 'network:malformed', 'event:reordered', 'effect:committed'])
       if (!coverage.includes(label)) throw new Error(`external candidate coverage missing ${label}`);
-    const pipeline = await frame(prepared.workerSocket, { op: 'finalize' }) as LivingPipelineReportV1;
-    if (!pipeline.complete || pipeline.generated !== cases.length || pipeline.executed !== cases.length
-      || pipeline.attemptedExecutions !== attempted || pipeline.failedAttempts !== 1
-      || pipeline.filteredAttempts !== 0 || pipeline.recoveries !== 2
-      || JSON.stringify(pipeline.coverage) !== JSON.stringify(coverage)
-      || JSON.stringify(pipeline.seeds) !== JSON.stringify(cases.map(item => item.input.seed)))
+    const phase2 = await frame(activeSocket, { op: 'finalize' }) as LivingPipelineReportV1;
+    if (!phase2.complete || phase2.generated !== cases.length || phase2.executed !== cases.length
+      || phase1.attemptedExecutions + phase2.attemptedExecutions !== attempted
+      || phase2.failedAttempts !== 0 || phase2.filteredAttempts !== 0 || phase2.recoveries !== 2
+      || phase1.manifestDigest !== phase2.manifestDigest
+      || phase1.authorizationDigest !== phase2.authorizationDigest
+      || JSON.stringify(phase2.coverage) !== JSON.stringify(coverage)
+      || JSON.stringify(phase2.seeds) !== JSON.stringify(cases.map(item => item.input.seed)))
       throw new Error('external pipeline omitted or reclassified an execution');
-    const result: ExternalCampaignResult = { format: 'aether.living-external-campaign/2',
+    const pipeline: ExternalCampaignResult['pipeline'] = { format: 'aether.living-restart-pipeline/1',
+      phases: [phase1, phase2], generated: phase2.generated, executed: phase2.executed,
+      attemptedExecutions: attempted, failedAttempts: phase1.failedAttempts + phase2.failedAttempts,
+      filteredAttempts: phase1.filteredAttempts + phase2.filteredAttempts,
+      recoveries: phase1.recoveries + phase2.recoveries,
+      seeds: phase2.seeds, coverage: phase2.coverage };
+    const result: ExternalCampaignResult = { format: 'aether.living-external-campaign/3',
       generated: prepared.registration.generated.length, executed: cases.length,
       filtered: cases.filter(item => item.result.filtered).length,
       passed: cases.filter(item => item.result.passed).length,
       failed: cases.filter(item => !item.result.passed).length, attempted,
       partitionUnknown: during.unknown, reconciled: healed.reconciled,
       sinkDecisions: state.decisions.length, sinkWitnessRevision: head.revision,
-      seeds: cases.map(item => item.input.seed), coverage, cases, partitionAttempt, pipeline };
+      seeds: cases.map(item => item.input.seed), coverage, cases, partitionAttempt,
+      faultActions: [...faultActions], candidateRestarts: 1, workerTermination: 'SIGKILL', pipeline };
     cpSync(prepared.sinkStore, join(publicDirectory, 'sink-store'), { recursive: true });
     cpSync(prepared.witnessStore, join(publicDirectory, 'witness-store'), { recursive: true });
     cpSync(join(prepared.privateDirectory, 'candidate', 'external-effect-journals'),
       join(publicDirectory, 'broker-journals'), { recursive: true });
-    cpSync(join(prepared.privateDirectory, 'candidate', 'pipeline'),
-      join(publicDirectory, 'pipeline'), { recursive: true });
+    cpSync(join(prepared.privateDirectory, 'candidate', 'pipeline-phase-1'),
+      join(publicDirectory, 'pipeline', 'phase-1'), { recursive: true });
+    cpSync(join(prepared.privateDirectory, 'candidate', 'pipeline-phase-2'),
+      join(publicDirectory, 'pipeline', 'phase-2'), { recursive: true });
     return result;
   } finally {
     await stop(gateway);
@@ -261,9 +349,26 @@ export async function runExternal(prepared: ExternalPrepared, publicDirectory: s
 /** Offline audit uses only the preregistered public anchor and retained bytes. */
 export function auditExternalRaw(publicDirectory: string, result: ExternalCampaignResult,
   registration: ExternalRegistration): void {
-  if (result.format !== 'aether.living-external-campaign/2') throw new Error('external pipeline result version mismatch');
-  auditLivingCampaignPipelineV1(join(publicDirectory, 'pipeline'), result.pipeline,
-    [...new Set(externalFixture().manifest.scenarios.flatMap(item => item.requiredCoverage))]);
+  if (result.format !== 'aether.living-external-campaign/3'
+    || result.pipeline.format !== 'aether.living-restart-pipeline/1'
+    || result.candidateRestarts !== 1 || result.workerTermination !== 'SIGKILL')
+    throw new Error('external restart pipeline result version mismatch');
+  const required = [...new Set(externalFixture().manifest.scenarios.flatMap(item => item.requiredCoverage))];
+  const [phase1, phase2] = result.pipeline.phases;
+  auditLivingCampaignPipelineV1(join(publicDirectory, 'pipeline', 'phase-1'), phase1, required);
+  auditLivingCampaignPipelineV1(join(publicDirectory, 'pipeline', 'phase-2'), phase2, required);
+  if (phase1.complete || !phase2.complete || phase1.generated !== phase2.generated
+    || phase1.manifestDigest !== phase2.manifestDigest
+    || phase1.authorizationDigest !== phase2.authorizationDigest
+    || result.pipeline.generated !== phase2.generated || result.pipeline.executed !== phase2.executed
+    || result.pipeline.attemptedExecutions !== phase1.attemptedExecutions + phase2.attemptedExecutions
+    || result.pipeline.failedAttempts !== phase1.failedAttempts + phase2.failedAttempts
+    || result.pipeline.filteredAttempts !== phase1.filteredAttempts + phase2.filteredAttempts
+    || result.pipeline.recoveries !== phase1.recoveries + phase2.recoveries
+    || JSON.stringify(result.pipeline.seeds) !== JSON.stringify(phase2.seeds)
+    || JSON.stringify(result.pipeline.coverage) !== JSON.stringify(phase2.coverage)
+    || result.attempted !== result.pipeline.attemptedExecutions)
+    throw new Error('external restart pipeline omitted an attempt or recovery');
   const authorization = registration.authorization;
   if (authorization.format !== 'aether.living-effect-authorization/4'
     || domainDigest('aether.sink-anchor/1', registration.anchor)

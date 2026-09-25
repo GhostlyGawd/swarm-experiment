@@ -17,7 +17,7 @@ const registration = JSON.parse(readFileSync(registrationPath, 'utf8')) as {
 };
 const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
   directory: string; witnessSocket: string; witnessKeyFile: string;
-  gatewaySocket: string; sinkKeyFile: string; listenSocket: string;
+  gatewaySocket: string; sinkKeyFile: string; listenSocket: string; pipelineDirectory: string;
 };
 const authorization = registration.authorization;
 if (authorization.format !== 'aether.living-effect-authorization/4') throw new TypeError('external V4 authority required');
@@ -36,7 +36,7 @@ const campaign = new LivingCampaign({ manifest: fixture.manifest, module: fixtur
   effectTrust: { repositoryId: EXTERNAL_REPOSITORY, policyEpoch: '1',
     signer: 'living-integrated-operator', key: registration.operatorPublicKeyPem },
   externalEffectServices: { client, sinkStateWitness, effectCatalog } });
-const pipeline = new LivingCampaignPipelineV1({ campaign, directory: `${config.directory}/pipeline`,
+const pipeline = new LivingCampaignPipelineV1({ campaign, directory: config.pipelineDirectory,
   candidateRoot: authorization.executionManifest.astRoot,
   authorizationDigest: domainDigest('aether.living-effect-authorization/4', authorization),
   requiredCoverage: [...new Set(fixture.manifest.scenarios.flatMap(item => item.requiredCoverage))] });

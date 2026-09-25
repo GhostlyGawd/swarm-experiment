@@ -97,7 +97,7 @@ async function measure(directory: string): Promise<void> {
     prepared = await prepareExternal(privateDirectory, directory);
     validateRegistration(prepared.registration);
     const profile = read(profilePath);
-    assert.equal(profile.format, 'aether.living-external-research-profile/2');
+    assert.equal(profile.format, 'aether.living-external-research-profile/3');
     assert.equal(profile.minimumBoundaryPermutationsPerSecond, 2_000_000);
     write(join(directory, 'preregistration.json'), { format: 'aether.living-external-preregistration/1',
       at: new Date().toISOString(), gitHead, gitStatus, profileSha256: sha(readFileSync(profilePath)),
@@ -119,31 +119,23 @@ async function measure(directory: string): Promise<void> {
     const durable = durabilityProbe();
     write(join(directory, 'durability-probe.json'), durable);
     const pipeline = result.pipeline;
-    write(join(directory, 'results.json'), { format: 'aether.living-external-measurement/2',
+    write(join(directory, 'results.json'), { format: 'aether.living-external-measurement/3',
       registrationSha256: sha(readFileSync(prepared.registrationPath)),
       declared: 15, generated: result.generated, executed: result.executed, filtered: result.filtered,
       passed: result.passed, failed: result.failed, attempted: result.attempted,
       separateFailedPartitionAttempts: 1, partitionUnknown: result.partitionUnknown,
       reconciled: result.reconciled, sinkDecisions: result.sinkDecisions,
+      candidateRestarts: result.candidateRestarts, workerTermination: result.workerTermination,
       seeds: result.seeds, coverage: result.coverage, elapsedMs,
       completeCasesPerSecond: result.executed / (elapsedMs / 1000),
-      pipeline: { format: pipeline.format, generated: pipeline.generated, executed: pipeline.executed,
-        attemptedExecutions: pipeline.attemptedExecutions, failedAttempts: pipeline.failedAttempts,
-        filteredAttempts: pipeline.filteredAttempts, recoveries: pipeline.recoveries,
-        generationElapsedNs: pipeline.generationElapsedNs,
-        candidateExecutionNs: pipeline.candidateExecutionNs,
-        observationPublicationNs: pipeline.observationPublicationNs,
-        recoveryExecutionNs: pipeline.recoveryExecutionNs,
-        pipelineElapsedNs: pipeline.pipelineElapsedNs,
-        generatedCasesPerSecond: pipeline.generatedCasesPerSecond,
-        attemptedExecutionsPerSecond: pipeline.attemptedExecutionsPerSecond,
-        pipelineCasesPerSecond: pipeline.pipelineCasesPerSecond },
+      pipeline,
       r04KernelPass: kernel.pass,
       serialDurabilityProbePerSecond: durable.serialRecordsPerSecond,
       minimumBoundaryPermutationsPerSecond: profile.minimumBoundaryPermutationsPerSecond,
-      throughputQualified: result.executed / (elapsedMs / 1000) >= profile.minimumBoundaryPermutationsPerSecond,
+      r04RateQualified: kernel.pass,
+      fullCampaignRateTarget: null,
       productionAuthorized: false,
-      timingScope: 'Outer timer includes launch of independent sink, gateway and Aether worker; lost response, absent gateway, signed recovery/rejoin, all 15 generated cases, duplicate delivery, raw state copy/audit and durable observations. Pipeline timings separate case generation, candidate execution, recovery and immutable publication inside the worker. R04 JSON kernel, preregistration and final measurement publication are excluded from outer timer.',
+      timingScope: 'Outer timer includes launch of independent sink, gateway and two Aether worker processes; lost response, absent gateway, signed recovery/rejoin, all 15 generated cases, duplicate delivery, raw state copy/audit and durable observations. Two pipeline phases separately retain the failed pre-restart attempt and all post-restart recoveries/executions. R04 JSON kernel, preregistration and final measurement publication are excluded from outer timer.',
       after: diagnostic() });
     console.log(`Complete ${result.executed}/${result.generated} witnessed external cases in ${elapsedMs.toFixed(3)} ms (${(result.executed / (elapsedMs / 1000)).toFixed(2)}/s).`);
   } finally { rmSync(privateDirectory, { recursive: true, force: true }); }
@@ -159,11 +151,12 @@ async function verify(directory: string): Promise<void> {
   equal(preregistration.sources, sources());
   validateRegistration(registration);
   assert.equal(measured.registrationSha256, preregistration.registrationSha256);
-  assert.equal(measured.format, 'aether.living-external-measurement/2');
+  assert.equal(measured.format, 'aether.living-external-measurement/3');
   assert.equal(result.generated, 15); assert.equal(result.executed, 15);
   assert.equal(result.filtered, 0); assert.equal(result.passed, 15); assert.equal(result.failed, 0);
   assert.equal(result.attempted, 17); assert.equal(result.partitionUnknown, 1);
   assert.equal(result.reconciled, 1); assert.equal(result.sinkDecisions, 9);
+  assert.equal(result.candidateRestarts, 1); assert.equal(result.workerTermination, 'SIGKILL');
   assert.equal(result.partitionAttempt.passed, false);
   assert.equal(result.partitionAttempt.filtered, false);
   assert.equal(result.partitionAttempt.externalEffects.indeterminate, 1);
@@ -173,18 +166,8 @@ async function verify(directory: string): Promise<void> {
   for (const key of ['generated', 'executed', 'filtered', 'passed', 'failed', 'attempted', 'partitionUnknown', 'reconciled', 'sinkDecisions'] as const)
     assert.equal(measured[key], result[key]);
   equal(measured.seeds, result.seeds); equal(measured.coverage, result.coverage);
-  const pipeline = result.pipeline;
-  equal(measured.pipeline, { format: pipeline.format, generated: pipeline.generated, executed: pipeline.executed,
-    attemptedExecutions: pipeline.attemptedExecutions, failedAttempts: pipeline.failedAttempts,
-    filteredAttempts: pipeline.filteredAttempts, recoveries: pipeline.recoveries,
-    generationElapsedNs: pipeline.generationElapsedNs,
-    candidateExecutionNs: pipeline.candidateExecutionNs,
-    observationPublicationNs: pipeline.observationPublicationNs,
-    recoveryExecutionNs: pipeline.recoveryExecutionNs,
-    pipelineElapsedNs: pipeline.pipelineElapsedNs,
-    generatedCasesPerSecond: pipeline.generatedCasesPerSecond,
-    attemptedExecutionsPerSecond: pipeline.attemptedExecutionsPerSecond,
-    pipelineCasesPerSecond: pipeline.pipelineCasesPerSecond });
+  assert.equal(measured.candidateRestarts, 1); assert.equal(measured.workerTermination, 'SIGKILL');
+  equal(measured.pipeline, result.pipeline);
   const kernel = read(join(directory, 'r04-kernel.json'));
   assert.equal(kernel.format, 'aether.r04-json-event-measurement/1');
   assert.equal(kernel.minimumPerSecond, 2_000_000);
@@ -217,7 +200,8 @@ async function verify(directory: string): Promise<void> {
   assert.equal(measured.serialDurabilityProbePerSecond, durable.serialRecordsPerSecond);
   assert.equal(measured.minimumBoundaryPermutationsPerSecond, 2_000_000);
   assert.equal(measured.productionAuthorized, false);
-  assert.equal(measured.throughputQualified, measured.completeCasesPerSecond >= 2_000_000);
+  assert.equal(measured.r04RateQualified, kernel.pass);
+  assert.equal(measured.fullCampaignRateTarget, null);
   assert.ok(Math.abs(measured.completeCasesPerSecond - result.executed / (measured.elapsedMs / 1000)) < 1e-9);
   const freshPrivate = mkdtempSync(join(tmpdir(), 'aether-living-external-fresh-'));
   const freshPublic = mkdtempSync(join(tmpdir(), 'aether-living-external-audit-'));
@@ -228,8 +212,10 @@ async function verify(directory: string): Promise<void> {
     for (const key of ['generated', 'executed', 'filtered', 'passed', 'failed', 'attempted',
       'partitionUnknown', 'reconciled', 'sinkDecisions'] as const) assert.equal(repeated[key], result[key]);
     for (const key of ['generated', 'executed', 'attemptedExecutions', 'failedAttempts',
-      'filteredAttempts', 'recoveries', 'complete'] as const)
+      'filteredAttempts', 'recoveries'] as const)
       assert.equal(repeated.pipeline[key], result.pipeline[key]);
+    assert.equal(repeated.pipeline.phases[0].complete, false);
+    assert.equal(repeated.pipeline.phases[1].complete, true);
     equal(repeated.seeds, result.seeds); equal(repeated.coverage, result.coverage);
     equal(registration.generated.map(({ manifestDigest: _manifestDigest, ...item }) => item),
       fresh.registration.generated.map(({ manifestDigest: _manifestDigest, ...item }) => item));
