@@ -1,0 +1,64 @@
+{
+  "format": "aether.r04-json-event-measurement/1",
+  "minimumPerSecond": 2000000,
+  "warmups": 1,
+  "inputsPerTrial": 20000,
+  "warmup": {
+    "elapsedNs": "6083042",
+    "inputsPerSecond": 3287828.6883437596,
+    "checksum": 25534
+  },
+  "samples": [
+    {
+      "trial": 0,
+      "generated": 20000,
+      "executed": 20000,
+      "filtered": 0,
+      "elapsedNs": "6142541",
+      "inputsPerSecond": 3255981.5229560537,
+      "checksum": 25534,
+      "pass": true
+    },
+    {
+      "trial": 1,
+      "generated": 20000,
+      "executed": 20000,
+      "filtered": 0,
+      "elapsedNs": "6171667",
+      "inputsPerSecond": 3240615.5419597332,
+      "checksum": 25534,
+      "pass": true
+    },
+    {
+      "trial": 2,
+      "generated": 20000,
+      "executed": 20000,
+      "filtered": 0,
+      "elapsedNs": "6234542",
+      "inputsPerSecond": 3207934.1192985787,
+      "checksum": 25534,
+      "pass": true
+    },
+    {
+      "trial": 3,
+      "generated": 20000,
+      "executed": 20000,
+      "filtered": 0,
+      "elapsedNs": "5713333",
+      "inputsPerSecond": 3500583.634806513,
+      "checksum": 25534,
+      "pass": true
+    },
+    {
+      "trial": 4,
+      "generated": 20000,
+      "executed": 20000,
+      "filtered": 0,
+      "elapsedNs": "5714375",
+      "inputsPerSecond": 3499945.313354479,
+      "checksum": 25534,
+      "pass": true
+    }
+  ],
+  "pass": true
+}

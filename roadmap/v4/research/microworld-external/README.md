@@ -31,7 +31,26 @@ confirms that the five passing R04 trials qualify the fixed numerical rate
 component. Candidate execution and full campaign throughput remain separately
 reported; the whole task stays open for the missing fault and admission scope.
 
+## Durable external-fault shrink and restart
+
+`fault-shrink.ts` preregisters three optional host actions around the mandatory
+externally witnessed lost-reply fault. Every shrink proposal runs all 15
+generated cases under the same signed Aether execution manifest and effect
+policy body, with fresh test-only external sink authority. The first candidate
+process retains the indeterminate broker record and receives `SIGKILL`; a fresh
+process observes unknown while disconnected, obtains the original signed
+receipt after gateway rejoin, then completes the whole declared campaign.
+
+[Exact-source shrink evidence](../../../../docs/implementation/v4/evidence/t303-external-shrink-2611c4e/REVIEW.md)
+at `2611c4e` reduces three optional actions to none in three full proposals
+and replays the reduced schedule in a fresh run. Across original, proposals
+and replay: **75/75 cases executed, zero filtered, 88 attempts, five explicit
+partition failures, ten recovery calls and 45 signed sink decisions**. Each
+signed campaign runs at about 1.05–1.13 complete cases/s. The separate fixed
+R04 generator/evaluator passes five trials at 3.208–3.501M/s under [D21](../../../../docs/implementation/v4/decisions/D21-living-campaign-throughput-boundary.md).
+This bounded shrink is not global minimality or full T3-03 coverage.
+
 ```sh
-node --experimental-strip-types roadmap/v4/research/microworld-external/campaign.ts --verify docs/implementation/v4/evidence/t303-pipeline-faf2172
-node --experimental-strip-types --test roadmap/v4/research/microworld-external/harness.test.ts
+node --experimental-strip-types roadmap/v4/research/microworld-external/fault-campaign.ts --verify docs/implementation/v4/evidence/t303-external-shrink-2611c4e
+node --experimental-strip-types --test roadmap/v4/research/microworld-external/fault-shrink.test.ts
 ```
