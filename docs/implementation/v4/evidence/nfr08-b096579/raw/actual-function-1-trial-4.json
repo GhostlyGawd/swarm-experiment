@@ -1,0 +1,11 @@
+{
+  "caseId": "actual-function/1",
+  "trial": 4,
+  "elapsedNs": "70970000",
+  "innerElapsedMs": 71,
+  "status": "proved",
+  "reason": null,
+  "model": null,
+  "modelValid": null,
+  "pass": true
+}

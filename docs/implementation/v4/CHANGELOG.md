@@ -1,5 +1,9 @@
 # Implementation specification changelog
 
+## Current-source SMT cutoff preflight — 2026-09-24
+
+- At clean `b096579`, the unchanged six-shape [NFR-08 campaign](evidence/nfr08-b096579/REVIEW.md) passed **30/30** measured complete calls under the **1,500 ms** bound; maximum **1,483.031 ms**. The verifier recomputes raw verdicts and arithmetic from saved source snapshots. This is bounded built-in solver evidence only: the default release row remains unmeasured, and external fallback/full proof-pipeline qualification remains open.
+
 ## Combined V18 and living-campaign focused checkpoint — 2026-09-24
 
 - At clean `459ed63`, [combined focused evidence](evidence/integration-459ed63/REVIEW.md) passes **134/134** projection/resident-pressure tests and **2/2** external-sink tests, plus build, typecheck and roadmap. The saved external fault evidence independently verifies with a fresh replay. V18's 75-case saved audit verifies its contents but retains its own `bb15b30` exact-source identity; the combined tests cover the integrated source.

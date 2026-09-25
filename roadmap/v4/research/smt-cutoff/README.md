@@ -44,3 +44,12 @@ The [versioned campaign runner](campaign-v2.ts) registered clean source `22a1374
 All **30 measured calls passed** this bounded profile; overall p50 was 67.831 ms, p95 was 1,482.430 ms and maximum was **1,483.466 ms**. The verifier recomputes each sample's limit/outcome, checks a saved counterexample against the original formula, rechecks 127 archived source hashes and recalculates p50/p95/p99/max. The first campaign remains separate historical evidence rather than being overwritten.
 
 This is stronger evidence for the built-in process-isolated solver cutoff on one target. It still does not establish a universal scheduler bound, qualify external solver fallback or every query shape, or supply the release benchmark's full target-specific admission record. V4-NFR-08 remains open in release enforcement. A later qualification must bind the declared supported solver path, environment, source and raw maximum to the release inventory without treating an `unknown` timeout as a proof.
+
+## Current-source repeat at `b096579`
+
+The [new clean-source preflight](../../../../docs/implementation/v4/evidence/nfr08-b096579/REVIEW.md)
+reran the unchanged six shapes on the current combined implementation. All
+30 measured complete calls passed; the maximum was **1,483.031 ms** against
+the same 1,500 ms bound. Its registration, source snapshots, raw samples and
+copied-artifact audit are retained. This corroborates the bounded built-in
+solver result without turning the default release row into a measured pass.

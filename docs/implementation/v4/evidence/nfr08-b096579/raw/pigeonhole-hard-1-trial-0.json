@@ -1,0 +1,11 @@
+{
+  "caseId": "pigeonhole-hard/1",
+  "trial": 0,
+  "elapsedNs": "1482219583",
+  "innerElapsedMs": 1482.004583,
+  "status": "unknown",
+  "reason": "timeout",
+  "model": null,
+  "modelValid": null,
+  "pass": true
+}

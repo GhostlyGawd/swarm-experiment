@@ -1,0 +1,11 @@
+{
+  "caseId": "linear-valid/1",
+  "trial": -1,
+  "elapsedNs": "67466084",
+  "innerElapsedMs": 67.30941599999994,
+  "status": "unsat",
+  "reason": null,
+  "model": null,
+  "modelValid": null,
+  "pass": true
+}

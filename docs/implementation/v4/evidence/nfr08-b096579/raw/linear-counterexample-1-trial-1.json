@@ -1,0 +1,17 @@
+{
+  "caseId": "linear-counterexample/1",
+  "trial": 1,
+  "elapsedNs": "69890167",
+  "innerElapsedMs": 69.86254099999996,
+  "status": "sat",
+  "reason": null,
+  "model": [
+    [
+      "x",
+      "int",
+      "1"
+    ]
+  ],
+  "modelValid": true,
+  "pass": true
+}
