@@ -1,0 +1,9 @@
+typecheck.log: OK
+roadmap.log: OK
+focused.log: OK
+nfr09-verify.log: OK
+build.log: OK
+bench-measure.log: OK
+bench-verify.log: OK
+bench/manifest.json: OK
+bench/samples.json: OK

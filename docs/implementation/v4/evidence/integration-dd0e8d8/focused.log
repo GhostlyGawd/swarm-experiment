@@ -1,0 +1,16 @@
+✔ actual three-target projection trials recount and reject edited line evidence (8179.236ms)
+✔ AE7 checked seed preserves all identities, contracts and native runtime behavior (434.723416ms)
+✔ AE7 refuses false seed, stale edit, noncanonical indexes, provenance and framing (50.585333ms)
+✔ every node kind survives an Agent-IR round trip (49.244292ms)
+✔ the worked example round-trips exactly (1.065416ms)
+✔ a session dictionary is shared and warm messages remain smaller than the cold module (97.040209ms)
+✔ FR-1.2: actual tokenizer accounting reproduces the ledger reference without asserting a false target (9.52325ms)
+✔ a malformed stream is rejected rather than silently truncated (0.470625ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9172.121125

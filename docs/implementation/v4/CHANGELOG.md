@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Combined AE7 and NFR-09 focused checkpoint — 2026-09-24
+
+- The opt-in [AE7 seeded cold exchange](../../../roadmap/v4/research/agent-ir7/README.md) regenerates exact SymbolSpace identities from a checked seed/index sequence, retains the complete 256-bit AST root and delegates checked R7/E7 edits to AE6 semantics. On eight preregistered authored modules, cl100k cold TypeScript/AE7 is **1,563/1,716 tokens** and complete changed sessions **4,331/3,712** (1.167×); both miss the unchanged **4×** target. The code and raw verifier are pinned at `2a53bc2`; no representative FR-1.2/Q03 pass is claimed.
+- The clean `fc3b4c3` [NFR-09 preflight](evidence/nfr09-fc3b4c3/REVIEW.md) performs actual TypeScript/Python/Rust projection plus parse/identity across 48 bundles. All five trials miss **75,000 lines/s** on every target (complete rates roughly 10–12k lines/s); the authored corpus and absent external compiler execution keep the release row unmeasured.
+- At clean integrated `dd0e8d8`, [focused evidence](evidence/integration-dd0e8d8/REVIEW.md) passes **8/8** AE7/legacy/verifier tests, build, typecheck and roadmap. Default release inventory still uses AE6, reports 15 required NFR rows unmeasured and `releaseEligible: false`. T1-02, Q02/Q03 and **20/62** remain open.
+
 ## Current-source SMT cutoff preflight — 2026-09-24
 
 - At clean `b096579`, the unchanged six-shape [NFR-08 campaign](evidence/nfr08-b096579/REVIEW.md) passed **30/30** measured complete calls under the **1,500 ms** bound; maximum **1,483.031 ms**. The verifier recomputes raw verdicts and arithmetic from saved source snapshots. This is bounded built-in solver evidence only: the default release row remains unmeasured, and external fallback/full proof-pipeline qualification remains open.

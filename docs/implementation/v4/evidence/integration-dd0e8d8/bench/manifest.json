@@ -1,0 +1,444 @@
+{
+  "format": "aether.benchmark/1",
+  "specVersion": "0.1.0",
+  "subjectCommit": "dd0e8d8d43caaae6cd690d6b652fb1d9dbd5ce71",
+  "sourceTreeDigest": "sha256:87b950089c66127289f67b0a7d6b3a776c709df9f6d957164eba71d404876d39",
+  "workingTreeDirty": false,
+  "workloadDigest": "sha256:6ca08a20083bccc2277d541292b6422986542bda014922b3f967c31acb9cca8b",
+  "targetProfileDigest": "sha256:0f3eccb625b705a5eed770bea8f05e8a4d27486e3003a8d9bc1f68ce6bdba5e1",
+  "environment": {
+    "os": "darwin",
+    "release": "25.6.0",
+    "arch": "arm64",
+    "cpu": "Apple M4 Pro",
+    "logicalCpus": "12",
+    "ramBytes": "25769803776",
+    "node": "v26.7.0",
+    "tokenizerPackage": "js-tiktoken",
+    "tokenizerVersion": "1.0.21",
+    "tokenizerEncoding": "cl100k_base",
+    "packageLockDigest": "sha256:6e5fe506879b2c8311e70e055540f6d925ba7cd6b0cf04a1aa8eb68ff8b6e0d0",
+    "model": "none (offline text tokenization)",
+    "clock": "not timed"
+  },
+  "seed": "ledger-example",
+  "warmup": 0,
+  "trials": 1,
+  "samplesArtifact": "samples.json",
+  "samplesDigest": "sha256:f367b6b8c90788c60a0e14dfc6d3fc977ee5f0d69eb3bbe47875ee27549ed3ef",
+  "profile": {
+    "id": "v4-release/2",
+    "scope": "Provisional v4 measurement inventory. Includes every NFR; missing target-specific workloads/hardware profiles remain not_measured. A successful run cannot alone close a release or establish KPI/governance obligations.",
+    "targets": [
+      {
+        "requirement": "V4-NFR-11",
+        "metric": "aggregate:warmMessage",
+        "unit": "baseline/candidate tokens",
+        "bound": "≥4×",
+        "minimum": 4,
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-11",
+        "metric": "aggregate:warmBody",
+        "unit": "baseline/candidate tokens",
+        "bound": "≥4×",
+        "minimum": 4,
+        "required": false
+      },
+      {
+        "requirement": "V4-NFR-11",
+        "metric": "aggregate:cold",
+        "unit": "baseline/candidate tokens",
+        "bound": "≥4×",
+        "minimum": 4,
+        "required": false
+      },
+      {
+        "requirement": "V4-NFR-11",
+        "metric": "aggregate:fullSession",
+        "unit": "baseline/candidate tokens",
+        "bound": "≥4×",
+        "minimum": 4,
+        "required": false
+      },
+      {
+        "requirement": "V4-NFR-11",
+        "metric": "ledger-warm-v6/1:warmMessage",
+        "unit": "baseline/candidate tokens",
+        "bound": "≥4×",
+        "minimum": 4,
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-11",
+        "metric": "ledger-warm-v6/1:warmBody",
+        "unit": "baseline/candidate tokens",
+        "bound": "≥4×",
+        "minimum": 4,
+        "required": false
+      },
+      {
+        "requirement": "V4-NFR-11",
+        "metric": "ledger-warm-v6/1:cold",
+        "unit": "baseline/candidate tokens",
+        "bound": "≥4×",
+        "minimum": 4,
+        "required": false
+      },
+      {
+        "requirement": "V4-NFR-11",
+        "metric": "ledger-warm-v6/1:fullSession",
+        "unit": "baseline/candidate tokens",
+        "bound": "≥4×",
+        "minimum": 4,
+        "required": false
+      },
+      {
+        "requirement": "V4-NFR-01",
+        "metric": "ast.retrieval",
+        "unit": "ms",
+        "bound": "≤2 ms at 100M DAG nodes",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-02",
+        "metric": "replication.convergence",
+        "unit": "ms",
+        "bound": "≤50 ms across 1,000 agents",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-03",
+        "metric": "checkpoint.rollback",
+        "unit": "ms",
+        "bound": "≤5 ms",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-04",
+        "metric": "fallback.dispatch",
+        "unit": "ns",
+        "bound": "≤50 ns within the active frame",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-05",
+        "metric": "certificate.check",
+        "unit": "µs",
+        "bound": "≤50 µs per bounded certificate",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-06",
+        "metric": "unikernel.boot",
+        "unit": "ms/MB",
+        "bound": "≤1 ms boot-to-response and ≤2 MB footprint",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-07",
+        "metric": "state_lens.overhead",
+        "unit": "%",
+        "bound": "≤3.5% versus matched raw SQL",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-08",
+        "metric": "smt.cutoff",
+        "unit": "ms",
+        "bound": "≤1,500 ms including hard-query cancellation",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-09",
+        "metric": "projection.throughput",
+        "unit": "lines/sec",
+        "bound": "≥75,000 lines/sec",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-10",
+        "metric": "zk.verification",
+        "unit": "ms",
+        "bound": "≤5 ms",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-12",
+        "metric": "multimodal.extraction",
+        "unit": "ms",
+        "bound": "≤400 ms Figma-to-AST",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-13",
+        "metric": "mutation.safety",
+        "unit": "agents",
+        "bound": "1,000 mutating agents; no lock contention, deadlocks or write skew",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-14",
+        "metric": "graph.capacity",
+        "unit": "nodes",
+        "bound": "100M nodes with measured scaling behavior",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-15",
+        "metric": "execution.determinism",
+        "unit": "identity",
+        "bound": "Identical heaps/register states for identical event logs, inputs and tokens",
+        "required": true
+      },
+      {
+        "requirement": "V4-NFR-16",
+        "metric": "capability.containment",
+        "unit": "probability",
+        "bound": "Pr[Escape] = 0 under explicitly proved model and trusted computing base",
+        "required": true
+      }
+    ]
+  },
+  "measurements": [
+    {
+      "requirement": "V4-NFR-11",
+      "metric": "aggregate:warmMessage",
+      "unit": "baseline/candidate tokens",
+      "bound": "≥4×",
+      "minimum": 4,
+      "required": true,
+      "value": 5.629032258064516,
+      "verdict": "pass",
+      "reason": "Observed ratio 5.629032258064516; required minimum 4."
+    },
+    {
+      "requirement": "V4-NFR-11",
+      "metric": "aggregate:warmBody",
+      "unit": "baseline/candidate tokens",
+      "bound": "≥4×",
+      "minimum": 4,
+      "required": false,
+      "value": 5.629032258064516,
+      "verdict": "pass",
+      "reason": "Observed ratio 5.629032258064516; required minimum 4."
+    },
+    {
+      "requirement": "V4-NFR-11",
+      "metric": "aggregate:cold",
+      "unit": "baseline/candidate tokens",
+      "bound": "≥4×",
+      "minimum": 4,
+      "required": false,
+      "value": 0.9410503751339764,
+      "verdict": "fail",
+      "reason": "Observed ratio 0.9410503751339764; required minimum 4."
+    },
+    {
+      "requirement": "V4-NFR-11",
+      "metric": "aggregate:fullSession",
+      "unit": "baseline/candidate tokens",
+      "bound": "≥4×",
+      "minimum": 4,
+      "required": false,
+      "value": 1.140821458507963,
+      "verdict": "fail",
+      "reason": "Observed ratio 1.140821458507963; required minimum 4."
+    },
+    {
+      "requirement": "V4-NFR-11",
+      "metric": "ledger-warm-v6/1:warmMessage",
+      "unit": "baseline/candidate tokens",
+      "bound": "≥4×",
+      "minimum": 4,
+      "required": true,
+      "value": 5.629032258064516,
+      "verdict": "pass",
+      "reason": "Observed ratio 5.629032258064516; required minimum 4."
+    },
+    {
+      "requirement": "V4-NFR-11",
+      "metric": "ledger-warm-v6/1:warmBody",
+      "unit": "baseline/candidate tokens",
+      "bound": "≥4×",
+      "minimum": 4,
+      "required": false,
+      "value": 5.629032258064516,
+      "verdict": "pass",
+      "reason": "Observed ratio 5.629032258064516; required minimum 4."
+    },
+    {
+      "requirement": "V4-NFR-11",
+      "metric": "ledger-warm-v6/1:cold",
+      "unit": "baseline/candidate tokens",
+      "bound": "≥4×",
+      "minimum": 4,
+      "required": false,
+      "value": 0.9410503751339764,
+      "verdict": "fail",
+      "reason": "Observed ratio 0.9410503751339764; required minimum 4."
+    },
+    {
+      "requirement": "V4-NFR-11",
+      "metric": "ledger-warm-v6/1:fullSession",
+      "unit": "baseline/candidate tokens",
+      "bound": "≥4×",
+      "minimum": 4,
+      "required": false,
+      "value": 1.140821458507963,
+      "verdict": "fail",
+      "reason": "Observed ratio 1.140821458507963; required minimum 4."
+    },
+    {
+      "requirement": "V4-NFR-01",
+      "metric": "ast.retrieval",
+      "unit": "ms",
+      "bound": "≤2 ms at 100M DAG nodes",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-02",
+      "metric": "replication.convergence",
+      "unit": "ms",
+      "bound": "≤50 ms across 1,000 agents",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-03",
+      "metric": "checkpoint.rollback",
+      "unit": "ms",
+      "bound": "≤5 ms",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-04",
+      "metric": "fallback.dispatch",
+      "unit": "ns",
+      "bound": "≤50 ns within the active frame",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-05",
+      "metric": "certificate.check",
+      "unit": "µs",
+      "bound": "≤50 µs per bounded certificate",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-06",
+      "metric": "unikernel.boot",
+      "unit": "ms/MB",
+      "bound": "≤1 ms boot-to-response and ≤2 MB footprint",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-07",
+      "metric": "state_lens.overhead",
+      "unit": "%",
+      "bound": "≤3.5% versus matched raw SQL",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-08",
+      "metric": "smt.cutoff",
+      "unit": "ms",
+      "bound": "≤1,500 ms including hard-query cancellation",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-09",
+      "metric": "projection.throughput",
+      "unit": "lines/sec",
+      "bound": "≥75,000 lines/sec",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-10",
+      "metric": "zk.verification",
+      "unit": "ms",
+      "bound": "≤5 ms",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-12",
+      "metric": "multimodal.extraction",
+      "unit": "ms",
+      "bound": "≤400 ms Figma-to-AST",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-13",
+      "metric": "mutation.safety",
+      "unit": "agents",
+      "bound": "1,000 mutating agents; no lock contention, deadlocks or write skew",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-14",
+      "metric": "graph.capacity",
+      "unit": "nodes",
+      "bound": "100M nodes with measured scaling behavior",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-15",
+      "metric": "execution.determinism",
+      "unit": "identity",
+      "bound": "Identical heaps/register states for identical event logs, inputs and tokens",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    },
+    {
+      "requirement": "V4-NFR-16",
+      "metric": "capability.containment",
+      "unit": "probability",
+      "bound": "Pr[Escape] = 0 under explicitly proved model and trusted computing base",
+      "required": true,
+      "value": null,
+      "verdict": "not_measured",
+      "reason": "No qualifying measurement for this required target profile."
+    }
+  ]
+}
