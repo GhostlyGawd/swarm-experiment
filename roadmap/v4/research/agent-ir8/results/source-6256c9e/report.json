@@ -1,0 +1,1532 @@
+{
+  "format": "aether.agent-ir8.actual-token-report/1",
+  "sourceCommit": "6256c9e689cb5439474c4f88949d3d5a50112089",
+  "sourceHashes": {
+    "roadmap/v4/research/agent-ir8/REGISTRATION.md": "9044c6ac82ecf2285ac85a6a4f71b0e39e64216de826cf55551d9af8cbbf822e",
+    "roadmap/v4/research/agent-ir8/measure.ts": "332b519e129d0a5cae9d2cd4ff91586a87b5dd860c8a1e5bbb8cef5a4e46c393",
+    "roadmap/v4/research/agent-ir8/verify.mjs": "57270eb93b152275a7c22117024bc13d56964b9792a373a309c7f31681cc88e3",
+    "roadmap/v4/research/agent-ir7/corpus.ts": "bf9a2d7b041795dc63f7936c6a677dad16505a516b2240c8b5235f431e15b139",
+    "src/tier1/agent-ir-v8.ts": "5f821b70b3ab6f04b92bfee9a240d3ca26969c6dbb5221bf099ab2f286229db9",
+    "src/tier1/agent-ir-v7.ts": "9dcc4d8b3ef6bb624f8677bef2002a917edac2fe268af3a10ee76b3bd63728d2",
+    "src/tier1/agent-ir-v6.ts": "3f9cc9d5f748268d1e552008749b998c88786d62f21cd326496cb238e471e702",
+    "src/tier1/agent-ir.ts": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b",
+    "src/tier1/ast.ts": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb",
+    "src/tier1/store.ts": "b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3",
+    "src/tier1/ids.ts": "73a6cf5a0b6537d879b2b3980ba9b4a1937701d52f97b4bf1deb09acf1e023a5",
+    "src/tier1/symbols.ts": "1520a4adfd1f837f16357205d88c330056ffe73f3c74d4f26e1d1663dc0362a9",
+    "src/util/rng.ts": "722540744b859c0995931e6c0270f3b9a80012b6e31b2371c027cf19f4518295",
+    "src/util/tokens.ts": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9",
+    "src/examples/ledger.ts": "ef3ee4a64ab5227a6c4a4d135afe227583bcef0b313f50d30f5eee5de63362cd",
+    "src/projection/typescript.ts": "952e790f7da01ab12dd2fa0a247c7ac1699e106462c70fe388fe9923e592594a",
+    "src/index.ts": "837ad51df7290bee6f1f65c5b8c06d4dbf3ac1211124c37eb3073c8f8209d2ef",
+    "src/tier1/index.ts": "3e04c9d028607ff042bfb593ea49591fd8b8bb78bc21f2e46260ab893bb9861d",
+    "test/tier1/agent-ir.test.ts": "0c87c3150ce03bf6604cbbc06507b49dab5f562a3d0229d512bad24ac5223362",
+    "test/tier1/agent-ir-v8.test.ts": "f3eff7a9420b4309ebf0ce68bf06ab69c8be6b3dc1226007712a08625d3dadbc",
+    "package-lock.json": "d7ec4b7a7eeb891ec1f91896c6b8cfaff33e29895c3a0cd6a647984b8b7f8936",
+    "roadmap/v4/research/projections/corpus.ts": "1ba712e5dabe13991272f0075f6ac485c1c1a543804628e94aecd852a8d87304",
+    "roadmap/v4/research/projections/corpus-composites.ts": "7d9c23377fc94d1c58e8142e4b085d282cb35a82aa996d6fa19e10828d9d2ddb",
+    "roadmap/v4/research/projections/corpus-continuations.ts": "538f65731f91af3947069966386ca1d77a24823afa1a2cc31d01acd5cf5a88ed",
+    "roadmap/v4/research/projections/corpus-completion.ts": "c2216c09fba6e91e3e8291fb0d28adf06d711b699a1b4b20709a160dd286b337"
+  },
+  "corpus": "eight authored AE7 fixtures, preregistered nine-message graph-slice sessions",
+  "tokenizerPackage": "js-tiktoken@1.0.21",
+  "status": "authored_diagnostic_only; not representative FR-1.2 or Q03 qualification",
+  "counts": {
+    "cl100k_base": {
+      "workloads": [
+        {
+          "id": "ledger",
+          "cold": {
+            "baseline": 878,
+            "candidate": 681,
+            "ratio": 1.28928046989721,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 3,
+            "candidate": 31,
+            "ratio": 0.0967741935483871,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 120,
+            "candidate": 151,
+            "ratio": 0.7947019867549668,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 120,
+            "candidate": 66,
+            "ratio": 1.8181818181818181,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 1510,
+            "candidate": 1144,
+            "ratio": 1.31993006993007,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 955,
+              "candidate": 695
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 15,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 142,
+              "candidate": 167
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 141,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 140,
+              "candidate": 78
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "scalar-math",
+          "cold": {
+            "baseline": 85,
+            "candidate": 150,
+            "ratio": 0.5666666666666667,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 3,
+            "candidate": 31,
+            "ratio": 0.0967741935483871,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 44,
+            "candidate": 105,
+            "ratio": 0.41904761904761906,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 44,
+            "candidate": 90,
+            "ratio": 0.4888888888888889,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 419,
+            "candidate": 591,
+            "ratio": 0.7089678510998308,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 110,
+              "candidate": 164
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 15,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 60,
+              "candidate": 121
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 59,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 58,
+              "candidate": 102
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "loop-contract",
+          "cold": {
+            "baseline": 118,
+            "candidate": 160,
+            "ratio": 0.7375,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 3,
+            "candidate": 31,
+            "ratio": 0.0967741935483871,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 113,
+            "candidate": 163,
+            "ratio": 0.6932515337423313,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 113,
+            "candidate": 64,
+            "ratio": 1.765625,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 711,
+            "candidate": 633,
+            "ratio": 1.1232227488151658,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 150,
+              "candidate": 174
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 15,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 144,
+              "candidate": 179
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 143,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 142,
+              "candidate": 76
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "external-effect",
+          "cold": {
+            "baseline": 53,
+            "candidate": 108,
+            "ratio": 0.49074074074074076,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 3,
+            "candidate": 31,
+            "ratio": 0.0967741935483871,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 48,
+            "candidate": 93,
+            "ratio": 0.5161290322580645,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 48,
+            "candidate": 68,
+            "ratio": 0.7058823529411765,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 419,
+            "candidate": 513,
+            "ratio": 0.8167641325536062,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 77,
+              "candidate": 122
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 15,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 71,
+              "candidate": 107
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 70,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 69,
+              "candidate": 80
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "fixed-lazy",
+          "cold": {
+            "baseline": 86,
+            "candidate": 113,
+            "ratio": 0.7610619469026548,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 3,
+            "candidate": 31,
+            "ratio": 0.0967741935483871,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 57,
+            "candidate": 85,
+            "ratio": 0.6705882352941176,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 57,
+            "candidate": 66,
+            "ratio": 0.8636363636363636,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 459,
+            "candidate": 510,
+            "ratio": 0.9,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 108,
+              "candidate": 127
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 15,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 74,
+              "candidate": 101
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 73,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 72,
+              "candidate": 78
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "composite-alias-collections",
+          "cold": {
+            "baseline": 162,
+            "candidate": 216,
+            "ratio": 0.75,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 4,
+            "candidate": 31,
+            "ratio": 0.12903225806451613,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 98,
+            "candidate": 180,
+            "ratio": 0.5444444444444444,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 98,
+            "candidate": 66,
+            "ratio": 1.4848484848484849,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 681,
+            "candidate": 708,
+            "ratio": 0.961864406779661,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 197,
+              "candidate": 231
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 16,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 118,
+              "candidate": 195
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 117,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 116,
+              "candidate": 78
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "continuation-capture-task",
+          "cold": {
+            "baseline": 96,
+            "candidate": 152,
+            "ratio": 0.631578947368421,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 4,
+            "candidate": 31,
+            "ratio": 0.12903225806451613,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 91,
+            "candidate": 115,
+            "ratio": 0.7913043478260869,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 91,
+            "candidate": 64,
+            "ratio": 1.421875,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 592,
+            "candidate": 578,
+            "ratio": 1.0242214532871972,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 120,
+              "candidate": 167
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 16,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 114,
+              "candidate": 131
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 113,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 112,
+              "candidate": 76
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "scalar-five-kind-completion",
+          "cold": {
+            "baseline": 85,
+            "candidate": 136,
+            "ratio": 0.625,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 2,
+            "candidate": 31,
+            "ratio": 0.06451612903225806,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 80,
+            "candidate": 143,
+            "ratio": 0.5594405594405595,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 80,
+            "candidate": 70,
+            "ratio": 1.1428571428571428,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 542,
+            "candidate": 595,
+            "ratio": 0.9109243697478991,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 108,
+              "candidate": 150
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 14,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 102,
+              "candidate": 159
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 101,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 100,
+              "candidate": 82
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        }
+      ],
+      "aggregate": {
+        "cold": {
+          "baseline": 1563,
+          "candidate": 1716,
+          "ratio": 0.9108391608391608,
+          "passes4x": false
+        },
+        "selection": {
+          "baseline": 25,
+          "candidate": 248,
+          "ratio": 0.10080645161290322,
+          "passes4x": false
+        },
+        "retrieval": {
+          "baseline": 651,
+          "candidate": 1035,
+          "ratio": 0.6289855072463768,
+          "passes4x": false
+        },
+        "repaired": {
+          "baseline": 651,
+          "candidate": 554,
+          "ratio": 1.1750902527075813,
+          "passes4x": false
+        },
+        "session": {
+          "baseline": 5333,
+          "candidate": 5272,
+          "ratio": 1.0115705614567527,
+          "passes4x": false
+        }
+      }
+    },
+    "o200k_base": {
+      "workloads": [
+        {
+          "id": "ledger",
+          "cold": {
+            "baseline": 886,
+            "candidate": 686,
+            "ratio": 1.2915451895043732,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 3,
+            "candidate": 31,
+            "ratio": 0.0967741935483871,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 123,
+            "candidate": 151,
+            "ratio": 0.8145695364238411,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 123,
+            "candidate": 66,
+            "ratio": 1.8636363636363635,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 1529,
+            "candidate": 1148,
+            "ratio": 1.3318815331010454,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 963,
+              "candidate": 700
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 15,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 145,
+              "candidate": 166
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 145,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 144,
+              "candidate": 78
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "scalar-math",
+          "cold": {
+            "baseline": 85,
+            "candidate": 151,
+            "ratio": 0.5629139072847682,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 3,
+            "candidate": 31,
+            "ratio": 0.0967741935483871,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 44,
+            "candidate": 105,
+            "ratio": 0.41904761904761906,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 44,
+            "candidate": 90,
+            "ratio": 0.4888888888888889,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 418,
+            "candidate": 591,
+            "ratio": 0.7072758037225042,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 110,
+              "candidate": 165
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 15,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 59,
+              "candidate": 120
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 59,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 58,
+              "candidate": 102
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "loop-contract",
+          "cold": {
+            "baseline": 118,
+            "candidate": 160,
+            "ratio": 0.7375,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 3,
+            "candidate": 31,
+            "ratio": 0.0967741935483871,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 113,
+            "candidate": 163,
+            "ratio": 0.6932515337423313,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 113,
+            "candidate": 64,
+            "ratio": 1.765625,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 713,
+            "candidate": 632,
+            "ratio": 1.1281645569620253,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 150,
+              "candidate": 174
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 15,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 144,
+              "candidate": 178
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 144,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 143,
+              "candidate": 76
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "external-effect",
+          "cold": {
+            "baseline": 54,
+            "candidate": 108,
+            "ratio": 0.5,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 3,
+            "candidate": 31,
+            "ratio": 0.0967741935483871,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 49,
+            "candidate": 93,
+            "ratio": 0.5268817204301075,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 49,
+            "candidate": 68,
+            "ratio": 0.7205882352941176,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 425,
+            "candidate": 512,
+            "ratio": 0.830078125,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 78,
+              "candidate": 122
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 15,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 72,
+              "candidate": 106
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 72,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 71,
+              "candidate": 80
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "fixed-lazy",
+          "cold": {
+            "baseline": 86,
+            "candidate": 113,
+            "ratio": 0.7610619469026548,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 3,
+            "candidate": 31,
+            "ratio": 0.0967741935483871,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 57,
+            "candidate": 85,
+            "ratio": 0.6705882352941176,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 57,
+            "candidate": 66,
+            "ratio": 0.8636363636363636,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 458,
+            "candidate": 509,
+            "ratio": 0.899803536345776,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 108,
+              "candidate": 127
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 15,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 73,
+              "candidate": 100
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 73,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 72,
+              "candidate": 78
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "composite-alias-collections",
+          "cold": {
+            "baseline": 165,
+            "candidate": 216,
+            "ratio": 0.7638888888888888,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 4,
+            "candidate": 31,
+            "ratio": 0.12903225806451613,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 101,
+            "candidate": 180,
+            "ratio": 0.5611111111111111,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 101,
+            "candidate": 66,
+            "ratio": 1.5303030303030303,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 692,
+            "candidate": 707,
+            "ratio": 0.9787835926449788,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 200,
+              "candidate": 231
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 16,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 120,
+              "candidate": 194
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 120,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 119,
+              "candidate": 78
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "continuation-capture-task",
+          "cold": {
+            "baseline": 98,
+            "candidate": 152,
+            "ratio": 0.6447368421052632,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 4,
+            "candidate": 31,
+            "ratio": 0.12903225806451613,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 93,
+            "candidate": 115,
+            "ratio": 0.808695652173913,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 93,
+            "candidate": 64,
+            "ratio": 1.453125,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 599,
+            "candidate": 577,
+            "ratio": 1.0381282495667243,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 122,
+              "candidate": 167
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 16,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 115,
+              "candidate": 130
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 115,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 114,
+              "candidate": 76
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        },
+        {
+          "id": "scalar-five-kind-completion",
+          "cold": {
+            "baseline": 85,
+            "candidate": 138,
+            "ratio": 0.6159420289855072,
+            "passes4x": false
+          },
+          "selection": {
+            "baseline": 2,
+            "candidate": 31,
+            "ratio": 0.06451612903225806,
+            "passes4x": false
+          },
+          "retrieval": {
+            "baseline": 80,
+            "candidate": 143,
+            "ratio": 0.5594405594405595,
+            "passes4x": false
+          },
+          "repaired": {
+            "baseline": 80,
+            "candidate": 70,
+            "ratio": 1.1428571428571428,
+            "passes4x": false
+          },
+          "session": {
+            "baseline": 544,
+            "candidate": 596,
+            "ratio": 0.912751677852349,
+            "passes4x": false
+          },
+          "messages": [
+            {
+              "role": "system",
+              "purpose": "instructions",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "user",
+              "purpose": "initial_context",
+              "baseline": 108,
+              "candidate": 152
+            },
+            {
+              "role": "user",
+              "purpose": "change_request",
+              "baseline": 33,
+              "candidate": 33
+            },
+            {
+              "role": "assistant",
+              "purpose": "selection",
+              "baseline": 14,
+              "candidate": 43
+            },
+            {
+              "role": "tool",
+              "purpose": "retrieval",
+              "baseline": 102,
+              "candidate": 158
+            },
+            {
+              "role": "assistant",
+              "purpose": "failed_attempt",
+              "baseline": 102,
+              "candidate": 44
+            },
+            {
+              "role": "tool",
+              "purpose": "repair",
+              "baseline": 25,
+              "candidate": 25
+            },
+            {
+              "role": "assistant",
+              "purpose": "change",
+              "baseline": 101,
+              "candidate": 82
+            },
+            {
+              "role": "tool",
+              "purpose": "response",
+              "baseline": 26,
+              "candidate": 26
+            }
+          ]
+        }
+      ],
+      "aggregate": {
+        "cold": {
+          "baseline": 1577,
+          "candidate": 1724,
+          "ratio": 0.9147331786542924,
+          "passes4x": false
+        },
+        "selection": {
+          "baseline": 25,
+          "candidate": 248,
+          "ratio": 0.10080645161290322,
+          "passes4x": false
+        },
+        "retrieval": {
+          "baseline": 660,
+          "candidate": 1035,
+          "ratio": 0.6376811594202898,
+          "passes4x": false
+        },
+        "repaired": {
+          "baseline": 660,
+          "candidate": 554,
+          "ratio": 1.1913357400722022,
+          "passes4x": false
+        },
+        "session": {
+          "baseline": 5378,
+          "candidate": 5272,
+          "ratio": 1.0201062215477996,
+          "passes4x": false
+        }
+      }
+    }
+  }
+}

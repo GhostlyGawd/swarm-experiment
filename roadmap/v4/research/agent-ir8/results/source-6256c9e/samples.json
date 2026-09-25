@@ -1,0 +1,800 @@
+{
+  "format": "aether.agent-ir8.raw-samples/1",
+  "rows": [
+    {
+      "id": "ledger",
+      "seed": "ledger-example",
+      "memberIndex": 3,
+      "path": [
+        0,
+        0,
+        1
+      ],
+      "originalInteger": "100",
+      "changedInteger": "101",
+      "baseRoot": "ast:b3:722b9744f7520a7fb78c0afbbed88d16434c47d75af3211d7618dadebfb8dcca",
+      "changedRoot": "ast:b3:0cfec3627c26bfee461d3db2caa46a117f4ae6cc20ebd554dee5ddd899569ee5",
+      "slice": {
+        "declarationRoot": "ast:b3:acb6c66296333833329f9a6ca98ad2d08a79c12d10c5933211539010339d9336",
+        "contractRoot": "ast:b3:6e3fbe423c50e6e2c69a36e6522efeb2e89395c3f0559bcf9da27a27d5d530b6",
+        "dependencies": [],
+        "effects": []
+      },
+      "raw": {
+        "cold": {
+          "baseline": "// @module ledger\n// @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\n\n/** @nominal type:currency:cents\n * @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\n */\ntype Cents = bigint;\n\n/** @nominal type:ledger:account\n * @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\n */\ninterface Account {\n  id: string;\n  balance: Cents;\n}\n\n/**\n * @provenance prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\n * @capability cap:db:ledger_append\n * @requires [sufficient_funds] sender.balance >= amount\n * @requires [positive_amount] amount > (0n as Cents)\n * @requires [distinct_accounts] sender.id !== receiver.id\n * @ensures [debit_exact] sender.balance === old(sender.balance) - amount\n * @ensures [credit_exact] receiver.balance === old(receiver.balance) + amount\n * @ensures [conservation] sender.balance + receiver.balance === old(sender.balance) + old(receiver.balance)\n * @modifies sender.balance, receiver.balance\n */\nfunction transfer(sender: Account, receiver: Account, amount: Cents): void {\n  sender.balance = sender.balance - amount;\n  receiver.balance = receiver.balance + amount;\n  invoke(\"cap:db:ledger_append\", sender.id, receiver.id, amount);\n  return undefined;\n}\n\n/**\n * @requires [non_negative_gross] gross >= (0n as Cents)\n * @ensures [non_negative_fee] result >= (0n as Cents)\n * @ensures [fee_within_gross] result <= gross\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\n */\npure function feeFor(gross: Cents): Cents {\n  return gross / 100n;\n}\n\n/**\n * @requires [non_negative_principal] principal >= (0n as Cents)\n * @requires [non_negative_periods] periods >= 0n\n * @requires [bounded_periods] periods <= 1200n\n * @ensures [never_shrinks] @property result >= principal\n */\npure function accrue(principal: Cents, periods: bigint): Cents {\n  let total: Cents = principal;\n  let i: bigint = 0n;\n  /**\n   * @invariant total >= principal\n   * @invariant i >= 0n\n   * @variant periods - i\n   */\n  while (i < periods) {\n    total = total + total / 100n;\n    i = i + 1n;\n  }\n  return total;\n}\n\n/**\n * @provenance prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\n * @capability cap:db:ledger_append\n * @requires [sufficient_funds] payer.balance >= grossAmount\n * @requires [positive_amount] grossAmount > (0n as Cents)\n * @requires [distinct_accounts] payer.id !== payee.id\n * @modifies payer.balance, payee.balance\n * @surface cachePolicy: choice(lru, lfu, arc, none) minimize_latency = none\n */\nfunction settle(payer: Account, payee: Account, grossAmount: Cents): void {\n  let fee: Cents = feeFor(grossAmount);\n  transfer(payer, payee, grossAmount - fee);\n  return undefined;\n}\n",
+          "candidate": "AE7\n§g \"ledger-example\"\n§h 51640683185298463298738077950975190482922654030475378535375023573179693587658\n§w 1\n§n type:currency:cents|type:ledger:account|id|balance|total|transfer|grossAmount|batchSize|receiver|payee|payer|ledger|amount|fee|feeFor|principal|accrue|gross|settle|cachePolicy|sender|periods|i\n§y N0<I>|R1<2:S,3:N0<I>>|U|I\n§s none|lru|lfu|arc\n§c cap:db:ledger_append\n§l sufficient_funds|positive_amount|distinct_accounts|debit_exact|credit_exact|conservation|non_negative_gross|non_negative_fee|fee_within_gross|fee_below_gross|non_negative_principal|non_negative_periods|bounded_periods|never_shrinks\n§p 54849076934153825913732198128297461607565272684362483635966063597807470011133|50892475336653709823367337237432463338412997325023040745375503982085822349927\n§v 2,4,3,1,6,7,5,9,10,11,12,8,14,16,15,17,18,13,0\nY001 Y111 v0 F3 v1 >= Q00 v1 j00 > Q10 v0 F2 v2 F2 != Q20 v0 F3 v0 F3 @ v1 - == Q30 v2 F3 v2 F3 @ v1 + == Q40 v0 F3 v2 F3 + v0 F3 @ v2 F3 @ + == Q50 P013 P213 K332 P013 v0 F3 v1 - = P213 v2 F3 v1 + = v0 F2 v2 F2 v1 X03 E u N B4 D32111020301211010 v4 j00 >= Q60 $ j00 >= Q70 $ v4 <= Q80 v4 j00 > ! $ v4 < | Q90 K130 v4 i100 / N B1 Z50 r1x64x1 h8 D600111001400 v7 j00 >= Qa0 v8 i0 >= Qb0 v8 i1200 <= Qc0 $ v7 >= Qd1 K310 v7 L90 i0 La3 va v8 < v9 v7 >= va i0 >= v8 va - P90 v9 v9 i100 / + = Pa0 va i1 + = B2 W21 v9 N B4 Db0011000270830 vc F3 vd >= Q00 vd j00 > Q10 vc F2 ve F2 != Q20 Pc13 Pe13 K302 vd C61 Lf0 vc ve vd vf - C33 E u N B3 Zg0 c1230 m0 Dh21111203c1e1d010 Gj9435d65728e9caib1cfd6e7fbg4hhigj0k8lam Mi61"
+        },
+        "selection": {
+          "baseline": "SELECT feeFor",
+          "candidate": "S8:51640683185298463298738077950975190482922654030475378535375023573179693587658:3"
+        },
+        "retrieval": {
+          "baseline": "/**\n * @requires [non_negative_gross] gross >= (0n as Cents)\n * @ensures [non_negative_fee] result >= (0n as Cents)\n * @ensures [fee_within_gross] result <= gross\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\n */\npure function feeFor(gross: Cents): Cents {\n  return gross / 100n;\n}",
+          "candidate": "D8;51640683185298463298738077950975190482922654030475378535375023573179693587658;3;78120745325780836903881901430957646083010612975525784873410658733613962335030;49867037826754729783395988186432792370108966589521059730969005281765645168822;;\nAE1\n§w 1\nv4 j00 >= Q60 $ j00 >= Q70 $ v4 <= Q80 v4 j00 > ! $ v4 < | Q90 K130 v4 i100 / N B1 Z50 r1x64x1 h8 D600111001400"
+        },
+        "failed": {
+          "baseline": "/**\n * @requires [non_negative_gross] gross >= (0n as Cents)\n * @ensures [non_negative_fee] result >= (0n as Cents)\n * @ensures [fee_within_gross] result <= gross\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\n */\npure function feeFor(gross: Cents): Cents {\n  return gross / 100n;\n}",
+          "candidate": "R8:51640683185298463298738077950975190482922654030475378535375023573179693587658:3"
+        },
+        "repaired": {
+          "baseline": "/**\n * @requires [non_negative_gross] gross >= (0n as Cents)\n * @ensures [non_negative_fee] result >= (0n as Cents)\n * @ensures [fee_within_gross] result <= gross\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\n */\npure function feeFor(gross: Cents): Cents {\n  return gross / 101n;\n}",
+          "candidate": "E8:51640683185298463298738077950975190482922654030475378535375023573179693587658:3:12161003096040306239828738402476669511969372487194179255862472271116477238512:0.0.1:101"
+        }
+      },
+      "messages": [
+        {
+          "role": "system",
+          "purpose": "instructions",
+          "baseline": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n",
+          "candidate": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "initial_context",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"// @module ledger\\n// @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\\n\\n/** @nominal type:currency:cents\\n * @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\\n */\\ntype Cents = bigint;\\n\\n/** @nominal type:ledger:account\\n * @provenance prov:b3:79437a373ca618f292af3e7d893e0009c770538c0b8901d2689d24611ff662fd\\n */\\ninterface Account {\\n  id: string;\\n  balance: Cents;\\n}\\n\\n/**\\n * @provenance prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\\n * @capability cap:db:ledger_append\\n * @requires [sufficient_funds] sender.balance >= amount\\n * @requires [positive_amount] amount > (0n as Cents)\\n * @requires [distinct_accounts] sender.id !== receiver.id\\n * @ensures [debit_exact] sender.balance === old(sender.balance) - amount\\n * @ensures [credit_exact] receiver.balance === old(receiver.balance) + amount\\n * @ensures [conservation] sender.balance + receiver.balance === old(sender.balance) + old(receiver.balance)\\n * @modifies sender.balance, receiver.balance\\n */\\nfunction transfer(sender: Account, receiver: Account, amount: Cents): void {\\n  sender.balance = sender.balance - amount;\\n  receiver.balance = receiver.balance + amount;\\n  invoke(\\\"cap:db:ledger_append\\\", sender.id, receiver.id, amount);\\n  return undefined;\\n}\\n\\n/**\\n * @requires [non_negative_gross] gross >= (0n as Cents)\\n * @ensures [non_negative_fee] result >= (0n as Cents)\\n * @ensures [fee_within_gross] result <= gross\\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\\n */\\npure function feeFor(gross: Cents): Cents {\\n  return gross / 100n;\\n}\\n\\n/**\\n * @requires [non_negative_principal] principal >= (0n as Cents)\\n * @requires [non_negative_periods] periods >= 0n\\n * @requires [bounded_periods] periods <= 1200n\\n * @ensures [never_shrinks] @property result >= principal\\n */\\npure function accrue(principal: Cents, periods: bigint): Cents {\\n  let total: Cents = principal;\\n  let i: bigint = 0n;\\n  /**\\n   * @invariant total >= principal\\n   * @invariant i >= 0n\\n   * @variant periods - i\\n   */\\n  while (i < periods) {\\n    total = total + total / 100n;\\n    i = i + 1n;\\n  }\\n  return total;\\n}\\n\\n/**\\n * @provenance prov:b3:70841ec96c9ae2bcf8ed01475bff395099276514faa73a6cbaf088b7c1b60267\\n * @capability cap:db:ledger_append\\n * @requires [sufficient_funds] payer.balance >= grossAmount\\n * @requires [positive_amount] grossAmount > (0n as Cents)\\n * @requires [distinct_accounts] payer.id !== payee.id\\n * @modifies payer.balance, payee.balance\\n * @surface cachePolicy: choice(lru, lfu, arc, none) minimize_latency = none\\n */\\nfunction settle(payer: Account, payee: Account, grossAmount: Cents): void {\\n  let fee: Cents = feeFor(grossAmount);\\n  transfer(payer, payee, grossAmount - fee);\\n  return undefined;\\n}\\n\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"AE7\\n§g \\\"ledger-example\\\"\\n§h 51640683185298463298738077950975190482922654030475378535375023573179693587658\\n§w 1\\n§n type:currency:cents|type:ledger:account|id|balance|total|transfer|grossAmount|batchSize|receiver|payee|payer|ledger|amount|fee|feeFor|principal|accrue|gross|settle|cachePolicy|sender|periods|i\\n§y N0<I>|R1<2:S,3:N0<I>>|U|I\\n§s none|lru|lfu|arc\\n§c cap:db:ledger_append\\n§l sufficient_funds|positive_amount|distinct_accounts|debit_exact|credit_exact|conservation|non_negative_gross|non_negative_fee|fee_within_gross|fee_below_gross|non_negative_principal|non_negative_periods|bounded_periods|never_shrinks\\n§p 54849076934153825913732198128297461607565272684362483635966063597807470011133|50892475336653709823367337237432463338412997325023040745375503982085822349927\\n§v 2,4,3,1,6,7,5,9,10,11,12,8,14,16,15,17,18,13,0\\nY001 Y111 v0 F3 v1 >= Q00 v1 j00 > Q10 v0 F2 v2 F2 != Q20 v0 F3 v0 F3 @ v1 - == Q30 v2 F3 v2 F3 @ v1 + == Q40 v0 F3 v2 F3 + v0 F3 @ v2 F3 @ + == Q50 P013 P213 K332 P013 v0 F3 v1 - = P213 v2 F3 v1 + = v0 F2 v2 F2 v1 X03 E u N B4 D32111020301211010 v4 j00 >= Q60 $ j00 >= Q70 $ v4 <= Q80 v4 j00 > ! $ v4 < | Q90 K130 v4 i100 / N B1 Z50 r1x64x1 h8 D600111001400 v7 j00 >= Qa0 v8 i0 >= Qb0 v8 i1200 <= Qc0 $ v7 >= Qd1 K310 v7 L90 i0 La3 va v8 < v9 v7 >= va i0 >= v8 va - P90 v9 v9 i100 / + = Pa0 va i1 + = B2 W21 v9 N B4 Db0011000270830 vc F3 vd >= Q00 vd j00 > Q10 vc F2 ve F2 != Q20 Pc13 Pe13 K302 vd C61 Lf0 vc ve vd vf - C33 E u N B3 Zg0 c1230 m0 Dh21111203c1e1d010 Gj9435d65728e9caib1cfd6e7fbg4hhigj0k8lam Mi61\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "change_request",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "selection",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"SELECT feeFor\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"S8:51640683185298463298738077950975190482922654030475378535375023573179693587658:3\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "retrieval",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"/**\\n * @requires [non_negative_gross] gross >= (0n as Cents)\\n * @ensures [non_negative_fee] result >= (0n as Cents)\\n * @ensures [fee_within_gross] result <= gross\\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\\n */\\npure function feeFor(gross: Cents): Cents {\\n  return gross / 100n;\\n}\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"D8;51640683185298463298738077950975190482922654030475378535375023573179693587658;3;78120745325780836903881901430957646083010612975525784873410658733613962335030;49867037826754729783395988186432792370108966589521059730969005281765645168822;;\\nAE1\\n§w 1\\nv4 j00 >= Q60 $ j00 >= Q70 $ v4 <= Q80 v4 j00 > ! $ v4 < | Q90 K130 v4 i100 / N B1 Z50 r1x64x1 h8 D600111001400\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "failed_attempt",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"/**\\n * @requires [non_negative_gross] gross >= (0n as Cents)\\n * @ensures [non_negative_fee] result >= (0n as Cents)\\n * @ensures [fee_within_gross] result <= gross\\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\\n */\\npure function feeFor(gross: Cents): Cents {\\n  return gross / 100n;\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"R8:51640683185298463298738077950975190482922654030475378535375023573179693587658:3\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "repair",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "change",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"/**\\n * @requires [non_negative_gross] gross >= (0n as Cents)\\n * @ensures [non_negative_fee] result >= (0n as Cents)\\n * @ensures [fee_within_gross] result <= gross\\n * @ensures [fee_below_gross] !(gross > (0n as Cents)) || result < gross\\n * @surface batchSize: range(1, 64, 1) minimize_latency = 8\\n */\\npure function feeFor(gross: Cents): Cents {\\n  return gross / 101n;\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"E8:51640683185298463298738077950975190482922654030475378535375023573179693587658:3:12161003096040306239828738402476669511969372487194179255862472271116477238512:0.0.1:101\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "response",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n"
+        }
+      ]
+    },
+    {
+      "id": "scalar-math",
+      "seed": "projection-corpus-math",
+      "memberIndex": 1,
+      "path": [
+        0,
+        0
+      ],
+      "originalInteger": "100000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "changedInteger": "100000000000000000000000000000000000000000000000000000000000000000000000000000001",
+      "baseRoot": "ast:b3:0853be07294d280621ece1431932e001ed5c1cffbd911c7576a258971c22b337",
+      "changedRoot": "ast:b3:b11a501d813360aa8868c33d2a167800587f6b6f145362dfe7462865997a6c16",
+      "slice": {
+        "declarationRoot": "ast:b3:a9bfc18bee81f6b5912df0050c8f9f8d027cc359b3af787b384910f32a1dd909",
+        "contractRoot": null,
+        "dependencies": [],
+        "effects": []
+      },
+      "raw": {
+        "cold": {
+          "baseline": "// @module module\n\n/**\n * @requires [nonzero] divisor !== 0n\n */\npure function truncateDivision(amount: bigint, divisor: bigint): bigint {\n  return amount / divisor;\n}\n\npure function largeConstant(): bigint {\n  return 100000000000000000000000000000000000000000000000000000000000000000000000000000000n + 17n;\n}\n",
+          "candidate": "AE7\n§g \"projection-corpus-math\"\n§h 3766462619917798120671603018587066613885831334291883246831247722732572554039\n§w 1\n§n module|truncateDivision|divisor|amount|largeConstant\n§y I\n§l nonzero\n§v 1,0,2,3,4\nv0 i0 != Q00 K100 v1 v0 / N B1 D20011000210000 i100000000000000000000000000000000000000000000000000000000000000000000000000000000 i17 + N D3000100000 G54021021334 M420"
+        },
+        "selection": {
+          "baseline": "SELECT largeConstant",
+          "candidate": "S8:3766462619917798120671603018587066613885831334291883246831247722732572554039:1"
+        },
+        "retrieval": {
+          "baseline": "pure function largeConstant(): bigint {\n  return 100000000000000000000000000000000000000000000000000000000000000000000000000000000n + 17n;\n}",
+          "candidate": "D8;3766462619917798120671603018587066613885831334291883246831247722732572554039;1;76779675009539997740356410007498394644513104492122811728696687116342871841033;-;;\nAE1\n§w 1\ni100000000000000000000000000000000000000000000000000000000000000000000000000000000 i17 + N D3000100000"
+        },
+        "failed": {
+          "baseline": "pure function largeConstant(): bigint {\n  return 100000000000000000000000000000000000000000000000000000000000000000000000000000000n + 17n;\n}",
+          "candidate": "R8:3766462619917798120671603018587066613885831334291883246831247722732572554039:1"
+        },
+        "repaired": {
+          "baseline": "pure function largeConstant(): bigint {\n  return 100000000000000000000000000000000000000000000000000000000000000000000000000000001n + 17n;\n}",
+          "candidate": "E8:3766462619917798120671603018587066613885831334291883246831247722732572554039:1:59962546744471607073673187696526932369144665330832308949439694688465411921589:0.0:100000000000000000000000000000000000000000000000000000000000000000000000000000001"
+        }
+      },
+      "messages": [
+        {
+          "role": "system",
+          "purpose": "instructions",
+          "baseline": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n",
+          "candidate": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "initial_context",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"// @module module\\n\\n/**\\n * @requires [nonzero] divisor !== 0n\\n */\\npure function truncateDivision(amount: bigint, divisor: bigint): bigint {\\n  return amount / divisor;\\n}\\n\\npure function largeConstant(): bigint {\\n  return 100000000000000000000000000000000000000000000000000000000000000000000000000000000n + 17n;\\n}\\n\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"AE7\\n§g \\\"projection-corpus-math\\\"\\n§h 3766462619917798120671603018587066613885831334291883246831247722732572554039\\n§w 1\\n§n module|truncateDivision|divisor|amount|largeConstant\\n§y I\\n§l nonzero\\n§v 1,0,2,3,4\\nv0 i0 != Q00 K100 v1 v0 / N B1 D20011000210000 i100000000000000000000000000000000000000000000000000000000000000000000000000000000 i17 + N D3000100000 G54021021334 M420\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "change_request",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "selection",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"SELECT largeConstant\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"S8:3766462619917798120671603018587066613885831334291883246831247722732572554039:1\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "retrieval",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"pure function largeConstant(): bigint {\\n  return 100000000000000000000000000000000000000000000000000000000000000000000000000000000n + 17n;\\n}\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"D8;3766462619917798120671603018587066613885831334291883246831247722732572554039;1;76779675009539997740356410007498394644513104492122811728696687116342871841033;-;;\\nAE1\\n§w 1\\ni100000000000000000000000000000000000000000000000000000000000000000000000000000000 i17 + N D3000100000\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "failed_attempt",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"pure function largeConstant(): bigint {\\n  return 100000000000000000000000000000000000000000000000000000000000000000000000000000000n + 17n;\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"R8:3766462619917798120671603018587066613885831334291883246831247722732572554039:1\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "repair",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "change",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"pure function largeConstant(): bigint {\\n  return 100000000000000000000000000000000000000000000000000000000000000000000000000000001n + 17n;\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"E8:3766462619917798120671603018587066613885831334291883246831247722732572554039:1:59962546744471607073673187696526932369144665330832308949439694688465411921589:0.0:100000000000000000000000000000000000000000000000000000000000000000000000000000001\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "response",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n"
+        }
+      ]
+    },
+    {
+      "id": "loop-contract",
+      "seed": "projection-corpus-loops",
+      "memberIndex": 0,
+      "path": [
+        0,
+        0
+      ],
+      "originalInteger": "0",
+      "changedInteger": "1",
+      "baseRoot": "ast:b3:feed0ad7a35a3a7cded01efe5855089e4968038a8cb0722100471598d0e75750",
+      "changedRoot": "ast:b3:1807f12cbffbabb0b712f4ded46fd1ccb01eb29237c0b8589a74933ca435591a",
+      "slice": {
+        "declarationRoot": "ast:b3:9da038bd50a434593cdc9a6fc60aa998c19c0712182f1436c58df8f4e8e6bff3",
+        "contractRoot": "ast:b3:a8bb3c45e03d48c7edce68c1d3458cf1b45443260d0f8e8d0290739669b59846",
+        "dependencies": [],
+        "effects": []
+      },
+      "raw": {
+        "cold": {
+          "baseline": "// @module module\n\n/**\n * @requires [positive] count >= 0n\n * @ensures [counted] result === old(count)\n */\npure function countUp(count: bigint): bigint {\n  let position: bigint = 0n;\n  let total: bigint = 0n;\n  /**\n   * @invariant total >= 0n\n   * @variant count - position\n   */\n  while (position < count) {\n    total = total + 1n;\n    position = position + 1n;\n  }\n  return total;\n}\n",
+          "candidate": "AE7\n§g \"projection-corpus-loops\"\n§h 115306281125557162456706097373289165074743719359505090905885433917114748983120\n§w 1\n§n module|position|count|countUp|total\n§y I\n§l positive|counted\n§v 0,1,2,3,4\nv0 i0 >= Q00 $ v0 @ == Q10 K110 i0 L10 i0 L20 v1 v0 < v2 i0 >= v0 v1 - P20 v2 i1 + = P10 v1 i1 + = B2 W11 v2 N B4 D300110001000 G54011023324 M410"
+        },
+        "selection": {
+          "baseline": "SELECT countUp",
+          "candidate": "S8:115306281125557162456706097373289165074743719359505090905885433917114748983120:0"
+        },
+        "retrieval": {
+          "baseline": "/**\n * @requires [positive] count >= 0n\n * @ensures [counted] result === old(count)\n */\npure function countUp(count: bigint): bigint {\n  let position: bigint = 0n;\n  let total: bigint = 0n;\n  /**\n   * @invariant total >= 0n\n   * @variant count - position\n   */\n  while (position < count) {\n    total = total + 1n;\n    position = position + 1n;\n  }\n  return total;\n}",
+          "candidate": "D8;115306281125557162456706097373289165074743719359505090905885433917114748983120;0;71296204359655237971655663903359108132503721665169517069401030487263366529011;76319374951734602816341310829039610677618831983959051436631908171538018703430;;\nAE1\n§w 1\nv0 i0 >= Q00 $ v0 @ == Q10 K110 i0 L10 i0 L20 v1 v0 < v2 i0 >= v0 v1 - P20 v2 i1 + = P10 v1 i1 + = B2 W11 v2 N B4 D300110001000"
+        },
+        "failed": {
+          "baseline": "/**\n * @requires [positive] count >= 0n\n * @ensures [counted] result === old(count)\n */\npure function countUp(count: bigint): bigint {\n  let position: bigint = 0n;\n  let total: bigint = 0n;\n  /**\n   * @invariant total >= 0n\n   * @variant count - position\n   */\n  while (position < count) {\n    total = total + 1n;\n    position = position + 1n;\n  }\n  return total;\n}",
+          "candidate": "R8:115306281125557162456706097373289165074743719359505090905885433917114748983120:0"
+        },
+        "repaired": {
+          "baseline": "/**\n * @requires [positive] count >= 0n\n * @ensures [counted] result === old(count)\n */\npure function countUp(count: bigint): bigint {\n  let position: bigint = 1n;\n  let total: bigint = 0n;\n  /**\n   * @invariant total >= 0n\n   * @variant count - position\n   */\n  while (position < count) {\n    total = total + 1n;\n    position = position + 1n;\n  }\n  return total;\n}",
+          "candidate": "E8:115306281125557162456706097373289165074743719359505090905885433917114748983120:0:69319620572163638509018922545574812898156755791337736377653607880630120686079:0.0:1"
+        }
+      },
+      "messages": [
+        {
+          "role": "system",
+          "purpose": "instructions",
+          "baseline": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n",
+          "candidate": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "initial_context",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"// @module module\\n\\n/**\\n * @requires [positive] count >= 0n\\n * @ensures [counted] result === old(count)\\n */\\npure function countUp(count: bigint): bigint {\\n  let position: bigint = 0n;\\n  let total: bigint = 0n;\\n  /**\\n   * @invariant total >= 0n\\n   * @variant count - position\\n   */\\n  while (position < count) {\\n    total = total + 1n;\\n    position = position + 1n;\\n  }\\n  return total;\\n}\\n\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"AE7\\n§g \\\"projection-corpus-loops\\\"\\n§h 115306281125557162456706097373289165074743719359505090905885433917114748983120\\n§w 1\\n§n module|position|count|countUp|total\\n§y I\\n§l positive|counted\\n§v 0,1,2,3,4\\nv0 i0 >= Q00 $ v0 @ == Q10 K110 i0 L10 i0 L20 v1 v0 < v2 i0 >= v0 v1 - P20 v2 i1 + = P10 v1 i1 + = B2 W11 v2 N B4 D300110001000 G54011023324 M410\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "change_request",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "selection",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"SELECT countUp\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"S8:115306281125557162456706097373289165074743719359505090905885433917114748983120:0\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "retrieval",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"/**\\n * @requires [positive] count >= 0n\\n * @ensures [counted] result === old(count)\\n */\\npure function countUp(count: bigint): bigint {\\n  let position: bigint = 0n;\\n  let total: bigint = 0n;\\n  /**\\n   * @invariant total >= 0n\\n   * @variant count - position\\n   */\\n  while (position < count) {\\n    total = total + 1n;\\n    position = position + 1n;\\n  }\\n  return total;\\n}\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"D8;115306281125557162456706097373289165074743719359505090905885433917114748983120;0;71296204359655237971655663903359108132503721665169517069401030487263366529011;76319374951734602816341310829039610677618831983959051436631908171538018703430;;\\nAE1\\n§w 1\\nv0 i0 >= Q00 $ v0 @ == Q10 K110 i0 L10 i0 L20 v1 v0 < v2 i0 >= v0 v1 - P20 v2 i1 + = P10 v1 i1 + = B2 W11 v2 N B4 D300110001000\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "failed_attempt",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"/**\\n * @requires [positive] count >= 0n\\n * @ensures [counted] result === old(count)\\n */\\npure function countUp(count: bigint): bigint {\\n  let position: bigint = 0n;\\n  let total: bigint = 0n;\\n  /**\\n   * @invariant total >= 0n\\n   * @variant count - position\\n   */\\n  while (position < count) {\\n    total = total + 1n;\\n    position = position + 1n;\\n  }\\n  return total;\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"R8:115306281125557162456706097373289165074743719359505090905885433917114748983120:0\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "repair",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "change",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"/**\\n * @requires [positive] count >= 0n\\n * @ensures [counted] result === old(count)\\n */\\npure function countUp(count: bigint): bigint {\\n  let position: bigint = 1n;\\n  let total: bigint = 0n;\\n  /**\\n   * @invariant total >= 0n\\n   * @variant count - position\\n   */\\n  while (position < count) {\\n    total = total + 1n;\\n    position = position + 1n;\\n  }\\n  return total;\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"E8:115306281125557162456706097373289165074743719359505090905885433917114748983120:0:69319620572163638509018922545574812898156755791337736377653607880630120686079:0.0:1\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "response",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n"
+        }
+      ]
+    },
+    {
+      "id": "external-effect",
+      "seed": "projection-corpus-effects",
+      "memberIndex": 0,
+      "path": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "originalInteger": "1",
+      "changedInteger": "2",
+      "baseRoot": "ast:b3:16da6e3e11ac5cd6e2803c772df48daec9aa4c083131af78692917b810f872ff",
+      "changedRoot": "ast:b3:7f622cd8c35dc4a271d8add3603cc02c7ee60fa2278973acfbdd7a8ca5c9cb24",
+      "slice": {
+        "declarationRoot": "ast:b3:b224d958c38a3779539e00f16724cffd104d59472a00b772a90bd19d287a708f",
+        "contractRoot": null,
+        "dependencies": [],
+        "effects": [
+          "cap:audit:append"
+        ]
+      },
+      "raw": {
+        "cold": {
+          "baseline": "// @module module\n\n/**\n * @capability cap:audit:append\n */\nfunction recordEvent(): void {\n  if (true) {\n    invoke(\"cap:audit:append\", \"record the event\", 1n);\n  }\n  return undefined;\n}\n",
+          "candidate": "AE7\n§g \"projection-corpus-effects\"\n§h 10336816194429603494902489168322346429013389592784024321067959403693632680703\n§w 1\n§n module|recordEvent\n§y B|S|I|U\n§s record the event\n§c cap:audit:append\n§v 0,1\nt m0 i1 X02 E I0 u N B2 D03101000010 G21001 M110"
+        },
+        "selection": {
+          "baseline": "SELECT recordEvent",
+          "candidate": "S8:10336816194429603494902489168322346429013389592784024321067959403693632680703:0"
+        },
+        "retrieval": {
+          "baseline": "/**\n * @capability cap:audit:append\n */\nfunction recordEvent(): void {\n  if (true) {\n    invoke(\"cap:audit:append\", \"record the event\", 1n);\n  }\n  return undefined;\n}",
+          "candidate": "D8;10336816194429603494902489168322346429013389592784024321067959403693632680703;0;80576793614178755153683139561948079482908894030906300315887754428279936413839;-;;cap:audit:append\nAE1\n§w 1\nt m0 i1 X02 E I0 u N B2 D03101000010"
+        },
+        "failed": {
+          "baseline": "/**\n * @capability cap:audit:append\n */\nfunction recordEvent(): void {\n  if (true) {\n    invoke(\"cap:audit:append\", \"record the event\", 1n);\n  }\n  return undefined;\n}",
+          "candidate": "R8:10336816194429603494902489168322346429013389592784024321067959403693632680703:0"
+        },
+        "repaired": {
+          "baseline": "/**\n * @capability cap:audit:append\n */\nfunction recordEvent(): void {\n  if (true) {\n    invoke(\"cap:audit:append\", \"record the event\", 2n);\n  }\n  return undefined;\n}",
+          "candidate": "E8:10336816194429603494902489168322346429013389592784024321067959403693632680703:0:67878229629487215088797286816699031915251361354511827998189491577902437828355:0.1.0.1:2"
+        }
+      },
+      "messages": [
+        {
+          "role": "system",
+          "purpose": "instructions",
+          "baseline": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n",
+          "candidate": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "initial_context",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"// @module module\\n\\n/**\\n * @capability cap:audit:append\\n */\\nfunction recordEvent(): void {\\n  if (true) {\\n    invoke(\\\"cap:audit:append\\\", \\\"record the event\\\", 1n);\\n  }\\n  return undefined;\\n}\\n\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"AE7\\n§g \\\"projection-corpus-effects\\\"\\n§h 10336816194429603494902489168322346429013389592784024321067959403693632680703\\n§w 1\\n§n module|recordEvent\\n§y B|S|I|U\\n§s record the event\\n§c cap:audit:append\\n§v 0,1\\nt m0 i1 X02 E I0 u N B2 D03101000010 G21001 M110\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "change_request",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "selection",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"SELECT recordEvent\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"S8:10336816194429603494902489168322346429013389592784024321067959403693632680703:0\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "retrieval",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"/**\\n * @capability cap:audit:append\\n */\\nfunction recordEvent(): void {\\n  if (true) {\\n    invoke(\\\"cap:audit:append\\\", \\\"record the event\\\", 1n);\\n  }\\n  return undefined;\\n}\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"D8;10336816194429603494902489168322346429013389592784024321067959403693632680703;0;80576793614178755153683139561948079482908894030906300315887754428279936413839;-;;cap:audit:append\\nAE1\\n§w 1\\nt m0 i1 X02 E I0 u N B2 D03101000010\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "failed_attempt",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"/**\\n * @capability cap:audit:append\\n */\\nfunction recordEvent(): void {\\n  if (true) {\\n    invoke(\\\"cap:audit:append\\\", \\\"record the event\\\", 1n);\\n  }\\n  return undefined;\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"R8:10336816194429603494902489168322346429013389592784024321067959403693632680703:0\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "repair",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "change",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"/**\\n * @capability cap:audit:append\\n */\\nfunction recordEvent(): void {\\n  if (true) {\\n    invoke(\\\"cap:audit:append\\\", \\\"record the event\\\", 2n);\\n  }\\n  return undefined;\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"E8:10336816194429603494902489168322346429013389592784024321067959403693632680703:0:67878229629487215088797286816699031915251361354511827998189491577902437828355:0.1.0.1:2\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "response",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n"
+        }
+      ]
+    },
+    {
+      "id": "fixed-lazy",
+      "seed": "projection-corpus-fixed",
+      "memberIndex": 0,
+      "path": [
+        0,
+        0,
+        0
+      ],
+      "originalInteger": "250",
+      "changedInteger": "251",
+      "baseRoot": "ast:b3:f5e8e2427a0497e22d9b70679803276a34c9c78d017bce43b5d7ca874b5626e7",
+      "changedRoot": "ast:b3:a0709cf6904b036bc1870cde479bd6f03e1fc60784e4761424e78bcc3b4b6a36",
+      "slice": {
+        "declarationRoot": "ast:b3:21a676a6cfaae1e0d945a7415c6a78309593ba341f65f226af8528dec4635fa5",
+        "contractRoot": null,
+        "dependencies": [],
+        "effects": []
+      },
+      "raw": {
+        "cold": {
+          "baseline": "// @module module\n\npure function wrapByte(): IntN<8, unsigned, wrap> {\n  return fixedAdd<IntN<8, unsigned, wrap>>(intCast<IntN<8, unsigned, wrap>>(250n), intCast<IntN<8, unsigned, wrap>>(10n));\n}\n\npure function lazyCondition(): boolean {\n  return true || 1n / 0n === 0n;\n}\n",
+          "candidate": "AE7\n§g \"projection-corpus-fixed\"\n§h 111228118008809694170795189153278719975159244584736266102603393143744239118055\n§w 1\n§n wrapByte|lazyCondition|module\n§y I|D000|B\n§v 0,1,2\ni250 c1 i10 c1 b+1 N D0100100000 t i1 i0 / i0 == | N D1200100000 G3001122 M220"
+        },
+        "selection": {
+          "baseline": "SELECT wrapByte",
+          "candidate": "S8:111228118008809694170795189153278719975159244584736266102603393143744239118055:0"
+        },
+        "retrieval": {
+          "baseline": "pure function wrapByte(): IntN<8, unsigned, wrap> {\n  return fixedAdd<IntN<8, unsigned, wrap>>(intCast<IntN<8, unsigned, wrap>>(250n), intCast<IntN<8, unsigned, wrap>>(10n));\n}",
+          "candidate": "D8;111228118008809694170795189153278719975159244584736266102603393143744239118055;0;15220439519291011940099379772554416550171726687266130243400338879054281400229;-;;\nAE1\n§w 1\ni250 c1 i10 c1 b+1 N D0100100000"
+        },
+        "failed": {
+          "baseline": "pure function wrapByte(): IntN<8, unsigned, wrap> {\n  return fixedAdd<IntN<8, unsigned, wrap>>(intCast<IntN<8, unsigned, wrap>>(250n), intCast<IntN<8, unsigned, wrap>>(10n));\n}",
+          "candidate": "R8:111228118008809694170795189153278719975159244584736266102603393143744239118055:0"
+        },
+        "repaired": {
+          "baseline": "pure function wrapByte(): IntN<8, unsigned, wrap> {\n  return fixedAdd<IntN<8, unsigned, wrap>>(intCast<IntN<8, unsigned, wrap>>(251n), intCast<IntN<8, unsigned, wrap>>(10n));\n}",
+          "candidate": "E8:111228118008809694170795189153278719975159244584736266102603393143744239118055:0:45767504020561364035939280988860643905921629219386342452146655508040676216507:0.0.0:251"
+        }
+      },
+      "messages": [
+        {
+          "role": "system",
+          "purpose": "instructions",
+          "baseline": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n",
+          "candidate": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "initial_context",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"// @module module\\n\\npure function wrapByte(): IntN<8, unsigned, wrap> {\\n  return fixedAdd<IntN<8, unsigned, wrap>>(intCast<IntN<8, unsigned, wrap>>(250n), intCast<IntN<8, unsigned, wrap>>(10n));\\n}\\n\\npure function lazyCondition(): boolean {\\n  return true || 1n / 0n === 0n;\\n}\\n\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"AE7\\n§g \\\"projection-corpus-fixed\\\"\\n§h 111228118008809694170795189153278719975159244584736266102603393143744239118055\\n§w 1\\n§n wrapByte|lazyCondition|module\\n§y I|D000|B\\n§v 0,1,2\\ni250 c1 i10 c1 b+1 N D0100100000 t i1 i0 / i0 == | N D1200100000 G3001122 M220\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "change_request",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "selection",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"SELECT wrapByte\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"S8:111228118008809694170795189153278719975159244584736266102603393143744239118055:0\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "retrieval",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"pure function wrapByte(): IntN<8, unsigned, wrap> {\\n  return fixedAdd<IntN<8, unsigned, wrap>>(intCast<IntN<8, unsigned, wrap>>(250n), intCast<IntN<8, unsigned, wrap>>(10n));\\n}\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"D8;111228118008809694170795189153278719975159244584736266102603393143744239118055;0;15220439519291011940099379772554416550171726687266130243400338879054281400229;-;;\\nAE1\\n§w 1\\ni250 c1 i10 c1 b+1 N D0100100000\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "failed_attempt",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"pure function wrapByte(): IntN<8, unsigned, wrap> {\\n  return fixedAdd<IntN<8, unsigned, wrap>>(intCast<IntN<8, unsigned, wrap>>(250n), intCast<IntN<8, unsigned, wrap>>(10n));\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"R8:111228118008809694170795189153278719975159244584736266102603393143744239118055:0\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "repair",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "change",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"pure function wrapByte(): IntN<8, unsigned, wrap> {\\n  return fixedAdd<IntN<8, unsigned, wrap>>(intCast<IntN<8, unsigned, wrap>>(251n), intCast<IntN<8, unsigned, wrap>>(10n));\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"E8:111228118008809694170795189153278719975159244584736266102603393143744239118055:0:45767504020561364035939280988860643905921629219386342452146655508040676216507:0.0.0:251\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "response",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n"
+        }
+      ]
+    },
+    {
+      "id": "composite-alias-collections",
+      "seed": "projection-composite-corpus",
+      "memberIndex": 1,
+      "path": [
+        0,
+        0,
+        0
+      ],
+      "originalInteger": "1",
+      "changedInteger": "2",
+      "baseRoot": "ast:b3:0ebbbd5edbb4ad56f75f86626c6fdb455b27999dd84f30d90f9b42e1cf5ea282",
+      "changedRoot": "ast:b3:a8464f3868974656eb05d330f0d728bd2adcba86e0ced202dd922f40c4f914ee",
+      "slice": {
+        "declarationRoot": "ast:b3:0467fb50209c869f0ac2416db2c110c27aa3835fffeda0f36b2d5025426613b1",
+        "contractRoot": null,
+        "dependencies": [
+          {
+            "memberIndex": 2,
+            "root": "ast:b3:12663fe33f2898dbdd0bc4f2049e2ccc59c5b77a29dbed8a46e4800aee13d35a"
+          },
+          {
+            "memberIndex": 3,
+            "root": "ast:b3:c8579806989ee263a9706a06410db9f13c8d8940f16dee76911af34fe2ea4c33"
+          }
+        ],
+        "effects": []
+      },
+      "raw": {
+        "cold": {
+          "baseline": "// @module module\n\n/** @nominal type:corpus:counter\n */\ninterface Counter {\n  value: bigint;\n}\n\npure function updateSharedRecord(): Seq<bigint> {\n  let row: Counter = ({ value: 1n } satisfies Counter);\n  let alias: Counter = row;\n  alias.value = row.value + 1n;\n  return seq<bigint>(matchResult(ok<Result<Counter, string>>(row), ok => ok.value, error => 0n), seqFold(seqMap(seq<bigint>(1n, 2n), increment), 0n, sum));\n}\n\npure function increment(item: bigint): bigint {\n  return item + 1n;\n}\n\npure function sum(acc: bigint, item: bigint): bigint {\n  return acc + item;\n}\n",
+          "candidate": "AE7\n§g \"projection-composite-corpus\"\n§h 6664087268711535562246036799146447314308170707827419272783949640107894416002\n§w 1\n§n type:corpus:counter|value|item|updateSharedRecord|module|increment|error|row|sum|acc|ok|alias\n§y R0<1:I>|I|E<R0<1:I>,S>|A<I>\n§v 3,4,7,8,1,2,0,5,6,9\nY000 i1 R011 L00 v0 L10 P111 v0 F1 i1 + = v0 O02 v2 F1 i0 J23 i1 i2 V32 e4 i0 d5 V32 N B4 D6300100000 v7 i1 + N D410010001710 v8 v7 + N D51001000281710 Ga72639445360758892a1b M940"
+        },
+        "selection": {
+          "baseline": "SELECT updateSharedRecord",
+          "candidate": "S8:6664087268711535562246036799146447314308170707827419272783949640107894416002:1"
+        },
+        "retrieval": {
+          "baseline": "pure function updateSharedRecord(): Seq<bigint> {\n  let row: Counter = ({ value: 1n } satisfies Counter);\n  let alias: Counter = row;\n  alias.value = row.value + 1n;\n  return seq<bigint>(matchResult(ok<Result<Counter, string>>(row), ok => ok.value, error => 0n), seqFold(seqMap(seq<bigint>(1n, 2n), increment), 0n, sum));\n}",
+          "candidate": "D8;6664087268711535562246036799146447314308170707827419272783949640107894416002;1;1992971140568401282152474896259463055146912217255633801747820637819859506097;-;2@8322290611685306496431526755328292144290588156423828961988655937683797037914,3@90617334654566218837158697203063803783064717810398120388054928576879367179315;\nAE1\n§w 1\ni1 R011 L00 v0 L10 P111 v0 F1 i1 + = v0 O02 v2 F1 i0 J23 i1 i2 V32 e4 i0 d5 V32 N B4 D6300100000"
+        },
+        "failed": {
+          "baseline": "pure function updateSharedRecord(): Seq<bigint> {\n  let row: Counter = ({ value: 1n } satisfies Counter);\n  let alias: Counter = row;\n  alias.value = row.value + 1n;\n  return seq<bigint>(matchResult(ok<Result<Counter, string>>(row), ok => ok.value, error => 0n), seqFold(seqMap(seq<bigint>(1n, 2n), increment), 0n, sum));\n}",
+          "candidate": "R8:6664087268711535562246036799146447314308170707827419272783949640107894416002:1"
+        },
+        "repaired": {
+          "baseline": "pure function updateSharedRecord(): Seq<bigint> {\n  let row: Counter = ({ value: 2n } satisfies Counter);\n  let alias: Counter = row;\n  alias.value = row.value + 1n;\n  return seq<bigint>(matchResult(ok<Result<Counter, string>>(row), ok => ok.value, error => 0n), seqFold(seqMap(seq<bigint>(1n, 2n), increment), 0n, sum));\n}",
+          "candidate": "E8:6664087268711535562246036799146447314308170707827419272783949640107894416002:1:55103350482801143614678014764087971615419493144387023598510096609107362469156:0.0.0:2"
+        }
+      },
+      "messages": [
+        {
+          "role": "system",
+          "purpose": "instructions",
+          "baseline": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n",
+          "candidate": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "initial_context",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"// @module module\\n\\n/** @nominal type:corpus:counter\\n */\\ninterface Counter {\\n  value: bigint;\\n}\\n\\npure function updateSharedRecord(): Seq<bigint> {\\n  let row: Counter = ({ value: 1n } satisfies Counter);\\n  let alias: Counter = row;\\n  alias.value = row.value + 1n;\\n  return seq<bigint>(matchResult(ok<Result<Counter, string>>(row), ok => ok.value, error => 0n), seqFold(seqMap(seq<bigint>(1n, 2n), increment), 0n, sum));\\n}\\n\\npure function increment(item: bigint): bigint {\\n  return item + 1n;\\n}\\n\\npure function sum(acc: bigint, item: bigint): bigint {\\n  return acc + item;\\n}\\n\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"AE7\\n§g \\\"projection-composite-corpus\\\"\\n§h 6664087268711535562246036799146447314308170707827419272783949640107894416002\\n§w 1\\n§n type:corpus:counter|value|item|updateSharedRecord|module|increment|error|row|sum|acc|ok|alias\\n§y R0<1:I>|I|E<R0<1:I>,S>|A<I>\\n§v 3,4,7,8,1,2,0,5,6,9\\nY000 i1 R011 L00 v0 L10 P111 v0 F1 i1 + = v0 O02 v2 F1 i0 J23 i1 i2 V32 e4 i0 d5 V32 N B4 D6300100000 v7 i1 + N D410010001710 v8 v7 + N D51001000281710 Ga72639445360758892a1b M940\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "change_request",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "selection",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"SELECT updateSharedRecord\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"S8:6664087268711535562246036799146447314308170707827419272783949640107894416002:1\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "retrieval",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"pure function updateSharedRecord(): Seq<bigint> {\\n  let row: Counter = ({ value: 1n } satisfies Counter);\\n  let alias: Counter = row;\\n  alias.value = row.value + 1n;\\n  return seq<bigint>(matchResult(ok<Result<Counter, string>>(row), ok => ok.value, error => 0n), seqFold(seqMap(seq<bigint>(1n, 2n), increment), 0n, sum));\\n}\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"D8;6664087268711535562246036799146447314308170707827419272783949640107894416002;1;1992971140568401282152474896259463055146912217255633801747820637819859506097;-;2@8322290611685306496431526755328292144290588156423828961988655937683797037914,3@90617334654566218837158697203063803783064717810398120388054928576879367179315;\\nAE1\\n§w 1\\ni1 R011 L00 v0 L10 P111 v0 F1 i1 + = v0 O02 v2 F1 i0 J23 i1 i2 V32 e4 i0 d5 V32 N B4 D6300100000\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "failed_attempt",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"pure function updateSharedRecord(): Seq<bigint> {\\n  let row: Counter = ({ value: 1n } satisfies Counter);\\n  let alias: Counter = row;\\n  alias.value = row.value + 1n;\\n  return seq<bigint>(matchResult(ok<Result<Counter, string>>(row), ok => ok.value, error => 0n), seqFold(seqMap(seq<bigint>(1n, 2n), increment), 0n, sum));\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"R8:6664087268711535562246036799146447314308170707827419272783949640107894416002:1\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "repair",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "change",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"pure function updateSharedRecord(): Seq<bigint> {\\n  let row: Counter = ({ value: 2n } satisfies Counter);\\n  let alias: Counter = row;\\n  alias.value = row.value + 1n;\\n  return seq<bigint>(matchResult(ok<Result<Counter, string>>(row), ok => ok.value, error => 0n), seqFold(seqMap(seq<bigint>(1n, 2n), increment), 0n, sum));\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"E8:6664087268711535562246036799146447314308170707827419272783949640107894416002:1:55103350482801143614678014764087971615419493144387023598510096609107362469156:0.0.0:2\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "response",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n"
+        }
+      ]
+    },
+    {
+      "id": "continuation-capture-task",
+      "seed": "projection-continuation-corpus",
+      "memberIndex": 0,
+      "path": [
+        0,
+        0
+      ],
+      "originalInteger": "4",
+      "changedInteger": "5",
+      "baseRoot": "ast:b3:529ea9d51e142d173d47c63f2f2d83d11c4b993c01699e68f5087bf6af3aecd3",
+      "changedRoot": "ast:b3:0f35f08f63a32f53e670426cec591f6d18cf42b91b8322a0a54129b2be0f56ad",
+      "slice": {
+        "declarationRoot": "ast:b3:8a82e666fd35f4c7e0dbc0bd0ef8b1329fd8e425af8e3a68adbc62d02a261b3a",
+        "contractRoot": null,
+        "dependencies": [],
+        "effects": []
+      },
+      "raw": {
+        "cold": {
+          "baseline": "// @module module\n\npure function captureAndAwait(): bigint {\n  let captured: bigint = 4n;\n  let closure: Fn<(bigint), bigint, \"\"> = lambda(\"\", (argument: bigint): bigint => captured + argument);\n  let pending: Task<bigint> = spawn(apply(closure, 8n));\n  captured = 40n;\n  let first: bigint = awaitTask(pending);\n  return first + awaitTask(pending);\n}\n",
+          "candidate": "AE7\n§g \"projection-continuation-corpus\"\n§h 37369987560831745009984338347918671266023744564731174293389683488857532329171\n§w 1\n§n captureAndAwait|captured|pending|module|argument|first|closure\n§y I|F<I;I;>|K<I>\n§v 1,2,3,4,5,0,6\ni4 L00 v0 v1 + g01100 L21 v2 i8 a1 q L32 P00 i40 = v3 w L40 v4 v3 w + N B6 D5000100000 G750013263144526 M610"
+        },
+        "selection": {
+          "baseline": "SELECT captureAndAwait",
+          "candidate": "S8:37369987560831745009984338347918671266023744564731174293389683488857532329171:0"
+        },
+        "retrieval": {
+          "baseline": "pure function captureAndAwait(): bigint {\n  let captured: bigint = 4n;\n  let closure: Fn<(bigint), bigint, \"\"> = lambda(\"\", (argument: bigint): bigint => captured + argument);\n  let pending: Task<bigint> = spawn(apply(closure, 8n));\n  captured = 40n;\n  let first: bigint = awaitTask(pending);\n  return first + awaitTask(pending);\n}",
+          "candidate": "D8;37369987560831745009984338347918671266023744564731174293389683488857532329171;0;62650453401152479512469962744651492871665400952909652048941787963978554940218;-;;\nAE1\n§w 1\ni4 L00 v0 v1 + g01100 L21 v2 i8 a1 q L32 P00 i40 = v3 w L40 v4 v3 w + N B6 D5000100000"
+        },
+        "failed": {
+          "baseline": "pure function captureAndAwait(): bigint {\n  let captured: bigint = 4n;\n  let closure: Fn<(bigint), bigint, \"\"> = lambda(\"\", (argument: bigint): bigint => captured + argument);\n  let pending: Task<bigint> = spawn(apply(closure, 8n));\n  captured = 40n;\n  let first: bigint = awaitTask(pending);\n  return first + awaitTask(pending);\n}",
+          "candidate": "R8:37369987560831745009984338347918671266023744564731174293389683488857532329171:0"
+        },
+        "repaired": {
+          "baseline": "pure function captureAndAwait(): bigint {\n  let captured: bigint = 5n;\n  let closure: Fn<(bigint), bigint, \"\"> = lambda(\"\", (argument: bigint): bigint => captured + argument);\n  let pending: Task<bigint> = spawn(apply(closure, 8n));\n  captured = 40n;\n  let first: bigint = awaitTask(pending);\n  return first + awaitTask(pending);\n}",
+          "candidate": "E8:37369987560831745009984338347918671266023744564731174293389683488857532329171:0:63222039244757699762010040943529214402261217594156549412509065309357696207027:0.0:5"
+        }
+      },
+      "messages": [
+        {
+          "role": "system",
+          "purpose": "instructions",
+          "baseline": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n",
+          "candidate": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "initial_context",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"// @module module\\n\\npure function captureAndAwait(): bigint {\\n  let captured: bigint = 4n;\\n  let closure: Fn<(bigint), bigint, \\\"\\\"> = lambda(\\\"\\\", (argument: bigint): bigint => captured + argument);\\n  let pending: Task<bigint> = spawn(apply(closure, 8n));\\n  captured = 40n;\\n  let first: bigint = awaitTask(pending);\\n  return first + awaitTask(pending);\\n}\\n\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"AE7\\n§g \\\"projection-continuation-corpus\\\"\\n§h 37369987560831745009984338347918671266023744564731174293389683488857532329171\\n§w 1\\n§n captureAndAwait|captured|pending|module|argument|first|closure\\n§y I|F<I;I;>|K<I>\\n§v 1,2,3,4,5,0,6\\ni4 L00 v0 v1 + g01100 L21 v2 i8 a1 q L32 P00 i40 = v3 w L40 v4 v3 w + N B6 D5000100000 G750013263144526 M610\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "change_request",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "selection",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"SELECT captureAndAwait\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"S8:37369987560831745009984338347918671266023744564731174293389683488857532329171:0\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "retrieval",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"pure function captureAndAwait(): bigint {\\n  let captured: bigint = 4n;\\n  let closure: Fn<(bigint), bigint, \\\"\\\"> = lambda(\\\"\\\", (argument: bigint): bigint => captured + argument);\\n  let pending: Task<bigint> = spawn(apply(closure, 8n));\\n  captured = 40n;\\n  let first: bigint = awaitTask(pending);\\n  return first + awaitTask(pending);\\n}\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"D8;37369987560831745009984338347918671266023744564731174293389683488857532329171;0;62650453401152479512469962744651492871665400952909652048941787963978554940218;-;;\\nAE1\\n§w 1\\ni4 L00 v0 v1 + g01100 L21 v2 i8 a1 q L32 P00 i40 = v3 w L40 v4 v3 w + N B6 D5000100000\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "failed_attempt",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"pure function captureAndAwait(): bigint {\\n  let captured: bigint = 4n;\\n  let closure: Fn<(bigint), bigint, \\\"\\\"> = lambda(\\\"\\\", (argument: bigint): bigint => captured + argument);\\n  let pending: Task<bigint> = spawn(apply(closure, 8n));\\n  captured = 40n;\\n  let first: bigint = awaitTask(pending);\\n  return first + awaitTask(pending);\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"R8:37369987560831745009984338347918671266023744564731174293389683488857532329171:0\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "repair",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "change",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"pure function captureAndAwait(): bigint {\\n  let captured: bigint = 5n;\\n  let closure: Fn<(bigint), bigint, \\\"\\\"> = lambda(\\\"\\\", (argument: bigint): bigint => captured + argument);\\n  let pending: Task<bigint> = spawn(apply(closure, 8n));\\n  captured = 40n;\\n  let first: bigint = awaitTask(pending);\\n  return first + awaitTask(pending);\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"E8:37369987560831745009984338347918671266023744564731174293389683488857532329171:0:63222039244757699762010040943529214402261217594156549412509065309357696207027:0.0:5\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "response",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n"
+        }
+      ]
+    },
+    {
+      "id": "scalar-five-kind-completion",
+      "seed": "projection-kind-completion",
+      "memberIndex": 0,
+      "path": [
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "originalInteger": "0",
+      "changedInteger": "1",
+      "baseRoot": "ast:b3:405422003ae8cd3f63ee57e56a5a7f77768fdf030deb69d34a3bbf1aa0f1d2af",
+      "changedRoot": "ast:b3:6cedd600bd9dc8483e1895f2ff6f4b81cbbc41765f93d3e1f03b812b2ba7c54b",
+      "slice": {
+        "declarationRoot": "ast:b3:d1f9003d0458ea924120fd5493dfd276bfe8fe993afeb5bf9a8097fc318f44d3",
+        "contractRoot": "ast:b3:1f26f33fac0eb8abb9fae87e7848f263150f3f1f267782cb1f3248d468270e50",
+        "dependencies": [],
+        "effects": []
+      },
+      "raw": {
+        "cold": {
+          "baseline": "// @module module\n\n/**\n * @ensures [bounded-quantifier] forall(0n, 3n, i => i < 3n)\n * @surface tick: range(0, 10, 1) minimize_latency = 5\n */\npure function entry(x: bigint): bigint {\n  yield;\n  return !(x < 0n) ? x + tick : -x;\n}\n",
+          "candidate": "AE7\n§g \"projection-kind-completion\"\n§h 29096672128350106020054246918982768403378233427768711116760983546634217575087\n§w 1\n§n module|tick|i|entry|x\n§y I\n§l bounded-quantifier\n§v 3,1,2,0,4\ni0 i3 v0 i3 < p0 Q00 K010 y v1 i0 < ! v1 v2 + v1 _ ? N B2 Z20 r0x10x1 h5 D300111001100 G54021023314 M410"
+        },
+        "selection": {
+          "baseline": "SELECT entry",
+          "candidate": "S8:29096672128350106020054246918982768403378233427768711116760983546634217575087:0"
+        },
+        "retrieval": {
+          "baseline": "/**\n * @ensures [bounded-quantifier] forall(0n, 3n, i => i < 3n)\n * @surface tick: range(0, 10, 1) minimize_latency = 5\n */\npure function entry(x: bigint): bigint {\n  yield;\n  return !(x < 0n) ? x + tick : -x;\n}",
+          "candidate": "D8;29096672128350106020054246918982768403378233427768711116760983546634217575087;0;94973331918047066772771478417751622478982303038317510988553306848899980281043;14090517335501516969075087749273286391180021611482659628419053025426992991824;;\nAE1\n§w 1\ni0 i3 v0 i3 < p0 Q00 K010 y v1 i0 < ! v1 v2 + v1 _ ? N B2 Z20 r0x10x1 h5 D300111001100"
+        },
+        "failed": {
+          "baseline": "/**\n * @ensures [bounded-quantifier] forall(0n, 3n, i => i < 3n)\n * @surface tick: range(0, 10, 1) minimize_latency = 5\n */\npure function entry(x: bigint): bigint {\n  yield;\n  return !(x < 0n) ? x + tick : -x;\n}",
+          "candidate": "R8:29096672128350106020054246918982768403378233427768711116760983546634217575087:0"
+        },
+        "repaired": {
+          "baseline": "/**\n * @ensures [bounded-quantifier] forall(0n, 3n, i => i < 3n)\n * @surface tick: range(0, 10, 1) minimize_latency = 5\n */\npure function entry(x: bigint): bigint {\n  yield;\n  return !(x < 1n) ? x + tick : -x;\n}",
+          "candidate": "E8:29096672128350106020054246918982768403378233427768711116760983546634217575087:0:22262267597486981526176219240468187083851788518125478534483821870833042262712:1.0.0.0.1:1"
+        }
+      },
+      "messages": [
+        {
+          "role": "system",
+          "purpose": "instructions",
+          "baseline": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n",
+          "candidate": "{\"role\":\"system\",\"purpose\":\"instructions\",\"content\":\"Preserve every contract and effect. Select the requested declaration, then return a complete corrected declaration after feedback.\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "initial_context",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"// @module module\\n\\n/**\\n * @ensures [bounded-quantifier] forall(0n, 3n, i => i < 3n)\\n * @surface tick: range(0, 10, 1) minimize_latency = 5\\n */\\npure function entry(x: bigint): bigint {\\n  yield;\\n  return !(x < 0n) ? x + tick : -x;\\n}\\n\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"initial_context\",\"content\":\"AE7\\n§g \\\"projection-kind-completion\\\"\\n§h 29096672128350106020054246918982768403378233427768711116760983546634217575087\\n§w 1\\n§n module|tick|i|entry|x\\n§y I\\n§l bounded-quantifier\\n§v 3,1,2,0,4\\ni0 i3 v0 i3 < p0 Q00 K010 y v1 i0 < ! v1 v2 + v1 _ ? N B2 Z20 r0x10x1 h5 D300111001100 G54021023314 M410\"}\n"
+        },
+        {
+          "role": "user",
+          "purpose": "change_request",
+          "baseline": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n",
+          "candidate": "{\"role\":\"user\",\"purpose\":\"change_request\",\"content\":\"Increase the first integer literal in the first eligible function body by one. Preserve all other AST fields.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "selection",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"SELECT entry\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"selection\",\"content\":\"S8:29096672128350106020054246918982768403378233427768711116760983546634217575087:0\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "retrieval",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"/**\\n * @ensures [bounded-quantifier] forall(0n, 3n, i => i < 3n)\\n * @surface tick: range(0, 10, 1) minimize_latency = 5\\n */\\npure function entry(x: bigint): bigint {\\n  yield;\\n  return !(x < 0n) ? x + tick : -x;\\n}\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"retrieval\",\"content\":\"D8;29096672128350106020054246918982768403378233427768711116760983546634217575087;0;94973331918047066772771478417751622478982303038317510988553306848899980281043;14090517335501516969075087749273286391180021611482659628419053025426992991824;;\\nAE1\\n§w 1\\ni0 i3 v0 i3 < p0 Q00 K010 y v1 i0 < ! v1 v2 + v1 _ ? N B2 Z20 r0x10x1 h5 D300111001100\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "failed_attempt",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"/**\\n * @ensures [bounded-quantifier] forall(0n, 3n, i => i < 3n)\\n * @surface tick: range(0, 10, 1) minimize_latency = 5\\n */\\npure function entry(x: bigint): bigint {\\n  yield;\\n  return !(x < 0n) ? x + tick : -x;\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"failed_attempt\",\"content\":\"R8:29096672128350106020054246918982768403378233427768711116760983546634217575087:0\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "repair",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"repair\",\"content\":\"The submitted declaration left that literal unchanged. Apply the requested edit.\"}\n"
+        },
+        {
+          "role": "assistant",
+          "purpose": "change",
+          "baseline": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"/**\\n * @ensures [bounded-quantifier] forall(0n, 3n, i => i < 3n)\\n * @surface tick: range(0, 10, 1) minimize_latency = 5\\n */\\npure function entry(x: bigint): bigint {\\n  yield;\\n  return !(x < 1n) ? x + tick : -x;\\n}\"}\n",
+          "candidate": "{\"role\":\"assistant\",\"purpose\":\"change\",\"content\":\"E8:29096672128350106020054246918982768403378233427768711116760983546634217575087:0:22262267597486981526176219240468187083851788518125478534483821870833042262712:1.0.0.0.1:1\"}\n"
+        },
+        {
+          "role": "tool",
+          "purpose": "response",
+          "baseline": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n",
+          "candidate": "{\"role\":\"tool\",\"purpose\":\"response\",\"content\":\"The changed declaration, contract, dependencies and complete module root were checked.\"}\n"
+        }
+      ]
+    }
+  ]
+}
