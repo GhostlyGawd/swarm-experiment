@@ -5,12 +5,12 @@ import { CapabilityRegistry } from '../../src/tier2/ocap.ts';
 import { typecheck } from '../../src/tier2/typecheck.ts';
 import { Runtime } from '../../src/tier3/runtime.ts';
 import { executableBundle, parseExecutableBundle } from '../../src/projection/executable.ts';
-import { CONTRACT_BODY_FORMS_V17, CONTRACT_CARRIERS, validContractContexts } from
+import { CONTRACT_BODY_FORMS_V18, CONTRACT_CARRIERS, validContractContexts } from
   '../../roadmap/v4/research/projections/corpus-valid-contract-contexts.ts';
 
-test('V18 closes record-field reads from the prior 13×5 corpus and retains task identity gap', () => {
-  const rows = validContractContexts(17), misses: string[] = [];
-  assert.equal(rows.length, CONTRACT_BODY_FORMS_V17.length * CONTRACT_CARRIERS.length);
+test('V18 generated 15×5 corpus exposes remaining task identity and sequence gaps', () => {
+  const rows = validContractContexts(18), misses: string[] = [];
+  assert.equal(rows.length, CONTRACT_BODY_FORMS_V18.length * CONTRACT_CARRIERS.length);
   assert.equal(new Set(rows.map(row => row.id)).size, rows.length);
   for (const row of rows) {
     const checked = typecheck(row.module, { registry: new CapabilityRegistry() });
@@ -34,6 +34,8 @@ test('V18 closes record-field reads from the prior 13×5 corpus and retains task
       }
     }
   }
-  assert.equal(misses.length, 5 * 3, JSON.stringify(misses));
+  assert.equal(misses.length, 3 * 5 * 3, JSON.stringify(misses));
   assert.ok(misses.some(miss => miss.startsWith('task_identity/')), JSON.stringify(misses));
+  assert.ok(misses.some(miss => miss.startsWith('task_sequence_length/')), JSON.stringify(misses));
+  assert.ok(misses.some(miss => miss.startsWith('task_record_identity/')), JSON.stringify(misses));
 });

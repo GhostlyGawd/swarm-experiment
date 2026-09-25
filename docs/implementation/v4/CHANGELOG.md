@@ -6,6 +6,11 @@
 - Added an opt-in signed resource case under **64 MiB of real resident process pressure**, with three controller OS RSS samples, worker RSS, touched-page checksum and fresh-process replay. The clean `497da3a` [campaign evidence](evidence/t303-rss-497da3a/REVIEW.md) records a **67,141,632-byte OS RSS rise**, 15/15 good cases and four durable broken-root replays; the focused suite passes **7/7**. This does not induce a real allocation failure or close T3-03/G1. The task count stays **20/62**.
 - A proposed general dead-code GC profile was discarded before commit: the current signed evidence checker refuses Task/Await source declarations even when unreachable. A new structural proof policy is required before that path can be admitted safely.
 
+## Fresh record task contract projection V18 — 2026-09-24
+
+- Added `aether.executable-projection/18` for a new task that creates a scalar-field record and is directly awaited and consumed by one field read inside a checked contract closure. The certificate binds the exact owner/lambda roots, and the checker refuses record escape, ambient callbacks and unrelated task forms. Actual TypeScript, Python and Rust execution matches the reference with zero external callbacks; a pinned V17 source/runtime fixture remains byte-identical. [Profile and limits](../../../roadmap/v4/research/projections/FRESH-RECORD-TASK-CONTRACTS-V18.md).
+- The generated 15×5 reference-valid audit still finds unjoined task identity, sequence-valued task results and awaited-record identity as native gaps. Its authored cold token ratios miss 4×; AE6 history and thresholds are unchanged. T1-02/G1, G2, FR-1.2 and Q03 stay open at **20/62**.
+
 ## Clean combined verification at `888bfeb` — 2026-09-24
 
 - The exact-source serial full suite passed **1,204/1,206**, with zero failures and two existing skips, after integration of source-witness Artifact/4 config/18, V17 task projection and the living boundary pipeline. Build, typecheck, v4 roadmap and worker-bundle checks passed. [Raw checkpoint](evidence/integration-888bfeb/REVIEW.md).

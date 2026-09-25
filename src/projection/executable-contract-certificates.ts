@@ -18,14 +18,27 @@ function scalar(ty: Ty): boolean {
 
 /** Conservative certificate set for native closure bodies. The parser
  * recomputes it from the visible AST; runtime admission also checks captures. */
-export function contractClosureCertificates(module: Term, version: 15 | 16 | 17 = 15): ReadonlyMap<string, string> {
+export function contractClosureCertificates(module: Term, version: 15 | 16 | 17 | 18 = 15): ReadonlyMap<string, string> {
   const result = new Map<string, string>(), store = new GraphStore();
   const functions = new Map(moduleFunctions(module).map(fn => [fn.symbol, fn] as const));
   const helperRoots = (node: Term, initial: ReadonlySet<SymbolId>): string[] | null => {
     const roots = new Set<string>(), checking = new Set<SymbolId>(), checked = new Set<SymbolId>();
     const safeExpression = (expression: Term, bound: ReadonlySet<SymbolId>, inTask = false): boolean => {
+      if (version === 18 && !inTask && expression.kind === 'Field'
+        && expression.object.kind === 'Await' && expression.object.task.kind === 'Spawn'
+        && expression.object.task.body.kind === 'RecordLit') {
+        const record = expression.object.task.body;
+        return record.ty.t === 'Record'
+          && record.ty.fields.some(([field, ty]) => field === expression.field && scalar(ty))
+          && record.ty.fields.every(([, ty]) => scalar(ty))
+          && record.fields.every(([, value]) => safeExpression(value, bound, true));
+      }
       if (version === 17 && expression.kind === 'Await' && !inTask) {
         if (expression.task.kind !== 'Spawn') return false;
+        return safeExpression(expression.task.body, bound, true);
+      }
+      if (version === 18 && expression.kind === 'Await' && !inTask) {
+        if (expression.task.kind !== 'Spawn' || expression.task.body.kind === 'RecordLit') return false;
         return safeExpression(expression.task.body, bound, true);
       }
       if (inTask ? !BODY_KINDS.has(expression.kind) : !BODY_KINDS_16.has(expression.kind)) return false;
