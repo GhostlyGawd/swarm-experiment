@@ -1,0 +1,9 @@
+full-suite.log: OK
+typecheck.log: OK
+roadmap.log: OK
+build.log: OK
+bundle-verify.log: OK
+bench-measure.log: OK
+bench-verify.log: OK
+bench/manifest.json: OK
+bench/samples.json: OK

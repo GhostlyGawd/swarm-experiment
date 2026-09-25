@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Clean combined stopping checkpoint — 2026-09-24
+
+- At clean `f3c9fda`, the serial full suite passed **1,215/1,217**, with zero failures and two existing skips. Build, typecheck, v4 roadmap and independent worker-bundle checks passed. [Exact-source logs](evidence/integration-f3c9fda/REVIEW.md) cover the integrated AE8/V18, source-witness and living-campaign code while keeping the separate three-UID Colima campaign evidence distinct.
+- Exact-source default release verification remains **ineligible**: one pinned AE6 warm row passes at **5.6290×**, cold/changed-session diagnostics miss, and **15 required NFR rows remain unmeasured**. The user's requested stopping point follows this checkpoint; full v4 and the **20/62** tracker remain open.
+
 ## Three-UID signed external campaign within one Linux VM — 2026-09-24
 
 - Added versioned `aether.living-external-uid-custody/1`: candidate, signed sink and witness run in separate read-only-root containers as Linux UIDs **10001/10002/10003** with private `0700` directories and `0600` keys/state. Native Linux `SO_PEERCRED` gateways bind allowed caller UID/GID and upstream service UID. Wrong-UID live probes close before any witness change; four cross-service private-file probes return `EACCES`. The source, signed candidate/cases and sink decision format remain unchanged. [Profile and limits](../../../roadmap/v4/research/microworld-external/uid-custody/README.md).
