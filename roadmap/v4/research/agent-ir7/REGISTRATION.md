@@ -43,3 +43,11 @@ aggregate cold and complete changed sessions. Report a miss if either misses.
 This existing authored test corpus is broader than the single-ledger AE6
 diagnostic but is not a representative production-codebase sample or V4-Q03
 autonomous campaign. It cannot alone qualify FR-1.2 or close V4-T1-02.
+
+## Transparent control amendment
+
+After the first local preview, add a direct AE6 control with the same eight
+fixtures and seven message positions. This does not change the preregistered
+TypeScript versus AE7 4× verdict. The AE6 control uses its complete AE1 cold
+wire and the same checked R6/E6 declarations. Report AE6-to-AE7 cold and
+full-session savings separately as a development diagnostic.
