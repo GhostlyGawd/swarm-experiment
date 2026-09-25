@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## AE8 receiver graph-slice exchange and counted session miss — 2026-09-24
+
+- Added opt-in AE8 exchange that loads an exact receiver graph, checks a selected declaration's root, contract, dependencies and effect summary, retrieves a committed slice, and reconstructs a complete edited module through AE7/AE6 semantics. Missing/stale slices, altered retrieval and edits before retrieval fail. The clean `6256c9e` [nine-message campaign](../../../roadmap/v4/research/agent-ir8/README.md) counts graph load, selection, retrieval, failed attempt, repair, feedback and response on both sides: **5,333/5,272 cl100k TypeScript/AE8 tokens (1.012×)** and **5,378/5,272 o200k (1.020×)**. The unchanged ≥4× target misses.
+- The clean integrated `5eba2b8` [focused checkpoint](evidence/integration-5eba2b8/REVIEW.md) passes **27/27** Agent-IR version tests, build, typecheck and roadmap. The default release profile remains AE6 and ineligible with 15 required NFR rows unmeasured. AE8's authored corpus and one edit per module do not close T1-02, FR-1.2 or Q03; tracker remains **20/62**.
+
 ## Linux resident-pressure reader and signed campaign smoke test — 2026-09-24
 
 - Added a Linux kernel `/proc/<pid>/status` RSS reader to the existing opt-in physical-pressure harness while preserving macOS `ps` behavior and the 64 MiB/48 MiB threshold. The clean `76ea95c` [cross-OS checkpoint](evidence/t303-linux-rss-76ea95c/REVIEW.md) passes **7/7** integrated tests on macOS, **6/6** selected signed integrated tests and **1/1** witnessed external-sink test in a read-only mounted Node 26 container under Linux UID 10001. The minimal image lacks Git, so the CLI tamper-audit case remained a macOS check. Candidate and services still shared one Linux UID; this does not qualify distinct custody, real allocation failure or T3-03/G1. Tracker remains **20/62**.

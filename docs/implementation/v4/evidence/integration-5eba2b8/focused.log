@@ -1,0 +1,35 @@
+✔ binary DAG preserves grouped child identity, aliases, canonical scalar types and AE1 compatibility (11.725875ms)
+✔ truncated, corrupted, trailing and noncanonical binary frames reject without any context mutation (5.21475ms)
+✔ model framing rejects stale hashes, extra data, invalid versions and malformed AST scalar inputs (1.121125ms)
+✔ AE2 escapes dictionary delimiters and controls without reinterpreting AE1 data (1.345083ms)
+✔ AE3 preserves the exact full V7 corpus and every AST kind in both opcode profiles (1263.657916ms)
+✔ reserved atoms, Unicode, leading-zero opaque IDs and AE1/AE2 archives retain identity (11.3515ms)
+✔ edits preserve grouped links, paired labels, optional slots and the immutable base (204.537708ms)
+✔ truncation, stale bases, redundant edits, false roots and hostile field counts fail without changing state (15.295ms)
+✔ large edit sets fall back to a complete message without dropping changes (191.592834ms)
+✔ snapshot input rejects getters, proxies, dropped fields and oversized inputs before using them (0.649166ms)
+✔ AE5 exact-base warm references reconstruct every paid cold declaration (207.236417ms)
+✔ AE5 refuses changed, stale, wrong-index, noncanonical and oversized references (53.810417ms)
+✔ a fresh receiver process reconstructs the referenced declaration from the paid cold wire (173.197042ms)
+✔ AE6 cold-bound references restore exact declaration and module roots without aliases (271.462625ms)
+✔ AE6 root-bound literal edits preserve contracts and execute both failed and repaired outputs (114.80875ms)
+✔ AE6 rejects stale, noncanonical, wrong-root, out-of-scope and malformed wires (45.1385ms)
+✔ AE6 edit is independently decoded in a fresh process from only the paid cold wire (224.390291ms)
+✔ AE7 checked seed preserves all identities, contracts and native runtime behavior (498.501291ms)
+✔ AE7 refuses false seed, stale edit, noncanonical indexes, provenance and framing (50.51775ms)
+✔ AE8 retrieves a checked graph slice and reconstructs complete edited module (150.947916ms)
+✔ AE8 refuses missing imported dependency, stale selection and missing retrieval (5.468334ms)
+✔ AE8 retrieval binds derived effect summary to the exact declaration (81.344375ms)
+✔ every node kind survives an Agent-IR round trip (156.548375ms)
+✔ the worked example round-trips exactly (1.220417ms)
+✔ a session dictionary is shared and warm messages remain smaller than the cold module (93.38375ms)
+✔ FR-1.2: actual tokenizer accounting reproduces the ledger reference without asserting a false target (3.924917ms)
+✔ a malformed stream is rejected rather than silently truncated (0.327708ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4751.780583
