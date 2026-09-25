@@ -1,6 +1,7 @@
 /** Independent OS RSS observation around one signed living-campaign case. */
 import { spawn } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { LivingEffectCaseResultV2 } from '../../../../src/tier3/living-campaign.ts';
@@ -30,8 +31,10 @@ interface WorkerRow {
   retainedChecksum?: number; result?: LivingEffectCaseResultV2;
 }
 function osRss(pid: number): number {
-  const kib = Number(execFileSync('ps', ['-p', String(pid), '-o', 'rss='],
-    { encoding: 'utf8', timeout: 5000 }).trim());
+  const kib = process.platform === 'linux'
+    ? Number(/^VmRSS:\s+([0-9]+)\s+kB$/m.exec(readFileSync(`/proc/${pid}/status`, 'utf8'))?.[1])
+    : Number(execFileSync('ps', ['-p', String(pid), '-o', 'rss='],
+      { encoding: 'utf8', timeout: 5000 }).trim());
   if (!Number.isSafeInteger(kib) || kib < 1) throw new Error('OS RSS sample unavailable');
   return kib * 1024;
 }

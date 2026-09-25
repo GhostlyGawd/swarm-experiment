@@ -29,7 +29,8 @@ zero-filter rule and shrunk replay remain required.
 
 An additional bounded resource case runs the same signed candidate in a real
 worker while 64 MiB of touched pages stay resident. The controller takes OS
-`ps` RSS samples before pressure, after pressure, and after case execution;
+RSS samples before pressure, after pressure, and after case execution, using
+`ps` on macOS and the kernel's `/proc/<pid>/status` on Linux;
 the worker independently reports its RSS and rechecks a checksum of every
 touched page after the case. The preregistered minimum OS RSS rise is 48 MiB.
 The offline audit binds the complete observation, verifies the case result and
