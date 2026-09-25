@@ -12,6 +12,7 @@ import { walk } from '../../src/tier1/ast.ts';
 import { encodeAgentIrBinary, decodeAgentIrBinary, encodeAgentIrModel, decodeAgentIrModel } from '../../src/tier1/agent-ir-v2.ts';
 import { GraphStore } from '../../src/tier1/store.ts';
 import { encodeAgentIrColdV7, decodeAgentIrColdV7 } from '../../src/tier1/agent-ir-v7.ts';
+import { AgentIrGraphSliceSessionV8 } from '../../src/tier1/agent-ir-v8.ts';
 
 test('every node kind survives an Agent-IR round trip', () => {
   const syms = new SymbolSpace('ir-kinds');
@@ -98,6 +99,14 @@ test('every node kind survives an Agent-IR round trip', () => {
   const exactCold = encodeAgentIrColdV7(term, 'ir-kinds');
   assert.deepEqual(decodeAgentIrColdV7(exactCold).module, term);
   assert.equal(decodeAgentIrColdV7(exactCold).root, store.intern(term));
+  const sliceSender = new AgentIrGraphSliceSessionV8(exactCold);
+  const sliceReceiver = new AgentIrGraphSliceSessionV8(exactCold);
+  if (term.kind !== 'Module') throw new Error('exhaustive module fixture');
+  const selection = sliceSender.select(3);
+  const retrieval = sliceSender.retrieve(selection);
+  const hydrated = sliceReceiver.acceptRetrieval(retrieval);
+  assert.equal(hydrated.declarationRoot, store.intern(term.members[3]));
+  assert.equal(store.intern(sliceReceiver.decode(sliceSender.encode(3, term.members[3])).module), store.intern(term));
 
   // The fixture is meant to be exhaustive; fail loudly if a kind is missing.
   const covered = new Set([...walk(term)].map((n) => n.kind));

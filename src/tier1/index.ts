@@ -34,3 +34,4 @@ export { agentIr3Snapshot, encodeAgentIr3, decodeAgentIr3, AGENT_IR3_PROFILE, AG
 export { AgentIrWarmReferenceV5, AGENT_IR5_REFERENCE_PROFILE } from './agent-ir-v5.ts';
 export { AgentIrSessionV6, AGENT_IR6_PROFILE, type AgentIrV6Decoded } from './agent-ir-v6.ts';
 export { AgentIrSessionV7, AGENT_IR7_PROFILE, encodeAgentIrColdV7, decodeAgentIrColdV7 } from './agent-ir-v7.ts';
+export { AgentIrGraphSliceSessionV8, AGENT_IR8_PROFILE, type AgentIrV8Slice } from './agent-ir-v8.ts';
