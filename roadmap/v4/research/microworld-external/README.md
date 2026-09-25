@@ -10,8 +10,9 @@ stays absent for an unknown status check, then rejoins for signed recovery.
 [Exact-source evidence](../../../../docs/implementation/v4/evidence/t303-external-f8ccbdf/REVIEW.md)
 at clean `f8ccbdf` records 15/15 generated/executed/passed cases, zero filters,
 17 attempts, nine independently witnessed append decisions, 48 coverage
-labels and **1.1126 complete cases/s**. This fails the fixed R04 2M/s target.
-The four-field JSON kernel pass measures a different boundary. The test uses
+labels and **1.1126 complete cases/s**. This is the signed campaign's reported
+execution rate, not the fixed R04 2M/s generator/evaluator qualification rate.
+The four-field JSON kernel pass measures that separate boundary. The test uses
 one UID and a same-host socket partition; cross-host custody, production
 deployment, actual memory pressure and native races remain open.
 
@@ -26,7 +27,9 @@ complete external cases/s**. All 15 generated cases execute and pass; the
 failed partition attempt stays visible among 17 attempts. The unchanged R04
 four-field JSON kernel separately passes at 2.682–3.076M/s. One hundred raw
 serial file-plus-directory fsync samples show a 2.792 ms minimum. [D21](../../../../docs/implementation/v4/decisions/D21-living-campaign-throughput-boundary.md)
-records the exact qualification-boundary decision needed; G2 remains failed.
+confirms that the five passing R04 trials qualify the fixed numerical rate
+component. Candidate execution and full campaign throughput remain separately
+reported; the whole task stays open for the missing fault and admission scope.
 
 ```sh
 node --experimental-strip-types roadmap/v4/research/microworld-external/campaign.ts --verify docs/implementation/v4/evidence/t303-pipeline-faf2172

@@ -1,44 +1,52 @@
 # D21: Living-campaign throughput qualification boundary
 
-**Status: decision required.** Recorded 2026-09-24 for V4-T3-03/G2 and
-FR-3.3. This record does not amend the PRD, lower the 2,000,000/s threshold,
-or close a task.
+**Status: decided 2026-09-24.** The product owner delegated this interpretation
+to implementation judgment. This decision confirms the existing V4-T3-03/G2
+wording in specification 0.1.0: the 2,000,000/s threshold applies to the
+preregistered R04 boundary generator/evaluator, not to complete signed Aether
+candidate, sink and fault-campaign executions. The threshold, five-trial rule,
+source requirements and task inventory do not change.
 
-The PRD requires millions of adversarial boundary permutations per second and
-100% survival before graduation. R04 froze **2,000,000 materialized and
-evaluated four-field JSON inputs/s in each trial**; its profile explicitly
-excludes Aether execution and durable observations. The T3-03 G2 tracker also
-requires generated and executed counts, seeds, coverage and throughput to be
-reported separately while meeting the source target. It has not resolved
-whether the target applies to the four-field generator/evaluator alone or to
-the complete signed candidate and fault campaign. Neither interpretation can
-be silently substituted for the other.
+## Reason
 
-The [clean pipeline audit](../evidence/t303-pipeline-faf2172/REVIEW.md) measures
-the boundaries without changing them: five R04 kernel trials pass at
-2.682–3.076M/s; rich signed-case generation is 95,389.5/s; actual candidate
-attempts are 1.3735/s; the complete witnessed external campaign is 1.0741/s.
-Its 15 cases all execute and pass with zero filters. The 100-sample serial
-file-plus-directory fsync probe has a 2.792 ms minimum, while a 2M/s serial
-case budget is 0.0005 ms. This makes the current single-worker/per-case fsync
-profile unsuitable for the full rate on the measured machine. It is not a
-universal physical ceiling for batching, sharding, parallel workers or other
-hardware.
+The [v4 PRD](../../../PRD-v4.0.md) says the engine **synthesizes** millions of
+boundary permutations per second. It separately requires a synthesized
+implementation to survive 100% of the declared adversarial campaign before
+quorum graduation. The [task contract](../TRACKER.md#v4-t3-03) already requires
+generated and executed case counts, coverage, seeds and throughput to be
+reported separately, and places the speed target under the profile fixed by
+R04. That preregistered profile includes materialization, JSON encode/decode,
+four guard evaluations and coverage accumulation. It explicitly excludes
+Aether candidate execution, broker/sink calls and durable observations.
 
-**Concrete specification decision needed:** the product/spec owner must state
-which exact workload and accounting boundary the 2M/s gate qualifies:
+Applying 2M/s to a serial, separately fsynced signed fault campaign would
+combine two different obligations and silently change the frozen measurement
+boundary. The [pipeline audit](../evidence/t303-pipeline-faf2172/REVIEW.md)
+shows why those boundaries must be named: R04 passes five trials at
+**2.682–3.076M/s**, rich signed-case generation is **95,389.5/s**, actual
+candidate attempts are **1.3735/s**, and the full witnessed external campaign
+is **1.0741/s**. A 100-sample fsync probe is a diagnostic for the present
+serial architecture, not a claim that parallel/batched designs cannot be faster.
 
-1. If it covers **complete candidate execution**, keep that unchanged target
-   and authorize an implementation profile with streamed/batched evidence,
-   parallel Aether execution and independently sharded sink/witness custody.
-   Require every generated case to execute and retain a verifiable 100% survival
-   proof, and measure the full profile on named target hardware. Define which
-   durability steps may be amortized without losing exact case/fault evidence.
-2. If it covers **the frozen R04 generator/evaluator only**, version the
-   acceptance contract to state a separate nonzero full-campaign throughput
-   target and its exact signed execution, fault, durability and transport scope.
-   This would be a substantive acceptance change requiring an explicit owner
-   decision; the present implementation cannot make it unilaterally.
+## Acceptance consequence
 
-Until that decision and qualifying measurements exist, the passing R04 kernel
-is a bounded research result, G2 remains failed, and T3-03 remains in progress.
+- The fixed **R04 rate component of V4-T3-03/G2 passes** on the recorded
+  exact-source, named-machine evidence. Its four-field kernel is a narrow
+  quantitative benchmark. It does not establish the full feature's adversarial
+  coverage, candidate correctness or production deployment.
+- The signed campaign must still execute every declared case, retain failures,
+  retries, shrink/replay and durable observations, report its own throughput,
+  and demonstrate **100% survival with zero hidden exclusions** before any
+  graduation. The current 15/15 bounded result cannot stand in for native
+  races, actual memory pressure, cross-machine partitions, distinct custody,
+  ProcessHost proof admission or external-sink shrink coverage. V4-T3-03/G1
+  and the whole task remain open at **20/62**.
+- The PRD supplies no numerical full-campaign execution-rate target. We will
+  publish that rate separately and never label the R04 number as candidate
+  executions/s. A future product requirement for a signed-campaign rate must
+  name its workload, durability and hardware boundary, then be versioned and
+  measured before it can be an acceptance gate.
+
+Historical campaign records that compared complete-campaign rate with 2M/s
+remain immutable evidence of their original interpretation. This decision
+corrects current acceptance language without rewriting their raw samples.

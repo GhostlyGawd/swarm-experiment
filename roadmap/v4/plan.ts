@@ -186,6 +186,8 @@ feature(3, 1, 'Reversible execution and resumable checkpoints', 'v2', 'runtime',
 feature(3, 2, 'MCTS over copy-on-write heaps', 'v3', 'synthesis', ['V4-T3-01', 'V4-T2-05', 'V4-T3-03', 'V4-F08'],
   'Copy-on-write snapshots, search tree policy, bounded scoring and atomic winning-branch adoption.',
   ['Mutating one branch cannot affect siblings or duplicate external effects.', 'Validate selected programs before promotion and compare search quality/fork memory against baseline under equal budgets.']);
+// D21 confirms that the R04-fixed 2M/s boundary qualifies generation/evaluation;
+// signed candidate/fault execution has separate rate reporting and survival gates.
 feature(3, 3, 'Living micro-world campaigns', 'v2', 'verification', ['V4-F04', 'V4-T3-01', 'V4-R04'],
   'Campaign manifests, scheduler exploration and adversarial resource/network/event models.',
   ['Seeded failures shrink into persisted replayable cases; admitted candidates achieve 100% survival of the declared campaign without hidden exclusions.', 'Report generated and executed cases, coverage, seeds and throughput separately; meet the source millions-of-boundary-permutations-per-second target under the profile fixed by R04.']);

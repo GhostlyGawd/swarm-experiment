@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## D21 living-campaign rate boundary decided — 2026-09-24
+
+- The product owner delegated the FR-3.3 throughput interpretation. [D21](decisions/D21-living-campaign-throughput-boundary.md) confirms that the unchanged **2,000,000/s** criterion in specification 0.1.0 applies to the preregistered R04 four-field generator/evaluator, matching the PRD's synthesis wording and the tracker phrase “under the profile fixed by R04.” Signed candidate execution, fault injection, transport and durability are separate measurements; every declared case must still execute and survive before graduation. This is an interpretation of the existing criterion, so the specification version and all 20 prior verified-task evidence manifests remain unchanged.
+- Five exact-source R04 trials pass at **2.682–3.076M/s**. The complete external campaign reports **1.0741 cases/s** and 15/15 bounded survivors; that rate is not compared with 2M/s. The R04 pass is narrow quantitative evidence, not full FR-3.3 or T3-03 closure. G1's cross-machine, custody, native race, actual memory-pressure, ProcessHost and external-sink shrink gaps remain open; the tracker stays **20/62**. Historical raw evidence and its prior interpretation are retained.
+
 ## Direct pure lazy-task contract projection V17 — 2026-09-24
 
 - Added `aether.executable-projection/17` for a directly awaited new scalar task inside a checked closure. Static admission binds the exact task body under the owner/lambda certificate, rejects unjoined tasks and ambient callback/effect paths, and retains earlier native task laziness and completed-result behavior. Actual TypeScript, Python and Rust execution matches the reference with zero external-effect callbacks; pinned V16 source/runtime bytes remain identical. [Profile and limits](../../../roadmap/v4/research/projections/PURE-LAZY-TASK-CONTRACTS-V17.md).
