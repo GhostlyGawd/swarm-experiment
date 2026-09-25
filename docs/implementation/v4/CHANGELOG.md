@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Combined V18 and living-campaign focused checkpoint — 2026-09-24
+
+- At clean `459ed63`, [combined focused evidence](evidence/integration-459ed63/REVIEW.md) passes **134/134** projection/resident-pressure tests and **2/2** external-sink tests, plus build, typecheck and roadmap. The saved external fault evidence independently verifies with a fresh replay. V18's 75-case saved audit verifies its contents but retains its own `bb15b30` exact-source identity; the combined tests cover the integrated source.
+- The exact-current-source default release inventory remains **ineligible**: warm ledger **5.6290×** passes one required row, cold/full-session diagnostics miss, and **15 required NFR targets are unmeasured**. The last serial full-suite pass is still `888bfeb`; T1-02, T3-03 and the tracker remain **20/62**.
+
 ## Signed integrated `/2` accounting and observed memory pressure — 2026-09-24
 
 - Versioned the integrated living campaign's registration/measurement as `/2` under accepted [D21](decisions/D21-living-campaign-throughput-boundary.md). It retains the **2,000,000/s R04 generator/evaluator** target as a separate named boundary and removes the old full signed-campaign pass/fail comparison. Both complete signed execution rates remain reported with all 15 cases, zero filters, crash/retry and broken-root shrink/replay counts intact. Historical `/1` raw results are unchanged.

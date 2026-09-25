@@ -2,9 +2,13 @@
 
 Goal: implement the complete v4 specification, all 40 functional requirements and all NFR/governance/KPI gates. Full completion remains unproven.
 
-## Latest exact-source checkpoint — 2026-09-24
+## Latest serial full-suite checkpoint — 2026-09-24
 
 The clean combined `888bfeb` [integration evidence](evidence/integration-888bfeb/REVIEW.md) passes the serial full suite **1,204/1,206** with **zero failures and two existing skips**, plus build, typecheck, v4 roadmap and worker-bundle verification. Default release measurement independently verifies against the exact source: the required warm ledger row passes at **5.6290×**, cold and changed-session diagnostics miss at **0.9411×** and **1.1408×**, and **15 required NFR targets remain unmeasured**. Release eligibility is false. The source-witness config/18 and the accepted [D21](decisions/D21-living-campaign-throughput-boundary.md) R04 throughput interpretation are included in this checkpoint. The tracker remains **20/62**; T1-05, T3-03, other active tasks and release obligations are still open.
+
+## Latest focused integration — 2026-09-24
+
+At clean `459ed63`, [combined evidence](evidence/integration-459ed63/REVIEW.md) passes **134/134** projection and resident-pressure tests, **2/2** external-sink tests, build, typecheck and roadmap. The saved external fault evidence verifies with a fresh replay. V18's saved audit recomputes 75 rows but correctly reports a different exact-source commit; the integrated tests exercise V18 on current source. The current default release inventory has `sourceMatches: true` and `releaseEligible: false`: warm ledger 5.6290× passes, cold/full-session diagnostics miss, and 15 required NFR targets remain unmeasured. A current-source full serial suite has not yet run. T1-02, T3-03 and **20/62** stay open.
 
 ## Current task work after the checkpoint
 

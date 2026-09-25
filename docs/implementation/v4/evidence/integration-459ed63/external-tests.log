@@ -1,0 +1,10 @@
+✔ real signed external-sink unknown fault shrinks and replays after candidate restart (27856.360416ms)
+✔ same signed candidate uses witnessed external sink and refuses partition status until rejoin (14168.55075ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42288.044167
