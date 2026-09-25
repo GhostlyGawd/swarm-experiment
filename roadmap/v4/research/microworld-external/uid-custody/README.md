@@ -36,3 +36,13 @@ The report measures registration and the complete signed execution interval sepa
 All three UIDs share one Linux VM, volume, kernel, and root Docker controller. The controller can read or replace every private file and launch privileged containers. Candidate and sink also hold separate copies of the witness transport HMAC key required by the current protocol, so this profile does not prove independent operators or cross-machine custody. The native gateway checks peer credentials and file modes establish an OS process boundary only within that trusted VM/controller.
 
 Before the clean trial, one setup attempt created the public registration file with mode `0600`, so the candidate correctly failed to read it. A subsequent attempt hit the signed lost-reply fault but the **task-owned controller client** waited for the long-lived worker socket to close after a complete result frame and timed out. The client now returns on the newline-framed result. These attempts are diagnostics only; neither qualifies campaign behavior or contributes to the clean timing/counts above.
+
+## Integrated exact-source repeat
+
+The [clean committed-source repeat](../../../../../docs/implementation/v4/evidence/t303-uid-custody-6150604/REVIEW.md)
+ran from `6150604` after the runner itself was checked in. It again executed
+15/15 signed cases with zero filters, 17 attempts, a real candidate `SIGKILL`,
+unknown refusal during partition and signed recovery. Four cross-service
+private-file reads returned `EACCES`, both wrong-UID live gateway probes
+closed, and the copied raw evidence passed the independent tamper-aware audit.
+The root Docker controller and shared VM remain trusted in that result.

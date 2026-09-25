@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Three-UID signed external campaign within one Linux VM — 2026-09-24
+
+- Added versioned `aether.living-external-uid-custody/1`: candidate, signed sink and witness run in separate read-only-root containers as Linux UIDs **10001/10002/10003** with private `0700` directories and `0600` keys/state. Native Linux `SO_PEERCRED` gateways bind allowed caller UID/GID and upstream service UID. Wrong-UID live probes close before any witness change; four cross-service private-file probes return `EACCES`. The source, signed candidate/cases and sink decision format remain unchanged. [Profile and limits](../../../roadmap/v4/research/microworld-external/uid-custody/README.md).
+- The clean committed-source `6150604` [campaign](evidence/t303-uid-custody-6150604/REVIEW.md) executes/passes **15/15** cases, zero filters, 17 attempts and nine signed sink decisions, then recovers the original signed receipt after real candidate `SIGKILL` and gateway rejoin. The copied raw audit rejects sink-signature and witness-revision tampering. Complete signed rate is **1.915 cases/s**, distinct from D21's R04 generator target. The root Docker controller, shared VM and protocol HMAC copies remain trusted, so independent operators/cross-machine and full T3-03/G1 are still open; tracker stays **20/62**.
+
 ## AE8 receiver graph-slice exchange and counted session miss — 2026-09-24
 
 - Added opt-in AE8 exchange that loads an exact receiver graph, checks a selected declaration's root, contract, dependencies and effect summary, retrieves a committed slice, and reconstructs a complete edited module through AE7/AE6 semantics. Missing/stale slices, altered retrieval and edits before retrieval fail. The clean `6256c9e` [nine-message campaign](../../../roadmap/v4/research/agent-ir8/README.md) counts graph load, selection, retrieval, failed attempt, repair, feedback and response on both sides: **5,333/5,272 cl100k TypeScript/AE8 tokens (1.012×)** and **5,378/5,272 o200k (1.020×)**. The unchanged ≥4× target misses.
