@@ -1,0 +1,63 @@
+{
+  "format": "aether.living-physical-memory-pressure/1",
+  "workerPid": 71207,
+  "caseDigest": "aether.living-case/1:b3:7d39f028b829afbf5a626f44f76bfd7d1c260cb5e75670c1de270a90b65bb584",
+  "requestedBytes": 67108864,
+  "touchStrideBytes": 4096,
+  "minimumOsRssDeltaBytes": 50331648,
+  "osRssBaselineBytes": 112640000,
+  "osRssPressuredBytes": 179781632,
+  "osRssAfterCaseBytes": 179961856,
+  "workerRssBaselineBytes": 112148480,
+  "workerRssPressuredBytes": 179781632,
+  "workerRssAfterCaseBytes": 179961856,
+  "touchedPages": 16384,
+  "checksum": 2088960,
+  "result": {
+    "caseDigest": "aether.living-case/1:b3:7d39f028b829afbf5a626f44f76bfd7d1c260cb5e75670c1de270a90b65bb584",
+    "passed": true,
+    "failure": null,
+    "filtered": false,
+    "calls": 2,
+    "steps": 7,
+    "evaluatedOperations": 6,
+    "allocatedBytes": 1,
+    "peakAllocatedBytes": 4096,
+    "allocationChecksum": 69649,
+    "networkFrames": 0,
+    "deliveredFrames": 0,
+    "rejectedFrames": 0,
+    "droppedFrames": 0,
+    "coverage": [
+      "candidate-call",
+      "effect:broker-journal",
+      "resource:allocated",
+      "resource:exhausted",
+      "resource:released",
+      "runtime:call",
+      "runtime:return",
+      "step:$checks/final-value",
+      "step:allocator/excess",
+      "step:allocator/first",
+      "step:allocator/observe",
+      "step:allocator/release",
+      "step:allocator/reuse"
+    ],
+    "trace": [
+      "allocator/first",
+      "allocator/excess",
+      "allocator/observe",
+      "allocator/release",
+      "allocator/reuse",
+      "$checks/final-value"
+    ],
+    "heapDigest": "aether.living-heap/1:b3:6de7e77e2a40b2f5d13401f16087465c6afdf602a5308b54edd522d2a9d48dca",
+    "effects": {
+      "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+      "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+      "eventCount": 0,
+      "sinkWrites": 0,
+      "indeterminate": 0
+    }
+  }
+}

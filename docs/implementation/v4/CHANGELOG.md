@@ -1,5 +1,11 @@
 # Implementation specification changelog
 
+## Signed integrated `/2` accounting and observed memory pressure — 2026-09-24
+
+- Versioned the integrated living campaign's registration/measurement as `/2` under accepted [D21](decisions/D21-living-campaign-throughput-boundary.md). It retains the **2,000,000/s R04 generator/evaluator** target as a separate named boundary and removes the old full signed-campaign pass/fail comparison. Both complete signed execution rates remain reported with all 15 cases, zero filters, crash/retry and broken-root shrink/replay counts intact. Historical `/1` raw results are unchanged.
+- Added an opt-in signed resource case under **64 MiB of real resident process pressure**, with three controller OS RSS samples, worker RSS, touched-page checksum and fresh-process replay. The clean `497da3a` [campaign evidence](evidence/t303-rss-497da3a/REVIEW.md) records a **67,141,632-byte OS RSS rise**, 15/15 good cases and four durable broken-root replays; the focused suite passes **7/7**. This does not induce a real allocation failure or close T3-03/G1. The task count stays **20/62**.
+- A proposed general dead-code GC profile was discarded before commit: the current signed evidence checker refuses Task/Await source declarations even when unreachable. A new structural proof policy is required before that path can be admitted safely.
+
 ## Clean combined verification at `888bfeb` — 2026-09-24
 
 - The exact-source serial full suite passed **1,204/1,206**, with zero failures and two existing skips, after integration of source-witness Artifact/4 config/18, V17 task projection and the living boundary pipeline. Build, typecheck, v4 roadmap and worker-bundle checks passed. [Raw checkpoint](evidence/integration-888bfeb/REVIEW.md).

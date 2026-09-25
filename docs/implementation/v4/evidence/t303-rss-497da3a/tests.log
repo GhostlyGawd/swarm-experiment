@@ -1,0 +1,15 @@
+✔ same signed effectful candidate survives scheduler, memory, corrupted network and out-of-order cases (917.874166ms)
+✔ signed broken effectful candidate shrinks and replays interleaving failures durably (951.898084ms)
+✔ one signed candidate survives TCP faults, real post-sink SIGKILL, recovery and all generated schedules (1110.900542ms)
+✔ signed resource case executes with independently measured resident process pressure (216.286ms)
+✔ physical pressure worker refuses an authorization signed by another key before execution (116.805917ms)
+✔ versioned integrated audit refuses a changed physical pressure observation (5719.460875ms)
+✔ unknown signed post-sink result cannot pass the integrated candidate campaign (760.683167ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9962.814

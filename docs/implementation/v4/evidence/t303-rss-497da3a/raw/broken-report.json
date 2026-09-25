@@ -1,0 +1,1074 @@
+{
+  "format": "aether.living-effect-campaign-report/2",
+  "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+  "effectAuthorizationDigest": "aether.living-effect-authorization/2:b3:2002bb1723354ef53c9e991813404ae70d473d8c3105aa65297c5e1271c920fe",
+  "candidateRoot": "ast:b3:6bb5c866372481e8042a098cae4a90c6dd324cfafd631d0d8ed14268d849852d",
+  "declared": 15,
+  "generated": 15,
+  "executed": 15,
+  "filtered": 0,
+  "passed": 11,
+  "failed": 4,
+  "survival": "0.7333333333333333",
+  "accepted": false,
+  "missingCoverage": [],
+  "cases": [
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "two-writers",
+        "ordinal": 0,
+        "seed": "20260924-integrated/two-writers/0",
+        "schedule": [
+          "a",
+          "a",
+          "b",
+          "b"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:5fe2745453131a4dbccd9c676313753abedd3890c57227736ab389ed70d5a250",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 5,
+        "steps": 26,
+        "evaluatedOperations": 5,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:return",
+          "scheduler:switched",
+          "step:$checks/final-value",
+          "step:a/read",
+          "step:a/write",
+          "step:b/read",
+          "step:b/write"
+        ],
+        "trace": [
+          "a/read",
+          "a/write",
+          "b/read",
+          "b/write",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+          "eventCount": 0,
+          "sinkWrites": 0,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "two-writers",
+        "ordinal": 1,
+        "seed": "20260924-integrated/two-writers/1",
+        "schedule": [
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:9f4ee3fd2638a7c183cf66e78a7021ad9e745f7dbffce93239d4f9a32f2d2ed2",
+        "passed": false,
+        "failure": {
+          "property": "$checks/final-value/assertion",
+          "detail": "candidate result differs from declared oracle"
+        },
+        "filtered": false,
+        "calls": 5,
+        "steps": 26,
+        "evaluatedOperations": 5,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:return",
+          "scheduler:switched",
+          "step:$checks/final-value",
+          "step:a/read",
+          "step:a/write",
+          "step:b/read",
+          "step:b/write"
+        ],
+        "trace": [
+          "a/read",
+          "b/read",
+          "a/write",
+          "b/write",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:a1e2f27a73d656554b2079fe12491a86bc63e9ffe3072c81d5310d0ab95d8238",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+          "eventCount": 0,
+          "sinkWrites": 0,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "two-writers",
+        "ordinal": 2,
+        "seed": "20260924-integrated/two-writers/2",
+        "schedule": [
+          "a",
+          "b",
+          "b",
+          "a"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:c790d9789a94ab5246c9e7925b159a64163ef19190ebfc68f7f35cba193c8fa0",
+        "passed": false,
+        "failure": {
+          "property": "$checks/final-value/assertion",
+          "detail": "candidate result differs from declared oracle"
+        },
+        "filtered": false,
+        "calls": 5,
+        "steps": 26,
+        "evaluatedOperations": 5,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:return",
+          "scheduler:switched",
+          "step:$checks/final-value",
+          "step:a/read",
+          "step:a/write",
+          "step:b/read",
+          "step:b/write"
+        ],
+        "trace": [
+          "a/read",
+          "b/read",
+          "b/write",
+          "a/write",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:a1e2f27a73d656554b2079fe12491a86bc63e9ffe3072c81d5310d0ab95d8238",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+          "eventCount": 0,
+          "sinkWrites": 0,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "two-writers",
+        "ordinal": 3,
+        "seed": "20260924-integrated/two-writers/3",
+        "schedule": [
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:32c92d66ed44b3a0502e8aee75b0270d2031776950d60fc8c91fe36350a968d1",
+        "passed": false,
+        "failure": {
+          "property": "$checks/final-value/assertion",
+          "detail": "candidate result differs from declared oracle"
+        },
+        "filtered": false,
+        "calls": 5,
+        "steps": 26,
+        "evaluatedOperations": 5,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:return",
+          "scheduler:switched",
+          "step:$checks/final-value",
+          "step:a/read",
+          "step:a/write",
+          "step:b/read",
+          "step:b/write"
+        ],
+        "trace": [
+          "b/read",
+          "a/read",
+          "a/write",
+          "b/write",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:a1e2f27a73d656554b2079fe12491a86bc63e9ffe3072c81d5310d0ab95d8238",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+          "eventCount": 0,
+          "sinkWrites": 0,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "two-writers",
+        "ordinal": 4,
+        "seed": "20260924-integrated/two-writers/4",
+        "schedule": [
+          "b",
+          "a",
+          "b",
+          "a"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:db31fcd3a18ecfa65bc7bbcd9338c1b070b934eb5da62994eb7c5b247b14ed2a",
+        "passed": false,
+        "failure": {
+          "property": "$checks/final-value/assertion",
+          "detail": "candidate result differs from declared oracle"
+        },
+        "filtered": false,
+        "calls": 5,
+        "steps": 26,
+        "evaluatedOperations": 5,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:return",
+          "scheduler:switched",
+          "step:$checks/final-value",
+          "step:a/read",
+          "step:a/write",
+          "step:b/read",
+          "step:b/write"
+        ],
+        "trace": [
+          "b/read",
+          "a/read",
+          "b/write",
+          "a/write",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:a1e2f27a73d656554b2079fe12491a86bc63e9ffe3072c81d5310d0ab95d8238",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+          "eventCount": 0,
+          "sinkWrites": 0,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "two-writers",
+        "ordinal": 5,
+        "seed": "20260924-integrated/two-writers/5",
+        "schedule": [
+          "b",
+          "b",
+          "a",
+          "a"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:5a43b3e5e5b9160d116e0996e80c16bb9b6deba1f99b5d298ab243b74337353e",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 5,
+        "steps": 26,
+        "evaluatedOperations": 5,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "runtime:assign",
+          "runtime:call",
+          "runtime:return",
+          "scheduler:switched",
+          "step:$checks/final-value",
+          "step:a/read",
+          "step:a/write",
+          "step:b/read",
+          "step:b/write"
+        ],
+        "trace": [
+          "b/read",
+          "b/write",
+          "a/read",
+          "a/write",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+          "eventCount": 0,
+          "sinkWrites": 0,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "bounded-allocation",
+        "ordinal": 0,
+        "seed": "20260924-integrated/bounded-allocation/0",
+        "schedule": [
+          "allocator",
+          "allocator",
+          "allocator",
+          "allocator",
+          "allocator"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:d6e5e4e5a237e6ff6f89be56585084b5510ae103eacd720e4e258fe87c209b48",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 2,
+        "steps": 7,
+        "evaluatedOperations": 6,
+        "allocatedBytes": 1,
+        "peakAllocatedBytes": 4096,
+        "allocationChecksum": 69649,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "resource:allocated",
+          "resource:exhausted",
+          "resource:released",
+          "runtime:call",
+          "runtime:return",
+          "step:$checks/final-value",
+          "step:allocator/excess",
+          "step:allocator/first",
+          "step:allocator/observe",
+          "step:allocator/release",
+          "step:allocator/reuse"
+        ],
+        "trace": [
+          "allocator/first",
+          "allocator/excess",
+          "allocator/observe",
+          "allocator/release",
+          "allocator/reuse",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:6de7e77e2a40b2f5d13401f16087465c6afdf602a5308b54edd522d2a9d48dca",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+          "eventCount": 0,
+          "sinkWrites": 0,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "bounded-allocation",
+        "ordinal": 1,
+        "seed": "20260924-integrated/bounded-allocation/1",
+        "schedule": [
+          "allocator",
+          "allocator",
+          "allocator",
+          "allocator",
+          "allocator"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:33efd8c06264c4b17f8a414924c993a99e20b164221f603c64d7b51f57210896",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 2,
+        "steps": 7,
+        "evaluatedOperations": 6,
+        "allocatedBytes": 1,
+        "peakAllocatedBytes": 4096,
+        "allocationChecksum": 196656,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "resource:allocated",
+          "resource:exhausted",
+          "resource:released",
+          "runtime:call",
+          "runtime:return",
+          "step:$checks/final-value",
+          "step:allocator/excess",
+          "step:allocator/first",
+          "step:allocator/observe",
+          "step:allocator/release",
+          "step:allocator/reuse"
+        ],
+        "trace": [
+          "allocator/first",
+          "allocator/excess",
+          "allocator/observe",
+          "allocator/release",
+          "allocator/reuse",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:6de7e77e2a40b2f5d13401f16087465c6afdf602a5308b54edd522d2a9d48dca",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+          "eventCount": 0,
+          "sinkWrites": 0,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "bounded-allocation",
+        "ordinal": 2,
+        "seed": "20260924-integrated/bounded-allocation/2",
+        "schedule": [
+          "allocator",
+          "allocator",
+          "allocator",
+          "allocator",
+          "allocator"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:41b9ed9d9fedbbe4e8d69d62271adb7c24fcba22812befce6128637ef270a1e5",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 2,
+        "steps": 7,
+        "evaluatedOperations": 6,
+        "allocatedBytes": 1,
+        "peakAllocatedBytes": 4096,
+        "allocationChecksum": 323663,
+        "networkFrames": 0,
+        "deliveredFrames": 0,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "resource:allocated",
+          "resource:exhausted",
+          "resource:released",
+          "runtime:call",
+          "runtime:return",
+          "step:$checks/final-value",
+          "step:allocator/excess",
+          "step:allocator/first",
+          "step:allocator/observe",
+          "step:allocator/release",
+          "step:allocator/reuse"
+        ],
+        "trace": [
+          "allocator/first",
+          "allocator/excess",
+          "allocator/observe",
+          "allocator/release",
+          "allocator/reuse",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:6de7e77e2a40b2f5d13401f16087465c6afdf602a5308b54edd522d2a9d48dca",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:3d797c8b69c160a318289f198bcbf42949bdab36e12d31d43ebcd7a4a027de6c",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:63c749e9ed626dfa283a03cd520d14ce43bee1484e35dd0a4891d2fc320a534f",
+          "eventCount": 0,
+          "sinkWrites": 0,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "faulted-json-network",
+        "ordinal": 0,
+        "seed": "20260924-integrated/faulted-json-network/0",
+        "schedule": [
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:c0cbd18e5e3d03287865f93350952c7e3f38e1f193bd0ebaaa8737610ac709bd",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 5,
+        "steps": 90,
+        "evaluatedOperations": 12,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 6,
+        "deliveredFrames": 4,
+        "rejectedFrames": 1,
+        "droppedFrames": 1,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "event:ordered",
+          "event:sequence",
+          "ingress:delivered",
+          "ingress:empty",
+          "ingress:malformed",
+          "network:checksum",
+          "network:drop",
+          "network:duplicate",
+          "network:malformed",
+          "network:none",
+          "runtime:assign",
+          "runtime:branch",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/final-value",
+          "step:transport/bad-integrity",
+          "step:transport/bad-json",
+          "step:transport/dup",
+          "step:transport/duplicate",
+          "step:transport/empty",
+          "step:transport/first",
+          "step:transport/good",
+          "step:transport/last",
+          "step:transport/loss",
+          "step:transport/reject-integrity",
+          "step:transport/reject-json"
+        ],
+        "trace": [
+          "transport/dup",
+          "transport/first",
+          "transport/duplicate",
+          "transport/bad-json",
+          "transport/reject-json",
+          "transport/bad-integrity",
+          "transport/reject-integrity",
+          "transport/loss",
+          "transport/empty",
+          "transport/good",
+          "transport/last",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:cfc732b06a6fdb691814d2f2e15e36c399fc557c261b77f1606638143ebcbecd",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:28123331a556d2a35263649365c4a5b1787420a6a134b4412bc2755f3efbf761",
+          "eventCount": 2,
+          "sinkWrites": 2,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "faulted-json-network",
+        "ordinal": 1,
+        "seed": "20260924-integrated/faulted-json-network/1",
+        "schedule": [
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:5ff1f5c6866c5a58be5c97929f79a7d4476908af16da7d80e4d26fe2bb9ffb58",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 5,
+        "steps": 90,
+        "evaluatedOperations": 12,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 6,
+        "deliveredFrames": 4,
+        "rejectedFrames": 1,
+        "droppedFrames": 1,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "event:ordered",
+          "event:sequence",
+          "ingress:delivered",
+          "ingress:empty",
+          "ingress:malformed",
+          "network:checksum",
+          "network:drop",
+          "network:duplicate",
+          "network:malformed",
+          "network:none",
+          "runtime:assign",
+          "runtime:branch",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/final-value",
+          "step:transport/bad-integrity",
+          "step:transport/bad-json",
+          "step:transport/dup",
+          "step:transport/duplicate",
+          "step:transport/empty",
+          "step:transport/first",
+          "step:transport/good",
+          "step:transport/last",
+          "step:transport/loss",
+          "step:transport/reject-integrity",
+          "step:transport/reject-json"
+        ],
+        "trace": [
+          "transport/dup",
+          "transport/first",
+          "transport/duplicate",
+          "transport/bad-json",
+          "transport/reject-json",
+          "transport/bad-integrity",
+          "transport/reject-integrity",
+          "transport/loss",
+          "transport/empty",
+          "transport/good",
+          "transport/last",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:b10c777ee1e62d5433e15b06122984be7402e8147371a2391dcf254d68d10218",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:7d10e8120387924f4e41b686190aa7e12bed41ed6f61e3db1a7e6712547c8e77",
+          "eventCount": 2,
+          "sinkWrites": 2,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "faulted-json-network",
+        "ordinal": 2,
+        "seed": "20260924-integrated/faulted-json-network/2",
+        "schedule": [
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport",
+          "transport"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:a7ac359a423bc630b4fb1ea5ed5f8544474bc22a5d08b29bb0de84d839ae8923",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 5,
+        "steps": 90,
+        "evaluatedOperations": 12,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 6,
+        "deliveredFrames": 4,
+        "rejectedFrames": 1,
+        "droppedFrames": 1,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "event:ordered",
+          "event:sequence",
+          "ingress:delivered",
+          "ingress:empty",
+          "ingress:malformed",
+          "network:checksum",
+          "network:drop",
+          "network:duplicate",
+          "network:malformed",
+          "network:none",
+          "runtime:assign",
+          "runtime:branch",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/final-value",
+          "step:transport/bad-integrity",
+          "step:transport/bad-json",
+          "step:transport/dup",
+          "step:transport/duplicate",
+          "step:transport/empty",
+          "step:transport/first",
+          "step:transport/good",
+          "step:transport/last",
+          "step:transport/loss",
+          "step:transport/reject-integrity",
+          "step:transport/reject-json"
+        ],
+        "trace": [
+          "transport/dup",
+          "transport/first",
+          "transport/duplicate",
+          "transport/bad-json",
+          "transport/reject-json",
+          "transport/bad-integrity",
+          "transport/reject-integrity",
+          "transport/loss",
+          "transport/empty",
+          "transport/good",
+          "transport/last",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:ba8780303f351496fdf6fe872b3065ccc6ab2cd51527b18f668b74b62838b396",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:827680519a5241f4f20cadc07f80f0b144d73153d260f7497bcae649f22eadd5",
+          "eventCount": 2,
+          "sinkWrites": 2,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "out-of-order-events",
+        "ordinal": 0,
+        "seed": "20260924-integrated/out-of-order-events/0",
+        "schedule": [
+          "events",
+          "events",
+          "events",
+          "events"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:a84e1558ec1f18faa0bc6d62896225ae5fae29e619e7ba7988d6da012ac81e95",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 3,
+        "steps": 51,
+        "evaluatedOperations": 5,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 2,
+        "deliveredFrames": 2,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "event:ordered",
+          "event:reordered",
+          "event:sequence",
+          "ingress:delivered",
+          "network:none",
+          "runtime:assign",
+          "runtime:branch",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/final-value",
+          "step:events/first",
+          "step:events/late-first",
+          "step:events/second",
+          "step:events/second-before-first"
+        ],
+        "trace": [
+          "events/second-before-first",
+          "events/second",
+          "events/late-first",
+          "events/first",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:eecf4ee3f9e28b0eb1d50ecd16881ad2bc4f302a3568445bf18cabf1ea031201",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:695bbaef3cc3af3b7b9d1e0af653e3e8722ac7b21749af0abb0afc8d961e3a6f",
+          "eventCount": 1,
+          "sinkWrites": 1,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "out-of-order-events",
+        "ordinal": 1,
+        "seed": "20260924-integrated/out-of-order-events/1",
+        "schedule": [
+          "events",
+          "events",
+          "events",
+          "events"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:4ee65252fa6684410642c14034625853293e7b08dd787041d82784efed2f6a5f",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 3,
+        "steps": 51,
+        "evaluatedOperations": 5,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 2,
+        "deliveredFrames": 2,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "event:ordered",
+          "event:reordered",
+          "event:sequence",
+          "ingress:delivered",
+          "network:none",
+          "runtime:assign",
+          "runtime:branch",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/final-value",
+          "step:events/first",
+          "step:events/late-first",
+          "step:events/second",
+          "step:events/second-before-first"
+        ],
+        "trace": [
+          "events/second-before-first",
+          "events/second",
+          "events/late-first",
+          "events/first",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:8c1227a92a53232e5e01af373e76d8142a191318ae52c5838ba997232c52127a",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:691fbac1bd653c94051430e0778451eba9a9a0ff590e056e9b5abd06eb549d77",
+          "eventCount": 1,
+          "sinkWrites": 1,
+          "indeterminate": 0
+        }
+      }
+    },
+    {
+      "input": {
+        "format": "aether.living-case/1",
+        "manifestDigest": "aether.living-effect-campaign/2:b3:c2422e85ffb03f4dd81bcfb5585f0083273fe351382b8f256c59c87a3ed50f7d",
+        "scenario": "out-of-order-events",
+        "ordinal": 2,
+        "seed": "20260924-integrated/out-of-order-events/2",
+        "schedule": [
+          "events",
+          "events",
+          "events",
+          "events"
+        ],
+        "variables": {}
+      },
+      "result": {
+        "caseDigest": "aether.living-case/1:b3:b7330b234d485f79afca2904ab4cd1add77096af222e181385dac08d213aa16c",
+        "passed": true,
+        "failure": null,
+        "filtered": false,
+        "calls": 3,
+        "steps": 51,
+        "evaluatedOperations": 5,
+        "allocatedBytes": 0,
+        "peakAllocatedBytes": 0,
+        "allocationChecksum": 0,
+        "networkFrames": 2,
+        "deliveredFrames": 2,
+        "rejectedFrames": 0,
+        "droppedFrames": 0,
+        "coverage": [
+          "candidate-call",
+          "effect:broker-journal",
+          "effect:committed",
+          "event:ordered",
+          "event:reordered",
+          "event:sequence",
+          "ingress:delivered",
+          "network:none",
+          "runtime:assign",
+          "runtime:branch",
+          "runtime:call",
+          "runtime:invoke",
+          "runtime:return",
+          "step:$checks/final-value",
+          "step:events/first",
+          "step:events/late-first",
+          "step:events/second",
+          "step:events/second-before-first"
+        ],
+        "trace": [
+          "events/second-before-first",
+          "events/second",
+          "events/late-first",
+          "events/first",
+          "$checks/final-value"
+        ],
+        "heapDigest": "aether.living-heap/1:b3:b13a5231e329eb02c8dc754705fdb76c33aa2af85dfc61d5ec32193e3b400614",
+        "effects": {
+          "journalDigest": "aether.living-effect-journal/2:b3:d994823c43b9082a38a88f69be465ff38dd6cac0e17603ee62d912e3b589e51a",
+          "sinkDigest": "aether.living-effect-sink-set/2:b3:4436fae1c3f6081ddff2cdaee79506723ca3cbb1976e9f81417c939d8da8c3ce",
+          "eventCount": 1,
+          "sinkWrites": 1,
+          "indeterminate": 0
+        }
+      }
+    }
+  ],
+  "counterexamples": [
+    "aether.living-effect-counterexample/2:b3:6f6bce03bd5a1a76ef06b0d5ab05b7b98c48f3786982159a6d050ffd8e497064",
+    "aether.living-effect-counterexample/2:b3:8198bdcf8164c29146f1222c774d3f7ee57a1322504fe6e483f14a4952c4da73",
+    "aether.living-effect-counterexample/2:b3:337c8e792e4b0af6206f8b9f65075436c925533456314f50ad61bdd2911215be",
+    "aether.living-effect-counterexample/2:b3:ebba7009934dcb48f81bff6e1568b38a57946265a5442c015eba954a226f5ec9"
+  ],
+  "elapsedMs": "929.9027499999997",
+  "executedCasesPerSecond": "16.130719045620634",
+  "evaluatedOperations": 99,
+  "evaluatedOperationsPerSecond": "106.46274570109618",
+  "effectEvents": 9,
+  "indeterminateEffects": 0,
+  "productionAuthorized": false
+}

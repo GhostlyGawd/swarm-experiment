@@ -37,6 +37,9 @@ repeats the signed case in a fresh pressured worker. A tampered checksum is
 rejected. This demonstrates resident pressure during one case. The candidate's
 allocation refusal is still the campaign's bounded quota model; this profile
 does not induce a real OS allocation failure or qualify production RSS limits.
+[Exact-source `/2` evidence](../../../../docs/implementation/v4/evidence/t303-rss-497da3a/REVIEW.md)
+records 15/15 signed good cases, four durable broken-root replays and a 67.14 MB
+observed OS RSS rise during the separate signed resource case.
 
 ```sh
 node --experimental-strip-types roadmap/v4/research/microworld-integrated/campaign.ts --verify docs/implementation/v4/evidence/t303-integrated-82d88b6
