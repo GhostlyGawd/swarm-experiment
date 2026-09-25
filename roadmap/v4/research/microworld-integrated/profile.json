@@ -1,11 +1,18 @@
 {
-  "format": "aether.living-integrated-profile/1",
+  "format": "aether.living-integrated-profile/2",
   "seed": "20260924-integrated",
   "declaredGoodCases": 15,
   "declaredBrokenCases": 15,
   "sourceScenarios": ["two-writers", "bounded-allocation", "faulted-json-network", "out-of-order-events"],
   "tcpFaults": ["truncated-frame", "malformed-frame", "duplicate-delivery"],
   "processFault": "One signed post-sink pre-receipt SIGKILL; explicit dead-owner recovery and reconciliation in a new worker",
-  "minimumBoundaryPermutationsPerSecond": 2000000,
-  "qualification": "Complete good process campaign and broken shrink/replay campaign are timed separately; neither is the four-field JSON kernel"
+  "r04BoundaryMinimumPerSecond": 2000000,
+  "campaignRateQualification": "reported-only; signed Aether candidate execution, fault handling, transport and durability are separate from the frozen R04 generator/evaluator rate",
+  "physicalMemoryPressure": {
+    "residentBytes": 67108864,
+    "touchStrideBytes": 4096,
+    "minimumOsRssDeltaBytes": 50331648,
+    "caseScenario": "bounded-allocation"
+  },
+  "qualification": "Every declared signed case executes with zero filters and survives; complete good and broken process campaign rates are reported separately from the R04 four-field generator/evaluator"
 }

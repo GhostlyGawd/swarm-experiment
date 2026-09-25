@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
 import { after, test } from 'node:test';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { LivingCampaign } from '../../../../src/tier3/living-campaign.ts';
 import { integratedFixture, integratedTrust, signIntegratedFixture } from './fixture.ts';
 import { auditCombinedRaw, runCombinedProcess } from './harness.ts';
+import { runPhysicalMemoryPressure } from './memory-pressure.ts';
 
 const directories: string[] = [];
 const temporary = () => { const path = mkdtempSync(join(tmpdir(), 'aether-integrated-test-')); directories.push(path); return path; };
@@ -75,6 +78,55 @@ test('one signed candidate survives TCP faults, real post-sink SIGKILL, recovery
   const file = join(sinks, first, readdirSync(join(sinks, first)).find(name => name.endsWith('.json'))!);
   writeFileSync(file, readFileSync(file, 'utf8').replace('executionManifest', 'changedManifest'));
   assert.throws(() => auditCombinedRaw(join(directory, 'process'), result), /raw broker\/sink evidence changed/);
+});
+
+test('signed resource case executes with independently measured resident process pressure', async () => {
+  const fixture = integratedFixture(), keys = generateKeyPairSync('ed25519'), directory = temporary();
+  const publicKeyPem = keys.publicKey.export({ type: 'spki', format: 'pem' }).toString();
+  const registrationPath = join(directory, 'registration.json');
+  writeFileSync(registrationPath, JSON.stringify({ memoryAuthorization: signIntegratedFixture(fixture,
+    keys.privateKey), publicKeyPem }));
+  const profile = JSON.parse(readFileSync(new URL('./profile.json', import.meta.url), 'utf8')) as {
+    physicalMemoryPressure: { residentBytes: number; touchStrideBytes: number;
+      minimumOsRssDeltaBytes: number; caseScenario: string } };
+  const observed = await runPhysicalMemoryPressure(registrationPath, join(directory, 'pressure'),
+    profile.physicalMemoryPressure);
+  assert.ok(observed.osRssPressuredBytes - observed.osRssBaselineBytes
+    >= profile.physicalMemoryPressure.minimumOsRssDeltaBytes);
+  assert.ok(observed.osRssAfterCaseBytes - observed.osRssBaselineBytes
+    >= profile.physicalMemoryPressure.minimumOsRssDeltaBytes);
+  assert.equal(observed.result.passed, true);
+  assert.equal(observed.result.filtered, false);
+  assert.ok(observed.result.coverage.includes('resource:exhausted'));
+});
+
+test('physical pressure worker refuses an authorization signed by another key before execution', async () => {
+  const fixture = integratedFixture(), signer = generateKeyPairSync('ed25519');
+  const stranger = generateKeyPairSync('ed25519'), directory = temporary();
+  const registrationPath = join(directory, 'registration.json');
+  writeFileSync(registrationPath, JSON.stringify({ memoryAuthorization: signIntegratedFixture(fixture,
+    signer.privateKey), publicKeyPem: stranger.publicKey.export({ type: 'spki', format: 'pem' }).toString() }));
+  const profile = JSON.parse(readFileSync(new URL('./profile.json', import.meta.url), 'utf8')) as {
+    physicalMemoryPressure: { residentBytes: number; touchStrideBytes: number;
+      minimumOsRssDeltaBytes: number; caseScenario: string } };
+  await assert.rejects(runPhysicalMemoryPressure(registrationPath, join(directory, 'pressure'),
+    profile.physicalMemoryPressure), /worker exited|authorization|signature/);
+});
+
+test('versioned integrated audit refuses a changed physical pressure observation', () => {
+  const campaign = fileURLToPath(new URL('./campaign.ts', import.meta.url));
+  const directory = join(temporary(), 'campaign');
+  for (const mode of ['--register', '--run', '--verify'])
+    execFileSync(process.execPath, ['--experimental-strip-types', campaign, mode, directory],
+      { encoding: 'utf8', timeout: 60_000 });
+  const path = join(directory, 'memory-pressure.json');
+  const memory = JSON.parse(readFileSync(path, 'utf8')) as { checksum: number };
+  writeFileSync(path, JSON.stringify({ ...memory, checksum: memory.checksum ^ 1 }, null, 2) + '\n');
+  const altered = spawnSync(process.execPath,
+    ['--experimental-strip-types', campaign, '--verify', directory],
+    { encoding: 'utf8', timeout: 60_000 });
+  assert.notEqual(altered.status, 0);
+  assert.match(altered.stderr, /checksum|observationDigest/);
 });
 
 test('unknown signed post-sink result cannot pass the integrated candidate campaign', () => {

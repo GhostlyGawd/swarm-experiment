@@ -15,8 +15,28 @@ at `82d88b6` reports 15 generated/executed/passed good cases, zero filters,
 17 attempts, 48 coverage labels and **12.7784 complete cases/s**. A separate
 signed broken candidate executes 15 cases, fails four schedules, and retains
 four durable shrunk replays at **15.0576 original cases/s including shrinking**.
-Both miss the fixed R04 **2,000,000/s** threshold. The earlier four-field JSON
-kernel pass is not a complete-campaign result.
+Those rates measure complete signed execution, not the frozen R04
+generator/evaluator. [D21](../../../../docs/implementation/v4/decisions/D21-living-campaign-throughput-boundary.md)
+places the unchanged **2,000,000/s** target on that separate R04 boundary.
+The four-field JSON kernel pass does not establish full campaign survival.
+
+## Versioned integrated profile `/2`
+
+The current `/2` registration and measurement keep the 2M/s R04 target named,
+but report complete signed candidate rates without comparing them to that
+generator target. The same 15 good and 15 broken case sets, SIGKILL recovery,
+zero-filter rule and shrunk replay remain required.
+
+An additional bounded resource case runs the same signed candidate in a real
+worker while 64 MiB of touched pages stay resident. The controller takes OS
+`ps` RSS samples before pressure, after pressure, and after case execution;
+the worker independently reports its RSS and rechecks a checksum of every
+touched page after the case. The preregistered minimum OS RSS rise is 48 MiB.
+The offline audit binds the complete observation, verifies the case result and
+repeats the signed case in a fresh pressured worker. A tampered checksum is
+rejected. This demonstrates resident pressure during one case. The candidate's
+allocation refusal is still the campaign's bounded quota model; this profile
+does not induce a real OS allocation failure or qualify production RSS limits.
 
 ```sh
 node --experimental-strip-types roadmap/v4/research/microworld-integrated/campaign.ts --verify docs/implementation/v4/evidence/t303-integrated-82d88b6
