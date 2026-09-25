@@ -2,6 +2,10 @@
 
 Goal: implement the complete v4 specification, all 40 functional requirements and all NFR/governance/KPI gates. Full completion remains unproven.
 
+## Latest exact-source checkpoint — 2026-09-24
+
+The clean combined `888bfeb` [integration evidence](evidence/integration-888bfeb/REVIEW.md) passes the serial full suite **1,204/1,206** with **zero failures and two existing skips**, plus build, typecheck, v4 roadmap and worker-bundle verification. Default release measurement independently verifies against the exact source: the required warm ledger row passes at **5.6290×**, cold and changed-session diagnostics miss at **0.9411×** and **1.1408×**, and **15 required NFR targets remain unmeasured**. Release eligibility is false. The source-witness config/18 and the accepted [D21](decisions/D21-living-campaign-throughput-boundary.md) R04 throughput interpretation are included in this checkpoint. The tracker remains **20/62**; T1-05, T3-03, other active tasks and release obligations are still open.
+
 ## Resumed implementation — 2026-09-23
 
 The user resumed the build after the pushed stopping point. **20 of 62 tracked tasks are verified** (baseline 13/13, v2 7/20); full v4 completion and the release performance gates remain open. Seven tasks have verified prerequisites and are actively in progress. The [active gate dependencies](GATE-DEPENDENCIES.md) show bounded evidence, exact missing work and downstream tasks for each; no partial slice is counted as a verified task.

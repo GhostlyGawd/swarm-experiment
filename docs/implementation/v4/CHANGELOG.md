@@ -1,5 +1,10 @@
 # Implementation specification changelog
 
+## Clean combined verification at `888bfeb` — 2026-09-24
+
+- The exact-source serial full suite passed **1,204/1,206**, with zero failures and two existing skips, after integration of source-witness Artifact/4 config/18, V17 task projection and the living boundary pipeline. Build, typecheck, v4 roadmap and worker-bundle checks passed. [Raw checkpoint](evidence/integration-888bfeb/REVIEW.md).
+- Independent release inventory verification matched the tested commit but returned `releaseEligible: false`: one fixed warm ledger row passes at **5.6290×**, cold/full-session diagnostics miss, and **15 required NFR targets remain unmeasured**. The tracker stays **20/62**; a green suite is not full gate closure.
+
 ## D21 living-campaign rate boundary decided — 2026-09-24
 
 - The product owner delegated the FR-3.3 throughput interpretation. [D21](decisions/D21-living-campaign-throughput-boundary.md) confirms that the unchanged **2,000,000/s** criterion in specification 0.1.0 applies to the preregistered R04 four-field generator/evaluator, matching the PRD's synthesis wording and the tracker phrase “under the profile fixed by R04.” Signed candidate execution, fault injection, transport and durability are separate measurements; every declared case must still execute and survive before graduation. This is an interpretation of the existing criterion, so the specification version and all 20 prior verified-task evidence manifests remain unchanged.

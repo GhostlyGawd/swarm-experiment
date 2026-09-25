@@ -1,0 +1,23 @@
+{
+  "verified": true,
+  "subjectCommit": "888bfebf2d43e2879244ae588c5a8c22387808bd",
+  "sourceMatches": true,
+  "requiredFailures": [
+    "ast.retrieval: not_measured",
+    "replication.convergence: not_measured",
+    "checkpoint.rollback: not_measured",
+    "fallback.dispatch: not_measured",
+    "certificate.check: not_measured",
+    "unikernel.boot: not_measured",
+    "state_lens.overhead: not_measured",
+    "smt.cutoff: not_measured",
+    "projection.throughput: not_measured",
+    "zk.verification: not_measured",
+    "multimodal.extraction: not_measured",
+    "mutation.safety: not_measured",
+    "graph.capacity: not_measured",
+    "execution.determinism: not_measured",
+    "capability.containment: not_measured"
+  ],
+  "releaseEligible": false
+}
