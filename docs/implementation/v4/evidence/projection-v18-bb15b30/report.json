@@ -1,0 +1,3123 @@
+{
+  "format": "aether.valid-contract-context-audit/3",
+  "profile": "aether.executable-projection/18",
+  "specVersion": "0.1.0",
+  "commit": "bb15b308a962c4d08bb778f2e210eaff455aec54",
+  "gitStatusBefore": "",
+  "node": "v26.7.0",
+  "tokenizerPackage": {
+    "name": "js-tiktoken",
+    "version": "1.0.21"
+  },
+  "scope": "75 generated reference-valid AST contexts, three native parser/round-trip checks each; authored diagnostic, not representative FR-1.2 or Q03 release qualification",
+  "sources": [
+    {
+      "path": "roadmap/v4/research/projections/corpus-valid-contract-contexts.ts",
+      "sha256": "e68a7dad66497bd137dbd57b14b8cd9d9a7090db04a93ffa3eb1d3cedbd9989c"
+    },
+    {
+      "path": "roadmap/v4/research/projections/audit-valid-contexts-v18.ts",
+      "sha256": "c9ef2ef861923712198146b92239a002a429f022c704a659fd3132ac49b0f165"
+    },
+    {
+      "path": "roadmap/v4/research/projections/verify-valid-contexts-v18.ts",
+      "sha256": "e6524efb38b250ced20ce18c966e3111688e31352337c9df0c295a253ddfaae0"
+    },
+    {
+      "path": "src/projection/executable-contract-certificates.ts",
+      "sha256": "0d70936a1ea22696a37a1d6527327b89c21d5c468bc28dd54ab415fa303cf3ad"
+    },
+    {
+      "path": "src/projection/executable-contract-closures.ts",
+      "sha256": "46ae65a1e979ccf868dbf1f2bea72036b53ea86d86927c912d1dc3f6c4734623"
+    },
+    {
+      "path": "src/projection/executable-runtime.ts",
+      "sha256": "190bf5ec07e9244b02ed5d3c5790fc1682f6aee78e4960f1365dbedcb1d695a2"
+    },
+    {
+      "path": "src/projection/executable.ts",
+      "sha256": "f6aeb108deee6a578d1b16866754b477f2e3cbe19ae05e2233a1d88f9efa90ee"
+    },
+    {
+      "path": "src/tier1/agent-ir-v2.ts",
+      "sha256": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671"
+    },
+    {
+      "path": "src/util/tokens.ts",
+      "sha256": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9"
+    }
+  ],
+  "samplesArtifact": "samples.json",
+  "samplesSha256": "7142fe0ff24b5782f7968ae31a025a82c9674431d48af8d8a64710cb6ed249e0",
+  "rows": [
+    {
+      "id": "literal/inline",
+      "bodyForm": "literal",
+      "carrier": "inline",
+      "root": "ast:b3:9cf687b4302d37671bac10c48e14aa0814d40d57a410ab8f141940a0bd6839a5",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 77,
+          "ae2CompleteModelTokens": 388
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 77,
+          "ae2CompleteModelTokens": 381
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "0522e88ac3a4cf613ec96da8b503aa70e17398d201e151ee261c532a909fe406",
+          "sourceTokens": {
+            "cl100k_base": 2011,
+            "o200k_base": 2026
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "d53cce70f08c45cc416de8476699e3ebd4f23ba34eb5154d2de22ae8919bd6a3",
+          "sourceTokens": {
+            "cl100k_base": 1780,
+            "o200k_base": 1793
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "3f0d5180cc290e6bf52446dcb35fe71a08c6597f65fee0a8a08207491e30d403",
+          "sourceTokens": {
+            "cl100k_base": 1810,
+            "o200k_base": 1822
+          }
+        }
+      }
+    },
+    {
+      "id": "literal/direct_factory",
+      "bodyForm": "literal",
+      "carrier": "direct_factory",
+      "root": "ast:b3:2a058a952f2d6df2558ebef5e305414d340b8fd69af0f3077a9677da7cab0708",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 93,
+          "ae2CompleteModelTokens": 389
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 93,
+          "ae2CompleteModelTokens": 388
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "1d9b303c30dc6b882d6bb9d5ff0793ff2b396ad4618ceb5c735f408a4346e513",
+          "sourceTokens": {
+            "cl100k_base": 2254,
+            "o200k_base": 2284
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "26170c31b0e94ba6366b888dd90b09f1429918c91179b2363fb1cc004a490091",
+          "sourceTokens": {
+            "cl100k_base": 2012,
+            "o200k_base": 2040
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "ec94931345c0507171ed5c6ba1545a644792be36339c071197198be85b8354d6",
+          "sourceTokens": {
+            "cl100k_base": 2057,
+            "o200k_base": 2084
+          }
+        }
+      }
+    },
+    {
+      "id": "literal/block_factory",
+      "bodyForm": "literal",
+      "carrier": "block_factory",
+      "root": "ast:b3:6597d9295cd0b27dd6bf2806c21476d6de0d87f867f355e5f35cf3dd8033a133",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 107,
+          "ae2CompleteModelTokens": 419
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 107,
+          "ae2CompleteModelTokens": 413
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "c6a889f06eba1b61408d79efa275fe8020fc422e53c22100063910a3e7f7e92a",
+          "sourceTokens": {
+            "cl100k_base": 2562,
+            "o200k_base": 2576
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "29cb4b06eb313ea03dc0583bd912b7c09d80286ee5aa510c81f5fb9c6877b4b0",
+          "sourceTokens": {
+            "cl100k_base": 2308,
+            "o200k_base": 2320
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "eda1fde510d77fc958623dcb6a9f10105e95bdacbdc1b71859f50baffa034c7b",
+          "sourceTokens": {
+            "cl100k_base": 2361,
+            "o200k_base": 2372
+          }
+        }
+      }
+    },
+    {
+      "id": "literal/branch_factory",
+      "bodyForm": "literal",
+      "carrier": "branch_factory",
+      "root": "ast:b3:8f2498777c77717a8b424ecdff9e33488d3639a95cd41827d148a2bda679711c",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 144,
+          "ae2CompleteModelTokens": 424
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 144,
+          "ae2CompleteModelTokens": 424
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "20fc460be9048674fc67f1b59e0b88b4aae8a26667465c9300984db9d47ac727",
+          "sourceTokens": {
+            "cl100k_base": 2785,
+            "o200k_base": 2826
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "456dc4614a89e9e6d29ff8e453ad1294911a4a306f0d7ee13baa07299a49faf0",
+          "sourceTokens": {
+            "cl100k_base": 2520,
+            "o200k_base": 2559
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "fedd9d8ae7b2ccd28f93175c28d3a49b8ead56e12094b9106bad7d2c89f0f3c9",
+          "sourceTokens": {
+            "cl100k_base": 2587,
+            "o200k_base": 2625
+          }
+        }
+      }
+    },
+    {
+      "id": "literal/passed_parameter",
+      "bodyForm": "literal",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:b272a0511f9871b3a29432d304d04768dca1ee3ab821b6d7586ed73eb27f0e3b",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 99,
+          "ae2CompleteModelTokens": 406
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 99,
+          "ae2CompleteModelTokens": 399
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "f211e2418696ed7b4d2bc8008739448e7562a2608e1ddf14c79576bed55bfe54",
+          "sourceTokens": {
+            "cl100k_base": 2522,
+            "o200k_base": 2538
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "e63420a1074fa465f9b849da0d0fd5196f141921c5ca0cbc8b9ec32170c9480c",
+          "sourceTokens": {
+            "cl100k_base": 2289,
+            "o200k_base": 2303
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "9313443607c70c6294b9f31c3b346bb77a47e2104ef1ee84120e0a9b84c066f6",
+          "sourceTokens": {
+            "cl100k_base": 2321,
+            "o200k_base": 2334
+          }
+        }
+      }
+    },
+    {
+      "id": "negative_division/inline",
+      "bodyForm": "negative_division",
+      "carrier": "inline",
+      "root": "ast:b3:66776320b62853f64d4f89121bf9ade95ac29eb7ea5590704e9cc27a51699d1c",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 81,
+          "ae2CompleteModelTokens": 387
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 81,
+          "ae2CompleteModelTokens": 385
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "d39a198be1d9e9787d3a561b1ad7398b67a5d9973ab055d43d55fda5b0cea6db",
+          "sourceTokens": {
+            "cl100k_base": 2036,
+            "o200k_base": 2059
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "0a5c3927e52708c4a60730e36a1261c8f8a76ca45fc04a6365f5484326ae8eca",
+          "sourceTokens": {
+            "cl100k_base": 1808,
+            "o200k_base": 1828
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "8dfef41175540a443ca0a3e1021cafcff41b0ff30db9d5e91b3e44fbc403d6b2",
+          "sourceTokens": {
+            "cl100k_base": 1835,
+            "o200k_base": 1855
+          }
+        }
+      }
+    },
+    {
+      "id": "negative_division/direct_factory",
+      "bodyForm": "negative_division",
+      "carrier": "direct_factory",
+      "root": "ast:b3:44f7e589400949b12a3b319b69853057953f97163ada4d37f7a6819e144898f7",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 97,
+          "ae2CompleteModelTokens": 412
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 97,
+          "ae2CompleteModelTokens": 404
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "3bb87e345561a4c45c13d9a82deb9422e7bfa3bd36aec20487b7d25cb604f054",
+          "sourceTokens": {
+            "cl100k_base": 2323,
+            "o200k_base": 2312
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "f7c818971ccc156a7a4bdd7def1d15a49317f80f40c0530081b7ec16874733a3",
+          "sourceTokens": {
+            "cl100k_base": 2080,
+            "o200k_base": 2064
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "8927d6ab212234b7fccb695283cd6e9ed7b1c4aed760a682ec1948fca6f8fea4",
+          "sourceTokens": {
+            "cl100k_base": 2126,
+            "o200k_base": 2112
+          }
+        }
+      }
+    },
+    {
+      "id": "negative_division/block_factory",
+      "bodyForm": "negative_division",
+      "carrier": "block_factory",
+      "root": "ast:b3:b1bc9230e53d425ea075152582d4841ce1187b2c0a85fde4be0b9ea9e7eede00",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 111,
+          "ae2CompleteModelTokens": 406
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 111,
+          "ae2CompleteModelTokens": 402
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "334d371939f3c2f7488486c5157f1ed40763798eed23f59136f215eacfb26f45",
+          "sourceTokens": {
+            "cl100k_base": 2485,
+            "o200k_base": 2509
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "d151fc59e0fbb58c06687e3a18da7379ef8b63c3ca03472c6ce2964e12197ad8",
+          "sourceTokens": {
+            "cl100k_base": 2228,
+            "o200k_base": 2249
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "d1df774eadef74ca4ea362afd179293c70e2942f7d4748f76f35027b22dc20be",
+          "sourceTokens": {
+            "cl100k_base": 2284,
+            "o200k_base": 2305
+          }
+        }
+      }
+    },
+    {
+      "id": "negative_division/branch_factory",
+      "bodyForm": "negative_division",
+      "carrier": "branch_factory",
+      "root": "ast:b3:418004b0754301ac69d68116b50bcf7c6835525d1e7dd79132a2077241a4132c",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 152,
+          "ae2CompleteModelTokens": 438
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 152,
+          "ae2CompleteModelTokens": 433
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "5bbe3d17fb74abb4f5cc5f113d8e60026dab8faa932d84e91c5e9361e6cb2074",
+          "sourceTokens": {
+            "cl100k_base": 2858,
+            "o200k_base": 2862
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "0820bd315e2a857be3841f39c78a3551efa3a7a2f3f981d73199b87eee0313e1",
+          "sourceTokens": {
+            "cl100k_base": 2595,
+            "o200k_base": 2596
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "7b200902c0c5d771e9b62a6869e47fc08630fcea8349f086fb378c343ca6fe8e",
+          "sourceTokens": {
+            "cl100k_base": 2660,
+            "o200k_base": 2661
+          }
+        }
+      }
+    },
+    {
+      "id": "negative_division/passed_parameter",
+      "bodyForm": "negative_division",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:010b44a0ec8b9c4f159668b2db1cc9d864ced32dfe0064d977ecd3abc438aa7f",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 103,
+          "ae2CompleteModelTokens": 414
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 103,
+          "ae2CompleteModelTokens": 402
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "d9e0c5905be44076fd45a0a418d2a9ec7ac463818244175deae4ccb40201ae1c",
+          "sourceTokens": {
+            "cl100k_base": 2582,
+            "o200k_base": 2569
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "096be33118b0b5402cd90e97ba33d652bc61e54d8be73f5d64e5a1a60894af14",
+          "sourceTokens": {
+            "cl100k_base": 2354,
+            "o200k_base": 2337
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "85accd57bcc045e982690f18859223d00b9341887a23a41c53e6086efd0864f8",
+          "sourceTokens": {
+            "cl100k_base": 2381,
+            "o200k_base": 2365
+          }
+        }
+      }
+    },
+    {
+      "id": "string_length/inline",
+      "bodyForm": "string_length",
+      "carrier": "inline",
+      "root": "ast:b3:cb84b7406a07b10ab95753334843549246e326b1d185258129593f7b2f2369ef",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 78,
+          "ae2CompleteModelTokens": 386
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 78,
+          "ae2CompleteModelTokens": 386
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "c84764a9242c968d85ba351d9b6c94e2d9b2fcc3de7eea88f9fedb49d662b005",
+          "sourceTokens": {
+            "cl100k_base": 1988,
+            "o200k_base": 2024
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "8653b2b3327eeee8e492048af4cb6d12a495a9bd36e790fdf6f6994206d6cfc6",
+          "sourceTokens": {
+            "cl100k_base": 1757,
+            "o200k_base": 1791
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "c459074afa879aad58b703a58f853bdf5089df48fceca7694780377e649ab868",
+          "sourceTokens": {
+            "cl100k_base": 1787,
+            "o200k_base": 1820
+          }
+        }
+      }
+    },
+    {
+      "id": "string_length/direct_factory",
+      "bodyForm": "string_length",
+      "carrier": "direct_factory",
+      "root": "ast:b3:de303491ef623b15cb38352a7dd063396953ab8e41885fc8ba2714da518642f8",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 94,
+          "ae2CompleteModelTokens": 414
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 94,
+          "ae2CompleteModelTokens": 411
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "5914499651c06a53ad2b797f825cf14031cd187295f5b77d006afb218c0c177b",
+          "sourceTokens": {
+            "cl100k_base": 2324,
+            "o200k_base": 2345
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "4963a1bb3eabde118180489a0a99a8e35f74984fc3f4c55d788f5f129f3ecceb",
+          "sourceTokens": {
+            "cl100k_base": 2082,
+            "o200k_base": 2101
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "1bbb511872dcbb4611d5d4e3aa9cba9fcb5b26c0f4c9618d180ddb7b013a0dbf",
+          "sourceTokens": {
+            "cl100k_base": 2127,
+            "o200k_base": 2145
+          }
+        }
+      }
+    },
+    {
+      "id": "string_length/block_factory",
+      "bodyForm": "string_length",
+      "carrier": "block_factory",
+      "root": "ast:b3:f1cf97f5399d534fc4bd3e9c74bc5a9cc0fbf4218f866671102282db3e8e5bbf",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 109,
+          "ae2CompleteModelTokens": 424
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 109,
+          "ae2CompleteModelTokens": 419
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "03edff9fe45bb481ff1e9466daed23b0bf5ced9c1e25c37f5f063374575be7f0",
+          "sourceTokens": {
+            "cl100k_base": 2567,
+            "o200k_base": 2588
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "ed23811a1155c505e9ee192a42346ab265d6dcce5fa6f53e199ba050e7c5fc5e",
+          "sourceTokens": {
+            "cl100k_base": 2313,
+            "o200k_base": 2333
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "64fa9005229e1109716baf1c257ccde7ff1e735e694bff05978f62da9512a033",
+          "sourceTokens": {
+            "cl100k_base": 2366,
+            "o200k_base": 2384
+          }
+        }
+      }
+    },
+    {
+      "id": "string_length/branch_factory",
+      "bodyForm": "string_length",
+      "carrier": "branch_factory",
+      "root": "ast:b3:a289373fd4b6886a52739ddb775851824f9d254cb4aff3b4dc3619636637b5b8",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 148,
+          "ae2CompleteModelTokens": 434
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 148,
+          "ae2CompleteModelTokens": 434
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "aca9b2f93cb64f0f107a3016ad5931b9c8ca7bce0d0b6f2848450f4754f23481",
+          "sourceTokens": {
+            "cl100k_base": 2827,
+            "o200k_base": 2868
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "012861554e74026ac2e830e5d9e9445d19f68500df8fb395d83052a4fe1ce5dc",
+          "sourceTokens": {
+            "cl100k_base": 2566,
+            "o200k_base": 2605
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "b37cbd2e2b1a914c409930bee6c5d94c96afec58adc7d7d54253450cafc93752",
+          "sourceTokens": {
+            "cl100k_base": 2629,
+            "o200k_base": 2667
+          }
+        }
+      }
+    },
+    {
+      "id": "string_length/passed_parameter",
+      "bodyForm": "string_length",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:8451f6b3cfc64cab741b3b776020a41bad12e36c30f2693a0f88e0d1f3808efb",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 100,
+          "ae2CompleteModelTokens": 427
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 100,
+          "ae2CompleteModelTokens": 419
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "e9584ef8bc3348d84624639be0ff38b7b5eb7a12ffb025782b3dcc9f462a4ef9",
+          "sourceTokens": {
+            "cl100k_base": 2555,
+            "o200k_base": 2556
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "930696cdd887162adea2c022a2bc5e208a474ba970272c23c3f44f5da4f187e7",
+          "sourceTokens": {
+            "cl100k_base": 2325,
+            "o200k_base": 2321
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "dceb936958d6e088cf4887223c5f3ab3d0a33d83aa1abbe62d9dde5ce494956e",
+          "sourceTokens": {
+            "cl100k_base": 2354,
+            "o200k_base": 2352
+          }
+        }
+      }
+    },
+    {
+      "id": "quantifier/inline",
+      "bodyForm": "quantifier",
+      "carrier": "inline",
+      "root": "ast:b3:f4a92a7021225225644bc57f7962d874540027bb5a94678ec32faf079c298254",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 99,
+          "ae2CompleteModelTokens": 398
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 99,
+          "ae2CompleteModelTokens": 393
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "8ce7b5cd7b2a8fca273c787c366e6f06adf2efb8b0aa6b411ffab0c36311283c",
+          "sourceTokens": {
+            "cl100k_base": 2181,
+            "o200k_base": 2199
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "cc30b7cb6dc65e11fb92abd013e37529bd16efbbd44679b35f48feb25e8b6559",
+          "sourceTokens": {
+            "cl100k_base": 1941,
+            "o200k_base": 1956
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "883406b5404575657fcceddb5321d7d2127c114fcb7f121216214b0117bb5e54",
+          "sourceTokens": {
+            "cl100k_base": 1964,
+            "o200k_base": 1979
+          }
+        }
+      }
+    },
+    {
+      "id": "quantifier/direct_factory",
+      "bodyForm": "quantifier",
+      "carrier": "direct_factory",
+      "root": "ast:b3:a8a96b796e5bb2e55ef626a910fd53b563eee7addc641d8329899b2702c796c0",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 115,
+          "ae2CompleteModelTokens": 414
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 115,
+          "ae2CompleteModelTokens": 408
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "f9af00382a7ca4560d69f60170cd5c91986f7262cdd831991bdac077f5c43cee",
+          "sourceTokens": {
+            "cl100k_base": 2427,
+            "o200k_base": 2438
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "715694047194958b33698bf72d1791f810383838d93090937d738a00adf2aaac",
+          "sourceTokens": {
+            "cl100k_base": 2170,
+            "o200k_base": 2178
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "38b0637a7a63adeba1e13305b0dcd89c530adc67640b7b782b2b6a1533b19132",
+          "sourceTokens": {
+            "cl100k_base": 2214,
+            "o200k_base": 2222
+          }
+        }
+      }
+    },
+    {
+      "id": "quantifier/block_factory",
+      "bodyForm": "quantifier",
+      "carrier": "block_factory",
+      "root": "ast:b3:fa7959cb82bea4d6e14340defe4c5c59609aadace94aadf1d1ff998e0fb4be80",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 131,
+          "ae2CompleteModelTokens": 420
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 131,
+          "ae2CompleteModelTokens": 414
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "d02410df22b3ebd715266a43bac888d322a80a145ab2d0128620527adb558ebd",
+          "sourceTokens": {
+            "cl100k_base": 2573,
+            "o200k_base": 2596
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "0361a0561ddc9760ac29affcbcdc6e7ef07abf2e1268b4924c168a4f11960e5c",
+          "sourceTokens": {
+            "cl100k_base": 2314,
+            "o200k_base": 2335
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "96608d276a03ccf7108d8ff6050a4ef3671414e990e824cb300d3378af1bdc82",
+          "sourceTokens": {
+            "cl100k_base": 2365,
+            "o200k_base": 2385
+          }
+        }
+      }
+    },
+    {
+      "id": "quantifier/branch_factory",
+      "bodyForm": "quantifier",
+      "carrier": "branch_factory",
+      "root": "ast:b3:c2030593f23e521b5c92ed1e0546af47f9fb64095a5a280ca7e1ebf3c5c3d8a5",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 192,
+          "ae2CompleteModelTokens": 461
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 192,
+          "ae2CompleteModelTokens": 462
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "e384f6f79c3c463b48970bbb008b26acc6d32c3eef65c64cdecf018af701d802",
+          "sourceTokens": {
+            "cl100k_base": 2979,
+            "o200k_base": 3019
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "18f2995d184b93e284c69fba94878f5bab3be04fa3dc5dd2761ec596805c1b19",
+          "sourceTokens": {
+            "cl100k_base": 2708,
+            "o200k_base": 2745
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "419c24ab05b3bae67f606ca20f01b1bc3d0a779e1ac2de66fd3441471ac11914",
+          "sourceTokens": {
+            "cl100k_base": 2767,
+            "o200k_base": 2804
+          }
+        }
+      }
+    },
+    {
+      "id": "quantifier/passed_parameter",
+      "bodyForm": "quantifier",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:912493cb052e8c8f825d86da4fc04a9b817ab297774e208fceed81c40eecedeb",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 121,
+          "ae2CompleteModelTokens": 412
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 121,
+          "ae2CompleteModelTokens": 408
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "d16810b46f7cceb740c146927fb346737b6162f54a4f453a58b09538d006c839",
+          "sourceTokens": {
+            "cl100k_base": 2558,
+            "o200k_base": 2580
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "cf5d255c868728f60ec3492c60fc07c2e6c4951091d93b12aa491ad21da382d6",
+          "sourceTokens": {
+            "cl100k_base": 2320,
+            "o200k_base": 2340
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "5103b5168c11ce49170a1b6383a9e82ffd3a8a380fe42b8efd85921a94c49dbf",
+          "sourceTokens": {
+            "cl100k_base": 2350,
+            "o200k_base": 2369
+          }
+        }
+      }
+    },
+    {
+      "id": "direct_pure_call/inline",
+      "bodyForm": "direct_pure_call",
+      "carrier": "inline",
+      "root": "ast:b3:dddb611e4ab7733c85aaacf3785e0d477fda808ff5abbe82c7f56e0708e93de9",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 75,
+          "ae2CompleteModelTokens": 389
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 75,
+          "ae2CompleteModelTokens": 384
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "635fcc4502b3451b3dd9814667a9f731b37ed9c8c1c3aa81123d6b3d5e283cc1",
+          "sourceTokens": {
+            "cl100k_base": 2160,
+            "o200k_base": 2167
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "c86909ee301a9af52c6c1971d4267f8dee34ddbdc9020b3fa3b735523c2da97c",
+          "sourceTokens": {
+            "cl100k_base": 1924,
+            "o200k_base": 1927
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "2e3f3d3806130a541ca881f886c0674497bd5747fdfa83ad7a1103fa718769e8",
+          "sourceTokens": {
+            "cl100k_base": 1951,
+            "o200k_base": 1955
+          }
+        }
+      }
+    },
+    {
+      "id": "direct_pure_call/direct_factory",
+      "bodyForm": "direct_pure_call",
+      "carrier": "direct_factory",
+      "root": "ast:b3:37ae0a8caacbb0ca946ea444c0debe29b5e43837e9b921bdf16e7688f26760ab",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 91,
+          "ae2CompleteModelTokens": 388
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 91,
+          "ae2CompleteModelTokens": 388
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "246a3fa179294a19ef48fcfe1c0b4fd40d5158834e1d618a942a41cbe28bdc67",
+          "sourceTokens": {
+            "cl100k_base": 2343,
+            "o200k_base": 2384
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "44c3a47292e2df597dd4b0b28790409242510274bcfb43b1510e5646f7ecd47c",
+          "sourceTokens": {
+            "cl100k_base": 2091,
+            "o200k_base": 2130
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "e3791e6f1f5c650deb0946ba9ad81ece72d418e9f29da655aeaefed986063e22",
+          "sourceTokens": {
+            "cl100k_base": 2138,
+            "o200k_base": 2176
+          }
+        }
+      }
+    },
+    {
+      "id": "direct_pure_call/block_factory",
+      "bodyForm": "direct_pure_call",
+      "carrier": "block_factory",
+      "root": "ast:b3:6f80b0a3d2c3b69d590945dfb135fae710a7f306f464f1c34e710e3045bd8e63",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 106,
+          "ae2CompleteModelTokens": 417
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 106,
+          "ae2CompleteModelTokens": 408
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "5157353a0c3aed7e5afbc4cdaf10e5f5fd356e57c1c1c6ca2238a4ccb1b0403f",
+          "sourceTokens": {
+            "cl100k_base": 2563,
+            "o200k_base": 2566
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "cde54391c15c1e9277f198ab60b1006890a9a02e9f2a2950c949bfbaadcc0c38",
+          "sourceTokens": {
+            "cl100k_base": 2309,
+            "o200k_base": 2310
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "248921af377cfee21bc89034136fabde7f7becf459d5ad0d7760e8855f754ffc",
+          "sourceTokens": {
+            "cl100k_base": 2363,
+            "o200k_base": 2363
+          }
+        }
+      }
+    },
+    {
+      "id": "direct_pure_call/branch_factory",
+      "bodyForm": "direct_pure_call",
+      "carrier": "branch_factory",
+      "root": "ast:b3:62f96130a492c6b1f1c98d562c79f7e3f151335171b1a3c60a66f7a948f542b1",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 142,
+          "ae2CompleteModelTokens": 436
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 142,
+          "ae2CompleteModelTokens": 430
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "5cce99455bebb65032b0c5c52e874edc7abc0f3d37e55928cbdd8b0592dd01d6",
+          "sourceTokens": {
+            "cl100k_base": 2903,
+            "o200k_base": 2910
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "f3cf105b300b71fba4042da5f03f58ba5651e5ad9404cda5edfb36d122d12722",
+          "sourceTokens": {
+            "cl100k_base": 2644,
+            "o200k_base": 2648
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "0221029e41928d8c3074b84e030e7ab668cc3604b9afee34f3ec0cfda3358090",
+          "sourceTokens": {
+            "cl100k_base": 2707,
+            "o200k_base": 2711
+          }
+        }
+      }
+    },
+    {
+      "id": "direct_pure_call/passed_parameter",
+      "bodyForm": "direct_pure_call",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:57d4efb7909800bd7be055ba5bd7aad3131013196d63ef9b66c6d46bd8b5ebdc",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 97,
+          "ae2CompleteModelTokens": 404
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 97,
+          "ae2CompleteModelTokens": 394
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "fffd77ce499ea4ea75bb05c953d1f423e0a5f4150bec9a56c712f61009f1df07",
+          "sourceTokens": {
+            "cl100k_base": 2511,
+            "o200k_base": 2515
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "db857d0594023ee1d29ad66a2b840fb872a1cc29904c92d1e7a493dd1af9c75e",
+          "sourceTokens": {
+            "cl100k_base": 2277,
+            "o200k_base": 2279
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "46c850ab18228f83326760adfbe0c88155004a9c3011e07271d871dfc8077c29",
+          "sourceTokens": {
+            "cl100k_base": 2311,
+            "o200k_base": 2312
+          }
+        }
+      }
+    },
+    {
+      "id": "result_binder/inline",
+      "bodyForm": "result_binder",
+      "carrier": "inline",
+      "root": "ast:b3:b51504fe224b1a40acf13f78454bc8a1b40db87228f2d6bcdfef2e65aeb6782e",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 95,
+          "ae2CompleteModelTokens": 407
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 96,
+          "ae2CompleteModelTokens": 406
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "a22d36316ae2382a5d78e758c7d0e200818777650ff1d9ed6a2104d7d4e29218",
+          "sourceTokens": {
+            "cl100k_base": 2257,
+            "o200k_base": 2290
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "296ad3f4b87a74e744ef9ea111115ee099f9b7b0b5226e894404792aa0a98026",
+          "sourceTokens": {
+            "cl100k_base": 2018,
+            "o200k_base": 2050
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "09edcba1166267be472aad5771b0546c31efafa5babba8f88765d87d8a209db2",
+          "sourceTokens": {
+            "cl100k_base": 2040,
+            "o200k_base": 2070
+          }
+        }
+      }
+    },
+    {
+      "id": "result_binder/direct_factory",
+      "bodyForm": "result_binder",
+      "carrier": "direct_factory",
+      "root": "ast:b3:5e7a78e2a4a424eea3dadc220f72cfd3f33d3fb6544b75f97e11df9964c06419",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 111,
+          "ae2CompleteModelTokens": 423
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 112,
+          "ae2CompleteModelTokens": 421
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "59a7722cbe5996386ddaa5d08c14902a237e38e47334617aa733acc41692ee07",
+          "sourceTokens": {
+            "cl100k_base": 2497,
+            "o200k_base": 2518
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "1420708ec254f4cbc66a4172363a73092060725ebba291be139a3c9ca43141c5",
+          "sourceTokens": {
+            "cl100k_base": 2240,
+            "o200k_base": 2258
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "f7610ecb66a102696c6d7fe931f03733a6385e458ce8f359db6c36a741cffb6e",
+          "sourceTokens": {
+            "cl100k_base": 2284,
+            "o200k_base": 2302
+          }
+        }
+      }
+    },
+    {
+      "id": "result_binder/block_factory",
+      "bodyForm": "result_binder",
+      "carrier": "block_factory",
+      "root": "ast:b3:ba5c8d62bb7bab1b47656598450a6e4e844cacfca56f28f5305876fc4212ab11",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 126,
+          "ae2CompleteModelTokens": 430
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 127,
+          "ae2CompleteModelTokens": 426
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "7ac07a5bca5253b183e2497adacb9958e599df9744b82293587c661fbd24687c",
+          "sourceTokens": {
+            "cl100k_base": 2656,
+            "o200k_base": 2663
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "a024d664ed71aede83edccfa08622874604c7f56376520c7e5f881aac0ba4921",
+          "sourceTokens": {
+            "cl100k_base": 2398,
+            "o200k_base": 2399
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "6bbece77333a8bf8eb42701d8d83f02a029836ab7f7d362e5b678eb4a7ab82ff",
+          "sourceTokens": {
+            "cl100k_base": 2448,
+            "o200k_base": 2452
+          }
+        }
+      }
+    },
+    {
+      "id": "result_binder/branch_factory",
+      "bodyForm": "result_binder",
+      "carrier": "branch_factory",
+      "root": "ast:b3:0abc43f0f0c192aa52d7c35019534d54afa901746751916fdd132fdd460dbc4c",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 182,
+          "ae2CompleteModelTokens": 449
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 184,
+          "ae2CompleteModelTokens": 444
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "df67afbb1b460c3965417afcc77976bb1493244fc87ce736bddbcdf065ec2c37",
+          "sourceTokens": {
+            "cl100k_base": 3019,
+            "o200k_base": 3026
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "c37b93fe81608d1bbdf20dc5a9d87871eae0ed0eb770dcd34792497e1bfc2bda",
+          "sourceTokens": {
+            "cl100k_base": 2744,
+            "o200k_base": 2747
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "3ccde7bc44edc995bb5633e69b93f42e3818cba8d3f566368a46f666a6b43b62",
+          "sourceTokens": {
+            "cl100k_base": 2807,
+            "o200k_base": 2811
+          }
+        }
+      }
+    },
+    {
+      "id": "result_binder/passed_parameter",
+      "bodyForm": "result_binder",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:a1eb9e246bf0dbaad9687bb5a4af922f1721f2b34a2973ef78f2bfbf3fd6db23",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 117,
+          "ae2CompleteModelTokens": 428
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 118,
+          "ae2CompleteModelTokens": 422
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "8675013a3e8f9122b0304ea712c4b1da45690d2410e96b9a8818fa12d035666a",
+          "sourceTokens": {
+            "cl100k_base": 2648,
+            "o200k_base": 2655
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "fd9e33a9c9a88ace5345dc2608f8fd8aab8945d754b203e3340baef7e403834b",
+          "sourceTokens": {
+            "cl100k_base": 2411,
+            "o200k_base": 2414
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "7f28132fda9006881635c05f16f8b21dcf02af75c202537fda6227885365fe8d",
+          "sourceTokens": {
+            "cl100k_base": 2440,
+            "o200k_base": 2444
+          }
+        }
+      }
+    },
+    {
+      "id": "sequence_fold/inline",
+      "bodyForm": "sequence_fold",
+      "carrier": "inline",
+      "root": "ast:b3:5a303f139ad71bac8b4f0039ede80eec18f314e19368abbfc472fa26aa5a2dfb",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 92,
+          "ae2CompleteModelTokens": 390
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 93,
+          "ae2CompleteModelTokens": 386
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "ba7fc36e0d326562d73883acaee3fbb89943fb3dfe1dd1396b856788772d7dba",
+          "sourceTokens": {
+            "cl100k_base": 2145,
+            "o200k_base": 2161
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "abe053387041cc6dc1d15967963e330fbadc0181ee50ffc1702bc8d38452e490",
+          "sourceTokens": {
+            "cl100k_base": 1905,
+            "o200k_base": 1918
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "a7ee85c68118ef9b57b3557dcf853e492e02616da85c821735ef9c8b23f9287b",
+          "sourceTokens": {
+            "cl100k_base": 1937,
+            "o200k_base": 1949
+          }
+        }
+      }
+    },
+    {
+      "id": "sequence_fold/direct_factory",
+      "bodyForm": "sequence_fold",
+      "carrier": "direct_factory",
+      "root": "ast:b3:1a4e647b11f953259fd1b369700a943509e75bb4a0d2f956ba603dc79cc4b166",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 108,
+          "ae2CompleteModelTokens": 428
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 109,
+          "ae2CompleteModelTokens": 425
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "30f8caca8eced2b9d2cc4d6fd76a4c7bf331c37a6234023fe96fda6922d2568c",
+          "sourceTokens": {
+            "cl100k_base": 2462,
+            "o200k_base": 2491
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "1a78fca4e8347cf367c34fdb02fbb98362d9461aca75436074ca0a1106ff3f5a",
+          "sourceTokens": {
+            "cl100k_base": 2208,
+            "o200k_base": 2235
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "1e7a1f31b436daec7188595728ffef8bea9d5149d87f22f2d9f8b4a6ddc6099e",
+          "sourceTokens": {
+            "cl100k_base": 2258,
+            "o200k_base": 2283
+          }
+        }
+      }
+    },
+    {
+      "id": "sequence_fold/block_factory",
+      "bodyForm": "sequence_fold",
+      "carrier": "block_factory",
+      "root": "ast:b3:e898453e5e907a4d6bcaf31a0fb1dd32da223a627a93eb74658ebf52b3d9ad83",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 123,
+          "ae2CompleteModelTokens": 423
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 124,
+          "ae2CompleteModelTokens": 417
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "a9b33c12d488d6427a8951f65e8bc7503c81f28b17b0bd53af6e32e91e31bd24",
+          "sourceTokens": {
+            "cl100k_base": 2546,
+            "o200k_base": 2570
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "e388078411c08b59893d4650d902f18bf1898d5e8219c5faaae69f27c8895560",
+          "sourceTokens": {
+            "cl100k_base": 2289,
+            "o200k_base": 2312
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "545e7a7f4fd795de10c4dc1bc58ca776de65b7e808f4aad3c321d87939f930d1",
+          "sourceTokens": {
+            "cl100k_base": 2347,
+            "o200k_base": 2367
+          }
+        }
+      }
+    },
+    {
+      "id": "sequence_fold/branch_factory",
+      "bodyForm": "sequence_fold",
+      "carrier": "branch_factory",
+      "root": "ast:b3:bd82442f8b7cd2f2f1f840aa8b09633105e7bfe0fd815bb3a498c5975fd2f589",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 176,
+          "ae2CompleteModelTokens": 449
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 178,
+          "ae2CompleteModelTokens": 441
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "45e7bbe3bf38efa78bc7db67f00697d14cf0e0dc922a52f468301ff37862b73d",
+          "sourceTokens": {
+            "cl100k_base": 2955,
+            "o200k_base": 2951
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "931ff4964bcf2ac3133d055004b43114216444f64cb3cd6c292e3a6f5e74085f",
+          "sourceTokens": {
+            "cl100k_base": 2693,
+            "o200k_base": 2685
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "9e9b91d04a122ac4da8357b2b7e4ba4b1c495e6ec02a2d02b9f28344242a7c5c",
+          "sourceTokens": {
+            "cl100k_base": 2761,
+            "o200k_base": 2752
+          }
+        }
+      }
+    },
+    {
+      "id": "sequence_fold/passed_parameter",
+      "bodyForm": "sequence_fold",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:a5b9a2456d5e9d138dae14dc7c33bcd507e85ca454f71eaf8c4f5fdc24beff90",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 114,
+          "ae2CompleteModelTokens": 414
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 115,
+          "ae2CompleteModelTokens": 416
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "a4b8ee3496372248a8e97ac873b10b3d1f9770548884635a99ff95dcc4a30056",
+          "sourceTokens": {
+            "cl100k_base": 2547,
+            "o200k_base": 2590
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "29e04919fc8cad12ff4c7fd30c5f8f6965f46aeed8d0e2762744864a3c3f6fcf",
+          "sourceTokens": {
+            "cl100k_base": 2314,
+            "o200k_base": 2355
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "97834584254b7d135af801c669e354e33431287444fcee4475f41d8728a8a67a",
+          "sourceTokens": {
+            "cl100k_base": 2348,
+            "o200k_base": 2387
+          }
+        }
+      }
+    },
+    {
+      "id": "nested_lambda/inline",
+      "bodyForm": "nested_lambda",
+      "carrier": "inline",
+      "root": "ast:b3:21630660d6f78c91450fb86c61f586f472a4c002ac08d90904924bd9d9657f94",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 83,
+          "ae2CompleteModelTokens": 389
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 83,
+          "ae2CompleteModelTokens": 387
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "641a970e1e2273ed5eeb37522af1ce554fa9d8865e310050850d1b2d5cc78d29",
+          "sourceTokens": {
+            "cl100k_base": 2154,
+            "o200k_base": 2175
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "c02a157fe50a0c5b54779845d15afb25ccd53254440cc3bf6ad887be671cb59b",
+          "sourceTokens": {
+            "cl100k_base": 1913,
+            "o200k_base": 1930
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "cf1c5849a2c95b8370946fe02a292816591011f15e8faa1c0d03115a069095cc",
+          "sourceTokens": {
+            "cl100k_base": 1944,
+            "o200k_base": 1962
+          }
+        }
+      }
+    },
+    {
+      "id": "nested_lambda/direct_factory",
+      "bodyForm": "nested_lambda",
+      "carrier": "direct_factory",
+      "root": "ast:b3:fd0e17c3b9c09729b0baefe8e3a28d1d7fb70b40bbe961b5d267e3444d6e54b0",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 99,
+          "ae2CompleteModelTokens": 413
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 99,
+          "ae2CompleteModelTokens": 411
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "a3d9d88815f11233d4172a9fd3d05da50d63be003d79d25c5ab74d4b5f7dc2c4",
+          "sourceTokens": {
+            "cl100k_base": 2399,
+            "o200k_base": 2428
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "fa3fbbefec8eb6b276659ea416f9832a85d1f131d47959f3db7c00bd1bea852c",
+          "sourceTokens": {
+            "cl100k_base": 2145,
+            "o200k_base": 2171
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "be7573972046f4dc59b23b986fe20eb855bcaa3eaaceef1496f6dec6b87eaeff",
+          "sourceTokens": {
+            "cl100k_base": 2193,
+            "o200k_base": 2219
+          }
+        }
+      }
+    },
+    {
+      "id": "nested_lambda/block_factory",
+      "bodyForm": "nested_lambda",
+      "carrier": "block_factory",
+      "root": "ast:b3:8d4391fe86a2c8c257c14cc6ee1ce4dc31f8c6ef8dec55cef6349425e89bddcb",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 114,
+          "ae2CompleteModelTokens": 422
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 114,
+          "ae2CompleteModelTokens": 417
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "0f89d1e3cef6d3f1b18bec063d8c9ab241addc76e5cb903b6096f5508d09fbfc",
+          "sourceTokens": {
+            "cl100k_base": 2606,
+            "o200k_base": 2632
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "f5ed9a1eed2c282b5fd826ab39edab1f7d8fd242d7609b45b6da04ba5d8f6934",
+          "sourceTokens": {
+            "cl100k_base": 2349,
+            "o200k_base": 2372
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "46fbbb12ac23a67c6888386255f4950a31a93bce65808e80b414fe942a63c010",
+          "sourceTokens": {
+            "cl100k_base": 2405,
+            "o200k_base": 2428
+          }
+        }
+      }
+    },
+    {
+      "id": "nested_lambda/branch_factory",
+      "bodyForm": "nested_lambda",
+      "carrier": "branch_factory",
+      "root": "ast:b3:32c47e00c8f414967f79565969c2f5e7ad4801e6fc5965b8901e3fbf6867ddb9",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 158,
+          "ae2CompleteModelTokens": 444
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 158,
+          "ae2CompleteModelTokens": 436
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "2783b6b748e2bb03da4c116ee188866f4cd483414dfc71a1dd189a4edbc5be0c",
+          "sourceTokens": {
+            "cl100k_base": 2993,
+            "o200k_base": 2994
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "6257862fe97803fa3820cbb4164c81c342a79aa22767e2edc58c06871fc2251d",
+          "sourceTokens": {
+            "cl100k_base": 2727,
+            "o200k_base": 2726
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "083705f6dff9d9574fb03f2bf5f47c72bec164e3568fd9323c048ba642c8ff9d",
+          "sourceTokens": {
+            "cl100k_base": 2795,
+            "o200k_base": 2793
+          }
+        }
+      }
+    },
+    {
+      "id": "nested_lambda/passed_parameter",
+      "bodyForm": "nested_lambda",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:a7029cd009f51c03db6f384b28443bf84b5f201e99f218a199b6f2392c31ebdd",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 105,
+          "ae2CompleteModelTokens": 410
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 105,
+          "ae2CompleteModelTokens": 405
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "0eed0b9374393e361feb32b6922ba0357cb5541d99d6a8b02267626b51305c94",
+          "sourceTokens": {
+            "cl100k_base": 2580,
+            "o200k_base": 2596
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "675d748e6a98f61288ececa768bda953ea4b3ec2eb7418dee9c22d48ffd3cf83",
+          "sourceTokens": {
+            "cl100k_base": 2349,
+            "o200k_base": 2361
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "0d7e11870439fbf77a06916b0e8b6921b29408129ef419d2d8250e05ab81a236",
+          "sourceTokens": {
+            "cl100k_base": 2379,
+            "o200k_base": 2392
+          }
+        }
+      }
+    },
+    {
+      "id": "fresh_record_field/inline",
+      "bodyForm": "fresh_record_field",
+      "carrier": "inline",
+      "root": "ast:b3:71aac6b36ac3056de60d070a82000ea0d5971876d4ab135133503b554a4af7a8",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 86,
+          "ae2CompleteModelTokens": 413
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 86,
+          "ae2CompleteModelTokens": 411
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "e9db89197ff24d6a594b09c8ed0d090196485b440218b34771371e0811b3383f",
+          "sourceTokens": {
+            "cl100k_base": 2203,
+            "o200k_base": 2234
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "6403e1ce8c19e82c9f63098e191b2a2df244b2c1d6914d8d87d71ffb32a320c2",
+          "sourceTokens": {
+            "cl100k_base": 1967,
+            "o200k_base": 1996
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "8920239428a8b0fd07081695ac5f4a12546f04ef49e9dff52daab054529401f9",
+          "sourceTokens": {
+            "cl100k_base": 1994,
+            "o200k_base": 2021
+          }
+        }
+      }
+    },
+    {
+      "id": "fresh_record_field/direct_factory",
+      "bodyForm": "fresh_record_field",
+      "carrier": "direct_factory",
+      "root": "ast:b3:2e2134d7ab8536e3bbad3c41f85aae13a71a658cd02c3e0f4b098c85c3592a21",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 102,
+          "ae2CompleteModelTokens": 428
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 102,
+          "ae2CompleteModelTokens": 418
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "d0bd1f083f8ddfb9d910aa357a11f638d37682000f13b75d38ad7c83753477d1",
+          "sourceTokens": {
+            "cl100k_base": 2423,
+            "o200k_base": 2416
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "483c25a986009f28c7a60a60083a844b41e2e73f2f8d307bb55ccaf3ed9b9215",
+          "sourceTokens": {
+            "cl100k_base": 2169,
+            "o200k_base": 2159
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "08baf6c58cbeb090377f29156b42c0ca4f9e4be19ab2fc70ca423dc4a88a88b0",
+          "sourceTokens": {
+            "cl100k_base": 2218,
+            "o200k_base": 2207
+          }
+        }
+      }
+    },
+    {
+      "id": "fresh_record_field/block_factory",
+      "bodyForm": "fresh_record_field",
+      "carrier": "block_factory",
+      "root": "ast:b3:03b08d9ee6735de6af01e4ba7956c1ee198f9a2364c5a80c29a0e7e2596b2ee2",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 116,
+          "ae2CompleteModelTokens": 425
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 116,
+          "ae2CompleteModelTokens": 423
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "a2ea90336af1a74774e8f2b742c1ff44c51481e580d4ec1c607a1cd7c6fde6a1",
+          "sourceTokens": {
+            "cl100k_base": 2502,
+            "o200k_base": 2536
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "9ceccb1dec4b9c3fbb427147ee0dde0bdee253b4ff5736f2ba9c2141278b0d3f",
+          "sourceTokens": {
+            "cl100k_base": 2245,
+            "o200k_base": 2277
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "1747c454e5dfbc0166bfc1e6e3623cee551e62b26cd9ed8593c4a8e729a9506c",
+          "sourceTokens": {
+            "cl100k_base": 2302,
+            "o200k_base": 2332
+          }
+        }
+      }
+    },
+    {
+      "id": "fresh_record_field/branch_factory",
+      "bodyForm": "fresh_record_field",
+      "carrier": "branch_factory",
+      "root": "ast:b3:a2065278a20955117b77d5349d6a06cb5ae337d09f3e23eafd54a712c5706811",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 162,
+          "ae2CompleteModelTokens": 456
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 162,
+          "ae2CompleteModelTokens": 452
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "fe464d975385d112d66525f7b9bb2db0e29f1fa790038ab74bf277ecbafeed97",
+          "sourceTokens": {
+            "cl100k_base": 2930,
+            "o200k_base": 2948
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "bc382a8a52c6585aa94606c1eb8def9b85435fef80b47cdb07088544fe8f3ae8",
+          "sourceTokens": {
+            "cl100k_base": 2670,
+            "o200k_base": 2685
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "0d7b571df73081fda5c3ed565a8cf12d4a1a010e04efdd9825aa3dc9a9cf07d4",
+          "sourceTokens": {
+            "cl100k_base": 2734,
+            "o200k_base": 2747
+          }
+        }
+      }
+    },
+    {
+      "id": "fresh_record_field/passed_parameter",
+      "bodyForm": "fresh_record_field",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:c40e85c37ccdfcd469f6b8aeecc52087060f19e59ea1cb0a5ac96fda5526cda7",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 108,
+          "ae2CompleteModelTokens": 431
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 108,
+          "ae2CompleteModelTokens": 430
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "774a26f8bdf01a48f04ff59d244224b9a72d1302b531e86e382a25c7bbfa8eb3",
+          "sourceTokens": {
+            "cl100k_base": 2563,
+            "o200k_base": 2599
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "223f176bb085fa7f638dbc2198c5ae705c2a1c7b28b0fd949cc0feae37c2142a",
+          "sourceTokens": {
+            "cl100k_base": 2328,
+            "o200k_base": 2361
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "d32d9856dbfbbab50cd7bb74d7e23859631ff6a31abb016103e40f350899c2f3",
+          "sourceTokens": {
+            "cl100k_base": 2363,
+            "o200k_base": 2395
+          }
+        }
+      }
+    },
+    {
+      "id": "fixed_wrap/inline",
+      "bodyForm": "fixed_wrap",
+      "carrier": "inline",
+      "root": "ast:b3:1f920daced452cc79c0f4617766a2d74c3c535817b1df9993a8275c47846331e",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 135,
+          "ae2CompleteModelTokens": 404
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 135,
+          "ae2CompleteModelTokens": 401
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "4834d2d5df812683a2450139e803828bfb93be144f4cbaa3227a6ed6d3ce1d2e",
+          "sourceTokens": {
+            "cl100k_base": 2145,
+            "o200k_base": 2178
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "f4716eea6b441eeffc713332ef0dfe3ded85dc666e5a1d2783de87026a0901c2",
+          "sourceTokens": {
+            "cl100k_base": 1915,
+            "o200k_base": 1947
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "4a6a6f3ff2a5256ae78f044c625da456aef4527501f3ffb4e14d9bb10338ad02",
+          "sourceTokens": {
+            "cl100k_base": 1941,
+            "o200k_base": 1971
+          }
+        }
+      }
+    },
+    {
+      "id": "fixed_wrap/direct_factory",
+      "bodyForm": "fixed_wrap",
+      "carrier": "direct_factory",
+      "root": "ast:b3:a9736acd0ccbd7fc6182a3c7a56527413a2559f949826ece9f35491511f3ac52",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 151,
+          "ae2CompleteModelTokens": 407
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 151,
+          "ae2CompleteModelTokens": 404
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "7e45562fe71c37ab07543ffe29ba65ecac987e3ef187bdd5f9fe29fa6c7441ec",
+          "sourceTokens": {
+            "cl100k_base": 2360,
+            "o200k_base": 2390
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "e6d5adf240952dfdbc185b56b581680c61859c798c9acac5b588a94a8d265a6d",
+          "sourceTokens": {
+            "cl100k_base": 2114,
+            "o200k_base": 2141
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "f35281baa2888d76bc2fc1a24e2ea34f2660a27e44793d5cc8d893026adae426",
+          "sourceTokens": {
+            "cl100k_base": 2160,
+            "o200k_base": 2187
+          }
+        }
+      }
+    },
+    {
+      "id": "fixed_wrap/block_factory",
+      "bodyForm": "fixed_wrap",
+      "carrier": "block_factory",
+      "root": "ast:b3:4b69ae0df44f989d04db6a751ba5f1da7cdd45632c1178b5c20808cb8fc35a90",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 167,
+          "ae2CompleteModelTokens": 439
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 167,
+          "ae2CompleteModelTokens": 434
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "0271bc990105f09f4c2583984030b34f98dd029aaa66d9e1cc531123e35e63f6",
+          "sourceTokens": {
+            "cl100k_base": 2678,
+            "o200k_base": 2698
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "b8edad8c175e7d17afbe074b7b2be6c34033f333a785156998f56a7ce02f5079",
+          "sourceTokens": {
+            "cl100k_base": 2422,
+            "o200k_base": 2439
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "d3c99bcb96dbbc37067b5d148903cfe1144c3d878ed833d799ead64d9fde78ac",
+          "sourceTokens": {
+            "cl100k_base": 2474,
+            "o200k_base": 2491
+          }
+        }
+      }
+    },
+    {
+      "id": "fixed_wrap/branch_factory",
+      "bodyForm": "fixed_wrap",
+      "carrier": "branch_factory",
+      "root": "ast:b3:3ec7497aab14cc14ad17eb7cca33327a2df52dea1a3e852a801b915c4b08f49f",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 264,
+          "ae2CompleteModelTokens": 463
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 264,
+          "ae2CompleteModelTokens": 458
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "819c6760a232572c91ded335b9a8a73a84086e2873a90382918dbef9816b47c0",
+          "sourceTokens": {
+            "cl100k_base": 3092,
+            "o200k_base": 3124
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "c14b5a7eabe09b0ffb1c79c0b584e412c1a6c91281ef394a4633da4ea709d003",
+          "sourceTokens": {
+            "cl100k_base": 2831,
+            "o200k_base": 2860
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "e07c7497bfd6da5b7e9e587e6d292bd65a4c31a534f34d6634527c6e5f00ec04",
+          "sourceTokens": {
+            "cl100k_base": 2888,
+            "o200k_base": 2917
+          }
+        }
+      }
+    },
+    {
+      "id": "fixed_wrap/passed_parameter",
+      "bodyForm": "fixed_wrap",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:b377af089ef8c895d8ffc88d91158d64d4f94a302b49bcb9590789ce10b3e155",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 157,
+          "ae2CompleteModelTokens": 423
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 157,
+          "ae2CompleteModelTokens": 417
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "c0b854478fd725cee2cf69924552b1f8cc8ab2733a59ba4e4d556b8c75e6a368",
+          "sourceTokens": {
+            "cl100k_base": 2674,
+            "o200k_base": 2688
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "63213476c2c0db0fd16edf0c31aa2a9b57f2ab6adf15f86d9286ac75ca0ae246",
+          "sourceTokens": {
+            "cl100k_base": 2444,
+            "o200k_base": 2454
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "7cf12c3586e965e0683b14cfeaf53d7439895b3c60e4e59af324839525128859",
+          "sourceTokens": {
+            "cl100k_base": 2470,
+            "o200k_base": 2481
+          }
+        }
+      }
+    },
+    {
+      "id": "lazy_task/inline",
+      "bodyForm": "lazy_task",
+      "carrier": "inline",
+      "root": "ast:b3:ca8d46460eb48c38540403ae808244b775ed801b7bba9cf150a0c85a548e581c",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 81,
+          "ae2CompleteModelTokens": 378
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 81,
+          "ae2CompleteModelTokens": 375
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "39479a20ac1b80810b42d5d1ca36f353539a98f847f0428573c0e85be186ecbd",
+          "sourceTokens": {
+            "cl100k_base": 2116,
+            "o200k_base": 2134
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "8c6bf1e65c765531809bf8cbd31b0537552068c538648f532d95e1bb6c465e15",
+          "sourceTokens": {
+            "cl100k_base": 1873,
+            "o200k_base": 1887
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "8a5cd252f93bd881631fe3d5314461b4aa6da39ba67893bdb65bcf52e4c3166e",
+          "sourceTokens": {
+            "cl100k_base": 1906,
+            "o200k_base": 1921
+          }
+        }
+      }
+    },
+    {
+      "id": "lazy_task/direct_factory",
+      "bodyForm": "lazy_task",
+      "carrier": "direct_factory",
+      "root": "ast:b3:23137b8b2cfcf3cda33da35ad10eee3aae90529f307289056c97832c4a173e66",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 97,
+          "ae2CompleteModelTokens": 414
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 97,
+          "ae2CompleteModelTokens": 408
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "3e33fbd21c707b8df189376d46504f51ae077aa7691f1c0eada3984ad4178820",
+          "sourceTokens": {
+            "cl100k_base": 2446,
+            "o200k_base": 2463
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "ea236bfdc0c2490788a29a1745a0378098b7150b770877ec77e39776c210edbe",
+          "sourceTokens": {
+            "cl100k_base": 2190,
+            "o200k_base": 2204
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "f97ecb4bedbdcee81dd91e4874636d59f4a2f0b2de9c391e88aef1c45cee8b26",
+          "sourceTokens": {
+            "cl100k_base": 2240,
+            "o200k_base": 2254
+          }
+        }
+      }
+    },
+    {
+      "id": "lazy_task/block_factory",
+      "bodyForm": "lazy_task",
+      "carrier": "block_factory",
+      "root": "ast:b3:02f69f620fb1a29665df8f65c4b09368aac0fe302f8a8011ae2b7a65086a1c3c",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 112,
+          "ae2CompleteModelTokens": 419
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 112,
+          "ae2CompleteModelTokens": 414
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "fcd3038e5a8b83c01788fcb2f08c049430871181ae7dd3bea1601a798b8dd825",
+          "sourceTokens": {
+            "cl100k_base": 2606,
+            "o200k_base": 2610
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "979815158daaba8003bdde1b1992c841a60efe596696ee6e33fafa2cf0efd006",
+          "sourceTokens": {
+            "cl100k_base": 2354,
+            "o200k_base": 2353
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "1b8f540af7e792b5414ab6755296b9532dfd782655768d7235882b35115f14f2",
+          "sourceTokens": {
+            "cl100k_base": 2405,
+            "o200k_base": 2406
+          }
+        }
+      }
+    },
+    {
+      "id": "lazy_task/branch_factory",
+      "bodyForm": "lazy_task",
+      "carrier": "branch_factory",
+      "root": "ast:b3:7aba32d36b2426184e5453b1c28b64d8c5f95008c366f7f730b9b350e7829cc4",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 154,
+          "ae2CompleteModelTokens": 437
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 154,
+          "ae2CompleteModelTokens": 432
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "d262624a8b73c8664f091539883b6ffc076f2aa8583b6cf12e68743b91203df3",
+          "sourceTokens": {
+            "cl100k_base": 2967,
+            "o200k_base": 2971
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "c14bd917cea903d5d2b0bdbaf8f07a37fd2f968984aa469c39f1cd13ce8d10ad",
+          "sourceTokens": {
+            "cl100k_base": 2705,
+            "o200k_base": 2705
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "a02f1e306e750fb675784d8ebdd0b25f805e335f892b0322804cf4ee106fb497",
+          "sourceTokens": {
+            "cl100k_base": 2769,
+            "o200k_base": 2770
+          }
+        }
+      }
+    },
+    {
+      "id": "lazy_task/passed_parameter",
+      "bodyForm": "lazy_task",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:d1c2329c2c1bb1a0dea1394e4c1faf05623aa692f154b6415043ac703e78e61a",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 103,
+          "ae2CompleteModelTokens": 414
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 103,
+          "ae2CompleteModelTokens": 409
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "1e61920bdb04309e581fb94ffb097626da9dc93712d01e54f9f74a0c1cc0a7b5",
+          "sourceTokens": {
+            "cl100k_base": 2569,
+            "o200k_base": 2591
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "905d7c772a132db56d8359fa283863b2610b689d3c97297f2ce8896d7264d17f",
+          "sourceTokens": {
+            "cl100k_base": 2335,
+            "o200k_base": 2356
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "26c7f0e86ac8e44c84f9aed8aec764651d0db175c3f742ba7774891e40e34e10",
+          "sourceTokens": {
+            "cl100k_base": 2368,
+            "o200k_base": 2387
+          }
+        }
+      }
+    },
+    {
+      "id": "task_record_field/inline",
+      "bodyForm": "task_record_field",
+      "carrier": "inline",
+      "root": "ast:b3:6bf2275fd2a9b492d988c3f7069c2dbacf4230eedd36b564393d15f4b3606f02",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 90,
+          "ae2CompleteModelTokens": 405
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 90,
+          "ae2CompleteModelTokens": 408
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "1af083dd6c0927592e6c9263f568391cc0fc42b5e86640ec3e2cdcf0e62dbbb2",
+          "sourceTokens": {
+            "cl100k_base": 2178,
+            "o200k_base": 2223
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "c89ac1ebe261521bf244a58cbcd484cd9bcc77483c265b0ed6ae007f96ef25e4",
+          "sourceTokens": {
+            "cl100k_base": 1937,
+            "o200k_base": 1980
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "b025a042571015607f73f39987b2c2f48fae11e8fea47c73dc243e4027279424",
+          "sourceTokens": {
+            "cl100k_base": 1969,
+            "o200k_base": 2010
+          }
+        }
+      }
+    },
+    {
+      "id": "task_record_field/direct_factory",
+      "bodyForm": "task_record_field",
+      "carrier": "direct_factory",
+      "root": "ast:b3:7afdd4112af1bfe86b34f69f2cb2a8e62bb09c64c01c96f71a10e47d55c0dd84",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 106,
+          "ae2CompleteModelTokens": 421
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 106,
+          "ae2CompleteModelTokens": 419
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "658bf9499ffb0fdde7962c7c8682c2feb5f3a2a7667b440c5c7683aebd592b09",
+          "sourceTokens": {
+            "cl100k_base": 2478,
+            "o200k_base": 2494
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "d8cbb5e521ff934019493710a55b44b06ea522b61918015cd1ee0f29dd1ebd55",
+          "sourceTokens": {
+            "cl100k_base": 2225,
+            "o200k_base": 2236
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "533463596a4bf88fc6a641d89d1c703e4dc8bad329577ed750e0933d71adee90",
+          "sourceTokens": {
+            "cl100k_base": 2273,
+            "o200k_base": 2285
+          }
+        }
+      }
+    },
+    {
+      "id": "task_record_field/block_factory",
+      "bodyForm": "task_record_field",
+      "carrier": "block_factory",
+      "root": "ast:b3:3fa4242e2744411e3f46d8c699f9654a3b1c8d166c53f710c45a0e72c80a3ac6",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 120,
+          "ae2CompleteModelTokens": 437
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 120,
+          "ae2CompleteModelTokens": 437
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "9ce4302e23924c360a4522a79d6305482160a63387e49f7550eaafe3d6458b1a",
+          "sourceTokens": {
+            "cl100k_base": 2656,
+            "o200k_base": 2686
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "88610c15fdabfe2e7f3ec582156eef15e167623dc981f2812a8dbb191c14cfea",
+          "sourceTokens": {
+            "cl100k_base": 2400,
+            "o200k_base": 2429
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "01e102e18ce17272e7762d75f017171a449e66408c11baf522b08c394827d6bf",
+          "sourceTokens": {
+            "cl100k_base": 2456,
+            "o200k_base": 2482
+          }
+        }
+      }
+    },
+    {
+      "id": "task_record_field/branch_factory",
+      "bodyForm": "task_record_field",
+      "carrier": "branch_factory",
+      "root": "ast:b3:f4659aa162b3772883340ee07b32a22ede236933796c13c15e6cabcbb385983e",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 170,
+          "ae2CompleteModelTokens": 452
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 170,
+          "ae2CompleteModelTokens": 448
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "37130e4f31f92fa59ad4af2757adc9e450721a261d4a845f1cae6951ee379726",
+          "sourceTokens": {
+            "cl100k_base": 3110,
+            "o200k_base": 3124
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "a78237c1d35b6a97a0b1c8a8a78f559446b92510dbd96cb496371d5b9185ad16",
+          "sourceTokens": {
+            "cl100k_base": 2844,
+            "o200k_base": 2857
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "8842996b6f33c824b5758a2a39be775fadd119f2bae91984a1b2056293aab04e",
+          "sourceTokens": {
+            "cl100k_base": 2914,
+            "o200k_base": 2923
+          }
+        }
+      }
+    },
+    {
+      "id": "task_record_field/passed_parameter",
+      "bodyForm": "task_record_field",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:0a87955125ff4e1c0f4e12a03b1bbe59f0eb5615b265c9b7a6cb5c1607a210a5",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 112,
+          "ae2CompleteModelTokens": 432
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 112,
+          "ae2CompleteModelTokens": 432
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "round_trip",
+          "sourceSha256": "3e0acf15be322971841de5a955fb4d72648e45be64078f7aa96af41db1201e8e",
+          "sourceTokens": {
+            "cl100k_base": 2622,
+            "o200k_base": 2670
+          }
+        },
+        "python": {
+          "status": "round_trip",
+          "sourceSha256": "e7b079d7ac74a02be6728d4ba40ac9d5a846685d7ddb96148db975ad4e82e5c4",
+          "sourceTokens": {
+            "cl100k_base": 2388,
+            "o200k_base": 2435
+          }
+        },
+        "rust": {
+          "status": "round_trip",
+          "sourceSha256": "43be852cb632bfa79680647f4ff8266b56d83af718dc21b4c552e2484f7c02a8",
+          "sourceTokens": {
+            "cl100k_base": 2422,
+            "o200k_base": 2466
+          }
+        }
+      }
+    },
+    {
+      "id": "task_identity/inline",
+      "bodyForm": "task_identity",
+      "carrier": "inline",
+      "root": "ast:b3:f6d205c1cedf5cfe74a0eac0a5c5f3ae621b03b400ebd3b23aeb9c0a79e17c25",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 93,
+          "ae2CompleteModelTokens": 401
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 93,
+          "ae2CompleteModelTokens": 400
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        }
+      }
+    },
+    {
+      "id": "task_identity/direct_factory",
+      "bodyForm": "task_identity",
+      "carrier": "direct_factory",
+      "root": "ast:b3:8e6df2688d2a4557b61065f78c04f4aeea8b8cfcf5d3b75b5440cb81ab0e6589",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 109,
+          "ae2CompleteModelTokens": 424
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 109,
+          "ae2CompleteModelTokens": 420
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        }
+      }
+    },
+    {
+      "id": "task_identity/block_factory",
+      "bodyForm": "task_identity",
+      "carrier": "block_factory",
+      "root": "ast:b3:a03091051046112677aaee3928f99fd0939c643f0ebaa9932f12863d775c3ae1",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 125,
+          "ae2CompleteModelTokens": 419
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 125,
+          "ae2CompleteModelTokens": 417
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        }
+      }
+    },
+    {
+      "id": "task_identity/branch_factory",
+      "bodyForm": "task_identity",
+      "carrier": "branch_factory",
+      "root": "ast:b3:1042cb82f173cadb4412d1d7220230af1a8f24f2e0c55df021a13ecc02a52fcc",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 180,
+          "ae2CompleteModelTokens": 456
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 180,
+          "ae2CompleteModelTokens": 451
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a directly awaited new task"
+        }
+      }
+    },
+    {
+      "id": "task_identity/passed_parameter",
+      "bodyForm": "task_identity",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:971abe83a7a84b09bf99b964ab5f41faa592745bc9a73b548625149e0c2dda84",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 115,
+          "ae2CompleteModelTokens": 409
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 115,
+          "ae2CompleteModelTokens": 407
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "unqualified_native",
+          "reason": "passed closure has no checked certificate; contract guard refuses at execution",
+          "sourceSha256": "344aa74dffa986a553bb96ecc5662a0bb1785c7daa4dd6d64a17fc61cba80801"
+        },
+        "python": {
+          "status": "unqualified_native",
+          "reason": "passed closure has no checked certificate; contract guard refuses at execution",
+          "sourceSha256": "326203c08ac1ef2924b6bf2137f456fc8107b466379593b065bbdc75796a58dc"
+        },
+        "rust": {
+          "status": "unqualified_native",
+          "reason": "passed closure has no checked certificate; contract guard refuses at execution",
+          "sourceSha256": "81fdec157b0d7d5b75da9a8fdeee0628c3a6d3d740b19165eecb01b332672b1f"
+        }
+      }
+    },
+    {
+      "id": "task_sequence_length/inline",
+      "bodyForm": "task_sequence_length",
+      "carrier": "inline",
+      "root": "ast:b3:21d26c6326df5cb262503c99a661e8496e155db94bdbe543639d15e64f9b6215",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 90,
+          "ae2CompleteModelTokens": 399
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 91,
+          "ae2CompleteModelTokens": 390
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        }
+      }
+    },
+    {
+      "id": "task_sequence_length/direct_factory",
+      "bodyForm": "task_sequence_length",
+      "carrier": "direct_factory",
+      "root": "ast:b3:d65d767594315c2929061a35cfa279d156c941db7685f7558be42918ffb80d6c",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 105,
+          "ae2CompleteModelTokens": 401
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 106,
+          "ae2CompleteModelTokens": 397
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        }
+      }
+    },
+    {
+      "id": "task_sequence_length/block_factory",
+      "bodyForm": "task_sequence_length",
+      "carrier": "block_factory",
+      "root": "ast:b3:d65050d43858a4de43ca99653846a2aeded40b1b2036ac118fbe9228eab3220d",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 120,
+          "ae2CompleteModelTokens": 415
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 121,
+          "ae2CompleteModelTokens": 414
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        }
+      }
+    },
+    {
+      "id": "task_sequence_length/branch_factory",
+      "bodyForm": "task_sequence_length",
+      "carrier": "branch_factory",
+      "root": "ast:b3:373dcfcb9a7dcd292064f69e71aa472cb346295c7f897a289cecdd7f592a8384",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 170,
+          "ae2CompleteModelTokens": 450
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 172,
+          "ae2CompleteModelTokens": 447
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract task requires a scalar callback-free body"
+        }
+      }
+    },
+    {
+      "id": "task_sequence_length/passed_parameter",
+      "bodyForm": "task_sequence_length",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:2c2180adfb787108d2d177c407809276735961b8d6d6cc0b51b7a2cb99b8084b",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 112,
+          "ae2CompleteModelTokens": 419
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 113,
+          "ae2CompleteModelTokens": 414
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "unqualified_native",
+          "reason": "passed closure has no checked certificate; contract guard refuses at execution",
+          "sourceSha256": "683b760b98f15f8308eaee25ecdec84d75be63cd98638bade717b130064196b4"
+        },
+        "python": {
+          "status": "unqualified_native",
+          "reason": "passed closure has no checked certificate; contract guard refuses at execution",
+          "sourceSha256": "b0abe466ffed7e198d322b749ef180123812f73b431748f3ea98c161395a0c5e"
+        },
+        "rust": {
+          "status": "unqualified_native",
+          "reason": "passed closure has no checked certificate; contract guard refuses at execution",
+          "sourceSha256": "52a7411c59b4048bf6da867defd618748828eebb85f841944c33f7df5d3b4e13"
+        }
+      }
+    },
+    {
+      "id": "task_record_identity/inline",
+      "bodyForm": "task_record_identity",
+      "carrier": "inline",
+      "root": "ast:b3:354d76d7a745f4ca5447a8ea1a6002d96d0aac4b0872cfa43ca5140d812843db",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 113,
+          "ae2CompleteModelTokens": 421
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 113,
+          "ae2CompleteModelTokens": 415
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        }
+      }
+    },
+    {
+      "id": "task_record_identity/direct_factory",
+      "bodyForm": "task_record_identity",
+      "carrier": "direct_factory",
+      "root": "ast:b3:f0a8ca1703131e0527f5dc8d74102d642eb4631b79fac9268921082467b5ac2e",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 129,
+          "ae2CompleteModelTokens": 423
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 129,
+          "ae2CompleteModelTokens": 420
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        }
+      }
+    },
+    {
+      "id": "task_record_identity/block_factory",
+      "bodyForm": "task_record_identity",
+      "carrier": "block_factory",
+      "root": "ast:b3:78f8054972dbc4bfd70ceaf40f57cdbb75c04efb6aed278f874354d922c27a74",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 145,
+          "ae2CompleteModelTokens": 440
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 145,
+          "ae2CompleteModelTokens": 434
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        }
+      }
+    },
+    {
+      "id": "task_record_identity/branch_factory",
+      "bodyForm": "task_record_identity",
+      "carrier": "branch_factory",
+      "root": "ast:b3:cf0ad3c4c34827b57d2a02b3f7cbb01cca6a8df2be1e330ce7e6a5c6331360e5",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 220,
+          "ae2CompleteModelTokens": 482
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 220,
+          "ae2CompleteModelTokens": 479
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        },
+        "python": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        },
+        "rust": {
+          "status": "refused",
+          "reason": "TypeError: contract record task requires an immediate scalar field read"
+        }
+      }
+    },
+    {
+      "id": "task_record_identity/passed_parameter",
+      "bodyForm": "task_record_identity",
+      "carrier": "passed_parameter",
+      "root": "ast:b3:8aca925941c4c9174aeebf5a3952e3862192f191509137bd6f0ae1813d1a12a6",
+      "reference": "pass",
+      "costs": {
+        "cl100k_base": {
+          "legacyTsReviewTokens": 135,
+          "ae2CompleteModelTokens": 439
+        },
+        "o200k_base": {
+          "legacyTsReviewTokens": 135,
+          "ae2CompleteModelTokens": 433
+        }
+      },
+      "native": {
+        "typescript": {
+          "status": "unqualified_native",
+          "reason": "passed closure has no checked certificate; contract guard refuses at execution",
+          "sourceSha256": "734353ba93ad4905cb4479a7cd4803ea5d1fc683625e0475cfba672474bf2e65"
+        },
+        "python": {
+          "status": "unqualified_native",
+          "reason": "passed closure has no checked certificate; contract guard refuses at execution",
+          "sourceSha256": "39348a797a6063c6bf72e5dc9bcd0f5d52d4f074fb139c7c28891babbd37506d"
+        },
+        "rust": {
+          "status": "unqualified_native",
+          "reason": "passed closure has no checked certificate; contract guard refuses at execution",
+          "sourceSha256": "7df9af4a781bfc96ec6925cf85c5e154dc9a5bbc770298b4ff4efb5387c8a508"
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "cl100k_base": {
+      "legacyTsReviewTokens": 9119,
+      "ae2CompleteModelTokens": 31522,
+      "ratioOfSums": 0.28929001966880274,
+      "meetsFourfoldDiagnostic": false
+    },
+    "o200k_base": {
+      "legacyTsReviewTokens": 9137,
+      "ae2CompleteModelTokens": 31217,
+      "ratioOfSums": 0.2926930838965948,
+      "meetsFourfoldDiagnostic": false
+    }
+  }
+}
