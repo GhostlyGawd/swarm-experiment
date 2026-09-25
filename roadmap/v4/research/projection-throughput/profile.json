@@ -1,0 +1,12 @@
+{
+  "format": "aether.projection-throughput-profile/1",
+  "targetLinesPerSecond": 75000,
+  "targets": ["typescript", "python", "rust"],
+  "workloads": ["scalar-math", "loop-contract", "composite-alias-collections", "full-ledger", "strings-linked-imports", "generics-nested-import", "nested-exact-address-import", "atomic-nested-return-fault"],
+  "variantsPerWorkload": ["original", "one-literal-edit"],
+  "warmups": 1,
+  "measuredTrials": 5,
+  "timedBoundary": "For each target/workload/variant, executableBundle on the actual Aether module and complete addressed closure, then parseExecutableBundle with exact entry and every dependency root checked. Source line count is entry plus emitted dependency source, excluding separately reported target runtime support. Source hashing, corpus setup, diagnostics and raw artifact writes occur outside timed spans.",
+  "passRule": "Every measured trial of each target must reach at least 75000 generated source lines per second across projection plus parse/identity. All roots and dependency addresses must roundtrip; zero tasks may be skipped. Projection-only and aggregate rates are diagnostics, not substitutes.",
+  "scope": "Reproducible preflight on eight authored workloads and one exact-root edit each, including linked/nested modules. No production repository distribution, external target compiler execution or release-wide NFR-09 qualification is claimed."
+}
