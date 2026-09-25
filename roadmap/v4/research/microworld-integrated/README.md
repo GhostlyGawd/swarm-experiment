@@ -41,6 +41,9 @@ does not induce a real OS allocation failure or qualify production RSS limits.
 [Exact-source `/2` evidence](../../../../docs/implementation/v4/evidence/t303-rss-497da3a/REVIEW.md)
 records 15/15 signed good cases, four durable broken-root replays and a 67.14 MB
 observed OS RSS rise during the separate signed resource case.
+The later [Linux UID 10001 smoke test](../../../../docs/implementation/v4/evidence/t303-linux-rss-76ea95c/REVIEW.md)
+passes the signed resource case using kernel `/proc` RSS and a read-only source
+mount; candidate and services still share that UID.
 
 ```sh
 node --experimental-strip-types roadmap/v4/research/microworld-integrated/campaign.ts --verify docs/implementation/v4/evidence/t303-integrated-82d88b6

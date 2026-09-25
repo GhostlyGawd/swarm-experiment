@@ -1,5 +1,9 @@
 # Implementation specification changelog
 
+## Linux resident-pressure reader and signed campaign smoke test — 2026-09-24
+
+- Added a Linux kernel `/proc/<pid>/status` RSS reader to the existing opt-in physical-pressure harness while preserving macOS `ps` behavior and the 64 MiB/48 MiB threshold. The clean `76ea95c` [cross-OS checkpoint](evidence/t303-linux-rss-76ea95c/REVIEW.md) passes **7/7** integrated tests on macOS, **6/6** selected signed integrated tests and **1/1** witnessed external-sink test in a read-only mounted Node 26 container under Linux UID 10001. The minimal image lacks Git, so the CLI tamper-audit case remained a macOS check. Candidate and services still shared one Linux UID; this does not qualify distinct custody, real allocation failure or T3-03/G1. Tracker remains **20/62**.
+
 ## Combined AE7 and NFR-09 focused checkpoint — 2026-09-24
 
 - The opt-in [AE7 seeded cold exchange](../../../roadmap/v4/research/agent-ir7/README.md) regenerates exact SymbolSpace identities from a checked seed/index sequence, retains the complete 256-bit AST root and delegates checked R7/E7 edits to AE6 semantics. On eight preregistered authored modules, cl100k cold TypeScript/AE7 is **1,563/1,716 tokens** and complete changed sessions **4,331/3,712** (1.167×); both miss the unchanged **4×** target. The code and raw verifier are pinned at `2a53bc2`; no representative FR-1.2/Q03 pass is claimed.

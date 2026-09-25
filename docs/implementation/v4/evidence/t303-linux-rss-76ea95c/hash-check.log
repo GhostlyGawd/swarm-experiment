@@ -1,0 +1,6 @@
+macos-tests.log: OK
+linux-integrated-tests.log: OK
+linux-external-test.log: OK
+typecheck.log: OK
+roadmap.log: OK
+build.log: OK
