@@ -1,0 +1,1109 @@
+{
+  "format": "aether.projection-throughput-trial/1",
+  "trial": 2,
+  "targets": [
+    {
+      "target": "typescript",
+      "wallNs": "271115709",
+      "projectionNs": "143770124",
+      "parseIdentityNs": "127190542",
+      "lines": 3174,
+      "outputs": 16,
+      "wallLinesPerSecond": 11707.178502150166,
+      "projectionOnlyLinesPerSecond": 22076.909386264422,
+      "pass": false
+    },
+    {
+      "target": "python",
+      "wallNs": "261852250",
+      "projectionNs": "140015625",
+      "parseIdentityNs": "121715332",
+      "lines": 2736,
+      "outputs": 16,
+      "wallLinesPerSecond": 10448.640406947046,
+      "projectionOnlyLinesPerSecond": 19540.67626380984,
+      "pass": false
+    },
+    {
+      "target": "rust",
+      "wallNs": "265390208",
+      "projectionNs": "139821041",
+      "parseIdentityNs": "125442000",
+      "lines": 2992,
+      "outputs": 16,
+      "wallLinesPerSecond": 11273.96531525383,
+      "projectionOnlyLinesPerSecond": 21398.782176138997,
+      "pass": false
+    }
+  ],
+  "outputs": [
+    {
+      "task": "scalar-math/original",
+      "workload": "scalar-math",
+      "variant": "original",
+      "target": "typescript",
+      "root": "ast:b3:0853be07294d280621ece1431932e001ed5c1cffbd911c7576a258971c22b337",
+      "dependencyRoots": [],
+      "sourceLines": 50,
+      "dependencyLines": 0,
+      "totalLines": 50,
+      "sourceBytes": 3066,
+      "runtimeBytes": 4720,
+      "sourceSha256": "7ae7fecf1361364f253e5f7e3fd9fa2b6b816c80f62e6cb40db655885e2f06a7",
+      "runtimeSha256": "924dc81b10149da3ac067ea31ce15eb69d426026564398538bea0c249218252c",
+      "dependencyFiles": [],
+      "projectionNs": "1201166",
+      "parseIdentityNs": "840917"
+    },
+    {
+      "task": "scalar-math/one-literal-edit",
+      "workload": "scalar-math",
+      "variant": "one-literal-edit",
+      "target": "typescript",
+      "root": "ast:b3:aaa00f1b4132eaf0d1f03e245e9de1c0f8d03932a5aeb96361a32b5c0f9316b8",
+      "dependencyRoots": [],
+      "sourceLines": 50,
+      "dependencyLines": 0,
+      "totalLines": 50,
+      "sourceBytes": 3066,
+      "runtimeBytes": 4720,
+      "sourceSha256": "7c92381dd8850358d5030cfb14e9b459ffe1355da99994c6a094c62aa4016499",
+      "runtimeSha256": "924dc81b10149da3ac067ea31ce15eb69d426026564398538bea0c249218252c",
+      "dependencyFiles": [],
+      "projectionNs": "1264292",
+      "parseIdentityNs": "863375"
+    },
+    {
+      "task": "loop-contract/original",
+      "workload": "loop-contract",
+      "variant": "original",
+      "target": "typescript",
+      "root": "ast:b3:feed0ad7a35a3a7cded01efe5855089e4968038a8cb0722100471598d0e75750",
+      "dependencyRoots": [],
+      "sourceLines": 40,
+      "dependencyLines": 0,
+      "totalLines": 40,
+      "sourceBytes": 2650,
+      "runtimeBytes": 4720,
+      "sourceSha256": "15c8021f3c5d8c5af9f3e3e7b49b1d2941217eaa76cd4aa1ead1773cd4aaa9a6",
+      "runtimeSha256": "924dc81b10149da3ac067ea31ce15eb69d426026564398538bea0c249218252c",
+      "dependencyFiles": [],
+      "projectionNs": "2392000",
+      "parseIdentityNs": "1583416"
+    },
+    {
+      "task": "loop-contract/one-literal-edit",
+      "workload": "loop-contract",
+      "variant": "one-literal-edit",
+      "target": "typescript",
+      "root": "ast:b3:45541d36c36371a9afe14d6aaad547f8059e6183a6026afbe29d09b1a4a10eca",
+      "dependencyRoots": [],
+      "sourceLines": 40,
+      "dependencyLines": 0,
+      "totalLines": 40,
+      "sourceBytes": 2650,
+      "runtimeBytes": 4720,
+      "sourceSha256": "6814922d31f48bbeb27a0292be0751c63e83e093a6d1556c3d91539ce423cd5a",
+      "runtimeSha256": "924dc81b10149da3ac067ea31ce15eb69d426026564398538bea0c249218252c",
+      "dependencyFiles": [],
+      "projectionNs": "1838208",
+      "parseIdentityNs": "1316375"
+    },
+    {
+      "task": "composite-alias-collections/original",
+      "workload": "composite-alias-collections",
+      "variant": "original",
+      "target": "typescript",
+      "root": "ast:b3:0ebbbd5edbb4ad56f75f86626c6fdb455b27999dd84f30d90f9b42e1cf5ea282",
+      "dependencyRoots": [],
+      "sourceLines": 78,
+      "dependencyLines": 0,
+      "totalLines": 78,
+      "sourceBytes": 5702,
+      "runtimeBytes": 11829,
+      "sourceSha256": "1eda5e0400bc6c9438f9e667cf75ab14977b310b0424f7563bbba90d0665131d",
+      "runtimeSha256": "1704a8703e1221fe8253433eff89ed1c7acaf7aca5fff746235890dc7b94fb0d",
+      "dependencyFiles": [],
+      "projectionNs": "2365458",
+      "parseIdentityNs": "2528167"
+    },
+    {
+      "task": "composite-alias-collections/one-literal-edit",
+      "workload": "composite-alias-collections",
+      "variant": "one-literal-edit",
+      "target": "typescript",
+      "root": "ast:b3:a8464f3868974656eb05d330f0d728bd2adcba86e0ced202dd922f40c4f914ee",
+      "dependencyRoots": [],
+      "sourceLines": 78,
+      "dependencyLines": 0,
+      "totalLines": 78,
+      "sourceBytes": 5702,
+      "runtimeBytes": 11829,
+      "sourceSha256": "aecdc8df37c412754a06740260aaa7b076b6306ec19758c07f7dfbc93ee090bc",
+      "runtimeSha256": "1704a8703e1221fe8253433eff89ed1c7acaf7aca5fff746235890dc7b94fb0d",
+      "dependencyFiles": [],
+      "projectionNs": "2367417",
+      "parseIdentityNs": "2056042"
+    },
+    {
+      "task": "full-ledger/original",
+      "workload": "full-ledger",
+      "variant": "original",
+      "target": "typescript",
+      "root": "ast:b3:722b9744f7520a7fb78c0afbbed88d16434c47d75af3211d7618dadebfb8dcca",
+      "dependencyRoots": [],
+      "sourceLines": 157,
+      "dependencyLines": 0,
+      "totalLines": 157,
+      "sourceBytes": 15829,
+      "runtimeBytes": 11829,
+      "sourceSha256": "61ace2b94a921aef75efb11eb4ed838ea305de5623dfc51d8e155a5c44b668d7",
+      "runtimeSha256": "1704a8703e1221fe8253433eff89ed1c7acaf7aca5fff746235890dc7b94fb0d",
+      "dependencyFiles": [],
+      "projectionNs": "9744500",
+      "parseIdentityNs": "7272334"
+    },
+    {
+      "task": "full-ledger/one-literal-edit",
+      "workload": "full-ledger",
+      "variant": "one-literal-edit",
+      "target": "typescript",
+      "root": "ast:b3:c0db4daa0db62fc8161430a9ac1c15561062c1f725ac2b1fd6f5df15cee5d487",
+      "dependencyRoots": [],
+      "sourceLines": 157,
+      "dependencyLines": 0,
+      "totalLines": 157,
+      "sourceBytes": 15829,
+      "runtimeBytes": 11829,
+      "sourceSha256": "f6c112bff04ec79451fff1192e271d97f18516721238ac64b3af83002ce1a185",
+      "runtimeSha256": "1704a8703e1221fe8253433eff89ed1c7acaf7aca5fff746235890dc7b94fb0d",
+      "dependencyFiles": [],
+      "projectionNs": "9957000",
+      "parseIdentityNs": "6714500"
+    },
+    {
+      "task": "strings-linked-imports/original",
+      "workload": "strings-linked-imports",
+      "variant": "original",
+      "target": "typescript",
+      "root": "ast:b3:baa0baae0491529161e589cd828ae0d7808bea895041838a7500a637172fd21f",
+      "dependencyRoots": [
+        "ast:b3:0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a",
+        "ast:b3:80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6"
+      ],
+      "sourceLines": 78,
+      "dependencyLines": 219,
+      "totalLines": 297,
+      "sourceBytes": 7855,
+      "runtimeBytes": 74573,
+      "sourceSha256": "d27db5fedc98e9cb3b9aaa961b6760dadddfe69f5c7fe78fc3e54b526d320493",
+      "runtimeSha256": "1c079e2d0dc8b83c840c832f2a249db3564296e3e1861b926abdf7815ae3ab1d",
+      "dependencyFiles": [
+        {
+          "name": "aether_0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a.ts",
+          "lines": 30,
+          "bytes": 5206,
+          "sha256": "4eed054a506b557ec9ed7bd2c40a8207ecb8b160b24a389f8d81f398409fb77b"
+        },
+        {
+          "name": "aether_80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6.ts",
+          "lines": 189,
+          "bytes": 11607,
+          "sha256": "1cb140984387f66e6f51d9bc13deadc7755bbc41c8712fb5ea1ccb21ba6b1f92"
+        }
+      ],
+      "projectionNs": "21515167",
+      "parseIdentityNs": "21297625"
+    },
+    {
+      "task": "strings-linked-imports/one-literal-edit",
+      "workload": "strings-linked-imports",
+      "variant": "one-literal-edit",
+      "target": "typescript",
+      "root": "ast:b3:f7a11a5202c2b37ff9173ccfeca1b46fdd9494cc9cfddb7f024cf7f9a7e288d2",
+      "dependencyRoots": [
+        "ast:b3:0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a",
+        "ast:b3:80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6"
+      ],
+      "sourceLines": 78,
+      "dependencyLines": 219,
+      "totalLines": 297,
+      "sourceBytes": 7855,
+      "runtimeBytes": 74573,
+      "sourceSha256": "460e0a860eb35fa048c909405e8c832a4c186b50f90785b68d1b2c3a94017719",
+      "runtimeSha256": "1c079e2d0dc8b83c840c832f2a249db3564296e3e1861b926abdf7815ae3ab1d",
+      "dependencyFiles": [
+        {
+          "name": "aether_0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a.ts",
+          "lines": 30,
+          "bytes": 5206,
+          "sha256": "4eed054a506b557ec9ed7bd2c40a8207ecb8b160b24a389f8d81f398409fb77b"
+        },
+        {
+          "name": "aether_80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6.ts",
+          "lines": 189,
+          "bytes": 11607,
+          "sha256": "1cb140984387f66e6f51d9bc13deadc7755bbc41c8712fb5ea1ccb21ba6b1f92"
+        }
+      ],
+      "projectionNs": "22136792",
+      "parseIdentityNs": "20751209"
+    },
+    {
+      "task": "generics-nested-import/original",
+      "workload": "generics-nested-import",
+      "variant": "original",
+      "target": "typescript",
+      "root": "ast:b3:e9e49ad15ca18e7f7690df129dba49a27f30611eb0eef4e62c93c24315fdab95",
+      "dependencyRoots": [
+        "ast:b3:0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed"
+      ],
+      "sourceLines": 78,
+      "dependencyLines": 232,
+      "totalLines": 310,
+      "sourceBytes": 12913,
+      "runtimeBytes": 77987,
+      "sourceSha256": "7bf752c1b4d66d310f55ae60d8b1a38cca065b319385bf115bf42596c6155e20",
+      "runtimeSha256": "693f890cd9d2dc5cf98ae526e05e8afb785303e7478fb847fdba03c04f6dcd39",
+      "dependencyFiles": [
+        {
+          "name": "aether_0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed.ts",
+          "lines": 232,
+          "bytes": 20521,
+          "sha256": "edeb4d2e2fde72c14a34ea2897c717212cb8c1719c7c0e50d9ff6145ec58883d"
+        }
+      ],
+      "projectionNs": "22536500",
+      "parseIdentityNs": "21308208"
+    },
+    {
+      "task": "generics-nested-import/one-literal-edit",
+      "workload": "generics-nested-import",
+      "variant": "one-literal-edit",
+      "target": "typescript",
+      "root": "ast:b3:2ef5b5aabcf31efd8872a18131050918116639b2ff1a4a39986f238c3ce1f7e7",
+      "dependencyRoots": [
+        "ast:b3:0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed"
+      ],
+      "sourceLines": 78,
+      "dependencyLines": 232,
+      "totalLines": 310,
+      "sourceBytes": 12913,
+      "runtimeBytes": 77987,
+      "sourceSha256": "0703965a4c54c2883cd56fe5398171751722b4f60a28a865f4160d0da12b6f52",
+      "runtimeSha256": "693f890cd9d2dc5cf98ae526e05e8afb785303e7478fb847fdba03c04f6dcd39",
+      "dependencyFiles": [
+        {
+          "name": "aether_0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed.ts",
+          "lines": 232,
+          "bytes": 20521,
+          "sha256": "edeb4d2e2fde72c14a34ea2897c717212cb8c1719c7c0e50d9ff6145ec58883d"
+        }
+      ],
+      "projectionNs": "21568458",
+      "parseIdentityNs": "19884041"
+    },
+    {
+      "task": "nested-exact-address-import/original",
+      "workload": "nested-exact-address-import",
+      "variant": "original",
+      "target": "typescript",
+      "root": "ast:b3:4dd7f06bc5f430c47558ec57148ce0c0284e34047fa6fbc832c7c0affe82ad87",
+      "dependencyRoots": [
+        "ast:b3:23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507"
+      ],
+      "sourceLines": 30,
+      "dependencyLines": 26,
+      "totalLines": 56,
+      "sourceBytes": 3228,
+      "runtimeBytes": 77987,
+      "sourceSha256": "52283dc827d3fa6450a3099c5a92df9f4969f8b8c67079b8eb9ef5214b4ad476",
+      "runtimeSha256": "693f890cd9d2dc5cf98ae526e05e8afb785303e7478fb847fdba03c04f6dcd39",
+      "dependencyFiles": [
+        {
+          "name": "aether_23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507.ts",
+          "lines": 26,
+          "bytes": 2329,
+          "sha256": "309eaaef24ac39933cab90029884a55a1c2e83eb40a5b29ac3018b0f5458a94e"
+        }
+      ],
+      "projectionNs": "3130458",
+      "parseIdentityNs": "2508167"
+    },
+    {
+      "task": "nested-exact-address-import/one-literal-edit",
+      "workload": "nested-exact-address-import",
+      "variant": "one-literal-edit",
+      "target": "typescript",
+      "root": "ast:b3:ff1900469cf9be489a918aeee33e9e8946ef4343d76ffa0826dd6852d56229d0",
+      "dependencyRoots": [
+        "ast:b3:23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507"
+      ],
+      "sourceLines": 30,
+      "dependencyLines": 26,
+      "totalLines": 56,
+      "sourceBytes": 3228,
+      "runtimeBytes": 77987,
+      "sourceSha256": "7bc9a67b0e6da407908d6ad45f3eb0e9de40d4cf2c30261a794ec467de1cc0b5",
+      "runtimeSha256": "693f890cd9d2dc5cf98ae526e05e8afb785303e7478fb847fdba03c04f6dcd39",
+      "dependencyFiles": [
+        {
+          "name": "aether_23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507.ts",
+          "lines": 26,
+          "bytes": 2329,
+          "sha256": "309eaaef24ac39933cab90029884a55a1c2e83eb40a5b29ac3018b0f5458a94e"
+        }
+      ],
+      "projectionNs": "2629583",
+      "parseIdentityNs": "2904750"
+    },
+    {
+      "task": "atomic-nested-return-fault/original",
+      "workload": "atomic-nested-return-fault",
+      "variant": "original",
+      "target": "typescript",
+      "root": "ast:b3:7880357881bb801f804b50e3f011e202197b9bf7809a1b99678ec5304fec721a",
+      "dependencyRoots": [],
+      "sourceLines": 599,
+      "dependencyLines": 0,
+      "totalLines": 599,
+      "sourceBytes": 30883,
+      "runtimeBytes": 17946,
+      "sourceSha256": "15242ee3aa7f0a24f14146af86dade7f1733469a81d36274de4868c0a46f647f",
+      "runtimeSha256": "6a6507f46806fa97e4353d08c1d0b08da46920966a65e19c6caa4341d1f40797",
+      "dependencyFiles": [],
+      "projectionNs": "9902083",
+      "parseIdentityNs": "7738375"
+    },
+    {
+      "task": "atomic-nested-return-fault/one-literal-edit",
+      "workload": "atomic-nested-return-fault",
+      "variant": "one-literal-edit",
+      "target": "typescript",
+      "root": "ast:b3:ab73c470902afeb54c93ccd8e24551edca163acada023b5680c34aefefb3c6f0",
+      "dependencyRoots": [],
+      "sourceLines": 599,
+      "dependencyLines": 0,
+      "totalLines": 599,
+      "sourceBytes": 30883,
+      "runtimeBytes": 17946,
+      "sourceSha256": "5adee8abc0b28114a25cbdadcda4578f3709a864cf53b3292682e5a945292776",
+      "runtimeSha256": "6a6507f46806fa97e4353d08c1d0b08da46920966a65e19c6caa4341d1f40797",
+      "dependencyFiles": [],
+      "projectionNs": "9221042",
+      "parseIdentityNs": "7623041"
+    },
+    {
+      "task": "scalar-math/original",
+      "workload": "scalar-math",
+      "variant": "original",
+      "target": "python",
+      "root": "ast:b3:0853be07294d280621ece1431932e001ed5c1cffbd911c7576a258971c22b337",
+      "dependencyRoots": [],
+      "sourceLines": 46,
+      "dependencyLines": 0,
+      "totalLines": 46,
+      "sourceBytes": 2628,
+      "runtimeBytes": 4558,
+      "sourceSha256": "de3aa396c9674c7826e5e653577b3f935037a139b525361d41588464b39254fd",
+      "runtimeSha256": "7fa20d7ab3f921a55ae9e8db128816eeab1588a97d85277dcc50a6564dee2b00",
+      "dependencyFiles": [],
+      "projectionNs": "1124250",
+      "parseIdentityNs": "826458"
+    },
+    {
+      "task": "scalar-math/one-literal-edit",
+      "workload": "scalar-math",
+      "variant": "one-literal-edit",
+      "target": "python",
+      "root": "ast:b3:aaa00f1b4132eaf0d1f03e245e9de1c0f8d03932a5aeb96361a32b5c0f9316b8",
+      "dependencyRoots": [],
+      "sourceLines": 46,
+      "dependencyLines": 0,
+      "totalLines": 46,
+      "sourceBytes": 2628,
+      "runtimeBytes": 4558,
+      "sourceSha256": "d9e9354f9f4f1e8add1ac329dd8674a60652478153763d3f7883f6a19c7a3db6",
+      "runtimeSha256": "7fa20d7ab3f921a55ae9e8db128816eeab1588a97d85277dcc50a6564dee2b00",
+      "dependencyFiles": [],
+      "projectionNs": "1047000",
+      "parseIdentityNs": "762875"
+    },
+    {
+      "task": "loop-contract/original",
+      "workload": "loop-contract",
+      "variant": "original",
+      "target": "python",
+      "root": "ast:b3:feed0ad7a35a3a7cded01efe5855089e4968038a8cb0722100471598d0e75750",
+      "dependencyRoots": [],
+      "sourceLines": 36,
+      "dependencyLines": 0,
+      "totalLines": 36,
+      "sourceBytes": 2232,
+      "runtimeBytes": 4558,
+      "sourceSha256": "18cbd2313d2ce79aa7189529d63a2a3cf504cb3b018cbf3381c6e813047779a9",
+      "runtimeSha256": "7fa20d7ab3f921a55ae9e8db128816eeab1588a97d85277dcc50a6564dee2b00",
+      "dependencyFiles": [],
+      "projectionNs": "1942125",
+      "parseIdentityNs": "1472458"
+    },
+    {
+      "task": "loop-contract/one-literal-edit",
+      "workload": "loop-contract",
+      "variant": "one-literal-edit",
+      "target": "python",
+      "root": "ast:b3:45541d36c36371a9afe14d6aaad547f8059e6183a6026afbe29d09b1a4a10eca",
+      "dependencyRoots": [],
+      "sourceLines": 36,
+      "dependencyLines": 0,
+      "totalLines": 36,
+      "sourceBytes": 2232,
+      "runtimeBytes": 4558,
+      "sourceSha256": "c891a30d14014f1c8ca86c7dd9f7751cc93b30bb5e8c4277d857c50f6b575490",
+      "runtimeSha256": "7fa20d7ab3f921a55ae9e8db128816eeab1588a97d85277dcc50a6564dee2b00",
+      "dependencyFiles": [],
+      "projectionNs": "2182875",
+      "parseIdentityNs": "1340666"
+    },
+    {
+      "task": "composite-alias-collections/original",
+      "workload": "composite-alias-collections",
+      "variant": "original",
+      "target": "python",
+      "root": "ast:b3:0ebbbd5edbb4ad56f75f86626c6fdb455b27999dd84f30d90f9b42e1cf5ea282",
+      "dependencyRoots": [],
+      "sourceLines": 73,
+      "dependencyLines": 0,
+      "totalLines": 73,
+      "sourceBytes": 5027,
+      "runtimeBytes": 11361,
+      "sourceSha256": "09ee15b14e234c1c52510a08eb6243f37de5a393689273abecf523d27ac49e84",
+      "runtimeSha256": "6ceff256c170c00c81046405df8e005105a5fcdfe9f3352059131bbfa0664c8e",
+      "dependencyFiles": [],
+      "projectionNs": "2751500",
+      "parseIdentityNs": "1935583"
+    },
+    {
+      "task": "composite-alias-collections/one-literal-edit",
+      "workload": "composite-alias-collections",
+      "variant": "one-literal-edit",
+      "target": "python",
+      "root": "ast:b3:a8464f3868974656eb05d330f0d728bd2adcba86e0ced202dd922f40c4f914ee",
+      "dependencyRoots": [],
+      "sourceLines": 73,
+      "dependencyLines": 0,
+      "totalLines": 73,
+      "sourceBytes": 5027,
+      "runtimeBytes": 11361,
+      "sourceSha256": "d079bbc339af40073ee897567581f2d4038f25498527c22f8f0d03b44b6bde28",
+      "runtimeSha256": "6ceff256c170c00c81046405df8e005105a5fcdfe9f3352059131bbfa0664c8e",
+      "dependencyFiles": [],
+      "projectionNs": "2410208",
+      "parseIdentityNs": "1823667"
+    },
+    {
+      "task": "full-ledger/original",
+      "workload": "full-ledger",
+      "variant": "original",
+      "target": "python",
+      "root": "ast:b3:722b9744f7520a7fb78c0afbbed88d16434c47d75af3211d7618dadebfb8dcca",
+      "dependencyRoots": [],
+      "sourceLines": 147,
+      "dependencyLines": 0,
+      "totalLines": 147,
+      "sourceBytes": 15097,
+      "runtimeBytes": 11361,
+      "sourceSha256": "fe7498f28da6aeaecb25b748330994ae68603fc5d720fdeb9a52d6d56c49ba4a",
+      "runtimeSha256": "6ceff256c170c00c81046405df8e005105a5fcdfe9f3352059131bbfa0664c8e",
+      "dependencyFiles": [],
+      "projectionNs": "9908625",
+      "parseIdentityNs": "6752416"
+    },
+    {
+      "task": "full-ledger/one-literal-edit",
+      "workload": "full-ledger",
+      "variant": "one-literal-edit",
+      "target": "python",
+      "root": "ast:b3:c0db4daa0db62fc8161430a9ac1c15561062c1f725ac2b1fd6f5df15cee5d487",
+      "dependencyRoots": [],
+      "sourceLines": 147,
+      "dependencyLines": 0,
+      "totalLines": 147,
+      "sourceBytes": 15097,
+      "runtimeBytes": 11361,
+      "sourceSha256": "2394eb2fc43a7354c6138e2af83199fae9615007c6c3db7152985dc22c01fd51",
+      "runtimeSha256": "6ceff256c170c00c81046405df8e005105a5fcdfe9f3352059131bbfa0664c8e",
+      "dependencyFiles": [],
+      "projectionNs": "9316042",
+      "parseIdentityNs": "6618333"
+    },
+    {
+      "task": "strings-linked-imports/original",
+      "workload": "strings-linked-imports",
+      "variant": "original",
+      "target": "python",
+      "root": "ast:b3:baa0baae0491529161e589cd828ae0d7808bea895041838a7500a637172fd21f",
+      "dependencyRoots": [
+        "ast:b3:0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a",
+        "ast:b3:80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6"
+      ],
+      "sourceLines": 72,
+      "dependencyLines": 207,
+      "totalLines": 279,
+      "sourceBytes": 6834,
+      "runtimeBytes": 73506,
+      "sourceSha256": "5474eb691aefd331137f86ec698bbfb372aca17c41baa03b500d5f5accc8a83f",
+      "runtimeSha256": "988cc6041835bb7f311007104acd5e43b8c3dc8ee89b330206f2a4f04c96f914",
+      "dependencyFiles": [
+        {
+          "name": "aether_0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a.py",
+          "lines": 28,
+          "bytes": 4315,
+          "sha256": "8230b97f528b2dbcc793f945c4d258be889e2082698c20d7e5089bdbca56968b"
+        },
+        {
+          "name": "aether_80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6.py",
+          "lines": 179,
+          "bytes": 10791,
+          "sha256": "1ef364b7757e83877add5c74c53267a41d085de9dd6ec50ec02fda790dee4213"
+        }
+      ],
+      "projectionNs": "19663625",
+      "parseIdentityNs": "19323708"
+    },
+    {
+      "task": "strings-linked-imports/one-literal-edit",
+      "workload": "strings-linked-imports",
+      "variant": "one-literal-edit",
+      "target": "python",
+      "root": "ast:b3:f7a11a5202c2b37ff9173ccfeca1b46fdd9494cc9cfddb7f024cf7f9a7e288d2",
+      "dependencyRoots": [
+        "ast:b3:0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a",
+        "ast:b3:80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6"
+      ],
+      "sourceLines": 72,
+      "dependencyLines": 207,
+      "totalLines": 279,
+      "sourceBytes": 6834,
+      "runtimeBytes": 73506,
+      "sourceSha256": "271a2f88f544aeb41e5fd1ef593d4bcca7cbe16a30de49d71b648b6f4d5c44da",
+      "runtimeSha256": "988cc6041835bb7f311007104acd5e43b8c3dc8ee89b330206f2a4f04c96f914",
+      "dependencyFiles": [
+        {
+          "name": "aether_0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a.py",
+          "lines": 28,
+          "bytes": 4315,
+          "sha256": "8230b97f528b2dbcc793f945c4d258be889e2082698c20d7e5089bdbca56968b"
+        },
+        {
+          "name": "aether_80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6.py",
+          "lines": 179,
+          "bytes": 10791,
+          "sha256": "1ef364b7757e83877add5c74c53267a41d085de9dd6ec50ec02fda790dee4213"
+        }
+      ],
+      "projectionNs": "19876125",
+      "parseIdentityNs": "19296000"
+    },
+    {
+      "task": "generics-nested-import/original",
+      "workload": "generics-nested-import",
+      "variant": "original",
+      "target": "python",
+      "root": "ast:b3:e9e49ad15ca18e7f7690df129dba49a27f30611eb0eef4e62c93c24315fdab95",
+      "dependencyRoots": [
+        "ast:b3:0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed"
+      ],
+      "sourceLines": 71,
+      "dependencyLines": 222,
+      "totalLines": 293,
+      "sourceBytes": 11764,
+      "runtimeBytes": 76981,
+      "sourceSha256": "184880dec4db1108a4f72215576dd026eabeea5b1e09579c7d93a9c715b76d84",
+      "runtimeSha256": "cdb83a46a41db4f0f6d2ccad0fd6e3a878ae3c6bb2fd1a7305842b2d4c6cc5db",
+      "dependencyFiles": [
+        {
+          "name": "aether_0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed.py",
+          "lines": 222,
+          "bytes": 19492,
+          "sha256": "a3d2638adcdb8087c579bf4cf3515ca14b6d36af95f585e4d1763d02a6a87c1d"
+        }
+      ],
+      "projectionNs": "21795291",
+      "parseIdentityNs": "20983667"
+    },
+    {
+      "task": "generics-nested-import/one-literal-edit",
+      "workload": "generics-nested-import",
+      "variant": "one-literal-edit",
+      "target": "python",
+      "root": "ast:b3:2ef5b5aabcf31efd8872a18131050918116639b2ff1a4a39986f238c3ce1f7e7",
+      "dependencyRoots": [
+        "ast:b3:0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed"
+      ],
+      "sourceLines": 71,
+      "dependencyLines": 222,
+      "totalLines": 293,
+      "sourceBytes": 11764,
+      "runtimeBytes": 76981,
+      "sourceSha256": "694be894d5518b2ddd77d7166c074128dc2aeceac6ef0c374ffaf53be1a69458",
+      "runtimeSha256": "cdb83a46a41db4f0f6d2ccad0fd6e3a878ae3c6bb2fd1a7305842b2d4c6cc5db",
+      "dependencyFiles": [
+        {
+          "name": "aether_0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed.py",
+          "lines": 222,
+          "bytes": 19492,
+          "sha256": "a3d2638adcdb8087c579bf4cf3515ca14b6d36af95f585e4d1763d02a6a87c1d"
+        }
+      ],
+      "projectionNs": "22293958",
+      "parseIdentityNs": "20301417"
+    },
+    {
+      "task": "nested-exact-address-import/original",
+      "workload": "nested-exact-address-import",
+      "variant": "original",
+      "target": "python",
+      "root": "ast:b3:4dd7f06bc5f430c47558ec57148ce0c0284e34047fa6fbc832c7c0affe82ad87",
+      "dependencyRoots": [
+        "ast:b3:23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507"
+      ],
+      "sourceLines": 27,
+      "dependencyLines": 25,
+      "totalLines": 52,
+      "sourceBytes": 2436,
+      "runtimeBytes": 76981,
+      "sourceSha256": "e67cea4da751487b74a1fb50fd932b2d56f1229be22a9bba7833cad06ecb8b6b",
+      "runtimeSha256": "cdb83a46a41db4f0f6d2ccad0fd6e3a878ae3c6bb2fd1a7305842b2d4c6cc5db",
+      "dependencyFiles": [
+        {
+          "name": "aether_23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507.py",
+          "lines": 25,
+          "bytes": 1633,
+          "sha256": "07ab4ec6674cc5073ec2c6d03280ae2194f10825e752b9e30d2e804e1ed95fef"
+        }
+      ],
+      "projectionNs": "2732584",
+      "parseIdentityNs": "2811667"
+    },
+    {
+      "task": "nested-exact-address-import/one-literal-edit",
+      "workload": "nested-exact-address-import",
+      "variant": "one-literal-edit",
+      "target": "python",
+      "root": "ast:b3:ff1900469cf9be489a918aeee33e9e8946ef4343d76ffa0826dd6852d56229d0",
+      "dependencyRoots": [
+        "ast:b3:23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507"
+      ],
+      "sourceLines": 27,
+      "dependencyLines": 25,
+      "totalLines": 52,
+      "sourceBytes": 2436,
+      "runtimeBytes": 76981,
+      "sourceSha256": "9d62edb54bc4745e0e408a83ebdb8fb2bf19a092dc3cefb3c3b70a2d323beafb",
+      "runtimeSha256": "cdb83a46a41db4f0f6d2ccad0fd6e3a878ae3c6bb2fd1a7305842b2d4c6cc5db",
+      "dependencyFiles": [
+        {
+          "name": "aether_23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507.py",
+          "lines": 25,
+          "bytes": 1633,
+          "sha256": "07ab4ec6674cc5073ec2c6d03280ae2194f10825e752b9e30d2e804e1ed95fef"
+        }
+      ],
+      "projectionNs": "3385458",
+      "parseIdentityNs": "2610542"
+    },
+    {
+      "task": "atomic-nested-return-fault/original",
+      "workload": "atomic-nested-return-fault",
+      "variant": "original",
+      "target": "python",
+      "root": "ast:b3:7880357881bb801f804b50e3f011e202197b9bf7809a1b99678ec5304fec721a",
+      "dependencyRoots": [],
+      "sourceLines": 442,
+      "dependencyLines": 0,
+      "totalLines": 442,
+      "sourceBytes": 24630,
+      "runtimeBytes": 17040,
+      "sourceSha256": "66d74d87a9300e09b292940ecb50ed5977a56ae6308eaeb26fbe5016e44a1d94",
+      "runtimeSha256": "787d5f5fb34e9c63368c0525d384ed61a1c957d8dac9e6f9e170751ba738ffad",
+      "dependencyFiles": [],
+      "projectionNs": "9819292",
+      "parseIdentityNs": "7511292"
+    },
+    {
+      "task": "atomic-nested-return-fault/one-literal-edit",
+      "workload": "atomic-nested-return-fault",
+      "variant": "one-literal-edit",
+      "target": "python",
+      "root": "ast:b3:ab73c470902afeb54c93ccd8e24551edca163acada023b5680c34aefefb3c6f0",
+      "dependencyRoots": [],
+      "sourceLines": 442,
+      "dependencyLines": 0,
+      "totalLines": 442,
+      "sourceBytes": 24630,
+      "runtimeBytes": 17040,
+      "sourceSha256": "70881fef49bba572e766c5929db0aa4e2606b5df4dc1d18f2faabceb749c5c14",
+      "runtimeSha256": "787d5f5fb34e9c63368c0525d384ed61a1c957d8dac9e6f9e170751ba738ffad",
+      "dependencyFiles": [],
+      "projectionNs": "9766667",
+      "parseIdentityNs": "7344583"
+    },
+    {
+      "task": "scalar-math/original",
+      "workload": "scalar-math",
+      "variant": "original",
+      "target": "rust",
+      "root": "ast:b3:0853be07294d280621ece1431932e001ed5c1cffbd911c7576a258971c22b337",
+      "dependencyRoots": [],
+      "sourceLines": 50,
+      "dependencyLines": 0,
+      "totalLines": 50,
+      "sourceBytes": 2765,
+      "runtimeBytes": 5774,
+      "sourceSha256": "f5b5da7d00a5602fc3f535eae8e4c67a0fef9f8e8cf1af043ae8e5aea7a28843",
+      "runtimeSha256": "42c0abe1a397adf5ae60c307868f29579fd854008991995dc8d2bd02ccda4212",
+      "dependencyFiles": [],
+      "projectionNs": "1340000",
+      "parseIdentityNs": "814125"
+    },
+    {
+      "task": "scalar-math/one-literal-edit",
+      "workload": "scalar-math",
+      "variant": "one-literal-edit",
+      "target": "rust",
+      "root": "ast:b3:aaa00f1b4132eaf0d1f03e245e9de1c0f8d03932a5aeb96361a32b5c0f9316b8",
+      "dependencyRoots": [],
+      "sourceLines": 50,
+      "dependencyLines": 0,
+      "totalLines": 50,
+      "sourceBytes": 2765,
+      "runtimeBytes": 5774,
+      "sourceSha256": "f05805e8618cff6d072245c8f13cd7603876a5b0bc4f0caf7c50403d339d4b99",
+      "runtimeSha256": "42c0abe1a397adf5ae60c307868f29579fd854008991995dc8d2bd02ccda4212",
+      "dependencyFiles": [],
+      "projectionNs": "1358334",
+      "parseIdentityNs": "793208"
+    },
+    {
+      "task": "loop-contract/original",
+      "workload": "loop-contract",
+      "variant": "original",
+      "target": "rust",
+      "root": "ast:b3:feed0ad7a35a3a7cded01efe5855089e4968038a8cb0722100471598d0e75750",
+      "dependencyRoots": [],
+      "sourceLines": 40,
+      "dependencyLines": 0,
+      "totalLines": 40,
+      "sourceBytes": 2417,
+      "runtimeBytes": 5774,
+      "sourceSha256": "46ec94e01e00d4d10081b5e9cca98a59572583c3f345266174c206319b534815",
+      "runtimeSha256": "42c0abe1a397adf5ae60c307868f29579fd854008991995dc8d2bd02ccda4212",
+      "dependencyFiles": [],
+      "projectionNs": "2092250",
+      "parseIdentityNs": "1398000"
+    },
+    {
+      "task": "loop-contract/one-literal-edit",
+      "workload": "loop-contract",
+      "variant": "one-literal-edit",
+      "target": "rust",
+      "root": "ast:b3:45541d36c36371a9afe14d6aaad547f8059e6183a6026afbe29d09b1a4a10eca",
+      "dependencyRoots": [],
+      "sourceLines": 40,
+      "dependencyLines": 0,
+      "totalLines": 40,
+      "sourceBytes": 2417,
+      "runtimeBytes": 5774,
+      "sourceSha256": "a651dce1073b028228180533f82375335b88ec545fbcb32357a35cfd6a09f256",
+      "runtimeSha256": "42c0abe1a397adf5ae60c307868f29579fd854008991995dc8d2bd02ccda4212",
+      "dependencyFiles": [],
+      "projectionNs": "1916125",
+      "parseIdentityNs": "1382750"
+    },
+    {
+      "task": "composite-alias-collections/original",
+      "workload": "composite-alias-collections",
+      "variant": "original",
+      "target": "rust",
+      "root": "ast:b3:0ebbbd5edbb4ad56f75f86626c6fdb455b27999dd84f30d90f9b42e1cf5ea282",
+      "dependencyRoots": [],
+      "sourceLines": 78,
+      "dependencyLines": 0,
+      "totalLines": 78,
+      "sourceBytes": 5289,
+      "runtimeBytes": 16026,
+      "sourceSha256": "57d4daf38f6c23c1374d1687fb894f147a29c7d85e36a6f3c691411b2cdffb8e",
+      "runtimeSha256": "881fdd4f91f160c0eeaada75065f97527107fa537aac40e5c42aac3f4b357d28",
+      "dependencyFiles": [],
+      "projectionNs": "2384333",
+      "parseIdentityNs": "1755458"
+    },
+    {
+      "task": "composite-alias-collections/one-literal-edit",
+      "workload": "composite-alias-collections",
+      "variant": "one-literal-edit",
+      "target": "rust",
+      "root": "ast:b3:a8464f3868974656eb05d330f0d728bd2adcba86e0ced202dd922f40c4f914ee",
+      "dependencyRoots": [],
+      "sourceLines": 78,
+      "dependencyLines": 0,
+      "totalLines": 78,
+      "sourceBytes": 5289,
+      "runtimeBytes": 16026,
+      "sourceSha256": "2d32158cd23a7e9fc524c53d9e81cf255937a1b842f570a3d680432afc09502a",
+      "runtimeSha256": "881fdd4f91f160c0eeaada75065f97527107fa537aac40e5c42aac3f4b357d28",
+      "dependencyFiles": [],
+      "projectionNs": "2780708",
+      "parseIdentityNs": "1754167"
+    },
+    {
+      "task": "full-ledger/original",
+      "workload": "full-ledger",
+      "variant": "original",
+      "target": "rust",
+      "root": "ast:b3:722b9744f7520a7fb78c0afbbed88d16434c47d75af3211d7618dadebfb8dcca",
+      "dependencyRoots": [],
+      "sourceLines": 157,
+      "dependencyLines": 0,
+      "totalLines": 157,
+      "sourceBytes": 15946,
+      "runtimeBytes": 16026,
+      "sourceSha256": "289ab400529c74a96483b651e60af000d0724e7f2e1430d368691fe508f666b1",
+      "runtimeSha256": "881fdd4f91f160c0eeaada75065f97527107fa537aac40e5c42aac3f4b357d28",
+      "dependencyFiles": [],
+      "projectionNs": "9565958",
+      "parseIdentityNs": "7059875"
+    },
+    {
+      "task": "full-ledger/one-literal-edit",
+      "workload": "full-ledger",
+      "variant": "one-literal-edit",
+      "target": "rust",
+      "root": "ast:b3:c0db4daa0db62fc8161430a9ac1c15561062c1f725ac2b1fd6f5df15cee5d487",
+      "dependencyRoots": [],
+      "sourceLines": 157,
+      "dependencyLines": 0,
+      "totalLines": 157,
+      "sourceBytes": 15946,
+      "runtimeBytes": 16026,
+      "sourceSha256": "8c205ad30eb104b8c608173dbd609093510bbe4977286d62aeb0de48792ff505",
+      "runtimeSha256": "881fdd4f91f160c0eeaada75065f97527107fa537aac40e5c42aac3f4b357d28",
+      "dependencyFiles": [],
+      "projectionNs": "9653792",
+      "parseIdentityNs": "6694375"
+    },
+    {
+      "task": "strings-linked-imports/original",
+      "workload": "strings-linked-imports",
+      "variant": "original",
+      "target": "rust",
+      "root": "ast:b3:baa0baae0491529161e589cd828ae0d7808bea895041838a7500a637172fd21f",
+      "dependencyRoots": [
+        "ast:b3:0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a",
+        "ast:b3:80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6"
+      ],
+      "sourceLines": 79,
+      "dependencyLines": 218,
+      "totalLines": 297,
+      "sourceBytes": 7156,
+      "runtimeBytes": 76991,
+      "sourceSha256": "49685666f685cb727231d297866e5d6ea9276d0961abf61543dd34f4f95f62b4",
+      "runtimeSha256": "0e132ec12fdbab5709dc000922f5a1ec0576e319d70c0c670bcbe8018653b96f",
+      "dependencyFiles": [
+        {
+          "name": "aether_0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a.rs",
+          "lines": 29,
+          "bytes": 4349,
+          "sha256": "356b3f419f0e2ec36b763de59c219650b4cec2cfd42f35848a78f359b80336aa"
+        },
+        {
+          "name": "aether_80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6.rs",
+          "lines": 189,
+          "bytes": 11142,
+          "sha256": "148d6219c7e92c1659c44aa79230de26f5e79f7ee16fef8a2198e5d8b070416a"
+        }
+      ],
+      "projectionNs": "20190000",
+      "parseIdentityNs": "19955708"
+    },
+    {
+      "task": "strings-linked-imports/one-literal-edit",
+      "workload": "strings-linked-imports",
+      "variant": "one-literal-edit",
+      "target": "rust",
+      "root": "ast:b3:f7a11a5202c2b37ff9173ccfeca1b46fdd9494cc9cfddb7f024cf7f9a7e288d2",
+      "dependencyRoots": [
+        "ast:b3:0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a",
+        "ast:b3:80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6"
+      ],
+      "sourceLines": 79,
+      "dependencyLines": 218,
+      "totalLines": 297,
+      "sourceBytes": 7156,
+      "runtimeBytes": 76991,
+      "sourceSha256": "6eb67b32e935367b2e82a8dd2b865eb6a06072b18284aa4db6ab5068a3745245",
+      "runtimeSha256": "0e132ec12fdbab5709dc000922f5a1ec0576e319d70c0c670bcbe8018653b96f",
+      "dependencyFiles": [
+        {
+          "name": "aether_0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a.rs",
+          "lines": 29,
+          "bytes": 4349,
+          "sha256": "356b3f419f0e2ec36b763de59c219650b4cec2cfd42f35848a78f359b80336aa"
+        },
+        {
+          "name": "aether_80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6.rs",
+          "lines": 189,
+          "bytes": 11142,
+          "sha256": "148d6219c7e92c1659c44aa79230de26f5e79f7ee16fef8a2198e5d8b070416a"
+        }
+      ],
+      "projectionNs": "20336375",
+      "parseIdentityNs": "20539916"
+    },
+    {
+      "task": "generics-nested-import/original",
+      "workload": "generics-nested-import",
+      "variant": "original",
+      "target": "rust",
+      "root": "ast:b3:e9e49ad15ca18e7f7690df129dba49a27f30611eb0eef4e62c93c24315fdab95",
+      "dependencyRoots": [
+        "ast:b3:0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed"
+      ],
+      "sourceLines": 78,
+      "dependencyLines": 232,
+      "totalLines": 310,
+      "sourceBytes": 12090,
+      "runtimeBytes": 80729,
+      "sourceSha256": "0867e8b9031c8ecb2c6bb56fa7dd869713e7ec5952a2eff52cba5c01e9f9cb52",
+      "runtimeSha256": "6c3fdfda58265ef0981c7a1d6c635e5175d89081bf5268abf0ab2d405ad80029",
+      "dependencyFiles": [
+        {
+          "name": "aether_0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed.rs",
+          "lines": 232,
+          "bytes": 20075,
+          "sha256": "d5ba036ffaad594dce7f1df2014046f3024bd1586aa5108783d12c46e21f73fb"
+        }
+      ],
+      "projectionNs": "21972125",
+      "parseIdentityNs": "21866125"
+    },
+    {
+      "task": "generics-nested-import/one-literal-edit",
+      "workload": "generics-nested-import",
+      "variant": "one-literal-edit",
+      "target": "rust",
+      "root": "ast:b3:2ef5b5aabcf31efd8872a18131050918116639b2ff1a4a39986f238c3ce1f7e7",
+      "dependencyRoots": [
+        "ast:b3:0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed"
+      ],
+      "sourceLines": 78,
+      "dependencyLines": 232,
+      "totalLines": 310,
+      "sourceBytes": 12090,
+      "runtimeBytes": 80729,
+      "sourceSha256": "435377b4559ab30957854406a92a9d234f859af3f660a1fad38fa77748b49251",
+      "runtimeSha256": "6c3fdfda58265ef0981c7a1d6c635e5175d89081bf5268abf0ab2d405ad80029",
+      "dependencyFiles": [
+        {
+          "name": "aether_0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed.rs",
+          "lines": 232,
+          "bytes": 20075,
+          "sha256": "d5ba036ffaad594dce7f1df2014046f3024bd1586aa5108783d12c46e21f73fb"
+        }
+      ],
+      "projectionNs": "21333500",
+      "parseIdentityNs": "21119542"
+    },
+    {
+      "task": "nested-exact-address-import/original",
+      "workload": "nested-exact-address-import",
+      "variant": "original",
+      "target": "rust",
+      "root": "ast:b3:4dd7f06bc5f430c47558ec57148ce0c0284e34047fa6fbc832c7c0affe82ad87",
+      "dependencyRoots": [
+        "ast:b3:23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507"
+      ],
+      "sourceLines": 30,
+      "dependencyLines": 26,
+      "totalLines": 56,
+      "sourceBytes": 2581,
+      "runtimeBytes": 80729,
+      "sourceSha256": "770f5170894c9fa57557b5fbbf9c9100a7193172bf4ca003c1126f897d0179d9",
+      "runtimeSha256": "6c3fdfda58265ef0981c7a1d6c635e5175d89081bf5268abf0ab2d405ad80029",
+      "dependencyFiles": [
+        {
+          "name": "aether_23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507.rs",
+          "lines": 26,
+          "bytes": 1658,
+          "sha256": "e8f343824b870ebd4d3c3f28b2d0e21cd40940ce2c08cfe4217e526db18026dc"
+        }
+      ],
+      "projectionNs": "3019042",
+      "parseIdentityNs": "2860083"
+    },
+    {
+      "task": "nested-exact-address-import/one-literal-edit",
+      "workload": "nested-exact-address-import",
+      "variant": "one-literal-edit",
+      "target": "rust",
+      "root": "ast:b3:ff1900469cf9be489a918aeee33e9e8946ef4343d76ffa0826dd6852d56229d0",
+      "dependencyRoots": [
+        "ast:b3:23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507"
+      ],
+      "sourceLines": 30,
+      "dependencyLines": 26,
+      "totalLines": 56,
+      "sourceBytes": 2581,
+      "runtimeBytes": 80729,
+      "sourceSha256": "c67362b9ccf475ff6366f0e1cdf1bd7c6e1427cdb73ea7bd57241452e6ad2e5b",
+      "runtimeSha256": "6c3fdfda58265ef0981c7a1d6c635e5175d89081bf5268abf0ab2d405ad80029",
+      "dependencyFiles": [
+        {
+          "name": "aether_23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507.rs",
+          "lines": 26,
+          "bytes": 1658,
+          "sha256": "e8f343824b870ebd4d3c3f28b2d0e21cd40940ce2c08cfe4217e526db18026dc"
+        }
+      ],
+      "projectionNs": "2711291",
+      "parseIdentityNs": "2564334"
+    },
+    {
+      "task": "atomic-nested-return-fault/original",
+      "workload": "atomic-nested-return-fault",
+      "variant": "original",
+      "target": "rust",
+      "root": "ast:b3:7880357881bb801f804b50e3f011e202197b9bf7809a1b99678ec5304fec721a",
+      "dependencyRoots": [],
+      "sourceLines": 508,
+      "dependencyLines": 0,
+      "totalLines": 508,
+      "sourceBytes": 26508,
+      "runtimeBytes": 25655,
+      "sourceSha256": "886ddc0640b5a481e1402e74cd26a9218c4fe3edc93be85adf3d66ccb3c11db0",
+      "runtimeSha256": "63eb3f266f04e22c5d5499135c8734d0348a0a69ee3c34eeb7a0577bc6cf6054",
+      "dependencyFiles": [],
+      "projectionNs": "9799208",
+      "parseIdentityNs": "7488917"
+    },
+    {
+      "task": "atomic-nested-return-fault/one-literal-edit",
+      "workload": "atomic-nested-return-fault",
+      "variant": "one-literal-edit",
+      "target": "rust",
+      "root": "ast:b3:ab73c470902afeb54c93ccd8e24551edca163acada023b5680c34aefefb3c6f0",
+      "dependencyRoots": [],
+      "sourceLines": 508,
+      "dependencyLines": 0,
+      "totalLines": 508,
+      "sourceBytes": 26508,
+      "runtimeBytes": 25655,
+      "sourceSha256": "bb7a0b4c34181d0d744bd33804ac1a24491374acc432515972a182c953cc97a6",
+      "runtimeSha256": "63eb3f266f04e22c5d5499135c8734d0348a0a69ee3c34eeb7a0577bc6cf6054",
+      "dependencyFiles": [],
+      "projectionNs": "9368000",
+      "parseIdentityNs": "7395417"
+    }
+  ]
+}

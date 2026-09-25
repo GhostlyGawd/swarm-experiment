@@ -4,6 +4,11 @@
 
 - At clean `b096579`, the unchanged six-shape [NFR-08 campaign](evidence/nfr08-b096579/REVIEW.md) passed **30/30** measured complete calls under the **1,500 ms** bound; maximum **1,483.031 ms**. The verifier recomputes raw verdicts and arithmetic from saved source snapshots. This is bounded built-in solver evidence only: the default release row remains unmeasured, and external fallback/full proof-pipeline qualification remains open.
 
+## NFR-09 three-target projection throughput preflight — 2026-09-24
+
+- Added a preregistered, source-pinned benchmark of the real TypeScript, Python and Rust `executableBundle` projection plus complete target-source parse and exact entry/dependency identity. Eight authored scalar/composite/ledger/atomic/linked/nested workloads and one literal edit each produce 48 bundles and 8,902 entry+dependency lines per trial. The profile fixes one warmup, five trials, line accounting and an every-target/every-trial **75,000 lines/s** rule. Raw per-output projection/parse timings, line counts, source/tool/hardware hashes and an independent tamper-aware verifier are retained. [Profile](../../../roadmap/v4/research/projection-throughput/README.md).
+- [Clean exact-source preflight](evidence/nfr09-fc3b4c3/REVIEW.md) at `fc3b4c3`: every trial misses the unchanged target—TypeScript **11,707–12,329**, Python **10,181–10,924**, Rust **11,274–11,660** complete lines/s. Bundle-generation-only diagnostic rates also miss. The corpus is authored and does not execute external target compilers or represent production repository sizes, so release-wide NFR-09 and V4-Q02 stay open; the default release inventory remains unmeasured and the tracker stays **20/62**.
+
 ## Combined V18 and living-campaign focused checkpoint — 2026-09-24
 
 - At clean `459ed63`, [combined focused evidence](evidence/integration-459ed63/REVIEW.md) passes **134/134** projection/resident-pressure tests and **2/2** external-sink tests, plus build, typecheck and roadmap. The saved external fault evidence independently verifies with a fresh replay. V18's 75-case saved audit verifies its contents but retains its own `bb15b30` exact-source identity; the combined tests cover the integrated source.

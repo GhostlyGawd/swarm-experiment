@@ -1,0 +1,235 @@
+{
+  "format": "aether.projection-throughput-registration/1",
+  "at": "2026-09-25T01:48:59.608Z",
+  "gitHead": "fc3b4c30bdd4a675671c2f0bc0e1f84cc9900075",
+  "gitStatus": "",
+  "profileSha256": "f106626b20e7074410626e42b3b1c64905502d9e9f912af8b372d50e56bef823",
+  "sources": {
+    "package-lock.json": "d7ec4b7a7eeb891ec1f91896c6b8cfaff33e29895c3a0cd6a647984b8b7f8936",
+    "roadmap/v4/research/projection-throughput/campaign.ts": "baa1b990103e6d83c24b04850b600fcc1dbd6376113e4a00252c3b912556bc38",
+    "roadmap/v4/research/projection-throughput/corpus.ts": "8ae2d0e173c7aae51f6990ad5a30e2ba2b78dc8d15cacbfeb42d04f91a3fbc73",
+    "roadmap/v4/research/projection-throughput/profile.json": "f106626b20e7074410626e42b3b1c64905502d9e9f912af8b372d50e56bef823",
+    "roadmap/v4/research/projection-throughput/verify.ts": "beefaa715ecabc2377a46f35c4addb8a51d2420d1f48d232e4ee9ad5dc0828a0",
+    "roadmap/v4/research/projections/corpus-atomic.ts": "ac32d9df7577b7de31b4e73aa56b87358d0e4ddfedd4f6b29e7cf84d9b9cc89e",
+    "roadmap/v4/research/projections/corpus-composites.ts": "7d9c23377fc94d1c58e8142e4b085d282cb35a82aa996d6fa19e10828d9d2ddb",
+    "roadmap/v4/research/projections/corpus-generics-nested.ts": "958ce76569e5bc1ceb2cd9b85143ad32c16011233993bfbe1ca02cff21a5802a",
+    "roadmap/v4/research/projections/corpus-nested-imports.ts": "000ec890b6275d536e2153e76144566ba647ca934b6cf26203f2f1f99cbae8fa",
+    "roadmap/v4/research/projections/corpus-strings-imports.ts": "42f09b9f16ab06173f1ae4ffa9e36f804c69444fb5e1637daa8f7e05ef9b314f",
+    "roadmap/v4/research/projections/corpus.ts": "1ba712e5dabe13991272f0075f6ac485c1c1a543804628e94aecd852a8d87304",
+    "src/examples/ledger.ts": "ef3ee4a64ab5227a6c4a4d135afe227583bcef0b313f50d30f5eee5de63362cd",
+    "src/fabric/encoding.ts": "22f9c3414c3947cddad8040d866820d41fa02002e018afc783b88e2af5255d8d",
+    "src/fabric/identity.ts": "a9b7d57d50ae8d6771c8be8131bff9d6f9c73af7631bcf70fb5f451a99c72cbd",
+    "src/projection/executable-atomic.ts": "3f10194e7bacffe07dd9855b5c14b46763ef6856a359992574683fc2230d2dab",
+    "src/projection/executable-bindings.ts": "ae88368a505e6dd802e55b40c067e0c333de25a06a1e776dba7b6071ebc6a5fc",
+    "src/projection/executable-composites.ts": "e4a272e67dc1341f510fff032668e40582efc62dc8aa138c7fc1d57d9174cb97",
+    "src/projection/executable-continuation-plan.ts": "44b3a791275757d7966262e5ccfaf7cb136387affe30952def595c86170ff7d1",
+    "src/projection/executable-continuations.ts": "913206c17200b736fd4c9be7827730e5f33401b4b1d0569438ee242715b0969b",
+    "src/projection/executable-contract-certificates.ts": "0d70936a1ea22696a37a1d6527327b89c21d5c468bc28dd54ab415fa303cf3ad",
+    "src/projection/executable-contract-closures.ts": "46ae65a1e979ccf868dbf1f2bea72036b53ea86d86927c912d1dc3f6c4734623",
+    "src/projection/executable-declarations.ts": "0f546d9a1c24df6df7751d27b19d6ca52933d85c74a3f76b5388f57348a7a1ac",
+    "src/projection/executable-generic-plan.ts": "f6c010626d1c51698d72fc9779a8c0f46ed32ed35b0a4686e3a2013224325358",
+    "src/projection/executable-generics.ts": "b44f7a01f4b9e9857a81f6745aca50de91713086fc99e577f74379e36a0f02fb",
+    "src/projection/executable-link.ts": "ec83f9063b0fb534cea41bd52482541bdbbb7dbb378222208de61819ccab25d3",
+    "src/projection/executable-runtime.ts": "190bf5ec07e9244b02ed5d3c5790fc1682f6aee78e4960f1365dbedcb1d695a2",
+    "src/projection/executable-string-data.ts": "ddc546ef614eecffa148f186d4459c3c699ee6418cbc3ce39f11187d459a3a59",
+    "src/projection/executable-strings.ts": "0b1b6d5f924702c63b2dc34f88a5d52f7a88714489a24be9b688006e240dc767",
+    "src/projection/executable.ts": "f6aeb108deee6a578d1b16866754b477f2e3cbe19ae05e2233a1d88f9efa90ee",
+    "src/tier1/agent-ir-v2.ts": "93ba91e8743cfb2209749c302f7ff35bfbd7bdde9c2aefa5642f279e395ab671",
+    "src/tier1/agent-ir.ts": "bb51e1189564488b71b7223b9b01cb13a5b57a683f44269f1ee766df515e004b",
+    "src/tier1/ast.ts": "b69a104a34ff5dcfec63fea4659915f2c26775d723f252eb236f423bbab385cb",
+    "src/tier1/blake3.ts": "1fe06b0b58c78837acdb5a2a2431b313474c64427fde573196bcd58f86f709d4",
+    "src/tier1/build.ts": "e1617b0eed8c27cf4d3162e68494126f817f28ec1bf24d32828ebcaa55e6d934",
+    "src/tier1/canonical.ts": "16022baba00d8d0e87a4fe7f5eabfe1d79492945ad48c4bd6783ad22f5f83021",
+    "src/tier1/ids.ts": "73a6cf5a0b6537d879b2b3980ba9b4a1937701d52f97b4bf1deb09acf1e023a5",
+    "src/tier1/modules.ts": "8aef1c1e6ecb8051599a67507195e207b4d5d89b7507f22926a60c5ba54003e8",
+    "src/tier1/persistence.ts": "59a3d46d55aeeffadd80ecf834cbe3db5dd117142cf6ca8beb9c18abfa46ea06",
+    "src/tier1/provenance.ts": "2d18f16630b8eb189abd1e30cc64ab74b545234c7a6397741268fad6313a3b46",
+    "src/tier1/store.ts": "b42864b6b9553bd4efadf24a71627797aebaf9bc434a764aeb0cadad0a0dbdc3",
+    "src/tier1/symbols.ts": "1520a4adfd1f837f16357205d88c330056ffe73f3c74d4f26e1d1663dc0362a9",
+    "src/tier2/ocap.ts": "d24dd06f5a48bfba995ab2451229eaba939221a0d332df924ffe47ca7efd50ae",
+    "src/tier2/typecheck.ts": "19113ce88ac99a02a1e7b1f4acad694a1d1c83f9520b2fe7f2545669a5da1b18",
+    "src/util/rng.ts": "722540744b859c0995931e6c0270f3b9a80012b6e31b2371c027cf19f4518295",
+    "src/util/tokens.ts": "42d4ba36543572fe309aef1735cb145b0bfe559efed522b5d5ee0a28773895c9",
+    "tsconfig.check.json": "1b86870764d15763320371ecbb664211893a7e1af863d9d909c7386377db2e8d"
+  },
+  "hardware": {
+    "at": "2026-09-25T01:48:59.610Z",
+    "platform": "darwin",
+    "release": "25.6.0",
+    "arch": "arm64",
+    "cpuModels": [
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro",
+      "Apple M4 Pro"
+    ],
+    "totalMemoryBytes": 25769803776,
+    "load": [
+      3.3642578125,
+      3.494140625,
+      3.83984375
+    ],
+    "node": "v26.7.0",
+    "nodeBinary": {
+      "path": "/opt/homebrew/Cellar/node/26.7.0/bin/node",
+      "sha256": "1ef99ea25fe70c9b67e7efe768ef8ee22148d3cabc703db6131b57aeb617d040"
+    },
+    "python": {
+      "path": "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+      "version": "Python 3.14.7",
+      "sha256": "87d4df53fd91304be5bac391fb204643c36b7df2023c04a0953bcbc7d4fdf634"
+    },
+    "rustc": {
+      "path": "/Users/rhenmcleod/.cargo/bin/rustup",
+      "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+      "sha256": "aeb4105778ca1bd3c6b0e75768f581c656633cd51368fa61289b6a71696ac7e1"
+    },
+    "tsc": {
+      "path": "/private/tmp/aether-nfr09-projection-throughput/node_modules/typescript/bin/tsc",
+      "version": "Version 5.8.3",
+      "sha256": "8d5fa5bd883fec0979fc2004f1fe1d99aef40570155d550eadc0b03b55513bf0"
+    }
+  },
+  "cases": [
+    {
+      "id": "scalar-math/original",
+      "workload": "scalar-math",
+      "variant": "original",
+      "root": "ast:b3:0853be07294d280621ece1431932e001ed5c1cffbd911c7576a258971c22b337",
+      "dependencyRoots": []
+    },
+    {
+      "id": "scalar-math/one-literal-edit",
+      "workload": "scalar-math",
+      "variant": "one-literal-edit",
+      "root": "ast:b3:aaa00f1b4132eaf0d1f03e245e9de1c0f8d03932a5aeb96361a32b5c0f9316b8",
+      "dependencyRoots": []
+    },
+    {
+      "id": "loop-contract/original",
+      "workload": "loop-contract",
+      "variant": "original",
+      "root": "ast:b3:feed0ad7a35a3a7cded01efe5855089e4968038a8cb0722100471598d0e75750",
+      "dependencyRoots": []
+    },
+    {
+      "id": "loop-contract/one-literal-edit",
+      "workload": "loop-contract",
+      "variant": "one-literal-edit",
+      "root": "ast:b3:45541d36c36371a9afe14d6aaad547f8059e6183a6026afbe29d09b1a4a10eca",
+      "dependencyRoots": []
+    },
+    {
+      "id": "composite-alias-collections/original",
+      "workload": "composite-alias-collections",
+      "variant": "original",
+      "root": "ast:b3:0ebbbd5edbb4ad56f75f86626c6fdb455b27999dd84f30d90f9b42e1cf5ea282",
+      "dependencyRoots": []
+    },
+    {
+      "id": "composite-alias-collections/one-literal-edit",
+      "workload": "composite-alias-collections",
+      "variant": "one-literal-edit",
+      "root": "ast:b3:a8464f3868974656eb05d330f0d728bd2adcba86e0ced202dd922f40c4f914ee",
+      "dependencyRoots": []
+    },
+    {
+      "id": "full-ledger/original",
+      "workload": "full-ledger",
+      "variant": "original",
+      "root": "ast:b3:722b9744f7520a7fb78c0afbbed88d16434c47d75af3211d7618dadebfb8dcca",
+      "dependencyRoots": []
+    },
+    {
+      "id": "full-ledger/one-literal-edit",
+      "workload": "full-ledger",
+      "variant": "one-literal-edit",
+      "root": "ast:b3:c0db4daa0db62fc8161430a9ac1c15561062c1f725ac2b1fd6f5df15cee5d487",
+      "dependencyRoots": []
+    },
+    {
+      "id": "strings-linked-imports/original",
+      "workload": "strings-linked-imports",
+      "variant": "original",
+      "root": "ast:b3:baa0baae0491529161e589cd828ae0d7808bea895041838a7500a637172fd21f",
+      "dependencyRoots": [
+        "ast:b3:0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a",
+        "ast:b3:80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6"
+      ]
+    },
+    {
+      "id": "strings-linked-imports/one-literal-edit",
+      "workload": "strings-linked-imports",
+      "variant": "one-literal-edit",
+      "root": "ast:b3:f7a11a5202c2b37ff9173ccfeca1b46fdd9494cc9cfddb7f024cf7f9a7e288d2",
+      "dependencyRoots": [
+        "ast:b3:0afd2ab74270939475cd55920169aff964e7eb40a0cf3ea775800d5b3c320a3a",
+        "ast:b3:80168e33c2f9cc4c917cc3dc91d52e000af1c6b2d57529954e04c6902f2ce6e6"
+      ]
+    },
+    {
+      "id": "generics-nested-import/original",
+      "workload": "generics-nested-import",
+      "variant": "original",
+      "root": "ast:b3:e9e49ad15ca18e7f7690df129dba49a27f30611eb0eef4e62c93c24315fdab95",
+      "dependencyRoots": [
+        "ast:b3:0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed"
+      ]
+    },
+    {
+      "id": "generics-nested-import/one-literal-edit",
+      "workload": "generics-nested-import",
+      "variant": "one-literal-edit",
+      "root": "ast:b3:2ef5b5aabcf31efd8872a18131050918116639b2ff1a4a39986f238c3ce1f7e7",
+      "dependencyRoots": [
+        "ast:b3:0289218f8472fb6404368e15e6cbccbd09d45b8d5cb457a761454f0d895d16ed"
+      ]
+    },
+    {
+      "id": "nested-exact-address-import/original",
+      "workload": "nested-exact-address-import",
+      "variant": "original",
+      "root": "ast:b3:4dd7f06bc5f430c47558ec57148ce0c0284e34047fa6fbc832c7c0affe82ad87",
+      "dependencyRoots": [
+        "ast:b3:23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507"
+      ]
+    },
+    {
+      "id": "nested-exact-address-import/one-literal-edit",
+      "workload": "nested-exact-address-import",
+      "variant": "one-literal-edit",
+      "root": "ast:b3:ff1900469cf9be489a918aeee33e9e8946ef4343d76ffa0826dd6852d56229d0",
+      "dependencyRoots": [
+        "ast:b3:23106064a2fa22b2421550238512f567e14934cee344f6d93fe836180510a507"
+      ]
+    },
+    {
+      "id": "atomic-nested-return-fault/original",
+      "workload": "atomic-nested-return-fault",
+      "variant": "original",
+      "root": "ast:b3:7880357881bb801f804b50e3f011e202197b9bf7809a1b99678ec5304fec721a",
+      "dependencyRoots": []
+    },
+    {
+      "id": "atomic-nested-return-fault/one-literal-edit",
+      "workload": "atomic-nested-return-fault",
+      "variant": "one-literal-edit",
+      "root": "ast:b3:ab73c470902afeb54c93ccd8e24551edca163acada023b5680c34aefefb3c6f0",
+      "dependencyRoots": []
+    }
+  ],
+  "targetLinesPerSecond": 75000,
+  "warmups": 1,
+  "measuredTrials": 5,
+  "timedBoundary": "For each target/workload/variant, executableBundle on the actual Aether module and complete addressed closure, then parseExecutableBundle with exact entry and every dependency root checked. Source line count is entry plus emitted dependency source, excluding separately reported target runtime support. Source hashing, corpus setup, diagnostics and raw artifact writes occur outside timed spans.",
+  "passRule": "Every measured trial of each target must reach at least 75000 generated source lines per second across projection plus parse/identity. All roots and dependency addresses must roundtrip; zero tasks may be skipped. Projection-only and aggregate rates are diagnostics, not substitutes.",
+  "scope": "Reproducible preflight on eight authored workloads and one exact-root edit each, including linked/nested modules. No production repository distribution, external target compiler execution or release-wide NFR-09 qualification is claimed."
+}
