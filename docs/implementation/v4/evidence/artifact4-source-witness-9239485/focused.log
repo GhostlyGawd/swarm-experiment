@@ -1,0 +1,47 @@
+✔ Artifact/4 signed target binds independently rebuilt V2 bundle and exact virtual proof (9921.423542ms)
+✔ Artifact/4 rejects omitted input, changed tool, native library, Node and bundle identity (12535.400625ms)
+✔ Artifact/4 remeasures actual current input and build-recipe bytes on decode (10080.430292ms)
+✔ Artifact/4 rejects swapped descriptor, evidence and forged direct ancestry (23940.1805ms)
+✔ Artifact/4 bounded launch check starts only its measured worker bundle (10932.667583ms)
+✔ Artifact/4 init/3 executes the signed pure candidate and restores its real-worker snapshot (11583.528834ms)
+✔ Artifact/4 pure worker cannot gain callbacks through later caller option mutation (9214.172792ms)
+✔ Artifact/4 init/3 refuses tampered proof, authority, and packaged bytes before execution (11002.052ms)
+✔ Artifact/4 packaged child independently rejects altered init/3 proof (6667.642833ms)
+✔ Artifact/4 ProcessHost config/16 dispatches and reopens exact durable pure state (16872.008958ms)
+✔ Artifact/4 ProcessHost config/18 witnesses exact signed source and real-worker state (19388.125209ms)
+✔ Artifact/4 witnessed source survives real controller SIGKILL on each side of call commit (34962.623083ms)
+✔ Artifact/4 ProcessHost reconciles a real controller SIGKILL before commit (21305.295417ms)
+✔ Artifact/4 ProcessHost config/17 witnesses pure calls and recovers controller crashes (55532.432ms)
+✔ Artifact/4 ProcessHost refuses effect services and stale signed lineage before call intent (14567.064041ms)
+✔ pure Artifact/4 governor contract binds source snapshot, plan, witnesses and exact evidence (16828.157209ms)
+✔ pure Artifact/4 governor deployment promotes a real host and pins same-ID replay (59718.744917ms)
+✖ pure Artifact/4 deployment refuses superseded source spec before any call intent (10857.593209ms)
+✔ pure Artifact/4 commit fence refuses a witnessed source call after prepare (31222.980458ms)
+✔ pure Artifact/4 deployment reconciles real controller SIGKILL at prepared (54016.719541ms)
+✔ pure Artifact/4 deployment reconciles real controller SIGKILL at before-activation (60129.609292ms)
+✔ versioned pure virtual witness repairs a mirror after CAS/crash and refuses rollback (24.845083ms)
+✔ pure virtual /3 witness pins source plan and operator authority across revisions (10.180708ms)
+✔ pure virtual /2 journal refuses duplicate and forged same-ID receipts (10.647791ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 23
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 503867.497083
+
+✖ failing tests:
+
+test at test/tier4/process-virtual-artifact-v4.test.ts:1080:1
+✖ pure Artifact/4 deployment refuses superseded source spec before any call intent (10857.593209ms)
+  Error: candidate witness must not be selected
+      at Object.witnessFor (file:///private/tmp/aether-artifact4-source-witness/test/tier4/process-virtual-artifact-v4.test.ts:1102:31)
+      at selectHostJournalWitness (file:///private/tmp/aether-artifact4-source-witness/src/fabric/host-journal-witness.ts:74:26)
+      at #hostFor (file:///private/tmp/aether-artifact4-source-witness/src/tier4/process-virtual-deployment.ts:274:29)
+      at #activeHost (file:///private/tmp/aether-artifact4-source-witness/src/tier4/process-virtual-deployment.ts:297:68)
+      at PureVirtualProcessDeployment.open (file:///private/tmp/aether-artifact4-source-witness/src/tier4/process-virtual-deployment.ts:201:35)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///private/tmp/aether-artifact4-source-witness/test/tier4/process-virtual-artifact-v4.test.ts:1114:18)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)

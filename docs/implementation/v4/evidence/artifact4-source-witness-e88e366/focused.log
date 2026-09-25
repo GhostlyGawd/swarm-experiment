@@ -1,0 +1,32 @@
+✔ Artifact/4 signed target binds independently rebuilt V2 bundle and exact virtual proof (8439.624166ms)
+✔ Artifact/4 rejects omitted input, changed tool, native library, Node and bundle identity (11411.212042ms)
+✔ Artifact/4 remeasures actual current input and build-recipe bytes on decode (10519.962083ms)
+✔ Artifact/4 rejects swapped descriptor, evidence and forged direct ancestry (24929.008833ms)
+✔ Artifact/4 bounded launch check starts only its measured worker bundle (12956.939292ms)
+✔ Artifact/4 init/3 executes the signed pure candidate and restores its real-worker snapshot (13602.024041ms)
+✔ Artifact/4 pure worker cannot gain callbacks through later caller option mutation (11052.377167ms)
+✔ Artifact/4 init/3 refuses tampered proof, authority, and packaged bytes before execution (12649.526333ms)
+✔ Artifact/4 packaged child independently rejects altered init/3 proof (7409.024459ms)
+✔ Artifact/4 ProcessHost config/16 dispatches and reopens exact durable pure state (20042.92375ms)
+✔ Artifact/4 ProcessHost config/18 witnesses exact signed source and real-worker state (22592.459583ms)
+✔ Artifact/4 witnessed source survives real controller SIGKILL on each side of call commit (37555.528167ms)
+✔ Artifact/4 ProcessHost reconciles a real controller SIGKILL before commit (23224.792958ms)
+✔ Artifact/4 ProcessHost config/17 witnesses pure calls and recovers controller crashes (59668.1945ms)
+✔ Artifact/4 ProcessHost refuses effect services and stale signed lineage before call intent (14251.631959ms)
+✔ pure Artifact/4 governor contract binds source snapshot, plan, witnesses and exact evidence (21128.530542ms)
+✔ pure Artifact/4 governor deployment promotes a real host and pins same-ID replay (67339.764833ms)
+✔ pure Artifact/4 deployment refuses superseded source spec before any call intent (21611.826459ms)
+✔ pure Artifact/4 commit fence refuses a witnessed source call after prepare (34189.590959ms)
+✔ pure Artifact/4 deployment reconciles real controller SIGKILL at prepared (59394.037833ms)
+✔ pure Artifact/4 deployment reconciles real controller SIGKILL at before-activation (64433.008292ms)
+✔ versioned pure virtual witness repairs a mirror after CAS/crash and refuses rollback (21.406417ms)
+✔ pure virtual /3 witness pins source plan and operator authority across revisions (9.617334ms)
+✔ pure virtual /2 journal refuses duplicate and forged same-ID receipts (10.410167ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 560447.704458

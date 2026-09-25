@@ -1,0 +1,11 @@
+✔ live ProcessDeployment refuses Artifact/3 before worker or effect dispatch (579.636542ms)
+✔ legacy ProcessDeployment factory cannot inject Artifact/4 host admission (80.551958ms)
+✔ legacy ProcessDeployment refuses a virtual-forward target under Artifact/1 (530.30175ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1406.274042
